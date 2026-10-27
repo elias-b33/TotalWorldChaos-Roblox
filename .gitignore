@@ -5,3 +5,4 @@ build/
 *.rbxlx.lock
 sourcemap.json
 .DS_Store
+__pycache__/

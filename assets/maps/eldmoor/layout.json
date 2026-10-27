@@ -1,0 +1,3289 @@
+{
+ "id": "eldmoor",
+ "title": "Eldmoor",
+ "theme": "fantasy",
+ "imageSize": [
+  2048,
+  1024
+ ],
+ "summary": {
+  "provinces": 146,
+  "Plains": 65,
+  "Forest": 35,
+  "Hills": 31,
+  "Mountain": 15,
+  "neutralAtStart": 51
+ },
+ "nations": [
+  {
+   "slot": 1,
+   "name": "Mistborn",
+   "capital": 46,
+   "colorIndex": 1
+  },
+  {
+   "slot": 2,
+   "name": "Saltmarsh",
+   "capital": 53,
+   "colorIndex": 2
+  },
+  {
+   "slot": 3,
+   "name": "Ironholds",
+   "capital": 63,
+   "colorIndex": 3
+  },
+  {
+   "slot": 4,
+   "name": "Frostmarch",
+   "capital": 87,
+   "colorIndex": 4
+  },
+  {
+   "slot": 5,
+   "name": "Greenvale",
+   "capital": 95,
+   "colorIndex": 5
+  },
+  {
+   "slot": 6,
+   "name": "Elderwood",
+   "capital": 98,
+   "colorIndex": 6
+  },
+  {
+   "slot": 7,
+   "name": "Wyrmcoast",
+   "capital": 111,
+   "colorIndex": 7
+  },
+  {
+   "slot": 8,
+   "name": "Sunscorch",
+   "capital": 126,
+   "colorIndex": 8
+  },
+  {
+   "slot": 9,
+   "name": "Ashen Dominion",
+   "capital": 131,
+   "colorIndex": 9
+  },
+  {
+   "slot": 10,
+   "name": "Corsairs",
+   "capital": 146,
+   "colorIndex": 10
+  }
+ ],
+ "provinces": [
+  {
+   "id": 1,
+   "name": "Eaglecrown",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    712,
+    449
+   ],
+   "area": 9739,
+   "neighbors": [
+    2,
+    25,
+    39,
+    102,
+    116,
+    135
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 2,
+   "name": "Gianttalon",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    752,
+    369
+   ],
+   "area": 9377,
+   "neighbors": [
+    1,
+    3,
+    39,
+    40,
+    51,
+    93,
+    116
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 3,
+   "name": "Thunderspine",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    808,
+    319
+   ],
+   "area": 8120,
+   "neighbors": [
+    2,
+    4,
+    40,
+    51,
+    105
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 4,
+   "name": "Grimhorn",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    894,
+    285
+   ],
+   "area": 9344,
+   "neighbors": [
+    3,
+    33,
+    51,
+    77,
+    105,
+    132
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 5,
+   "name": "Dragonpeak",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1147,
+    297
+   ],
+   "area": 11129,
+   "neighbors": [
+    6,
+    33,
+    62,
+    74,
+    76,
+    78,
+    112
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 6,
+   "name": "Titanspine",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1231,
+    328
+   ],
+   "area": 9139,
+   "neighbors": [
+    5,
+    7,
+    62,
+    74,
+    117
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 7,
+   "name": "Eaglefang",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1276,
+    376
+   ],
+   "area": 7575,
+   "neighbors": [
+    6,
+    8,
+    74,
+    117,
+    140,
+    143
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 8,
+   "name": "Skullspine",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1307,
+    447
+   ],
+   "area": 6565,
+   "neighbors": [
+    7,
+    9,
+    72,
+    140,
+    143
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 9,
+   "name": "Wyrmspine",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1304,
+    537
+   ],
+   "area": 8981,
+   "neighbors": [
+    8,
+    38,
+    41,
+    45,
+    72,
+    140
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 10,
+   "name": "Dragonspire",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1126,
+    673
+   ],
+   "area": 10493,
+   "neighbors": [
+    11,
+    21,
+    24,
+    41,
+    45,
+    92
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 11,
+   "name": "Grimpeak",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1036,
+    694
+   ],
+   "area": 8019,
+   "neighbors": [
+    10,
+    12,
+    21,
+    37,
+    92,
+    109,
+    127
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 12,
+   "name": "Titanpeak",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    959,
+    692
+   ],
+   "area": 7640,
+   "neighbors": [
+    11,
+    13,
+    37,
+    109,
+    126
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 13,
+   "name": "Giantpeak",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    883,
+    679
+   ],
+   "area": 7733,
+   "neighbors": [
+    12,
+    14,
+    68,
+    109,
+    115,
+    126
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 14,
+   "name": "Eaglespire",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    811,
+    644
+   ],
+   "area": 8151,
+   "neighbors": [
+    13,
+    67,
+    97,
+    115,
+    135
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 15,
+   "name": "Mount Cinder",
+   "terrain": "Mountain",
+   "biome": "peaks",
+   "development": 1,
+   "center": [
+    1364,
+    790
+   ],
+   "area": 9947,
+   "neighbors": [
+    24,
+    55,
+    65,
+    75,
+    130,
+    131,
+    137
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 16,
+   "name": "Willowbough",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1668,
+    696
+   ],
+   "area": 9735,
+   "neighbors": [
+    61,
+    70,
+    84,
+    101,
+    103,
+    113
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 17,
+   "name": "Wolfheath",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    599,
+    653
+   ],
+   "area": 10537,
+   "neighbors": [
+    26,
+    30,
+    53,
+    67,
+    86,
+    102,
+    133
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 18,
+   "name": "Millbury",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    930,
+    517
+   ],
+   "area": 8181,
+   "neighbors": [
+    21,
+    39,
+    51,
+    77,
+    109,
+    115
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 19,
+   "name": "Dunedrift",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    1261,
+    901
+   ],
+   "area": 5334,
+   "neighbors": [
+    57,
+    130,
+    131
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 20,
+   "name": "Mistbough",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    363,
+    908
+   ],
+   "area": 5451,
+   "neighbors": [
+    49,
+    91
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 21,
+   "name": "Barleybury",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    1064,
+    587
+   ],
+   "area": 10517,
+   "neighbors": [
+    10,
+    11,
+    18,
+    41,
+    109,
+    120
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 22,
+   "name": "Honeyfield",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    143,
+    923
+   ],
+   "area": 5136,
+   "neighbors": [
+    91,
+    146
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 23,
+   "name": "Raventor",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    1548,
+    228
+   ],
+   "area": 8928,
+   "neighbors": [
+    35,
+    64,
+    80,
+    106,
+    139
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 24,
+   "name": "Smokepit",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 2,
+   "center": [
+    1245,
+    735
+   ],
+   "area": 9683,
+   "neighbors": [
+    10,
+    15,
+    45,
+    65,
+    92,
+    131
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 25,
+   "name": "Brightvale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    597,
+    440
+   ],
+   "area": 10243,
+   "neighbors": [
+    1,
+    32,
+    95,
+    102,
+    116,
+    124,
+    133
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 26,
+   "name": "Honeyvale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    538,
+    792
+   ],
+   "area": 10220,
+   "neighbors": [
+    17,
+    36,
+    53,
+    66,
+    86,
+    94,
+    134
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 27,
+   "name": "Brightstead",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    370,
+    433
+   ],
+   "area": 9957,
+   "neighbors": [
+    43,
+    52,
+    56,
+    81,
+    108,
+    124
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 28,
+   "name": "Duskhollow",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1749,
+    544
+   ],
+   "area": 5781,
+   "neighbors": [
+    101,
+    103,
+    136
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 29,
+   "name": "Smokeforge",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 1,
+   "center": [
+    1534,
+    795
+   ],
+   "area": 8929,
+   "neighbors": [
+    61,
+    75,
+    89,
+    113,
+    137
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 30,
+   "name": "Briarshade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    468,
+    610
+   ],
+   "area": 9903,
+   "neighbors": [
+    17,
+    36,
+    69,
+    86,
+    95,
+    108,
+    133
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 31,
+   "name": "Silverhollow",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1604,
+    469
+   ],
+   "area": 9601,
+   "neighbors": [
+    59,
+    84,
+    98,
+    103,
+    136
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 32,
+   "name": "Greytor",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    539,
+    379
+   ],
+   "area": 9539,
+   "neighbors": [
+    25,
+    43,
+    93,
+    116,
+    121,
+    124
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 33,
+   "name": "Palehold",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 1,
+   "center": [
+    1027,
+    282
+   ],
+   "area": 11322,
+   "neighbors": [
+    4,
+    5,
+    76,
+    77,
+    78,
+    132
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 34,
+   "name": "Palemere",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    854,
+    113
+   ],
+   "area": 5790,
+   "neighbors": [
+    87,
+    105,
+    129,
+    142
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 35,
+   "name": "Palemarch",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    1465,
+    163
+   ],
+   "area": 11522,
+   "neighbors": [
+    23,
+    63,
+    64,
+    110,
+    139
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 36,
+   "name": "Stormcrest",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    446,
+    735
+   ],
+   "area": 9071,
+   "neighbors": [
+    26,
+    30,
+    49,
+    66,
+    69,
+    86,
+    144
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 37,
+   "name": "Sandsea",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    1001,
+    775
+   ],
+   "area": 8261,
+   "neighbors": [
+    11,
+    12,
+    73,
+    126,
+    127
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 38,
+   "name": "Glimmerthicket",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1366,
+    592
+   ],
+   "area": 9197,
+   "neighbors": [
+    9,
+    45,
+    55,
+    65,
+    72,
+    122
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 39,
+   "name": "Amberford",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    811,
+    487
+   ],
+   "area": 11391,
+   "neighbors": [
+    1,
+    2,
+    18,
+    51,
+    115,
+    135
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 40,
+   "name": "Hoarfell",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 1,
+   "center": [
+    744,
+    249
+   ],
+   "area": 9413,
+   "neighbors": [
+    2,
+    3,
+    71,
+    93,
+    105,
+    129
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 41,
+   "name": "Fairmeadow",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    1175,
+    558
+   ],
+   "area": 9970,
+   "neighbors": [
+    9,
+    10,
+    21,
+    45,
+    74,
+    120,
+    140
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 42,
+   "name": "Moonbough",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1898,
+    251
+   ],
+   "area": 7943,
+   "neighbors": [
+    46,
+    88,
+    138,
+    145
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 43,
+   "name": "Heathercairn",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    418,
+    288
+   ],
+   "area": 10933,
+   "neighbors": [
+    27,
+    32,
+    44,
+    81,
+    119,
+    121,
+    124,
+    125
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 44,
+   "name": "Roseshire",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    477,
+    224
+   ],
+   "area": 8460,
+   "neighbors": [
+    43,
+    79,
+    96,
+    111,
+    121,
+    125
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 45,
+   "name": "Ashrift",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 1,
+   "center": [
+    1236,
+    627
+   ],
+   "area": 11200,
+   "neighbors": [
+    9,
+    10,
+    24,
+    38,
+    41,
+    65
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 46,
+   "name": "Oakstead",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    1807,
+    225
+   ],
+   "area": 9260,
+   "neighbors": [
+    42,
+    88,
+    90,
+    114,
+    138
+   ],
+   "startOwner": 1,
+   "isCapital": true
+  },
+  {
+   "id": 47,
+   "name": "Rosestead",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    237,
+    771
+   ],
+   "area": 7309,
+   "neighbors": [
+    83,
+    118,
+    146
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 48,
+   "name": "Ambermeadow",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    710,
+    808
+   ],
+   "area": 8851,
+   "neighbors": [
+    53,
+    94,
+    97,
+    104,
+    123
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 49,
+   "name": "Amberwick",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    411,
+    794
+   ],
+   "area": 4178,
+   "neighbors": [
+    20,
+    36,
+    66,
+    144
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 50,
+   "name": "Scorchspire",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    959,
+    936
+   ],
+   "area": 4334,
+   "neighbors": [
+    73,
+    82
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 51,
+   "name": "Millwick",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    865,
+    406
+   ],
+   "area": 10908,
+   "neighbors": [
+    2,
+    3,
+    4,
+    18,
+    39,
+    77
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 52,
+   "name": "Oakford",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    280,
+    532
+   ],
+   "area": 11221,
+   "neighbors": [
+    27,
+    56,
+    69,
+    108
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 53,
+   "name": "Thornthicket",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 3,
+   "center": [
+    654,
+    723
+   ],
+   "area": 10330,
+   "neighbors": [
+    17,
+    26,
+    48,
+    67,
+    94,
+    97
+   ],
+   "startOwner": 2,
+   "isCapital": true
+  },
+  {
+   "id": 54,
+   "name": "Honeywick",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    1711,
+    403
+   ],
+   "area": 7496,
+   "neighbors": [
+    59,
+    80,
+    90,
+    136
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 55,
+   "name": "Charforge",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 1,
+   "center": [
+    1424,
+    674
+   ],
+   "area": 9936,
+   "neighbors": [
+    15,
+    38,
+    65,
+    99,
+    122,
+    137
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 56,
+   "name": "Greyheath",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    272,
+    448
+   ],
+   "area": 5806,
+   "neighbors": [
+    27,
+    52,
+    81
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 57,
+   "name": "Sootpit",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 2,
+   "center": [
+    1167,
+    848
+   ],
+   "area": 8155,
+   "neighbors": [
+    19,
+    92,
+    127,
+    131
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 58,
+   "name": "Honeyshire",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    1889,
+    738
+   ],
+   "area": 4531,
+   "neighbors": [
+    70,
+    128
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 59,
+   "name": "Faeshade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1623,
+    377
+   ],
+   "area": 10317,
+   "neighbors": [
+    31,
+    54,
+    80,
+    98,
+    106,
+    136
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 60,
+   "name": "Heathertor",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    1426,
+    339
+   ],
+   "area": 9299,
+   "neighbors": [
+    63,
+    64,
+    98,
+    106,
+    117,
+    143
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 61,
+   "name": "Charscar",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 1,
+   "center": [
+    1620,
+    802
+   ],
+   "area": 5752,
+   "neighbors": [
+    16,
+    29,
+    89,
+    113
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 62,
+   "name": "Wintermarch",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    1265,
+    202
+   ],
+   "area": 10597,
+   "neighbors": [
+    5,
+    6,
+    63,
+    85,
+    110,
+    112,
+    117
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 63,
+   "name": "Stoneridge",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 3,
+   "center": [
+    1364,
+    224
+   ],
+   "area": 9407,
+   "neighbors": [
+    35,
+    60,
+    62,
+    64,
+    110,
+    117
+   ],
+   "startOwner": 3,
+   "isCapital": true
+  },
+  {
+   "id": 64,
+   "name": "Ravenmoor",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    1476,
+    275
+   ],
+   "area": 8485,
+   "neighbors": [
+    23,
+    35,
+    60,
+    63,
+    106
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 65,
+   "name": "Sootforge",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 2,
+   "center": [
+    1319,
+    678
+   ],
+   "area": 9926,
+   "neighbors": [
+    15,
+    24,
+    38,
+    45,
+    55
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 66,
+   "name": "Fairfield",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    479,
+    833
+   ],
+   "area": 5898,
+   "neighbors": [
+    26,
+    36,
+    49,
+    134
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 67,
+   "name": "Greenshire",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    709,
+    644
+   ],
+   "area": 8866,
+   "neighbors": [
+    14,
+    17,
+    53,
+    97,
+    102,
+    135
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 68,
+   "name": "Sunwell",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    838,
+    778
+   ],
+   "area": 9352,
+   "neighbors": [
+    13,
+    82,
+    97,
+    123,
+    126
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 69,
+   "name": "Willowthicket",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    381,
+    592
+   ],
+   "area": 8179,
+   "neighbors": [
+    30,
+    36,
+    52,
+    108,
+    144
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 70,
+   "name": "Eldershade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1843,
+    702
+   ],
+   "area": 3565,
+   "neighbors": [
+    16,
+    58,
+    101,
+    128
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 71,
+   "name": "Millford",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    685,
+    188
+   ],
+   "area": 7832,
+   "neighbors": [
+    40,
+    93,
+    111,
+    129,
+    141
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 72,
+   "name": "Briarthicket",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1416,
+    493
+   ],
+   "area": 8322,
+   "neighbors": [
+    8,
+    9,
+    38,
+    98,
+    122,
+    143
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 73,
+   "name": "Sandoasis",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    987,
+    868
+   ],
+   "area": 9600,
+   "neighbors": [
+    37,
+    50,
+    82,
+    126,
+    127
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 74,
+   "name": "Amberbury",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    1163,
+    432
+   ],
+   "area": 9480,
+   "neighbors": [
+    5,
+    6,
+    7,
+    41,
+    78,
+    120,
+    140
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 75,
+   "name": "Slagpit",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 2,
+   "center": [
+    1415,
+    872
+   ],
+   "area": 10440,
+   "neighbors": [
+    15,
+    29,
+    89,
+    130,
+    137
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 76,
+   "name": "Hoarmarch",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    1064,
+    189
+   ],
+   "area": 10220,
+   "neighbors": [
+    5,
+    33,
+    100,
+    112,
+    132
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 77,
+   "name": "Rosebury",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    963,
+    373
+   ],
+   "area": 11280,
+   "neighbors": [
+    4,
+    18,
+    33,
+    51,
+    78
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 78,
+   "name": "Greenford",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    1072,
+    390
+   ],
+   "area": 11415,
+   "neighbors": [
+    5,
+    33,
+    74,
+    77,
+    120
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 79,
+   "name": "Greyfell",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    558,
+    128
+   ],
+   "area": 6291,
+   "neighbors": [
+    44,
+    96,
+    111,
+    141
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 80,
+   "name": "Duskshade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1632,
+    274
+   ],
+   "area": 8740,
+   "neighbors": [
+    23,
+    54,
+    59,
+    90,
+    106,
+    139
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 81,
+   "name": "Millstead",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    333,
+    347
+   ],
+   "area": 10969,
+   "neighbors": [
+    27,
+    43,
+    56,
+    119
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 82,
+   "name": "Sunreach",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    867,
+    897
+   ],
+   "area": 9561,
+   "neighbors": [
+    50,
+    68,
+    73,
+    107,
+    123,
+    126
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 83,
+   "name": "Fairdale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    119,
+    684
+   ],
+   "area": 7027,
+   "neighbors": [
+    47,
+    118
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 84,
+   "name": "Silverglade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1591,
+    581
+   ],
+   "area": 10883,
+   "neighbors": [
+    16,
+    31,
+    98,
+    99,
+    103,
+    113,
+    122
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 85,
+   "name": "Mistwood",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1284,
+    123
+   ],
+   "area": 5396,
+   "neighbors": [
+    62,
+    110,
+    112
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 86,
+   "name": "Duskroot",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    517,
+    691
+   ],
+   "area": 8511,
+   "neighbors": [
+    17,
+    26,
+    30,
+    36
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 87,
+   "name": "Hoarreach",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 3,
+   "center": [
+    921,
+    146
+   ],
+   "area": 8205,
+   "neighbors": [
+    34,
+    100,
+    105,
+    132,
+    142
+   ],
+   "startOwner": 4,
+   "isCapital": true
+  },
+  {
+   "id": 88,
+   "name": "Willowgrove",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1843,
+    325
+   ],
+   "area": 9573,
+   "neighbors": [
+    42,
+    46,
+    90,
+    145
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 89,
+   "name": "Sootgate",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 1,
+   "center": [
+    1513,
+    875
+   ],
+   "area": 5453,
+   "neighbors": [
+    29,
+    61,
+    75
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 90,
+   "name": "Mistgrove",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1746,
+    265
+   ],
+   "area": 6801,
+   "neighbors": [
+    46,
+    54,
+    80,
+    88,
+    114
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 91,
+   "name": "Clovervale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    292,
+    900
+   ],
+   "area": 5486,
+   "neighbors": [
+    20,
+    22,
+    146
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 92,
+   "name": "Slagwaste",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 2,
+   "center": [
+    1155,
+    760
+   ],
+   "area": 8947,
+   "neighbors": [
+    10,
+    11,
+    24,
+    57,
+    127,
+    131
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 93,
+   "name": "Stonebarrow",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    639,
+    274
+   ],
+   "area": 9556,
+   "neighbors": [
+    2,
+    32,
+    40,
+    71,
+    111,
+    116,
+    121
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 94,
+   "name": "Rosedale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    609,
+    855
+   ],
+   "area": 10788,
+   "neighbors": [
+    26,
+    48,
+    53,
+    104,
+    134
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 95,
+   "name": "Stoneheath",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 3,
+   "center": [
+    497,
+    527
+   ],
+   "area": 8959,
+   "neighbors": [
+    25,
+    30,
+    108,
+    124,
+    133
+   ],
+   "startOwner": 5,
+   "isCapital": true
+  },
+  {
+   "id": 96,
+   "name": "Honeymeadow",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    478,
+    137
+   ],
+   "area": 4754,
+   "neighbors": [
+    44,
+    79,
+    125
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 97,
+   "name": "Greenstead",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    764,
+    731
+   ],
+   "area": 8785,
+   "neighbors": [
+    14,
+    48,
+    53,
+    67,
+    68,
+    123
+   ],
+   "startOwner": 2,
+   "isCapital": false
+  },
+  {
+   "id": 98,
+   "name": "Silvershade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 3,
+   "center": [
+    1507,
+    476
+   ],
+   "area": 12303,
+   "neighbors": [
+    31,
+    59,
+    60,
+    72,
+    84,
+    106,
+    122,
+    143
+   ],
+   "startOwner": 6,
+   "isCapital": true
+  },
+  {
+   "id": 99,
+   "name": "Cloverwick",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    1522,
+    633
+   ],
+   "area": 9070,
+   "neighbors": [
+    55,
+    84,
+    113,
+    122,
+    137
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 100,
+   "name": "Heatherheath",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    1003,
+    116
+   ],
+   "area": 5365,
+   "neighbors": [
+    76,
+    87,
+    132,
+    142
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 101,
+   "name": "Faethicket",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1732,
+    632
+   ],
+   "area": 4450,
+   "neighbors": [
+    16,
+    28,
+    70,
+    103
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 102,
+   "name": "Fairford",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    674,
+    551
+   ],
+   "area": 9781,
+   "neighbors": [
+    1,
+    17,
+    25,
+    67,
+    133,
+    135
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 103,
+   "name": "Willowroot",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1683,
+    573
+   ],
+   "area": 9579,
+   "neighbors": [
+    16,
+    28,
+    31,
+    84,
+    101,
+    136
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 104,
+   "name": "Barleyvale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    696,
+    905
+   ],
+   "area": 8986,
+   "neighbors": [
+    48,
+    94,
+    107,
+    123
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 105,
+   "name": "Hoarhaven",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    844,
+    204
+   ],
+   "area": 8632,
+   "neighbors": [
+    3,
+    4,
+    34,
+    40,
+    87,
+    129,
+    132
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 106,
+   "name": "Rosemeadow",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    1534,
+    336
+   ],
+   "area": 11261,
+   "neighbors": [
+    23,
+    59,
+    60,
+    64,
+    80,
+    98
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 107,
+   "name": "Scorchrest",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 1,
+   "center": [
+    807,
+    938
+   ],
+   "area": 5284,
+   "neighbors": [
+    82,
+    104,
+    123
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 108,
+   "name": "Cloverdale",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    401,
+    516
+   ],
+   "area": 8611,
+   "neighbors": [
+    27,
+    30,
+    52,
+    69,
+    95,
+    124
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 109,
+   "name": "Clovermeadow",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    969,
+    597
+   ],
+   "area": 7709,
+   "neighbors": [
+    11,
+    12,
+    13,
+    18,
+    21,
+    115
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 110,
+   "name": "Duskwood",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1372,
+    133
+   ],
+   "area": 8771,
+   "neighbors": [
+    35,
+    62,
+    63,
+    85
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 111,
+   "name": "Clovershire",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 3,
+   "center": [
+    585,
+    206
+   ],
+   "area": 8755,
+   "neighbors": [
+    44,
+    71,
+    79,
+    93,
+    121,
+    141
+   ],
+   "startOwner": 7,
+   "isCapital": true
+  },
+  {
+   "id": 112,
+   "name": "Highcairn",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    1175,
+    203
+   ],
+   "area": 8940,
+   "neighbors": [
+    5,
+    62,
+    76,
+    85
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 113,
+   "name": "Duskbough",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1570,
+    710
+   ],
+   "area": 10241,
+   "neighbors": [
+    16,
+    29,
+    61,
+    84,
+    99,
+    137
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 114,
+   "name": "Moonglade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1743,
+    154
+   ],
+   "area": 5813,
+   "neighbors": [
+    46,
+    90,
+    138
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 115,
+   "name": "Fairwick",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    876,
+    581
+   ],
+   "area": 8853,
+   "neighbors": [
+    13,
+    14,
+    18,
+    39,
+    109,
+    135
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 116,
+   "name": "Thorngrove",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    650,
+    371
+   ],
+   "area": 8942,
+   "neighbors": [
+    1,
+    2,
+    25,
+    32,
+    93
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 117,
+   "name": "Ironfell",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    1334,
+    313
+   ],
+   "area": 9564,
+   "neighbors": [
+    6,
+    7,
+    60,
+    62,
+    63,
+    143
+   ],
+   "startOwner": 3,
+   "isCapital": false
+  },
+  {
+   "id": 118,
+   "name": "Briarbough",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    159,
+    781
+   ],
+   "area": 2310,
+   "neighbors": [
+    47,
+    83,
+    146
+   ],
+   "startOwner": 10,
+   "isCapital": false
+  },
+  {
+   "id": 119,
+   "name": "Heathercrest",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    355,
+    245
+   ],
+   "area": 4682,
+   "neighbors": [
+    43,
+    81,
+    125
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 120,
+   "name": "Brightfield",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    1105,
+    503
+   ],
+   "area": 7813,
+   "neighbors": [
+    21,
+    41,
+    74,
+    78
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 121,
+   "name": "Greenbury",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    531,
+    283
+   ],
+   "area": 8714,
+   "neighbors": [
+    32,
+    43,
+    44,
+    93,
+    111
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 122,
+   "name": "Silverroot",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1467,
+    568
+   ],
+   "area": 8917,
+   "neighbors": [
+    38,
+    55,
+    72,
+    84,
+    98,
+    99
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 123,
+   "name": "Cragheath",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    775,
+    859
+   ],
+   "area": 8417,
+   "neighbors": [
+    48,
+    68,
+    82,
+    97,
+    104,
+    107
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 124,
+   "name": "Fairstead",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    469,
+    434
+   ],
+   "area": 10742,
+   "neighbors": [
+    25,
+    27,
+    32,
+    43,
+    95,
+    108
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 125,
+   "name": "Heatherfell",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    406,
+    187
+   ],
+   "area": 4062,
+   "neighbors": [
+    43,
+    44,
+    96,
+    119
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 126,
+   "name": "Dunehaven",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 3,
+   "center": [
+    918,
+    817
+   ],
+   "area": 8495,
+   "neighbors": [
+    12,
+    13,
+    37,
+    68,
+    73,
+    82
+   ],
+   "startOwner": 8,
+   "isCapital": true
+  },
+  {
+   "id": 127,
+   "name": "Miragespire",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 2,
+   "center": [
+    1077,
+    827
+   ],
+   "area": 10101,
+   "neighbors": [
+    11,
+    37,
+    57,
+    73,
+    92
+   ],
+   "startOwner": 8,
+   "isCapital": false
+  },
+  {
+   "id": 128,
+   "name": "Briarhollow",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1912,
+    684
+   ],
+   "area": 4254,
+   "neighbors": [
+    58,
+    70
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 129,
+   "name": "Palewatch",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    773,
+    159
+   ],
+   "area": 6809,
+   "neighbors": [
+    34,
+    40,
+    71,
+    105
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 130,
+   "name": "Emberscar",
+   "terrain": "Hills",
+   "biome": "ashlands",
+   "development": 2,
+   "center": [
+    1340,
+    915
+   ],
+   "area": 7325,
+   "neighbors": [
+    15,
+    19,
+    75,
+    131
+   ],
+   "startOwner": 9,
+   "isCapital": false
+  },
+  {
+   "id": 131,
+   "name": "Scorchoasis",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 3,
+   "center": [
+    1276,
+    823
+   ],
+   "area": 9146,
+   "neighbors": [
+    15,
+    19,
+    24,
+    57,
+    92,
+    130
+   ],
+   "startOwner": 9,
+   "isCapital": true
+  },
+  {
+   "id": 132,
+   "name": "Frosthold",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    963,
+    224
+   ],
+   "area": 8991,
+   "neighbors": [
+    4,
+    33,
+    76,
+    87,
+    100,
+    105
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 133,
+   "name": "Faeroot",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    583,
+    543
+   ],
+   "area": 9515,
+   "neighbors": [
+    17,
+    25,
+    30,
+    95,
+    102
+   ],
+   "startOwner": 5,
+   "isCapital": false
+  },
+  {
+   "id": 134,
+   "name": "Mistthicket",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    536,
+    884
+   ],
+   "area": 4401,
+   "neighbors": [
+    26,
+    66,
+    94
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 135,
+   "name": "Ambershire",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    766,
+    567
+   ],
+   "area": 8610,
+   "neighbors": [
+    1,
+    14,
+    39,
+    67,
+    102,
+    115
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 136,
+   "name": "Thornshade",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1695,
+    475
+   ],
+   "area": 8432,
+   "neighbors": [
+    28,
+    31,
+    54,
+    59,
+    103
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 137,
+   "name": "Goldhaven",
+   "terrain": "Plains",
+   "biome": "dunes",
+   "development": 1,
+   "center": [
+    1452,
+    762
+   ],
+   "area": 9377,
+   "neighbors": [
+    15,
+    29,
+    55,
+    75,
+    99,
+    113
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 138,
+   "name": "Silvergrove",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1816,
+    153
+   ],
+   "area": 3335,
+   "neighbors": [
+    42,
+    46,
+    114
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 139,
+   "name": "Glimmerhollow",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1589,
+    183
+   ],
+   "area": 3836,
+   "neighbors": [
+    23,
+    35,
+    80
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 140,
+   "name": "Rosefield",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 4,
+   "center": [
+    1226,
+    488
+   ],
+   "area": 7431,
+   "neighbors": [
+    7,
+    8,
+    9,
+    41,
+    74
+   ],
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 3000
+  },
+  {
+   "id": 141,
+   "name": "Cragmoor",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    633,
+    135
+   ],
+   "area": 3816,
+   "neighbors": [
+    71,
+    79,
+    111
+   ],
+   "startOwner": 7,
+   "isCapital": false
+  },
+  {
+   "id": 142,
+   "name": "Snowmarch",
+   "terrain": "Plains",
+   "biome": "frostfields",
+   "development": 2,
+   "center": [
+    930,
+    68
+   ],
+   "area": 3593,
+   "neighbors": [
+    34,
+    87,
+    100
+   ],
+   "startOwner": 4,
+   "isCapital": false
+  },
+  {
+   "id": 143,
+   "name": "Faewood",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 2,
+   "center": [
+    1383,
+    413
+   ],
+   "area": 8542,
+   "neighbors": [
+    7,
+    8,
+    60,
+    72,
+    98,
+    117
+   ],
+   "startOwner": 6,
+   "isCapital": false
+  },
+  {
+   "id": 144,
+   "name": "Stormheath",
+   "terrain": "Hills",
+   "biome": "highlands",
+   "development": 2,
+   "center": [
+    373,
+    743
+   ],
+   "area": 2927,
+   "neighbors": [
+    36,
+    49,
+    69
+   ],
+   "startOwner": null,
+   "isCapital": false
+  },
+  {
+   "id": 145,
+   "name": "Barleywick",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    1925,
+    307
+   ],
+   "area": 2859,
+   "neighbors": [
+    42,
+    88
+   ],
+   "startOwner": 1,
+   "isCapital": false
+  },
+  {
+   "id": 146,
+   "name": "Moonroot",
+   "terrain": "Forest",
+   "biome": "wildwood",
+   "development": 3,
+   "center": [
+    191,
+    813
+   ],
+   "area": 3217,
+   "neighbors": [
+    22,
+    47,
+    91,
+    118
+   ],
+   "startOwner": 10,
+   "isCapital": true
+  }
+ ],
+ "straits": [
+  {
+   "a": 90,
+   "b": 54,
+   "from": [
+    1742,
+    311
+   ],
+   "to": [
+    1722,
+    314
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 20,
+   "b": 49,
+   "from": [
+    388,
+    878
+   ],
+   "to": [
+    415,
+    837
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 146,
+   "b": 91,
+   "from": [
+    261,
+    827
+   ],
+   "to": [
+    273,
+    872
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 22,
+   "b": 91,
+   "from": [
+    196,
+    928
+   ],
+   "to": [
+    248,
+    922
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 70,
+   "b": 101,
+   "from": [
+    1816,
+    681
+   ],
+   "to": [
+    1765,
+    638
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 90,
+   "b": 80,
+   "from": [
+    1726,
+    276
+   ],
+   "to": [
+    1711,
+    292
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 146,
+   "b": 22,
+   "from": [
+    188,
+    836
+   ],
+   "to": [
+    174,
+    888
+   ],
+   "wrap": false,
+   "auto": true
+  },
+  {
+   "a": 70,
+   "b": 16,
+   "from": [
+    1814,
+    686
+   ],
+   "to": [
+    1739,
+    686
+   ],
+   "wrap": false,
+   "auto": true
+  }
+ ],
+ "notes": [
+  "province spacing 80.9px",
+  "auto strait Mistgrove - Honeywick (20px)",
+  "auto strait Mistbough - Amberwick (49px)",
+  "auto strait Moonroot - Clovervale (47px)",
+  "auto strait Honeyfield - Clovervale (52px)",
+  "auto strait Eldershade - Faethicket (67px)",
+  "second strait Mistgrove - Duskshade (22px)",
+  "second strait Moonroot - Honeyfield (54px)",
+  "second strait Eldershade - Willowbough (75px)"
+ ]
+}

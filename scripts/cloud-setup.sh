@@ -26,6 +26,13 @@ if ! has stylua; then
 	npm install -g @johnnymorganz/stylua-bin@2.6.0 >>"$LOG" 2>&1 || echo "cloud-setup: stylua install failed" | tee -a "$LOG"
 fi
 
+# Map generator (tools/mapgen): Python with numpy and Pillow
+if ! python3 -c "import numpy, PIL" >/dev/null 2>&1; then
+	pip install --quiet "numpy>=1.24" "Pillow>=10.0" >>"$LOG" 2>&1 ||
+		pip install --quiet --break-system-packages "numpy>=1.24" "Pillow>=10.0" >>"$LOG" 2>&1 ||
+		echo "cloud-setup: numpy/pillow install failed" | tee -a "$LOG"
+fi
+
 # Rojo, Selene, Lune: compiled from crates.io in parallel
 build() {
 	local name="$1"
