@@ -16,6 +16,7 @@ local Types = require(Shared.Types)
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Palette = require(Client.Palette)
+local ProfileState = require(Client.ProfileState)
 local Relations = require(Client.Relations)
 
 local BAR_HEIGHT = 44
@@ -30,6 +31,7 @@ local clockLabel: TextLabel
 local rankLabel: TextLabel
 local nationLabel: TextLabel
 local nationSwatch: Frame
+local levelLabel: TextLabel
 local toastLabel: TextLabel
 local toastUntil = 0
 local toastQueue: { string } = {}
@@ -231,6 +233,15 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
 	nationsButton.LayoutOrder = 8
 	nationsButton.Parent = bar
 	nationsButton.Activated:Connect(onNationsButton)
+
+	-- your account level (MONETIZATION.md 5.2), from the saved profile
+	levelLabel = label(bar, "", 64)
+	levelLabel.Name = "Level"
+	levelLabel.LayoutOrder = 9
+	ProfileState.onChange(function()
+		local summary = ProfileState.summary()
+		levelLabel.Text = if summary then "🎖 " .. summary.level else ""
+	end)
 
 	toastLabel = Instance.new("TextLabel")
 	toastLabel.Name = "Toast"

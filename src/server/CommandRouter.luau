@@ -32,6 +32,7 @@ local queue: { Pending } = {}
 local limiter = RateLimit.new(Config.Net.MaxIntentsPerSecond)
 local commandResult: RemoteEvent
 local nationOf: (Player) -> number?
+local observers: { (Player, Types.Command, boolean) -> () } = {}
 
 local function isId(v: unknown): boolean
 	return type(v) == "number" and v == v and v >= 1 and v <= 1e6 and v == math.floor(v)
@@ -171,7 +172,17 @@ function CommandRouter.applyQueued(state: Types.MatchState)
 			ok, reason = false, "NoNation"
 		end
 		reply(item.player, item.requestId, ok, reason)
+		if item.player and userId then
+			for _, observer in observers do
+				observer(item.player, item.command, ok)
+			end
+		end
 	end
+end
+
+-- Called with every player command once it has been applied (ok or not), e.g. for match stats.
+function CommandRouter.observe(fn: (Player, Types.Command, boolean) -> ())
+	table.insert(observers, fn)
 end
 
 -- A new match makes queued intents meaningless.

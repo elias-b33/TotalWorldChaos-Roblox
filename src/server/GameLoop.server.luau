@@ -18,6 +18,8 @@ local Server = script.Parent
 local AIService = require(Server.Services.AIService)
 local CommandRouter = require(Server.CommandRouter)
 local MatchService = require(Server.Services.MatchService)
+local PlayerDataService = require(Server.Services.PlayerDataService)
+local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
 
 local PHASE_TOASTS = {
@@ -40,6 +42,8 @@ end
 
 Replicator.init()
 CommandRouter.init(MatchService.nationOf)
+PlayerDataService.init()
+ProgressionService.init(MatchService.state)
 startMatch()
 
 Players.PlayerAdded:Connect(function(player)
@@ -58,6 +62,7 @@ local function tick()
 	-- 7. bots plan. Sim.Tick runs steps 2-8 in one call, so bots plan right after it; their commands wait in the
 	-- queue for step 1 of the next tick either way, so nothing changes in between.
 	AIService.step(state)
+	ProgressionService.afterTick(state) -- match stats from this tick's events; XP and Glory at Results
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end

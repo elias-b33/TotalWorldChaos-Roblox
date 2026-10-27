@@ -470,8 +470,8 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] 2D pixel-art map for Earth, Eldmoor and Skyshards (WorldBox style, painted at runtime)
 - [ ] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
-- [ ] Progression rules in Sim: match XP and Glory, level curve, ranks
-- [ ] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards
+- [x] Progression rules in Sim: match XP and Glory, level curve, ranks
+- [ ] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards (XP, Glory, saving and the Results rewards are done; items and receipts are connected with the shop)
 - [ ] Daily and weekly quests, login calendar, play streak
 - [ ] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
 - [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote

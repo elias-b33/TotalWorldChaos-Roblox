@@ -18,6 +18,8 @@ local EVENTS = {
 	"Snapshot",
 	"Delta",
 	"Notify",
+	"Profile", -- your ProfileSummary (on join and after every change)
+	"Reward", -- your RewardReport at Results
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

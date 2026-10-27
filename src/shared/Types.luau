@@ -155,4 +155,64 @@ export type Command =
 	-- target is an army, nation or province id, depending on the power (Sim.Primordial.TARGETS)
 	| { kind: "Power", power: PrimordialPower, target: number }
 
+-- Progression and saves (docs/MONETIZATION.md 4–5). Profiles are saved; MatchState never is.
+
+-- What one player did in the current match (kept by the server, never sent by the client). Ticks are match ticks.
+export type PlayerMatchStats = {
+	userId: number,
+	joinedAt: number,
+	leftAt: number?, -- set when they leave before Results
+	lastCommandAt: number,
+	longestIdle: number, -- longest run of ticks without a command so far
+	provincesTaken: number,
+	battlesWon: number,
+	powersUsed: number,
+}
+
+-- One row of a reward breakdown. kind: Finish, Placement, Provinces, Battles, Primordial, Powers, FirstMatch,
+-- Vip, CustomRules, LevelUp, RankUp.
+export type RewardLine = { kind: string, xp: number, glory: number }
+
+export type MatchReward = {
+	xp: number,
+	glory: number,
+	lines: { RewardLine },
+	placement: number?, -- nil without a nation or after leaving early
+	stayed: boolean, -- stayed to Results
+	afk: boolean, -- sent no command for Config.Progression.AfkTicks in a row: paid nothing
+}
+
+-- The saved profile (ProfileStore data). Version 1.
+export type PlayerProfile = {
+	version: number,
+	xp: number, -- total account XP
+	level: number,
+	glory: number,
+	lastMatchDay: number, -- UTC day of the last paid match (first-match-of-the-day bonus)
+	owned: { [string]: boolean }, -- item id -> true
+	equipped: { [string]: string }, -- slot -> item id
+	quests: { day: number, week: number, rerollsUsed: number, daily: { any }, weekly: { any } }, -- placeholders
+	login: { step: number, lastPlayDay: number, streak: number }, -- placeholders
+	achievements: { [string]: number }, -- id -> progress
+	season: { id: string, xp: number, premium: boolean, claimed: { [string]: boolean } },
+	receipts: { [string]: number }, -- purchase id -> os.time() it was granted (the last 200)
+	purchaseHistory: { { product: number, robux: number, at: number } },
+	stats: { matches: number, wins: number, provincesTaken: number, battlesWon: number, powersUsed: number },
+	settings: { [string]: any },
+}
+
+-- What a player sees of their own profile (the Profile remote, the HUD badge, the Results level bar).
+export type ProfileSummary = {
+	level: number,
+	xp: number, -- total
+	xpIntoLevel: number, -- progress inside the current level
+	xpForLevel: number, -- XP from this level to the next (0 at the cap)
+	glory: number,
+	rank: number, -- 1..#Config.Progression.Ranks
+	rankName: string,
+}
+
+-- Sent to a player at Results: the reward (with level-up and rank-up lines) and their profile before and after.
+export type RewardReport = { reward: MatchReward, before: ProfileSummary, after: ProfileSummary }
+
 return {}
