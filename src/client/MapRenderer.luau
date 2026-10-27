@@ -1,7 +1,8 @@
 --!strict
 -- What is drawn on the 2D map (docs/DESIGN.md "Map rendering"): the pixel-art image painted by PixelArt
 -- (terrain, owners, the selected province), straits, province names, army tokens gliding between province
--- centres, battle and siege markers and route lines. Everything sits on MapView's canvas, placed in map pixels.
+-- centres, battle and siege markers, the coalition leader's crown and route lines. Everything sits on MapView's
+-- canvas, placed in map pixels.
 
 local AssetService = game:GetService("AssetService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +10,7 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local CatchUp = require(Shared.Sim.CatchUp)
 local MapGrid = require(Shared.MapGrid)
 local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
@@ -38,6 +40,7 @@ local size = Vector2.new(1024, 512)
 local layers: { [string]: Frame } = {}
 local labels: { [number]: { frame: Frame, pips: TextLabel, width: number } } = {}
 local markers: { [number]: TextLabel } = {}
+local crowns: { [number]: TextLabel } = {}
 local tokens: { [number]: Token } = {}
 local selectedArmy: number? = nil
 
@@ -119,6 +122,7 @@ end
 local function build(map: Types.MapDef)
 	labels = {}
 	markers = {}
+	crowns = {}
 	tokens = {}
 	layers = {}
 	selectedArmy = nil
@@ -184,6 +188,7 @@ local function build(map: Types.MapDef)
 	end
 	layer("Tokens", canvas)
 	layer("Markers", canvas)
+	layer("Crowns", canvas)
 	showLabels(MapView.zoom())
 end
 
@@ -232,6 +237,50 @@ local function setMarker(provinceId: number, value: string?)
 	local m = assert(marker, "marker")
 	m.Text = value
 	m.Visible = true
+end
+
+-- A crown over the capital of every coalition leader (CatchUp.leadersFrom); over its first province if the capital
+-- is lost.
+local function refreshCrowns()
+	local snapshot = ClientState.snapshot()
+	if snapshot == nil or layers.Crowns == nil then
+		return
+	end
+	local counts: { [number]: number } = {}
+	local capitals: { [number]: number } = {}
+	for _, nation in snapshot.nations do
+		if not nation.eliminated then
+			counts[nation.id] = 0
+			capitals[nation.id] = nation.capital
+		end
+	end
+	local owners: { [number]: number } = {}
+	local firstOwned: { [number]: number } = {}
+	for _, record in snapshot.provinces do
+		owners[record.id] = record.owner
+		if counts[record.owner] then
+			counts[record.owner] += 1
+			firstOwned[record.owner] = math.min(firstOwned[record.owner] or math.huge, record.id)
+		end
+	end
+	local leaders = CatchUp.leadersFrom(counts, #snapshot.provinces)
+	for nationId, label in crowns do
+		label.Visible = leaders[nationId] == true
+	end
+	for nationId in leaders do
+		local where = if owners[capitals[nationId]] == nationId then capitals[nationId] else firstOwned[nationId]
+		local label = crowns[nationId]
+		if label == nil then
+			label = textLabel(layers.Crowns, "👑", 20)
+			label.Name = "Crown" .. nationId
+			label.AnchorPoint = Vector2.new(0.5, 1)
+			label.Size = UDim2.fromOffset(28, 26)
+			crowns[nationId] = label
+		end
+		local l = assert(label, "crown")
+		l.Position = at(MapRenderer.centerOf(where)) + UDim2.fromOffset(0, -30)
+		l.Visible = true
+	end
 end
 
 local function refreshProvince(record: Snapshot.ProvinceRecord)
@@ -395,6 +444,7 @@ function MapRenderer.init()
 				end
 			end
 			refreshArmies()
+			refreshCrowns()
 		end
 	end)
 	ClientState.onDelta(function(delta)
@@ -403,6 +453,7 @@ function MapRenderer.init()
 		end
 		if #delta.provinces > 0 or #delta.nations > 0 then
 			paintOwners()
+			refreshCrowns()
 		end
 		if #delta.armies > 0 or #delta.removedArmies > 0 then
 			refreshArmies()
