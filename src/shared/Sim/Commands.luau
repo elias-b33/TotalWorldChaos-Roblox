@@ -8,6 +8,7 @@ local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Movement = require("./Movement")
+local Primordial = require("./Primordial")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -110,6 +111,8 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 		return recruit(state, nationId, command.province, command.regiments)
 	elseif command.kind == "Move" then
 		return Movement.order(state, nationId, command.army, command.to)
+	elseif command.kind == "Power" then
+		return Primordial.use(state, { nation = nationId }, command.power, command.target)
 	elseif command.kind == "Diplomacy" then
 		local action = command.action
 		if action == "War" then
@@ -125,6 +128,17 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 		end
 	end
 	return false, "UnknownCommand"
+end
+
+-- An eliminated player's Primordial: powers are the only thing it can do.
+function Commands.applyPrimordial(state: MatchState, userId: number, command: Command): (boolean, string?)
+	if state.primordials[userId] == nil then
+		return false, "NoNation"
+	end
+	if command.kind ~= "Power" then
+		return false, "Primordial"
+	end
+	return Primordial.use(state, { userId = userId }, command.power, command.target)
 end
 
 return Commands

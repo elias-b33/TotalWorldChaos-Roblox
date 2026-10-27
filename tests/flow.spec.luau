@@ -46,6 +46,7 @@ for _, mapId in Maps.ids do
 		local startIncome = Economy.monthlyIncome(state, me).gold
 		local accepted, refused = 0, 0
 		local phasesSeen: { [string]: boolean } = {}
+		local lostToRebels: { [number]: number } = {}
 
 		local rng = Rng.new(7)
 		while not Match.isOver(state) do
@@ -65,6 +66,11 @@ for _, mapId in Maps.ids do
 				Snapshot.apply(client, delta)
 			end
 			lastSent = current
+			for _, e in state.events do
+				if e.kind == "ProvinceTaken" and e.a == 0 then
+					lostToRebels[e.b] = (lostToRebels[e.b] or 0) + 1
+				end
+			end
 			table.clear(state.events)
 		end
 
@@ -82,9 +88,9 @@ for _, mapId in Maps.ids do
 		T.expect(sameView(client, Snapshot.full(state)), "client mirror drifted from the server")
 		T.expect(state.result and state.result.kind == "Score", "the match ended on score")
 		T.expect(client.result and client.result.kind == "Score", "the client heard the result")
-		-- nobody else did anything, so bots kept their starting land
+		-- nobody else did anything, so bots kept their starting land, apart from what Cataclysm Rebels took
 		for id in state.nations do
-			T.equal(Match.provinceCount(state, id), 8)
+			T.equal(Match.provinceCount(state, id), 8 - (lostToRebels[id] or 0))
 		end
 	end)
 end

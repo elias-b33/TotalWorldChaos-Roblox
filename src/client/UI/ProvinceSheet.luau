@@ -76,13 +76,13 @@ local function statusLine(provinceId: number, record: Snapshot.ProvinceRecord): 
 	local parts = {}
 	if record.battle then
 		table.insert(parts, "💥 Battle")
-	elseif record.siegeBy ~= 0 and record.siegeRequired > 0 then
+	elseif record.siegeRequired > 0 then -- siegeBy is 0 for Rebels
 		local by = ClientState.nation(record.siegeBy)
 		table.insert(
 			parts,
 			string.format(
 				"⏳ %s siege %d%%",
-				if by then by.name else "?",
+				if by then by.name else "Rebels",
 				math.floor(100 * record.siegeProgress / record.siegeRequired)
 			)
 		)
@@ -119,6 +119,9 @@ local function render()
 	local def = map.provinces[provinceId]
 	local owner = ClientState.nation(record.owner)
 	local me = ClientState.nation(ClientState.myNation())
+	if me and me.eliminated then
+		me = nil -- a Primordial looks, but gives no orders (powers have their own button)
+	end
 	local mine = owner ~= nil and me ~= nil and owner.id == me.id
 
 	title.Text = (if def.isCapital then "⭐ " else "") .. def.name

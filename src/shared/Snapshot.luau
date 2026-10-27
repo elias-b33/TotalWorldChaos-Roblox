@@ -17,6 +17,7 @@ export type ProvinceRecord = {
 	siegeRequired: number,
 	battle: boolean,
 	shieldUntil: number, -- tick; 0 = never shielded
+	blessedUntil: number, -- tick a Blessing ends; 0 = none
 }
 
 export type NationRecord = {
@@ -29,6 +30,7 @@ export type NationRecord = {
 	gold: number,
 	manpower: number,
 	charges: number,
+	plagueUntil: number, -- tick a Plague ends; 0 = none
 	eliminated: boolean,
 	allianceId: number, -- 0 = none
 	battlesWon: number,
@@ -52,6 +54,9 @@ export type DiplomacyData = {
 	offers: { Types.Offer },
 }
 
+-- An eliminated player's Primordial: only charges change, so the list is sent whole whenever it changes.
+export type PrimordialRecord = { userId: number, charges: number }
+
 -- Unreliable position updates for moving armies: the client slides tokens between province centres.
 export type ArmyPosition = { id: number, from: number, to: number, progress: number }
 
@@ -63,6 +68,7 @@ export type SnapshotData = {
 	nations: { NationRecord },
 	armies: { ArmyRecord },
 	diplomacy: DiplomacyData,
+	primordials: { PrimordialRecord },
 	result: Types.MatchResult?,
 }
 
@@ -74,6 +80,7 @@ export type DeltaData = {
 	armies: { ArmyRecord },
 	removedArmies: { number },
 	diplomacy: DiplomacyData?, -- only when it changed
+	primordials: { PrimordialRecord }?, -- only when it changed
 	result: Types.MatchResult?, -- only when it changed
 	events: { Types.MatchEvent },
 }
@@ -104,6 +111,7 @@ function Snapshot.full(state: MatchState): SnapshotData
 			siegeRequired = if siege then siege.required else 0,
 			battle = state.battles[p.id] ~= nil,
 			shieldUntil = p.shieldUntil or 0,
+			blessedUntil = p.buffs.Blessing or 0,
 		})
 	end
 	local nations = {}
@@ -119,6 +127,7 @@ function Snapshot.full(state: MatchState): SnapshotData
 			gold = n.gold,
 			manpower = n.manpower,
 			charges = n.charges,
+			plagueUntil = n.plagueUntil or 0,
 			eliminated = n.eliminated,
 			allianceId = n.allianceId or 0,
 			battlesWon = n.battlesWon,
@@ -145,8 +154,17 @@ function Snapshot.full(state: MatchState): SnapshotData
 		nations = nations,
 		armies = armies,
 		diplomacy = Snapshot.diplomacy(state),
+		primordials = Snapshot.primordials(state),
 		result = state.result,
 	}
+end
+
+function Snapshot.primordials(state: MatchState): { PrimordialRecord }
+	local out = {}
+	for _, userId in sortedKeys(state.primordials) do
+		table.insert(out, { userId = userId, charges = state.primordials[userId].charges })
+	end
+	return out
 end
 
 function Snapshot.diplomacy(state: MatchState): DiplomacyData
@@ -259,6 +277,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		armies = changed(before.armies, after.armies),
 		removedArmies = removed,
 		diplomacy = if encode(before.diplomacy) ~= encode(after.diplomacy) then after.diplomacy else nil,
+		primordials = if encode(before.primordials) ~= encode(after.primordials) then after.primordials else nil,
 		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
 		events = if events then table.clone(events) else {},
 	}
@@ -269,6 +288,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		and #removed == 0
 		and before.phase == after.phase
 		and delta.diplomacy == nil
+		and delta.primordials == nil
 		and delta.result == nil
 		and #delta.events == 0
 	then
@@ -303,6 +323,9 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	merge(snapshot.armies, delta.armies)
 	if delta.diplomacy then
 		snapshot.diplomacy = delta.diplomacy
+	end
+	if delta.primordials then
+		snapshot.primordials = delta.primordials
 	end
 	if delta.result then
 		snapshot.result = delta.result

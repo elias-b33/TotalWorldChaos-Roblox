@@ -69,7 +69,13 @@ local PHASE_ICONS: { [string]: string } = {
 
 local function refresh()
 	local me = ClientState.nation(ClientState.myNation())
-	if me then
+	if me and me.eliminated then
+		goldLabel.Text = ""
+		manpowerLabel.Text = ""
+		nationLabel.Text = "✨ Primordial"
+		nationSwatch.Visible = false
+		rankLabel.Text = ""
+	elseif me then
 		goldLabel.Text = "💰 " .. formatNumber(me.gold)
 		goldLabel.TextColor3 = if me.gold < 0 then Color3.fromRGB(255, 120, 120) else Color3.new(1, 1, 1)
 		manpowerLabel.Text = "👥 " .. formatNumber(me.manpower)

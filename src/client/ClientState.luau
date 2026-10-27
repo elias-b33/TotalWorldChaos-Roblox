@@ -2,6 +2,7 @@
 -- The client's copy of the match: filled by the Snapshot remote, kept current by Delta.
 -- Other client modules read from here and subscribe to changes. The client never changes the match itself.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
@@ -128,6 +129,31 @@ function ClientState.nation(id: number): Snapshot.NationRecord?
 		if n.id == id then
 			return n
 		end
+	end
+	return nil
+end
+
+-- This player's Primordial, once their nation has been eliminated.
+function ClientState.myPrimordial(): Snapshot.PrimordialRecord?
+	if snapshot then
+		for _, p in snapshot.primordials do
+			if p.userId == Players.LocalPlayer.UserId then
+				return p
+			end
+		end
+	end
+	return nil
+end
+
+-- Primordial-power charges this player can spend: their Primordial's, else their living nation's (nil = none).
+function ClientState.myCharges(): number?
+	local primordial = ClientState.myPrimordial()
+	if primordial then
+		return primordial.charges
+	end
+	local nation = ClientState.nation(myNationId)
+	if nation and not nation.eliminated then
+		return nation.charges
 	end
 	return nil
 end

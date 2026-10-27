@@ -112,10 +112,10 @@ function Match.seatPlayer(state: MatchState, userId: number): number?
 	return best
 end
 
--- A player who leaves is replaced by a bot instantly.
+-- A player who leaves is replaced by a bot instantly. An eliminated nation stays theirs (they rejoin as a Primordial).
 function Match.unseatPlayer(state: MatchState, userId: number)
 	for _, nation in state.nations do
-		if nation.userId == userId then
+		if nation.userId == userId and not nation.eliminated then
 			nation.controller = "Bot"
 			nation.userId = nil
 		end
