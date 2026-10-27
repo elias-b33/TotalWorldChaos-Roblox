@@ -20,7 +20,7 @@ local SECONDS_PER_DAY = 86400
 
 local ProgressionService = {}
 
-local getState: () -> Types.MatchState
+local getState: () -> Types.MatchState? -- nil before the first match (the first Lobby)
 local current: Types.MatchState? = nil
 local stats: { [number]: Types.PlayerMatchStats } = {} -- by userId, for the current match
 local rewardRemote: RemoteEvent
@@ -66,12 +66,12 @@ local function payAll(state: Types.MatchState)
 	stats = {}
 end
 
-function ProgressionService.init(stateGetter: () -> Types.MatchState)
+function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 	getState = stateGetter
 	rewardRemote = Remotes.event("Reward")
 	Players.PlayerAdded:Connect(function(player)
 		local state = getState()
-		if state == current and state.result == nil then
+		if state and state == current and state.result == nil then
 			stats[player.UserId] = Progression.newStats(player.UserId, state.tick)
 		end
 	end)

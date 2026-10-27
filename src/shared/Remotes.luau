@@ -13,7 +13,10 @@ local EVENTS = {
 	"RequestDevelop",
 	"RequestDiplomacy",
 	"RequestPower",
+	"RequestVote", -- lobby: mapId
+	"RequestPick", -- lobby: nationId
 	-- server -> client
+	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
 	"Snapshot",
 	"Delta",

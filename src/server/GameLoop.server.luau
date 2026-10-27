@@ -1,7 +1,8 @@
 --!strict
 -- Boots the server and runs the 1-second tick (docs/DESIGN.md "Tick order").
 -- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 7 (bots) is AIService, step 9 is
--- Replicator.
+-- Replicator. Between matches the Lobby runs instead (map vote, then nation draft; LobbyService), unless Workspace
+-- has SkipLobby set, which starts every match straight away.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +18,7 @@ Players.CharacterAutoLoads = false -- the game is the map; nobody needs an avata
 local Server = script.Parent
 local AIService = require(Server.Services.AIService)
 local CommandRouter = require(Server.CommandRouter)
+local LobbyService = require(Server.Services.LobbyService)
 local MatchService = require(Server.Services.MatchService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
@@ -40,19 +42,76 @@ local function startMatch()
 	print(string.format("[server] match started on %s", state.mapId))
 end
 
+-- Lobby, part 1: the map vote (also after Results, for the next map). Everyone stays in the server.
+local function openLobby()
+	LobbyService.open(MatchService.lockedMap())
+	CommandRouter.clear()
+	Replicator.sendLobby(LobbyService.view())
+	print("[server] lobby open: vote on the map")
+end
+
+-- Lobby, part 2: the vote is over; the draft runs on a fresh match of the winning map, shown to everyone.
+local function startPick()
+	local state = MatchService.start(LobbyService.winner())
+	CommandRouter.clear()
+	AIService.reset()
+	LobbyService.startPick(state)
+	Replicator.reset(state)
+	for _, player in Players:GetPlayers() do
+		Replicator.sendSnapshot(player, state, nil)
+	end
+	print(string.format("[server] draft on %s", state.mapId))
+end
+
+-- The draft is over: the match starts in Peace at tick 0. Anyone who didn't get a turn takes a bot's nation.
+local function startDraftedMatch()
+	LobbyService.finish()
+	local state = MatchService.state()
+	Replicator.reset(state)
+	for _, player in Players:GetPlayers() do
+		Replicator.sendSnapshot(player, state, MatchService.seat(player))
+	end
+	Replicator.sendLobby(LobbyService.view()) -- "None": the lobby screens close
+	Replicator.notifyAll("Phase", "🕊 The match begins! Expand and build")
+	print(string.format("[server] match started on %s", state.mapId))
+end
+
+-- The next match: the Lobby, or straight into Peace with SkipLobby.
+local function nextMatch()
+	if LobbyService.skipped() then
+		startMatch()
+	else
+		openLobby()
+	end
+end
+
 Replicator.init()
 CommandRouter.init(MatchService.nationOf)
 PlayerDataService.init()
-ProgressionService.init(MatchService.state)
-startMatch()
+ProgressionService.init(MatchService.current)
+nextMatch()
 
 Players.PlayerAdded:Connect(function(player)
+	if LobbyService.active() then
+		-- joining the vote or the draft: the lobby, and the drafted map if there is one
+		LobbyService.join(player)
+		local drafted = LobbyService.match()
+		if drafted then
+			Replicator.sendSnapshot(player, drafted, nil)
+		end
+		Replicator.sendLobby(LobbyService.view(), player)
+		return
+	end
 	local nationId = MatchService.seat(player)
 	Replicator.sendSnapshot(player, MatchService.state(), nationId)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-	MatchService.unseat(player)
+	if LobbyService.active() then
+		LobbyService.leave(player)
+	else
+		MatchService.unseat(player)
+	end
 end)
 
 local function tick()
@@ -69,17 +128,44 @@ local function tick()
 	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
 end
 
+-- A Lobby second: votes and picks, the clocks, then what changed to every client.
+local function lobbyTick()
+	CommandRouter.refuseQueued("WrongPhase") -- no orders before the match starts
+	CommandRouter.applyLobbyQueued(LobbyService.apply)
+	if LobbyService.step() then
+		if LobbyService.phase() == "Lobby" then
+			startPick()
+		else
+			startDraftedMatch()
+			return
+		end
+	end
+	Replicator.sendLobby(LobbyService.view())
+	local drafted = LobbyService.match()
+	if drafted then
+		Replicator.broadcast(drafted) -- the picks, as nation changes
+	end
+end
+
 -- Fixed-rate loop that doesn't drift: each tick is scheduled from the previous target time.
 local nextTick = os.clock() + Config.TickSeconds
 while true do
 	task.wait(math.max(0, nextTick - os.clock()))
 	nextTick += Config.TickSeconds
-	local ok, err = pcall(tick)
-	if not ok then
-		warn("[server] tick failed: " .. tostring(err))
-	end
-	if MatchService.isOver() then
-		startMatch()
-		nextTick = os.clock() + Config.TickSeconds
+	if LobbyService.active() then
+		local ok, err = pcall(lobbyTick)
+		if not ok then
+			warn("[server] lobby tick failed: " .. tostring(err))
+		end
+	else
+		CommandRouter.applyLobbyQueued(nil) -- votes and picks mean nothing during a match
+		local ok, err = pcall(tick)
+		if not ok then
+			warn("[server] tick failed: " .. tostring(err))
+		end
+		if MatchService.isOver() then
+			nextMatch()
+			nextTick = os.clock() + Config.TickSeconds
+		end
 	end
 end

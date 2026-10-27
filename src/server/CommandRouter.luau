@@ -23,12 +23,16 @@ type Pending = {
 	command: Types.Command,
 }
 
+type LobbyPending = { player: Player, requestId: number, intent: Types.LobbyIntent }
+
 local BUILDINGS = { Farm = true, Barracks = true, Fort = true }
+local MAX_MAP_ID = 32 -- longest map id a vote may name (the map list itself is checked by Sim.Lobby)
 local DIPLOMACY_ACTIONS = { War = true, Ally = true, AcceptAlly = true, Peace = true, AcceptPeace = true }
 
 local CommandRouter = {}
 
 local queue: { Pending } = {}
+local lobbyQueue: { LobbyPending } = {}
 local limiter = RateLimit.new(Config.Net.MaxIntentsPerSecond)
 local commandResult: RemoteEvent
 local nationOf: (Player) -> number?
@@ -139,9 +143,56 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			end)
 		end)
 
+	-- Lobby intents: the same request ids and rate limit, their own queue (Sim.Lobby checks the rules).
+	local function acceptLobby(player: Player, requestId: unknown, intent: Types.LobbyIntent?)
+		if not isId(requestId) then
+			return
+		end
+		local id = requestId :: number
+		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+			reply(player, id, false, "TooFast")
+		elseif intent == nil then
+			reply(player, id, false, "BadRequest")
+		else
+			table.insert(lobbyQueue, { player = player, requestId = id, intent = intent })
+		end
+	end
+
+	Remotes.event("RequestVote").OnServerEvent:Connect(function(player: Player, requestId: unknown, map: unknown)
+		local ok = type(map) == "string" and #map <= MAX_MAP_ID
+		acceptLobby(player, requestId, if ok then { kind = "Vote", map = map :: string } else nil)
+	end)
+
+	Remotes.event("RequestPick").OnServerEvent:Connect(function(player: Player, requestId: unknown, nation: unknown)
+		acceptLobby(player, requestId, if isId(nation) then { kind = "Pick", nation = nation :: number } else nil)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
 	end)
+end
+
+-- Lobby step 1: apply queued votes and picks in arrival order. Without a lobby (a match is running) they are
+-- refused.
+function CommandRouter.applyLobbyQueued(apply: ((userId: number, intent: Types.LobbyIntent) -> (boolean, string?))?)
+	local pending = lobbyQueue
+	lobbyQueue = {}
+	for _, item in pending do
+		local ok, reason = false, "WrongPhase"
+		if apply and item.player.Parent == Players then
+			ok, reason = apply(item.player.UserId, item.intent)
+		end
+		reply(item.player, item.requestId, ok, reason)
+	end
+end
+
+-- Between matches (the Lobby) there is no match to give orders in: refuse whatever was queued.
+function CommandRouter.refuseQueued(reason: string)
+	local pending = queue
+	queue = {}
+	for _, item in pending do
+		reply(item.player, item.requestId, false, reason)
+	end
 end
 
 -- Bots (Phase 3) call this with the same commands players send.
@@ -188,6 +239,7 @@ end
 -- A new match makes queued intents meaningless.
 function CommandRouter.clear()
 	queue = {}
+	lobbyQueue = {}
 end
 
 return CommandRouter

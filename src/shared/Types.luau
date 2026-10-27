@@ -105,6 +105,25 @@ export type MatchState = {
 	result: MatchResult?, -- set when someone has won; the phase is then Results
 }
 
+-- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside
+-- MatchState because the vote happens before there is a map; the draft seats players in the new match.
+export type LobbyState = {
+	phase: "Lobby" | "Pick",
+	ticksLeft: number, -- until this phase ends
+	maps: { string }, -- the map ids on the vote cards
+	locked: string?, -- a map the server set (Workspace "MapId", later private servers): no vote
+	votes: { [number]: string }, -- userId -> map id (kept per voter, so a theme vote can look at the winners' voters)
+	mapId: string?, -- the chosen map, once the vote is over
+	order: { number }, -- draft order (userIds)
+	turn: number, -- index in order of who picks now (> #order when the draft is done)
+	turnTicks: number, -- length of one turn
+	turnTicksLeft: number,
+	picks: { [number]: NationId }, -- userId -> nation
+}
+
+-- Lobby intents: CommandRouter checks the shape, Sim/Lobby checks the rules.
+export type LobbyIntent = { kind: "Vote", map: string } | { kind: "Pick", nation: NationId }
+
 -- Static map definitions (src/shared/MapData, generated from assets/maps/*/layout.json).
 
 export type Point = { x: number, y: number }
