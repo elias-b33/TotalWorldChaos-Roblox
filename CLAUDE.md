@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Roblox map PvP strategy game: EU4 + WorldBox, simplified, for players aged 13–18+, mostly on phones.
-The full spec is `docs/DESIGN.md`. Read the sections your task touches before writing code.
+Total World Chaos: a Roblox map PvP strategy game (EU4 + WorldBox, simplified) for players aged 13–18+, mostly on phones.
+The full spec is `docs/DESIGN.md`; the three maps, textures and map data pipeline are in `docs/MAPS.md`. Read the sections your task touches before writing code.
 
 ## Golden rules
 
@@ -13,6 +13,7 @@ The full spec is `docs/DESIGN.md`. Read the sections your task touches before wr
 - Randomness in Sim comes from a seeded RNG module (`src/shared/Sim/Rng.luau`) passed in as an argument, so tests are deterministic. Never use `math.random` or `Random.new` inside Sim.
 - `src/server/Services/` are thin Roblox wrappers: they call Sim, handle remotes and timing, and nothing else.
 - `--!strict` at the top of every Luau file. Types come from `src/shared/Types.luau`. If you need to change a type, say so in your final message.
+- Map data and textures are generated. Never hand-edit `assets/maps/*/layout.json`, `assets/textures/` or `src/shared/MapData/`: change `tools/mapgen/` and rerun it, then check the validator printed no `PROBLEM` lines.
 - Inside `src/shared/`, use string requires (`require("./Rng")`) so the same files load in Roblox and Lune. If a require pattern fails in either runtime, fix it consistently and note it under "Decisions".
 
 ## Commands
@@ -25,6 +26,7 @@ The full spec is `docs/DESIGN.md`. Read the sections your task touches before wr
 | Lint | `selene src` |
 | Run Sim tests | `lune run tests/run` |
 | Install missing tools | `bash scripts/cloud-setup.sh` |
+| Regenerate maps and textures | `python3 tools/mapgen/generate.py` (or `--only earth`, `--only tiles`, …) |
 
 The cloud environment's setup script normally installs the tools. If one is missing when a session starts, the SessionStart hook is already installing it in the background: wait until `/tmp/cloud-setup.log` says `cloud-setup: done` instead of starting a second install.
 
@@ -55,6 +57,10 @@ src/server/            GameLoop, CommandRouter, Replicator, Services
 src/client/            MapRenderer, CameraController, UI
 tests/                 Lune tests for src/shared/Sim
 docs/DESIGN.md         The spec and the roadmap checkboxes
+docs/MAPS.md           The three maps, art direction, textures, map data pipeline
+assets/maps/           Generated per-map data (layout.json, province_ids.png) and previews
+assets/textures/       Generated seamless terrain tiles per theme
+tools/mapgen/          Python (numpy + Pillow) generator for everything in assets/
 roblox.yml             Roblox API list for Selene (committed; see Commands)
 scripts/cloud-setup.sh Installs rojo, stylua, selene, lune
 scripts/session-start.sh  SessionStart hook: installs missing tools in the background (cloud only)

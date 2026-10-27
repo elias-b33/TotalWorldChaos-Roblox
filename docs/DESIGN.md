@@ -1,4 +1,4 @@
-# Roblox Grand Strategy — Design Doc
+# Total World Chaos — Design Doc
 
 Source of truth for the game design. Mirrors the design doc in Claude (claude.ai). If they disagree, ask the owner which one wins.
 
@@ -26,7 +26,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 | --- | --- |
 | Server size | 12 players max |
 | Nations per match | 10 (bots fill empty slots) |
-| Map | ~150 provinces, ~15 per nation |
+| Map | ~150 provinces, ~15 per nation; three maps to vote on (`docs/MAPS.md`) |
 | Match length | 25 min |
 | Tick | 1 s = 1 game day |
 | Economy payout | every 10 ticks (1 "month") |
@@ -60,8 +60,9 @@ Two resources (gold and manpower), one unit type and one siege rule carry the wh
 
 - ~150 land provinces, each with terrain, development (1–5) and at most one building.
 - Terrain: plains (normal), forest and hills (+25% defence, slower movement), mountains (impassable, used to make chokepoints).
-- About 40% of provinces start **neutral** with a small garrison, so the first minutes are about expansion, not PvP.
-- No sea in v1. Islands connect through "straits": extra neighbour links drawn as bridges.
+- About 40% of provinces start **neutral** with a small garrison (one regiment, `Config.NeutralGarrison`; a map can set a bigger one per province), so the first minutes are about expansion, not PvP.
+- No sea in v1. Islands connect through "straits": extra neighbour links drawn as bridges or sea lanes.
+- Three maps: **Earth** (real world), **Eldmoor** (fantasy continent) and **Skyshards** (floating islands). Every nation starts with 8 provinces and 17 total development on every map. Details, art and data pipeline: `docs/MAPS.md`.
 
 ### Economy
 
@@ -150,14 +151,19 @@ src/
       PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
   client/
     MapRenderer.luau           -- colours provinces, draws armies and borders
+    MapArt.luau                -- texture asset ids per biome (Phase 4)
     CameraController.luau      -- pan, pinch zoom, tap selection
     UI/                        -- HUD, province sheet, diplomacy, powers
   shared/
     Types.luau
     Config.luau                -- every balance number
-    MapData/                   -- province ids, terrain, neighbours
+    MapData/                   -- Earth, Eldmoor, Skyshards (generated from assets/maps)
     Sim/                       -- pure game rules, no Roblox APIs (tested with Lune)
 tests/                         -- Lune test files for shared/Sim
+assets/
+  maps/<map>/                  -- layout.json, province_ids.png, previews, vote card
+  textures/<theme>/            -- 512 px seamless terrain tiles (+ detail/ for tinting)
+tools/mapgen/                  -- Python generator for everything in assets/
 ```
 
 ### Tick order
@@ -187,8 +193,8 @@ tests/                         -- Lune test files for shared/Sim
 
 ### Map rendering
 
-- **Prototype:** a hex grid generated in code. Neighbours come for free.
-- **Final map:** hand-made province MeshParts in Studio, each tagged with its province id from `MapData`.
+- **Prototype (Phase 1):** Skyshards `MapData` drawn as flat discs at province centres, with lines between neighbours.
+- **Final maps (Phase 4):** province MeshParts generated from each map's `province_ids.png` and imported into Studio in one go, named by province id, textured with `assets/textures` (see `docs/MAPS.md`).
 - Colour changes only when ownership changes; nothing updates per frame except army tokens.
 
 ### Performance budget
@@ -272,6 +278,35 @@ export type MatchState = {
 }
 ```
 
+### Map data
+
+Static map definitions live in `src/shared/MapData/<Map>.luau`, generated from `assets/maps/<map>/layout.json` (never hand-edited). At match start they fill `MatchState.provinces` and `nations`.
+
+```lua
+export type ProvinceDef = {
+    id: ProvinceId,
+    name: string,
+    terrain: Terrain,
+    biome: string,             -- cosmetic: picks the texture, never a rule
+    development: number,
+    neighbors: { ProvinceId }, -- includes straits
+    center: { x: number, y: number }, -- map pixels; 1 px = 0.5 stud
+    startOwner: number?,       -- start slot 1..10, nil = neutral
+    isCapital: boolean,
+    garrison: number?,         -- neutral garrison override, men
+}
+
+export type MapDef = {
+    id: string,                -- "earth" | "eldmoor" | "skyshards"
+    title: string,
+    theme: string,             -- texture set: "earth" | "fantasy" | "sky"
+    imageSize: { x: number, y: number },
+    nations: { { slot: number, name: string, capital: ProvinceId, colorIndex: number } },
+    provinces: { ProvinceDef },
+    straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean } },
+}
+```
+
 ### Remotes
 
 | Remote | Direction | Payload |
@@ -338,7 +373,7 @@ Sell looks, convenience and private play, never strength.
 | Product | Type | Starting price (Robux) |
 | --- | --- | --- |
 | Nation skins: flag, colour palette, army token | Shop item | 49–149 |
-| Map themes: snow, desert, fantasy | Shop item | 99 |
+| Map themes: re-skins of the three maps (e.g. Winter Skyshards) | Shop item | 99 |
 | God-power effects: meteor style, plague colour | Shop item | 49–99 |
 | Map emotes shown over your capital | Shop item | 25–49 |
 | VIP: exclusive colours, +25% XP, chat tag | Game pass | 199 |
@@ -357,7 +392,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 - [ ] Rojo project, StyLua, Selene, strict mode, Lune test runner
 - [ ] `Types.luau` and `Config.luau` from this doc
-- [ ] Generated hex map: 150 tiles with terrain and neighbours
+- [ ] `MapData` generated from `assets/maps/*/layout.json`; Skyshards is the test map
 - [ ] `MapRenderer` colours provinces by owner; camera pan and zoom on phone
 - [ ] `GameLoop` with a 1 s tick; economy pays income
 - [ ] Recruit, develop and build through `CommandRouter`
@@ -386,7 +421,8 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 4: Polish and shop
 
-- [ ] Hand-made final map
+- [ ] Province meshes and textures for Earth, Eldmoor and Skyshards
+- [ ] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
 - [ ] `PlayerDataService`: XP, ranks, daily quests
 - [ ] Shop: nation skins, map themes, VIP pass
@@ -398,13 +434,20 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 - [ ] Analytics events: match length, quit time, phase reached, win rate by start position
 - [ ] Weekly balance patch from the data
-- [ ] Easy and Hard bots, a second map
+- [ ] Easy and Hard bots
+- [ ] Per-map balance from win rate by start position
 
 ## Open questions
 
-- Working title and style: historical, fantasy or meme?
-- Real-world map or fictional continents? (Default: fictional.)
+Answered:
+
+- Working title: **Total World Chaos**.
+- Real-world map or fictional continents? **Both**: Earth (region names, never countries), Eldmoor and Skyshards. See `docs/MAPS.md`.
+- Hex grid or hand-made provinces for the final map? **Neither**: province meshes generated from the map data. See `docs/MAPS.md`.
+
+Still open:
+
+- Art style beyond the maps: historical, fantasy or meme?
 - Can a god target the nation that eliminated them?
-- Keep the hex grid for the final map, or switch to hand-made provinces?
 - Casual only, or a ranked mode after launch?
 - Provinces flip when a siege ends (current rule) or only through peace deals?
