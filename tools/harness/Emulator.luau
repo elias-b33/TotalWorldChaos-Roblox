@@ -462,6 +462,134 @@ function Emulator.terrainBlocks(client: Machine)
 	return terrainBlocks[client.dm:GetService("Workspace"):FindFirstChildOfClass("Terrain")] or {}
 end
 
+---------------------------------------------------------------------------------------------- data stores
+
+-- In-memory DataStoreService and MessagingService with the calls ProfileStore makes, so player saves run
+-- ProfileStore's live path (session locks, UpdateAsync transforms, release on leave) instead of its mock.
+-- Data lives as long as the boot, so a player can leave and rejoin; scenarios read it from Emulator.dataStores.
+
+local function deepCopy(v)
+	if type(v) ~= "table" then
+		return v
+	end
+	local out = {}
+	for k, val in v do
+		out[k] = deepCopy(val)
+	end
+	return out
+end
+
+Emulator.dataStores = {} -- store name -> key -> { value, version, userIds, metadata }
+
+local function keyInfo(entry)
+	return {
+		Version = tostring(entry.version),
+		CreatedTime = 0,
+		UpdatedTime = 0,
+		GetMetadata = function()
+			return deepCopy(entry.metadata)
+		end,
+		GetUserIds = function()
+			return deepCopy(entry.userIds)
+		end,
+	}
+end
+
+local function newDataStore(name: string)
+	local entries = Emulator.dataStores[name] or {}
+	Emulator.dataStores[name] = entries
+	local store = {}
+	local function write(key, value, userIds, metadata)
+		local old = entries[key]
+		local entry = {
+			value = deepCopy(value),
+			version = (if old then old.version else 0) + 1,
+			userIds = deepCopy(userIds or {}),
+			metadata = deepCopy(metadata or {}),
+		}
+		entries[key] = entry
+		return entry
+	end
+	function store.GetAsync(_self, key)
+		task.wait() -- a DataStore call yields
+		local entry = entries[key]
+		if entry == nil then
+			return nil
+		end
+		return deepCopy(entry.value), keyInfo(entry)
+	end
+	function store.SetAsync(_self, key, value, userIds)
+		task.wait()
+		return keyInfo(write(key, value, userIds, nil)).Version
+	end
+	function store.UpdateAsync(_self, key, transform)
+		task.wait()
+		local entry = entries[key]
+		local value, userIds, metadata = transform(deepCopy(entry and entry.value), entry and keyInfo(entry))
+		if value == nil then
+			return nil -- the transform cancelled the update
+		end
+		local written = write(key, value, userIds, metadata)
+		return deepCopy(written.value), keyInfo(written)
+	end
+	function store.RemoveAsync(_self, key)
+		task.wait()
+		local entry = entries[key]
+		entries[key] = nil
+		if entry == nil then
+			return nil
+		end
+		return deepCopy(entry.value), keyInfo(entry)
+	end
+	return store
+end
+
+roblox.implementMethod("DataStoreService", "GetDataStore", function(_service, name)
+	return newDataStore(name)
+end)
+roblox.implementMethod("DataStoreOptions", "SetExperimentalFeatures", function() end)
+
+local subscriptions: { [string]: { any } } = {}
+
+roblox.implementMethod("MessagingService", "SubscribeAsync", function(_service, topic, callback)
+	local list = subscriptions[topic] or {}
+	subscriptions[topic] = list
+	local entry = { fn = callback }
+	table.insert(list, entry)
+	return {
+		Disconnect = function()
+			local i = table.find(list, entry)
+			if i then
+				table.remove(list, i)
+			end
+		end,
+	}
+end)
+roblox.implementMethod("MessagingService", "PublishAsync", function(_service, topic, data)
+	for _, entry in subscriptions[topic] or {} do
+		task.spawn(entry.fn, { Data = deepCopy(data), Sent = os.time() })
+	end
+end)
+
+local guids = 0
+roblox.implementMethod("HttpService", "GenerateGUID", function(_service, wrap)
+	guids += 1
+	local guid = string.format("%08X-0000-4000-8000-%012X", guids, guids)
+	return if wrap == false then guid else "{" .. guid .. "}"
+end)
+
+local closeCallbacks = {}
+roblox.implementMethod("DataModel", "BindToClose", function(_dm, fn)
+	table.insert(closeCallbacks, fn)
+end)
+
+-- A kick is never expected in a scenario: record it as a warning so the scenario fails.
+roblox.implementMethod("Player", "Kick", function(player, message)
+	local msg = string.format("KICK %s: %s", player.Name, tostring(message))
+	table.insert(warnings, msg)
+	log(msg)
+end)
+
 ---------------------------------------------------------------------------------------------- camera maths
 
 local function cameraRay(cam, x: number, y: number)
@@ -774,6 +902,8 @@ end
 function Emulator.boot(placeBytes: string, mapId: string?)
 	Emulator.placeBytes = placeBytes
 	local dm = roblox.deserializePlace(placeBytes)
+	dm.PlaceId = 0 -- an unpublished place in Studio (ProfileStore tags its session locks with these)
+	dm.JobId = ""
 	if mapId then
 		dm:GetService("Workspace"):SetAttribute("MapId", mapId)
 	end
@@ -792,7 +922,8 @@ local nextUserId = 1000
 -- MaterialVariants every new client starts with (play.luau fills this when TEXTURES=1).
 Emulator.materialVariants = {} :: { any }
 
-function Emulator.addClient(name: string, viewport: any?): Machine
+-- userId (optional) lets a player rejoin as themselves; otherwise every client gets a new one.
+function Emulator.addClient(name: string, viewport: any?, userId: number?): Machine
 	local dm = roblox.deserializePlace(Emulator.placeBytes)
 	-- clients never see server scripts
 	for _, child in dm:GetService("ServerScriptService"):GetChildren() do
@@ -826,13 +957,16 @@ function Emulator.addClient(name: string, viewport: any?): Machine
 	dm:GetService("Workspace").CurrentCamera = cam
 	client.camera = cam
 
-	nextUserId += 1
+	if userId == nil then
+		nextUserId += 1
+		userId = nextUserId
+	end
 	local serverPlayer = Instance.new("Player")
 	serverPlayer.Name = name
-	serverPlayer.UserId = nextUserId
+	serverPlayer.UserId = userId
 	local localPlayer = Instance.new("Player")
 	localPlayer.Name = name
-	localPlayer.UserId = nextUserId
+	localPlayer.UserId = userId
 	Instance.new("PlayerGui").Parent = localPlayer
 	local playerScripts = Instance.new("PlayerScripts")
 	playerScripts.Parent = localPlayer

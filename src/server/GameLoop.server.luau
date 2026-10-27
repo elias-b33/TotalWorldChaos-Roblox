@@ -16,6 +16,8 @@ Players.CharacterAutoLoads = false -- the game is the map; nobody needs an avata
 local Server = script.Parent
 local CommandRouter = require(Server.CommandRouter)
 local MatchService = require(Server.Services.MatchService)
+local PlayerDataService = require(Server.Services.PlayerDataService)
+local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
 
 local PHASE_TOASTS = {
@@ -37,6 +39,8 @@ end
 
 Replicator.init()
 CommandRouter.init(MatchService.nationOf)
+PlayerDataService.init()
+ProgressionService.init(MatchService.state)
 startMatch()
 
 Players.PlayerAdded:Connect(function(player)
@@ -52,6 +56,7 @@ local function tick()
 	local state = MatchService.state()
 	CommandRouter.applyQueued(state) -- 1. apply queued commands
 	local newPhase = MatchService.advance() -- 2-8. armies, battles, sieges, income, win checks
+	ProgressionService.afterTick(state) -- match stats from this tick's events; XP and Glory at Results
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end

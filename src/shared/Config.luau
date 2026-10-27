@@ -119,6 +119,51 @@ Config.Win = {
 	ScorePerBattleWon = 2,
 }
 
+-- Progression (docs/MONETIZATION.md 4.1, 5.1–5.3): account XP and Glory a match pays, the level curve, ranks.
+-- Placement tables are indexed by finishing place 1..10.
+
+Config.Progression = {
+	FinishXp = 100, -- stayed to Results; leaving early prorates it by minutes played
+	FinishGlory = 20,
+	PlacementXp = { 150, 100, 75, 50, 50, 25, 25, 25, 25, 25 }, -- alliance victory: every member is 1st
+	PlacementGlory = { 40, 30, 20, 15, 15, 10, 10, 10, 10, 10 },
+	ProvinceXp = 5, -- per province captured
+	MaxProvinceXp = 100,
+	BattleXp = 5, -- per battle won
+	MaxBattleXp = 50,
+	ActivityGlory = 1, -- per province captured and per battle won...
+	MaxActivityGlory = 15, -- ...up to this, both together
+	PrimordialXp = 50, -- rose as a Primordial and stayed to Results
+	PrimordialGlory = 10,
+	PowerXp = 10, -- per Primordial power used
+	MaxPowerXp = 50,
+	FirstMatchXp = 200, -- first finished match of the UTC day
+	FirstMatchGlory = 50,
+	VipBonus = 0.25, -- VIP: +25% of match XP and Glory (not the first-match bonus)
+	CustomRulesShare = 0.5, -- private servers with custom rules pay half
+	AfkTicks = 5 * 60, -- no command for this long in a row: the match pays nothing
+	LateJoinGraceTicks = 60, -- joining in the first minute still counts as playing the whole match
+	LevelBaseXp = 300, -- XP from level L to L+1 = LevelBaseXp + LevelStepXp × (L − 1)
+	LevelStepXp = 60,
+	MaxLevel = 100,
+	LevelUpGlory = 50,
+	RankUpGlory = 500,
+	LevelsPerRank = 10,
+	Ranks = {
+		"Settler",
+		"Chieftain",
+		"Baron",
+		"Count",
+		"Duke",
+		"Prince",
+		"King",
+		"Emperor",
+		"Conqueror",
+		"World Shaker",
+		"Primordial",
+	},
+}
+
 -- Network and security ---------------------------------------------------------------------------
 
 Config.Net = {
