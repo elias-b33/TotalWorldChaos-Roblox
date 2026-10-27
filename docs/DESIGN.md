@@ -16,7 +16,7 @@ A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and pla
 | Source | Keep | Cut |
 | --- | --- | --- |
 | EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
-| WorldBox | God powers (here: Primordial powers), disasters, watching borders spread across the map | Pixel terrain, individual units, creatures, sandbox world editing |
+| WorldBox | God powers (here: Primordial powers), disasters, watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
 
 ## Match structure
 
