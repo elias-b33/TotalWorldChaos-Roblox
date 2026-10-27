@@ -58,6 +58,8 @@ src/client/            MapView (2D map GUI), PixelArt (pixel-art painter), MapRe
 tests/                 Lune tests for src/shared/Sim (and the pure client painter, PixelArt)
 docs/DESIGN.md         The spec and the roadmap checkboxes
 docs/MAPS.md           The three maps, art direction, the pixel-art map, map data pipeline
+docs/MONETIZATION.md   Shop, prices, Glory, progression, season pass, live ops, revenue model, Phase 4–5 task cards
+docs/LAUNCH.md         Soft-launch gates, store page, ads, creators, analytics events
 assets/maps/           Generated per-map data (layout.json, province_ids.png) and previews
 assets/textures/       Generated seamless terrain tiles per theme
 tools/mapgen/          Python (numpy + Pillow) generator for everything in assets/

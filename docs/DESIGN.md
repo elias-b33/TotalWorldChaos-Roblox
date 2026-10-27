@@ -398,21 +398,26 @@ No cheating: harder bots think faster and take more risks, but they never get fr
 
 ## Monetization and retention
 
-Sell looks, convenience and private play, never strength.
+Sell looks, convenience and private play, never strength. Full plan: `docs/MONETIZATION.md`; launch and analytics: `docs/LAUNCH.md`.
 
-| Product | Type | Starting price (Robux) |
+| Product | Type | Price (Robux) |
 | --- | --- | --- |
-| Nation skins: flag, colour palette, army token | Shop item | 49–149 |
-| Map themes: re-skins of the three maps (e.g. Winter Skyshards) | Shop item | 99 |
-| Primordial-power effects: meteor style, plague colour | Shop item | 49–99 |
-| Map emotes shown over your capital | Shop item | 25–49 |
-| VIP: exclusive colours, +25% XP, chat tag | Game pass | 199 |
-| Private servers: pick map, timer, bot count | Private server | 100 per month |
-| Seasonal pass with cosmetic tiers | Pass | 299 |
+| Cosmetics by rarity: Common / Rare / Epic / Legendary | Shop item | 49 / 99 / 149 / 249 (Glory 500 / 1,200 / 2,500 / —) |
+| Nation skins: flag, border style, shade set (within your assigned colour), army token; matched sets | Shop item | 49–249; sets 199 / 299 |
+| Map themes: re-skins of the maps (e.g. Ember Eldmoor); the winning map uses its voters' most-equipped theme | Shop item | 99 |
+| Primordial-power effects: meteor style, plague colour | Shop item | 49–149 |
+| Capital emotes | Shop item | 25–49 |
+| Victory animations, nameplate frames | Shop item | 49–249 |
+| VIP: VIP flag set, gold frame, chat tag, +25% match XP and Glory, +1 quest reroll | Game pass | 249 |
+| Private servers: map, theme, length, peace, bots, powers, disasters | Private server | 100 per month |
+| Season pass: 8 weeks, 50 tiers, free and premium tracks | Developer product | 299 (499 with 10 tiers) |
+| Starter pack (once per account, no timer) | Developer product | 149 |
 
-**Never sell:** gold, regiments, manpower, Primordial-power charges, combat bonuses or anything else that changes a match. No paid random items (loot boxes).
+**Glory** is the only soft currency. It is earned by playing (about 49 per match plus quests) and is never sold.
 
-**Retention:** account XP and ranks; 3 daily quests; the same server votes on the next map after Results; global leaderboard and weekly ranks; parties start next to each other.
+**Never sell:** gold, regiments, manpower, Primordial-power charges, combat bonuses, start positions, titles, Glory or anything else that changes a match. No paid random items (loot boxes), no countdown offers, no prompts during a match, no single tier skips.
+
+**Retention:** account XP (300 + 60 × (level − 1) per level, cap 100) and ten ranks; 3 daily and 3 weekly quests; a login calendar that pauses instead of resetting; achievements; the server votes on the next map after Results; weekly, friends and global leaderboards; parties of up to 3 start next to each other; clans and a ranked mode after launch.
 
 ## Build roadmap
 
@@ -442,10 +447,10 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 ### Phase 3: Bots and Primordials
 
 - [ ] `AIService` on Normal; bots fill empty slots and replace leavers
-- [ ] Elimination and the Primordial role
-- [ ] 6 Primordial powers with charges and cooldowns
+- [x] Elimination and the Primordial role
+- [x] 6 Primordial powers with charges and cooldowns
 - [ ] Catch-up rules: overextension, underdog, coalition
-- [ ] Cataclysm phase
+- [x] Cataclysm phase
 
 **Gate 3:** 1 player against 9 bots is fun for 25 minutes, and no single bot wins most matches.
 
@@ -454,18 +459,27 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] 2D pixel-art map for Earth, Eldmoor and Skyshards (WorldBox style, painted at runtime)
 - [ ] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
-- [ ] `PlayerDataService`: XP, ranks, daily quests
-- [ ] Shop: nation skins, map themes, VIP pass
+- [ ] Progression rules in Sim: match XP and Glory, level curve, ranks
+- [ ] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards
+- [ ] Daily and weekly quests, login calendar, play streak
+- [ ] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
+- [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote
+- [ ] Private server settings
 - [ ] Sound and effects for battles and Primordial powers
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 
 ### Phase 5: Soft launch
 
-- [ ] Analytics events: match length, quit time, phase reached, win rate by start position
+- [ ] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
 - [ ] Weekly balance patch from the data
 - [ ] Easy and Hard bots
 - [ ] Per-map balance from win rate by start position
+- [ ] Season pass (8 weeks, 50 tiers)
+- [ ] Rotating shop
+- [ ] Weekly, friends and global leaderboards; achievements
+- [ ] Rewarded video quest reroll; experience notifications
+- [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 
 ## Open questions
 
@@ -475,9 +489,10 @@ Answered:
 - Real-world map or fictional continents? **Both**: Earth (region names, never countries), Eldmoor and Skyshards. See `docs/MAPS.md`.
 - Hex grid or hand-made provinces for the final map? **Neither**: province meshes generated from the map data. See `docs/MAPS.md`.
 
+- Can a Primordial target the nation that eliminated them? **Yes** (the simplest rule; revisit after playtests).
+
 Still open:
 
 - Art style beyond the maps: historical, fantasy or meme?
-- Can a Primordial target the nation that eliminated them?
-- Casual only, or a ranked mode after launch?
+- Casual only, or a ranked mode after launch? Proposed: ranked beta in month 5–6 if peak CCU ≥ 1,500 (`docs/MONETIZATION.md` 7.5).
 - Provinces flip when a siege ends (current rule) or only through peace deals?
