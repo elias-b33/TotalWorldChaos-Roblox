@@ -22,6 +22,10 @@ local tickReceivedAt = os.clock()
 
 local resetListeners: { Listener<Snapshot.SnapshotData> } = {}
 local deltaListeners: { Listener<Snapshot.DeltaData> } = {}
+local positionListeners: { Listener<{ [number]: Snapshot.ArmyPosition }> } = {}
+
+-- Latest unreliable position per moving army (cleared when an army stops; see Snapshot.ArmyRecord.next).
+local positions: { [number]: Snapshot.ArmyPosition } = {}
 
 local function emit<T>(listeners: { Listener<T> }, value: T)
 	for _, fn in listeners do
@@ -35,7 +39,18 @@ function ClientState.init()
 		map = Maps.get(data.mapId)
 		myNationId = nationId
 		tickReceivedAt = os.clock()
+		positions = {}
 		emit(resetListeners, data)
+	end)
+	Remotes.unreliableEvent("ArmyPositions").OnClientEvent:Connect(function(_tick: number, flat: { number })
+		-- flat: id, from, to, progress% repeated
+		local changed: { [number]: Snapshot.ArmyPosition } = {}
+		for i = 1, #flat - 3, 4 do
+			local p = { id = flat[i], from = flat[i + 1], to = flat[i + 2], progress = flat[i + 3] / 100 }
+			positions[p.id] = p
+			changed[p.id] = p
+		end
+		emit(positionListeners, changed)
 	end)
 	Remotes.event("Delta").OnClientEvent:Connect(function(delta: Snapshot.DeltaData)
 		local current = snapshot
@@ -44,6 +59,14 @@ function ClientState.init()
 		end
 		Snapshot.apply(current, delta)
 		tickReceivedAt = os.clock()
+		for _, a in delta.armies do
+			if a.next == 0 then
+				positions[a.id] = nil
+			end
+		end
+		for _, id in delta.removedArmies do
+			positions[id] = nil
+		end
 		emit(deltaListeners, delta)
 	end)
 end
@@ -58,6 +81,26 @@ end
 
 function ClientState.onDelta(fn: Listener<Snapshot.DeltaData>)
 	table.insert(deltaListeners, fn)
+end
+
+-- Called with the positions that just arrived for moving armies.
+function ClientState.onPositions(fn: Listener<{ [number]: Snapshot.ArmyPosition }>)
+	table.insert(positionListeners, fn)
+end
+
+function ClientState.position(armyId: number): Snapshot.ArmyPosition?
+	return positions[armyId]
+end
+
+function ClientState.army(armyId: number): Snapshot.ArmyRecord?
+	if snapshot then
+		for _, a in snapshot.armies do
+			if a.id == armyId then
+				return a
+			end
+		end
+	end
+	return nil
 end
 
 function ClientState.map(): Types.MapDef?

@@ -1,6 +1,7 @@
 --!strict
--- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development and building,
--- and one-tap actions on your own provinces. Every button shows its price; the server decides.
+-- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
+-- who is standing there; one-tap actions on your own provinces (develop, build, recruit, move an army) and
+-- diplomacy on foreign ones (war, ally, peace). Every button shows its price; the server decides.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,12 +10,14 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Economy = require(Shared.Sim.Economy)
+local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local Palette = require(Client.Palette)
+local Relations = require(Client.Relations)
 
 local SHEET_WIDTH = 560
 local BUTTON_HEIGHT = 48 -- at least 44 px on phones
@@ -28,9 +31,11 @@ local ProvinceSheet = {}
 local sheet: Frame
 local title: TextLabel
 local info: TextLabel
+local status: TextLabel
 local actions: Frame
 local selected: number? = nil
 local onClose: (() -> ())? = nil
+local onSelectArmy: ((number) -> ())? = nil
 
 local function text(parent: Instance, size: number, height: number): TextLabel
 	local l = Instance.new("TextLabel")
@@ -61,6 +66,43 @@ local function button(caption: string, enabled: boolean, onPress: () -> ())
 	b.Activated:Connect(onPress)
 end
 
+local function shortMen(men: number): string
+	return if men >= 1000 then string.format("%gk", math.floor(men / 100) / 10) else tostring(men)
+end
+
+-- "🛡 1k garrison", "⚔ 3k Zephyr", "⏳ siege 40%", "💥 battle" for whatever is going on in the province.
+local function statusLine(provinceId: number, record: Snapshot.ProvinceRecord): string
+	local snap = ClientState.snapshot()
+	local parts = {}
+	if record.battle then
+		table.insert(parts, "💥 Battle")
+	elseif record.siegeBy ~= 0 and record.siegeRequired > 0 then
+		local by = ClientState.nation(record.siegeBy)
+		table.insert(
+			parts,
+			string.format(
+				"⏳ %s siege %d%%",
+				if by then by.name else "?",
+				math.floor(100 * record.siegeProgress / record.siegeRequired)
+			)
+		)
+	end
+	if snap then
+		for _, a in snap.armies do
+			if a.location == provinceId then
+				local owner = ClientState.nation(a.owner)
+				table.insert(
+					parts,
+					if a.owner == 0
+						then "🛡 " .. shortMen(a.men) .. " garrison"
+						else "⚔ " .. shortMen(a.men) .. " " .. (if owner then owner.name else "?")
+				)
+			end
+		end
+	end
+	return table.concat(parts, "   ·   ")
+end
+
 local function pips(development: number): string
 	return string.rep("●", development) .. string.rep("○", Config.Economy.MaxDevelopment - development)
 end
@@ -80,7 +122,11 @@ local function render()
 	local mine = owner ~= nil and me ~= nil and owner.id == me.id
 
 	title.Text = (if def.isCapital then "⭐ " else "") .. def.name
-	local ownerText = if owner then owner.name elseif def.terrain == "Mountain" then "Impassable" else "Neutral"
+	local relation = if owner and me and owner.id ~= me.id then Relations.icon(me.id, owner.id) .. " " else ""
+	local ownerText = if owner
+		then relation .. owner.name
+		elseif def.terrain == "Mountain" then "Impassable"
+		else "Neutral"
 	info.Text = string.format(
 		"%s %s   ·   %s   ·   %s %s",
 		TERRAIN_ICONS[def.terrain] or "",
@@ -92,6 +138,8 @@ local function render()
 	info.TextColor3 = if owner
 		then Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.35)
 		else Color3.new(1, 1, 1)
+	status.Text = statusLine(provinceId, record)
+	status.Visible = status.Text ~= ""
 
 	for _, child in actions:GetChildren() do
 		if child:IsA("TextButton") then
@@ -123,6 +171,45 @@ local function render()
 			end
 		)
 	end
+	-- your armies standing here: tap to pick one up and send it somewhere
+	local snap = ClientState.snapshot()
+	if me and snap then
+		for _, a in snap.armies do
+			if a.location == provinceId and a.owner == me.id then
+				local armyId = a.id
+				button("➜ Move\n⚔ " .. shortMen(a.men), not a.inBattle, function()
+					if onSelectArmy then
+						onSelectArmy(armyId)
+					end
+				end)
+			end
+		end
+	end
+	-- diplomacy with the owner of a foreign province
+	if owner and me and owner.id ~= me.id and snap then
+		local target = owner.id
+		if Relations.atWar(me.id, target) then
+			for _, tribute in Config.Diplomacy.PeaceTributes do
+				local caption = if tribute == 0 then "🕊 Peace" else "🕊 Peace\n+💰" .. tribute
+				button(caption, me.gold >= tribute, function()
+					Intents.diplomacy("Peace", target, tribute)
+				end)
+			end
+		else
+			local canWar = snap.phase ~= "Peace"
+				and not Relations.allied(me.id, target)
+				and not Relations.truce(me.id, target)
+				and Relations.borders(me.id, target)
+			button("⚔ Declare\nwar", canWar, function()
+				Intents.diplomacy("War", target)
+			end)
+			if not Relations.allied(me.id, target) then
+				button("🤝 Ally", true, function()
+					Intents.diplomacy("Ally", target)
+				end)
+			end
+		end
+	end
 	sheet.Visible = true
 end
 
@@ -131,8 +218,9 @@ function ProvinceSheet.show(provinceId: number?)
 	render()
 end
 
-function ProvinceSheet.init(closeHandler: () -> ())
+function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) -> ())
 	onClose = closeHandler
+	onSelectArmy = selectArmyHandler
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "ProvinceSheet"
 	gui.ResetOnSpawn = false
@@ -193,6 +281,8 @@ function ProvinceSheet.init(closeHandler: () -> ())
 	end)
 
 	info = text(sheet, 15, 22)
+	status = text(sheet, 14, 20)
+	status.LayoutOrder = 3
 	info.LayoutOrder = 2
 
 	actions = Instance.new("Frame")
@@ -200,7 +290,7 @@ function ProvinceSheet.init(closeHandler: () -> ())
 	actions.BackgroundTransparency = 1
 	actions.Size = UDim2.fromScale(1, 0)
 	actions.AutomaticSize = Enum.AutomaticSize.Y
-	actions.LayoutOrder = 3
+	actions.LayoutOrder = 4
 	actions.Parent = sheet
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(124, BUTTON_HEIGHT)

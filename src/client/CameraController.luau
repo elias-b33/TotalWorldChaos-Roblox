@@ -19,7 +19,9 @@ local focus = Vector3.zero -- point on the ground under the screen centre
 local height = 400 -- camera height above the ground (studs)
 local targetFocus = focus
 local targetHeight = height
-local onTap: ((number?) -> ())? = nil
+export type TapHandler = (kind: "Army" | "Province" | nil, id: number?) -> ()
+
+local onTap: TapHandler? = nil
 
 local function maxHeight(): number
 	-- high enough that the whole map fits the screen, with a small margin
@@ -73,23 +75,24 @@ local function nearestLevel(): number
 	return best
 end
 
-local function pick(screenPos: Vector2): number?
-	local folder = MapRenderer.provinceFolder()
-	if folder == nil then
-		return nil
-	end
+-- What is under a screen point: an army token (they sit on top) or a province.
+local function pick(screenPos: Vector2): ("Army" | "Province" | nil, number?)
 	local ray = camera:ScreenPointToRay(screenPos.X, screenPos.Y)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = { folder }
+	params.FilterDescendantsInstances = MapRenderer.pickables()
 	local hit = workspace:Raycast(ray.Origin, ray.Direction * 5000, params)
 	if hit then
-		local id = hit.Instance:GetAttribute("ProvinceId")
-		if type(id) == "number" then
-			return id
+		local armyId = hit.Instance:GetAttribute("ArmyId")
+		if type(armyId) == "number" then
+			return "Army", armyId
+		end
+		local provinceId = hit.Instance:GetAttribute("ProvinceId")
+		if type(provinceId) == "number" then
+			return "Province", provinceId
 		end
 	end
-	return nil
+	return nil, nil
 end
 
 local function tap(screenPos: Vector2)
@@ -112,7 +115,7 @@ function CameraController.showWholeMap()
 	targetHeight = height
 end
 
-function CameraController.init(tapHandler: (number?) -> ())
+function CameraController.init(tapHandler: TapHandler)
 	onTap = tapHandler
 	camera.CameraType = Enum.CameraType.Scriptable
 

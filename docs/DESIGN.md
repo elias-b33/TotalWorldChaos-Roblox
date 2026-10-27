@@ -412,11 +412,11 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 2: War
 
-- [ ] Army movement with BFS paths and client interpolation
-- [ ] Battles, retreats, sieges, provinces flipping
-- [ ] War, alliance, peace and truce
-- [ ] Neutral provinces with garrisons
-- [ ] Win conditions and the Results screen
+- [x] Army movement with BFS paths and client interpolation
+- [x] Battles, retreats, sieges, provinces flipping
+- [x] War, alliance, peace and truce
+- [x] Neutral provinces with garrisons
+- [x] Win conditions and the Results screen
 
 **Gate 2:** 4 friends play 3 matches and ask for a 4th.
 

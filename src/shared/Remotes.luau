@@ -45,4 +45,9 @@ function Remotes.event(name: string): RemoteEvent
 	return folder:WaitForChild(name) :: RemoteEvent
 end
 
+function Remotes.unreliableEvent(name: string): UnreliableRemoteEvent
+	local folder = ReplicatedStorage:WaitForChild(FOLDER_NAME)
+	return folder:WaitForChild(name) :: UnreliableRemoteEvent
+end
+
 return Remotes

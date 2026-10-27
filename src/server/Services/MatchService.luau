@@ -9,11 +9,14 @@ local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Maps = require(Shared.Maps)
 local Match = require(Shared.Sim.Match)
+local Rng = require(Shared.Sim.Rng)
+local Tick = require(Shared.Sim.Tick)
 local Types = require(Shared.Types)
 
 local MatchService = {}
 
 local state: Types.MatchState? = nil
+local rng = Rng.new(1)
 
 -- Map for the next match: set a "MapId" attribute on Workspace in Studio to test another map.
 function MatchService.chooseMap(): string
@@ -27,6 +30,7 @@ end
 function MatchService.start(mapId: string): Types.MatchState
 	local newState = Match.new(Maps.get(mapId))
 	state = newState
+	rng = Rng.new(os.time()) -- battles get their random rolls from here; Sim never calls math.random
 	return newState
 end
 
@@ -35,20 +39,13 @@ function MatchService.state(): Types.MatchState
 	return state
 end
 
--- Moves the clock one tick. Returns the new phase if it changed.
+-- Tick order steps 2-8 (movement, battles, sieges, income, win checks). Returns the new phase if it changed.
 function MatchService.advance(): Types.Phase?
-	local s = MatchService.state()
-	s.tick += 1
-	local phase = Match.phaseAt(s.tick)
-	if phase ~= s.phase then
-		s.phase = phase
-		return phase
-	end
-	return nil
+	return Tick.advance(MatchService.state(), rng)
 end
 
 function MatchService.isOver(): boolean
-	return Match.isOver(MatchService.state().tick)
+	return Match.isOver(MatchService.state())
 end
 
 function MatchService.seat(player: Player): number?

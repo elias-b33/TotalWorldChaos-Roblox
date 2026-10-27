@@ -1,6 +1,6 @@
 --!strict
 -- Boots the server and runs the 1-second tick (docs/DESIGN.md "Tick order").
--- Phase 1 runs steps 1, 5, 8 and 9; armies, battles, sieges, Primordials and bots plug in here as they arrive.
+-- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 9 is Replicator.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,7 +15,6 @@ Players.CharacterAutoLoads = false -- the game is the map; nobody needs an avata
 
 local Server = script.Parent
 local CommandRouter = require(Server.CommandRouter)
-local EconomyService = require(Server.Services.EconomyService)
 local MatchService = require(Server.Services.MatchService)
 local Replicator = require(Server.Replicator)
 
@@ -52,14 +51,11 @@ end)
 local function tick()
 	local state = MatchService.state()
 	CommandRouter.applyQueued(state) -- 1. apply queued commands
-	local newPhase = MatchService.advance()
-	-- 2-4. move armies, resolve battles, advance sieges (Phase 2)
-	EconomyService.onTick(state) -- 5. income and upkeep every month
-	-- 6-7. Primordial-power charges, bots plan (Phase 3)
-	if newPhase and PHASE_TOASTS[newPhase] then -- 8. phase changes (win checks arrive in Phase 2)
+	local newPhase = MatchService.advance() -- 2-8. armies, battles, sieges, income, win checks
+	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end
-	Replicator.broadcast(state) -- 9. one delta to every client
+	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
 end
 
 -- Fixed-rate loop that doesn't drift: each tick is scheduled from the previous target time.

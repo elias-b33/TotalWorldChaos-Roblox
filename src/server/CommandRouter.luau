@@ -23,6 +23,7 @@ type Pending = {
 }
 
 local BUILDINGS = { Farm = true, Barracks = true, Fort = true }
+local DIPLOMACY_ACTIONS = { War = true, Ally = true, AcceptAlly = true, Peace = true, AcceptPeace = true }
 
 local CommandRouter = {}
 
@@ -33,6 +34,10 @@ local nationOf: (Player) -> number?
 
 local function isId(v: unknown): boolean
 	return type(v) == "number" and v == v and v >= 1 and v <= 1e6 and v == math.floor(v)
+end
+
+local function isAmount(v: unknown): boolean
+	return type(v) == "number" and v == v and v >= 0 and v <= 1e6 and v == math.floor(v)
 end
 
 local function reply(player: Player?, requestId: number, ok: boolean, reason: string?)
@@ -90,6 +95,35 @@ function CommandRouter.init(getNation: (Player) -> number?)
 					return nil
 				end
 				return { kind = "Recruit", province = province :: number, regiments = regiments :: number }
+			end)
+		end)
+
+	Remotes.event("RequestMove").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, army: unknown, to: unknown)
+			accept(player, requestId, function()
+				if not isId(army) or not isId(to) then
+					return nil
+				end
+				return { kind = "Move", army = army :: number, to = to :: number }
+			end)
+		end)
+
+	Remotes.event("RequestDiplomacy").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, action: unknown, target: unknown, gold: unknown)
+			accept(player, requestId, function()
+				if type(action) ~= "string" or not DIPLOMACY_ACTIONS[action] or not isId(target) then
+					return nil
+				end
+				local amount = if gold == nil then 0 else gold
+				if not isAmount(amount) then
+					return nil
+				end
+				return {
+					kind = "Diplomacy",
+					action = action :: Types.DiplomacyAction,
+					target = target :: number,
+					gold = amount :: number,
+				}
 			end)
 		end)
 

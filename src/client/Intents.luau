@@ -22,6 +22,21 @@ local REASONS: { [string]: string } = {
 	BadAmount = "🚫 Bad amount",
 	BadBuilding = "🚫 Unknown building",
 	BadRequest = "🚫 Bad request",
+	UnknownArmy = "🚫 That army is gone",
+	NotYourArmy = "🚫 Not your army",
+	InBattle = "💥 It's in a battle",
+	NoPath = "🚫 Can't get there",
+	BadTarget = "🚫 Not possible",
+	PeaceTime = "🕊 No wars until 3:00",
+	Allied = "🤝 You're allies",
+	AlreadyAtWar = "⚔ Already at war",
+	Truce = "🕊 Truce still running",
+	NoBorder = "🗺 You must share a border",
+	AlreadyAllied = "🤝 Already allied",
+	AtWar = "⚔ You're at war",
+	NotAtWar = "🕊 You're not at war",
+	AllianceFull = "🤝 Alliance is full (3)",
+	NoOffer = "⌛ That offer expired",
 }
 
 local Intents = {}
@@ -53,6 +68,15 @@ end
 
 function Intents.recruit(provinceId: number, regiments: number)
 	send("RequestRecruit", provinceId, regiments)
+end
+
+function Intents.move(armyId: number, to: number)
+	send("RequestMove", armyId, to)
+end
+
+-- action: War | Ally | AcceptAlly | Peace | AcceptPeace
+function Intents.diplomacy(action: string, target: number, gold: number?)
+	send("RequestDiplomacy", action, target, gold or 0)
 end
 
 return Intents

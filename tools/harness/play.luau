@@ -135,6 +135,146 @@ function scenarios.smoke()
 	H.expect(ClientState.nation(me).gold == nation.gold, "The client's gold matches the server")
 end
 
+local function provinceByName(name: string): number
+	local state = H.state()
+	for id, p in state.provinces do
+		if p.name == name then
+			return id
+		end
+	end
+	error("no province " .. name)
+end
+
+local function tapProvince(client, provinceId: number)
+	local CameraController = H.client(client, "CameraController")
+	CameraController.centreOn(H.provinceWorld(client, provinceId), true)
+	Emulator.run(1.5)
+	-- aim a little off-centre so army tokens standing at the centre don't catch the tap
+	Emulator.tapWorld(client, H.provinceWorld(client, provinceId) + Emulator.roblox.Vector3.new(0, 1, 4))
+	Emulator.run(0.3)
+end
+
+-- Phase 2: march on a garrison, win the battle, siege and take the province; war, peace and results.
+function scenarios.war()
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	local bob = Emulator.addClient("Bob")
+	Emulator.run(2)
+	local state = H.state()
+	local A, B = H.myNation(alice), H.myNation(bob)
+	H.expect(A == 1 and B == 2, "Alice is Aurora, Bob is Zephyr")
+	state.nations[A].gold, state.nations[A].manpower = 400, 20000
+
+	-- recruit 3 regiments at the capital
+	Emulator.press(alice, "⭐")
+	Emulator.run(1)
+	for _ = 1, 3 do
+		Emulator.press(alice, "Regiment")
+		Emulator.run(1.2)
+	end
+	local army
+	for _, a in state.armies do
+		if a.owner == A then
+			army = a
+		end
+	end
+	H.expect(army ~= nil and army.men == 3000, "a 3k army stands at the capital")
+
+	-- pick it up from the sheet, tap the neutral drift isle, Go
+	Emulator.press(alice, "Move")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(alice, "Tap where to go") ~= nil, "the army sheet asks for a destination")
+	local rock = provinceByName("Cinder Rock")
+	tapProvince(alice, rock)
+	H.expect(Emulator.findText(alice, "Cinder Rock") ~= nil, "route preview names the destination")
+	H.shot(alice, "route_preview")
+	Emulator.press(alice, "Go")
+	Emulator.run(1)
+	H.expect(#army.path > 0, "the army is marching")
+	Emulator.run(6)
+	H.shot(alice, "marching")
+
+	-- arrive, fight the garrison, besiege, take it
+	local deadline = Emulator.now() + 60
+	while army.location ~= rock and Emulator.now() < deadline do
+		Emulator.run(1)
+	end
+	H.expect(army.location == rock, "the army reached Cinder Rock")
+	Emulator.run(1.5)
+	H.shot(alice, "battle")
+	Emulator.run(4)
+	local garrisonLeft = false
+	for _, a in state.armies do
+		garrisonLeft = garrisonLeft or (a.owner == 0 and a.location == rock)
+	end
+	H.expect(not garrisonLeft, "the garrison was beaten")
+	Emulator.run(8)
+	H.shot(alice, "siege")
+	deadline = Emulator.now() + 120
+	while state.provinces[rock].owner ~= A and Emulator.now() < deadline do
+		Emulator.run(1)
+	end
+	H.expect(state.provinces[rock].owner == A, "Cinder Rock was captured")
+	Emulator.run(0.5)
+	H.shot(alice, "captured")
+
+	-- jump to the war phase, take the other drift province so Aurora borders Zephyr, declare war
+	state.tick = 179
+	state.provinces[provinceByName("Cinder Reach")].owner = A
+	Emulator.run(2)
+	local zephyrLeeward = provinceByName("Zephyr Leeward")
+	tapProvince(alice, zephyrLeeward)
+	H.shot(alice, "foreign_sheet")
+	Emulator.press(alice, "Declare")
+	Emulator.run(1.5)
+	local Diplomacy = require("../../src/shared/Sim/Diplomacy")
+	H.expect(Diplomacy.atWar(state, A, B), "Aurora and Zephyr are at war")
+	H.shot(bob, "war_declared_on_bob")
+
+	-- Bob offers peace with 50 gold; Alice accepts from the offer card
+	state.nations[B].gold = 300
+	Emulator.run(1)
+	tapProvince(bob, provinceByName("Cinder Reach"))
+	Emulator.press(bob, "+💰50")
+	Emulator.run(2)
+	H.expect(Emulator.findText(alice, "offers peace") ~= nil, "Alice sees Bob's peace offer")
+	H.shot(alice, "peace_offer")
+	local aliceGold = state.nations[A].gold
+	Emulator.press(alice, "Accept")
+	Emulator.run(1.5)
+	H.expect(not Diplomacy.atWar(state, A, B), "peace was made")
+	H.expect(state.nations[A].gold >= aliceGold + 50, "Alice got the tribute")
+
+	-- the nations drawer
+	Emulator.press(alice, "🌍")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Zephyr") ~= nil, "the drawer lists the nations")
+	H.shot(alice, "nations")
+	Emulator.press(alice, "🌍")
+
+	-- give Aurora 40% of the world: domination and the results screen
+	local need = math.ceil(0.4 * 131)
+	local given = 0
+	for _, p in state.provinces do
+		if p.owner == A then
+			given += 1
+		end
+	end
+	for _, p in state.provinces do
+		if given < need and p.owner ~= A and p.terrain ~= "Mountain" then
+			p.owner = A
+			given += 1
+		end
+	end
+	Emulator.run(2)
+	H.expect(state.result ~= nil and state.result.kind == "Domination", "Aurora won by domination")
+	H.expect(Emulator.findText(alice, "You win") ~= nil, "Alice sees the victory screen")
+	H.shot(alice, "results")
+	Emulator.run(32)
+	H.expect(state ~= H.state(), "a new match started after Results")
+	H.expect(H.state().phase == "Peace", "the new match is in Peace")
+end
+
 ---------------------------------------------------------------------------------------------- main
 
 local function runScenario(name: string)
