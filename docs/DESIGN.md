@@ -150,8 +150,9 @@ src/
       MatchService.luau        -- phases, win checks, scoring
       PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
   client/
-    MapRenderer.luau           -- colours provinces, draws armies and borders
-    MapArt.luau                -- texture asset ids per biome (Phase 4)
+    MapRenderer.luau           -- colours provinces, draws armies, labels and markers
+    MapSurface.luau            -- builds the land from MapData shapes: wedges, relief, water, borders
+    MapStyle.luau              -- biome look: material, colour, height
     CameraController.luau      -- pan, pinch zoom, tap selection
     UI/                        -- HUD, province sheet, diplomacy, powers
   shared/
@@ -193,8 +194,10 @@ tools/mapgen/                  -- Python generator for everything in assets/
 
 ### Map rendering
 
-- **Prototype (Phase 1):** Skyshards `MapData` drawn as flat discs at province centres, with lines between neighbours.
-- **Final maps (Phase 4):** province MeshParts generated from each map's `province_ids.png` and imported into Studio in one go, named by province id, textured with `assets/textures` (see `docs/MAPS.md`).
+- **Province shapes:** `tools/mapgen` traces every province outline from `province_ids.png`, simplifies and triangulates it, and stores the triangles in `MapData` (`tris`) with the shared border lines (`borders`). At match start the client builds each province from its triangles (two `WedgePart`s per triangle) under a `Model` named `P<id>`. Nothing is imported into Studio, so a regenerated map just works.
+- **Look:** each biome has a built-in Roblox material and colour (`MapStyle`). In the political view the part colour is the owner's nation colour with a touch of the terrain colour, so the material still shows. Hills and mountains stand higher than plains; mountains get rock ridges with snow caps and are never painted. Seas are Roblox `Terrain` water; Skyshards floats over a deep sky.
+- **Borders:** thin lines between provinces of one owner, bold where two owners meet; redrawn when ownership changes.
+- **Labels:** a province's name and development pips show once the camera is within about four province widths, so big provinces are named from far away and small ones only up close.
 - Colour changes only when ownership changes; nothing updates per frame except army tokens.
 
 ### Performance budget
@@ -202,6 +205,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 | Budget | Target |
 | --- | --- |
 | Provinces | ≤ 150 |
+| Map parts (static, anchored, no collision or shadows) | ≤ 7,000 (Earth 6.4k, Eldmoor 3.1k, Skyshards 1.9k) |
 | Armies on the map | ≤ 60 |
 | Server work per tick | < 5 ms |
 | Network per client | < 10 KB/s |
@@ -292,11 +296,14 @@ export type ProvinceDef = {
     development: number,
     neighbors: { ProvinceId }, -- includes straits
     center: { x: number, y: number }, -- map pixels; 1 px = 0.5 stud
-    area: number,              -- map pixels (the prototype sizes its discs by it)
+    area: number,              -- map pixels (sizes the label distance)
     startOwner: number?,       -- start slot 1..10, nil = neutral
     isCapital: boolean,
     garrison: number?,         -- neutral garrison override, men
+    tris: { number },          -- the province's shape: triangles as flat x1, y1, x2, y2, x3, y3, ... in map pixels
 }
+
+export type BorderDef = { a: ProvinceId, b: ProvinceId, points: { number } } -- a shared border line, flat x, y, ...
 
 export type MapDef = {
     id: string,                -- "earth" | "eldmoor" | "skyshards"
@@ -306,6 +313,7 @@ export type MapDef = {
     nations: { { slot: number, name: string, capital: ProvinceId, colorIndex: number } },
     provinces: { ProvinceDef },
     straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean } },
+    borders: { BorderDef },
 }
 ```
 
@@ -432,7 +440,8 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 4: Polish and shop
 
-- [ ] Province meshes and textures for Earth, Eldmoor and Skyshards
+- [x] Province shapes for Earth, Eldmoor and Skyshards (built from `MapData` triangles, materials by biome)
+- [ ] Custom terrain texture pack as material variants
 - [ ] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
 - [ ] `PlayerDataService`: XP, ranks, daily quests

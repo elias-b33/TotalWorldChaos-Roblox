@@ -47,6 +47,7 @@ local function dumpGui(inst)
 			node.textColor = c3(inst.TextColor3)
 			node.textXAlign = enumName(inst.TextXAlignment)
 			node.textWrapped = inst.TextWrapped
+			node.stroke = inst.TextStrokeTransparency < 0.9
 		end
 	elseif inst:IsA("UIListLayout") then
 		node.fill = enumName(inst.FillDirection)
@@ -83,11 +84,12 @@ function Scene.capture(client)
 	local parts = {}
 	local billboards = {}
 	local selections = {}
+	local highlights = {}
 	for _, d in ws:GetDescendants() do
-		if d:IsA("BasePart") then
+		if d:IsA("BasePart") and not d:IsA("Terrain") then
 			table.insert(parts, {
 				name = d.Name,
-				shape = if d:IsA("Part") then enumName(d.Shape) else "Block",
+				shape = if d:IsA("WedgePart") then "Wedge" elseif d:IsA("Part") then enumName(d.Shape) else "Block",
 				cf = { d.CFrame:GetComponents() },
 				size = { d.Size.X, d.Size.Y, d.Size.Z },
 				color = c3(d.Color),
@@ -97,17 +99,26 @@ function Scene.capture(client)
 		elseif d:IsA("BillboardGui") and d.Enabled then
 			local adornee = d.Adornee or d.Parent
 			if adornee and adornee:IsA("BasePart") then
-				local label = textOf(d)
 				local offset = d.StudsOffsetWorldSpace
 				local p = adornee.CFrame.Position + offset
 				table.insert(billboards, {
 					pos = { p.X, p.Y, p.Z },
 					maxDistance = d.MaxDistance,
 					size = udim2(d.Size),
-					text = if label then label.Text else "",
-					textSize = if label then label.TextSize else 14,
-					textColor = if label then c3(label.TextColor3) else { 1, 1, 1 },
+					gui = dumpGui(d),
 				})
+			end
+		elseif d:IsA("Highlight") and d.Enabled and d.Adornee then
+			for _, p in d.Adornee:GetDescendants() do
+				if p:IsA("BasePart") then
+					table.insert(highlights, {
+						shape = if p:IsA("WedgePart") then "Wedge" else "Block",
+						cf = { p.CFrame:GetComponents() },
+						size = { p.Size.X, p.Size.Y, p.Size.Z },
+						color = c3(d.FillColor),
+						alpha = 1 - d.FillTransparency,
+					})
+				end
 			end
 		elseif d:IsA("SelectionBox") and d.Visible and d.Adornee then
 			local a = d.Adornee
@@ -129,6 +140,19 @@ function Scene.capture(client)
 		parts = parts,
 		billboards = billboards,
 		selections = selections,
+		highlights = highlights,
+		water = (function()
+			local out = {}
+			for _, b in Emulator.terrainBlocks(client) do
+				local t = ws:FindFirstChildOfClass("Terrain")
+				table.insert(out, {
+					cf = { b.cf:GetComponents() },
+					size = { b.size.X, b.size.Y, b.size.Z },
+					color = c3(t.WaterColor),
+				})
+			end
+			return out
+		end)(),
 		gui = gui,
 		time = Emulator.now(),
 	}

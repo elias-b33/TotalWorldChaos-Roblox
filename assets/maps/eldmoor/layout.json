@@ -1,3289 +1,542 @@
 {
- "id": "eldmoor",
- "title": "Eldmoor",
- "theme": "fantasy",
- "imageSize": [
-  2048,
-  1024
- ],
- "summary": {
-  "provinces": 146,
-  "Plains": 65,
-  "Forest": 35,
-  "Hills": 31,
-  "Mountain": 15,
-  "neutralAtStart": 51
- },
- "nations": [
-  {
-   "slot": 1,
-   "name": "Mistborn",
-   "capital": 46,
-   "colorIndex": 1
-  },
-  {
-   "slot": 2,
-   "name": "Saltmarsh",
-   "capital": 53,
-   "colorIndex": 2
-  },
-  {
-   "slot": 3,
-   "name": "Ironholds",
-   "capital": 63,
-   "colorIndex": 3
-  },
-  {
-   "slot": 4,
-   "name": "Frostmarch",
-   "capital": 87,
-   "colorIndex": 4
-  },
-  {
-   "slot": 5,
-   "name": "Greenvale",
-   "capital": 95,
-   "colorIndex": 5
-  },
-  {
-   "slot": 6,
-   "name": "Elderwood",
-   "capital": 98,
-   "colorIndex": 6
-  },
-  {
-   "slot": 7,
-   "name": "Wyrmcoast",
-   "capital": 111,
-   "colorIndex": 7
-  },
-  {
-   "slot": 8,
-   "name": "Sunscorch",
-   "capital": 126,
-   "colorIndex": 8
-  },
-  {
-   "slot": 9,
-   "name": "Ashen Dominion",
-   "capital": 131,
-   "colorIndex": 9
-  },
-  {
-   "slot": 10,
-   "name": "Corsairs",
-   "capital": 146,
-   "colorIndex": 10
-  }
- ],
- "provinces": [
-  {
-   "id": 1,
-   "name": "Eaglecrown",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    712,
-    449
-   ],
-   "area": 9739,
-   "neighbors": [
-    2,
-    25,
-    39,
-    102,
-    116,
-    135
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 2,
-   "name": "Gianttalon",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    752,
-    369
-   ],
-   "area": 9377,
-   "neighbors": [
-    1,
-    3,
-    39,
-    40,
-    51,
-    93,
-    116
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 3,
-   "name": "Thunderspine",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    808,
-    319
-   ],
-   "area": 8120,
-   "neighbors": [
-    2,
-    4,
-    40,
-    51,
-    105
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 4,
-   "name": "Grimhorn",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    894,
-    285
-   ],
-   "area": 9344,
-   "neighbors": [
-    3,
-    33,
-    51,
-    77,
-    105,
-    132
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 5,
-   "name": "Dragonpeak",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1147,
-    297
-   ],
-   "area": 11129,
-   "neighbors": [
-    6,
-    33,
-    62,
-    74,
-    76,
-    78,
-    112
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 6,
-   "name": "Titanspine",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1231,
-    328
-   ],
-   "area": 9139,
-   "neighbors": [
-    5,
-    7,
-    62,
-    74,
-    117
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 7,
-   "name": "Eaglefang",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1276,
-    376
-   ],
-   "area": 7575,
-   "neighbors": [
-    6,
-    8,
-    74,
-    117,
-    140,
-    143
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 8,
-   "name": "Skullspine",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1307,
-    447
-   ],
-   "area": 6565,
-   "neighbors": [
-    7,
-    9,
-    72,
-    140,
-    143
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 9,
-   "name": "Wyrmspine",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1304,
-    537
-   ],
-   "area": 8981,
-   "neighbors": [
-    8,
-    38,
-    41,
-    45,
-    72,
-    140
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 10,
-   "name": "Dragonspire",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1126,
-    673
-   ],
-   "area": 10493,
-   "neighbors": [
-    11,
-    21,
-    24,
-    41,
-    45,
-    92
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 11,
-   "name": "Grimpeak",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1036,
-    694
-   ],
-   "area": 8019,
-   "neighbors": [
-    10,
-    12,
-    21,
-    37,
-    92,
-    109,
-    127
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 12,
-   "name": "Titanpeak",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    959,
-    692
-   ],
-   "area": 7640,
-   "neighbors": [
-    11,
-    13,
-    37,
-    109,
-    126
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 13,
-   "name": "Giantpeak",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    883,
-    679
-   ],
-   "area": 7733,
-   "neighbors": [
-    12,
-    14,
-    68,
-    109,
-    115,
-    126
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 14,
-   "name": "Eaglespire",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    811,
-    644
-   ],
-   "area": 8151,
-   "neighbors": [
-    13,
-    67,
-    97,
-    115,
-    135
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 15,
-   "name": "Mount Cinder",
-   "terrain": "Mountain",
-   "biome": "peaks",
-   "development": 1,
-   "center": [
-    1364,
-    790
-   ],
-   "area": 9947,
-   "neighbors": [
-    24,
-    55,
-    65,
-    75,
-    130,
-    131,
-    137
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 16,
-   "name": "Willowbough",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1668,
-    696
-   ],
-   "area": 9735,
-   "neighbors": [
-    61,
-    70,
-    84,
-    101,
-    103,
-    113
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 17,
-   "name": "Wolfheath",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    599,
-    653
-   ],
-   "area": 10537,
-   "neighbors": [
-    26,
-    30,
-    53,
-    67,
-    86,
-    102,
-    133
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 18,
-   "name": "Millbury",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    930,
-    517
-   ],
-   "area": 8181,
-   "neighbors": [
-    21,
-    39,
-    51,
-    77,
-    109,
-    115
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 19,
-   "name": "Dunedrift",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    1261,
-    901
-   ],
-   "area": 5334,
-   "neighbors": [
-    57,
-    130,
-    131
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 20,
-   "name": "Mistbough",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    363,
-    908
-   ],
-   "area": 5451,
-   "neighbors": [
-    49,
-    91
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 21,
-   "name": "Barleybury",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    1064,
-    587
-   ],
-   "area": 10517,
-   "neighbors": [
-    10,
-    11,
-    18,
-    41,
-    109,
-    120
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 22,
-   "name": "Honeyfield",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    143,
-    923
-   ],
-   "area": 5136,
-   "neighbors": [
-    91,
-    146
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 23,
-   "name": "Raventor",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    1548,
-    228
-   ],
-   "area": 8928,
-   "neighbors": [
-    35,
-    64,
-    80,
-    106,
-    139
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 24,
-   "name": "Smokepit",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 2,
-   "center": [
-    1245,
-    735
-   ],
-   "area": 9683,
-   "neighbors": [
-    10,
-    15,
-    45,
-    65,
-    92,
-    131
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 25,
-   "name": "Brightvale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    597,
-    440
-   ],
-   "area": 10243,
-   "neighbors": [
-    1,
-    32,
-    95,
-    102,
-    116,
-    124,
-    133
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 26,
-   "name": "Honeyvale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    538,
-    792
-   ],
-   "area": 10220,
-   "neighbors": [
-    17,
-    36,
-    53,
-    66,
-    86,
-    94,
-    134
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 27,
-   "name": "Brightstead",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    370,
-    433
-   ],
-   "area": 9957,
-   "neighbors": [
-    43,
-    52,
-    56,
-    81,
-    108,
-    124
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 28,
-   "name": "Duskhollow",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1749,
-    544
-   ],
-   "area": 5781,
-   "neighbors": [
-    101,
-    103,
-    136
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 29,
-   "name": "Smokeforge",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 1,
-   "center": [
-    1534,
-    795
-   ],
-   "area": 8929,
-   "neighbors": [
-    61,
-    75,
-    89,
-    113,
-    137
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 30,
-   "name": "Briarshade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    468,
-    610
-   ],
-   "area": 9903,
-   "neighbors": [
-    17,
-    36,
-    69,
-    86,
-    95,
-    108,
-    133
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 31,
-   "name": "Silverhollow",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1604,
-    469
-   ],
-   "area": 9601,
-   "neighbors": [
-    59,
-    84,
-    98,
-    103,
-    136
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 32,
-   "name": "Greytor",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    539,
-    379
-   ],
-   "area": 9539,
-   "neighbors": [
-    25,
-    43,
-    93,
-    116,
-    121,
-    124
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 33,
-   "name": "Palehold",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 1,
-   "center": [
-    1027,
-    282
-   ],
-   "area": 11322,
-   "neighbors": [
-    4,
-    5,
-    76,
-    77,
-    78,
-    132
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 34,
-   "name": "Palemere",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    854,
-    113
-   ],
-   "area": 5790,
-   "neighbors": [
-    87,
-    105,
-    129,
-    142
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 35,
-   "name": "Palemarch",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    1465,
-    163
-   ],
-   "area": 11522,
-   "neighbors": [
-    23,
-    63,
-    64,
-    110,
-    139
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 36,
-   "name": "Stormcrest",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    446,
-    735
-   ],
-   "area": 9071,
-   "neighbors": [
-    26,
-    30,
-    49,
-    66,
-    69,
-    86,
-    144
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 37,
-   "name": "Sandsea",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    1001,
-    775
-   ],
-   "area": 8261,
-   "neighbors": [
-    11,
-    12,
-    73,
-    126,
-    127
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 38,
-   "name": "Glimmerthicket",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1366,
-    592
-   ],
-   "area": 9197,
-   "neighbors": [
-    9,
-    45,
-    55,
-    65,
-    72,
-    122
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 39,
-   "name": "Amberford",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    811,
-    487
-   ],
-   "area": 11391,
-   "neighbors": [
-    1,
-    2,
-    18,
-    51,
-    115,
-    135
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 40,
-   "name": "Hoarfell",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 1,
-   "center": [
-    744,
-    249
-   ],
-   "area": 9413,
-   "neighbors": [
-    2,
-    3,
-    71,
-    93,
-    105,
-    129
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 41,
-   "name": "Fairmeadow",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    1175,
-    558
-   ],
-   "area": 9970,
-   "neighbors": [
-    9,
-    10,
-    21,
-    45,
-    74,
-    120,
-    140
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 42,
-   "name": "Moonbough",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1898,
-    251
-   ],
-   "area": 7943,
-   "neighbors": [
-    46,
-    88,
-    138,
-    145
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 43,
-   "name": "Heathercairn",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    418,
-    288
-   ],
-   "area": 10933,
-   "neighbors": [
-    27,
-    32,
-    44,
-    81,
-    119,
-    121,
-    124,
-    125
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 44,
-   "name": "Roseshire",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    477,
-    224
-   ],
-   "area": 8460,
-   "neighbors": [
-    43,
-    79,
-    96,
-    111,
-    121,
-    125
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 45,
-   "name": "Ashrift",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 1,
-   "center": [
-    1236,
-    627
-   ],
-   "area": 11200,
-   "neighbors": [
-    9,
-    10,
-    24,
-    38,
-    41,
-    65
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 46,
-   "name": "Oakstead",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    1807,
-    225
-   ],
-   "area": 9260,
-   "neighbors": [
-    42,
-    88,
-    90,
-    114,
-    138
-   ],
-   "startOwner": 1,
-   "isCapital": true
-  },
-  {
-   "id": 47,
-   "name": "Rosestead",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    237,
-    771
-   ],
-   "area": 7309,
-   "neighbors": [
-    83,
-    118,
-    146
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 48,
-   "name": "Ambermeadow",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    710,
-    808
-   ],
-   "area": 8851,
-   "neighbors": [
-    53,
-    94,
-    97,
-    104,
-    123
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 49,
-   "name": "Amberwick",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    411,
-    794
-   ],
-   "area": 4178,
-   "neighbors": [
-    20,
-    36,
-    66,
-    144
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 50,
-   "name": "Scorchspire",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    959,
-    936
-   ],
-   "area": 4334,
-   "neighbors": [
-    73,
-    82
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 51,
-   "name": "Millwick",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    865,
-    406
-   ],
-   "area": 10908,
-   "neighbors": [
-    2,
-    3,
-    4,
-    18,
-    39,
-    77
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 52,
-   "name": "Oakford",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    280,
-    532
-   ],
-   "area": 11221,
-   "neighbors": [
-    27,
-    56,
-    69,
-    108
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 53,
-   "name": "Thornthicket",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 3,
-   "center": [
-    654,
-    723
-   ],
-   "area": 10330,
-   "neighbors": [
-    17,
-    26,
-    48,
-    67,
-    94,
-    97
-   ],
-   "startOwner": 2,
-   "isCapital": true
-  },
-  {
-   "id": 54,
-   "name": "Honeywick",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    1711,
-    403
-   ],
-   "area": 7496,
-   "neighbors": [
-    59,
-    80,
-    90,
-    136
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 55,
-   "name": "Charforge",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 1,
-   "center": [
-    1424,
-    674
-   ],
-   "area": 9936,
-   "neighbors": [
-    15,
-    38,
-    65,
-    99,
-    122,
-    137
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 56,
-   "name": "Greyheath",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    272,
-    448
-   ],
-   "area": 5806,
-   "neighbors": [
-    27,
-    52,
-    81
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 57,
-   "name": "Sootpit",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 2,
-   "center": [
-    1167,
-    848
-   ],
-   "area": 8155,
-   "neighbors": [
-    19,
-    92,
-    127,
-    131
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 58,
-   "name": "Honeyshire",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    1889,
-    738
-   ],
-   "area": 4531,
-   "neighbors": [
-    70,
-    128
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 59,
-   "name": "Faeshade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1623,
-    377
-   ],
-   "area": 10317,
-   "neighbors": [
-    31,
-    54,
-    80,
-    98,
-    106,
-    136
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 60,
-   "name": "Heathertor",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    1426,
-    339
-   ],
-   "area": 9299,
-   "neighbors": [
-    63,
-    64,
-    98,
-    106,
-    117,
-    143
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 61,
-   "name": "Charscar",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 1,
-   "center": [
-    1620,
-    802
-   ],
-   "area": 5752,
-   "neighbors": [
-    16,
-    29,
-    89,
-    113
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 62,
-   "name": "Wintermarch",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    1265,
-    202
-   ],
-   "area": 10597,
-   "neighbors": [
-    5,
-    6,
-    63,
-    85,
-    110,
-    112,
-    117
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 63,
-   "name": "Stoneridge",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 3,
-   "center": [
-    1364,
-    224
-   ],
-   "area": 9407,
-   "neighbors": [
-    35,
-    60,
-    62,
-    64,
-    110,
-    117
-   ],
-   "startOwner": 3,
-   "isCapital": true
-  },
-  {
-   "id": 64,
-   "name": "Ravenmoor",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    1476,
-    275
-   ],
-   "area": 8485,
-   "neighbors": [
-    23,
-    35,
-    60,
-    63,
-    106
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 65,
-   "name": "Sootforge",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 2,
-   "center": [
-    1319,
-    678
-   ],
-   "area": 9926,
-   "neighbors": [
-    15,
-    24,
-    38,
-    45,
-    55
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 66,
-   "name": "Fairfield",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    479,
-    833
-   ],
-   "area": 5898,
-   "neighbors": [
-    26,
-    36,
-    49,
-    134
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 67,
-   "name": "Greenshire",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    709,
-    644
-   ],
-   "area": 8866,
-   "neighbors": [
-    14,
-    17,
-    53,
-    97,
-    102,
-    135
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 68,
-   "name": "Sunwell",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    838,
-    778
-   ],
-   "area": 9352,
-   "neighbors": [
-    13,
-    82,
-    97,
-    123,
-    126
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 69,
-   "name": "Willowthicket",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    381,
-    592
-   ],
-   "area": 8179,
-   "neighbors": [
-    30,
-    36,
-    52,
-    108,
-    144
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 70,
-   "name": "Eldershade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1843,
-    702
-   ],
-   "area": 3565,
-   "neighbors": [
-    16,
-    58,
-    101,
-    128
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 71,
-   "name": "Millford",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    685,
-    188
-   ],
-   "area": 7832,
-   "neighbors": [
-    40,
-    93,
-    111,
-    129,
-    141
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 72,
-   "name": "Briarthicket",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1416,
-    493
-   ],
-   "area": 8322,
-   "neighbors": [
-    8,
-    9,
-    38,
-    98,
-    122,
-    143
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 73,
-   "name": "Sandoasis",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    987,
-    868
-   ],
-   "area": 9600,
-   "neighbors": [
-    37,
-    50,
-    82,
-    126,
-    127
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 74,
-   "name": "Amberbury",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    1163,
-    432
-   ],
-   "area": 9480,
-   "neighbors": [
-    5,
-    6,
-    7,
-    41,
-    78,
-    120,
-    140
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 75,
-   "name": "Slagpit",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 2,
-   "center": [
-    1415,
-    872
-   ],
-   "area": 10440,
-   "neighbors": [
-    15,
-    29,
-    89,
-    130,
-    137
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 76,
-   "name": "Hoarmarch",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    1064,
-    189
-   ],
-   "area": 10220,
-   "neighbors": [
-    5,
-    33,
-    100,
-    112,
-    132
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 77,
-   "name": "Rosebury",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    963,
-    373
-   ],
-   "area": 11280,
-   "neighbors": [
-    4,
-    18,
-    33,
-    51,
-    78
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 78,
-   "name": "Greenford",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    1072,
-    390
-   ],
-   "area": 11415,
-   "neighbors": [
-    5,
-    33,
-    74,
-    77,
-    120
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 79,
-   "name": "Greyfell",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    558,
-    128
-   ],
-   "area": 6291,
-   "neighbors": [
-    44,
-    96,
-    111,
-    141
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 80,
-   "name": "Duskshade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1632,
-    274
-   ],
-   "area": 8740,
-   "neighbors": [
-    23,
-    54,
-    59,
-    90,
-    106,
-    139
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 81,
-   "name": "Millstead",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    333,
-    347
-   ],
-   "area": 10969,
-   "neighbors": [
-    27,
-    43,
-    56,
-    119
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 82,
-   "name": "Sunreach",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    867,
-    897
-   ],
-   "area": 9561,
-   "neighbors": [
-    50,
-    68,
-    73,
-    107,
-    123,
-    126
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 83,
-   "name": "Fairdale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    119,
-    684
-   ],
-   "area": 7027,
-   "neighbors": [
-    47,
-    118
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 84,
-   "name": "Silverglade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1591,
-    581
-   ],
-   "area": 10883,
-   "neighbors": [
-    16,
-    31,
-    98,
-    99,
-    103,
-    113,
-    122
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 85,
-   "name": "Mistwood",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1284,
-    123
-   ],
-   "area": 5396,
-   "neighbors": [
-    62,
-    110,
-    112
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 86,
-   "name": "Duskroot",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    517,
-    691
-   ],
-   "area": 8511,
-   "neighbors": [
-    17,
-    26,
-    30,
-    36
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 87,
-   "name": "Hoarreach",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 3,
-   "center": [
-    921,
-    146
-   ],
-   "area": 8205,
-   "neighbors": [
-    34,
-    100,
-    105,
-    132,
-    142
-   ],
-   "startOwner": 4,
-   "isCapital": true
-  },
-  {
-   "id": 88,
-   "name": "Willowgrove",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1843,
-    325
-   ],
-   "area": 9573,
-   "neighbors": [
-    42,
-    46,
-    90,
-    145
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 89,
-   "name": "Sootgate",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 1,
-   "center": [
-    1513,
-    875
-   ],
-   "area": 5453,
-   "neighbors": [
-    29,
-    61,
-    75
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 90,
-   "name": "Mistgrove",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1746,
-    265
-   ],
-   "area": 6801,
-   "neighbors": [
-    46,
-    54,
-    80,
-    88,
-    114
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 91,
-   "name": "Clovervale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    292,
-    900
-   ],
-   "area": 5486,
-   "neighbors": [
-    20,
-    22,
-    146
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 92,
-   "name": "Slagwaste",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 2,
-   "center": [
-    1155,
-    760
-   ],
-   "area": 8947,
-   "neighbors": [
-    10,
-    11,
-    24,
-    57,
-    127,
-    131
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 93,
-   "name": "Stonebarrow",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    639,
-    274
-   ],
-   "area": 9556,
-   "neighbors": [
-    2,
-    32,
-    40,
-    71,
-    111,
-    116,
-    121
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 94,
-   "name": "Rosedale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    609,
-    855
-   ],
-   "area": 10788,
-   "neighbors": [
-    26,
-    48,
-    53,
-    104,
-    134
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 95,
-   "name": "Stoneheath",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 3,
-   "center": [
-    497,
-    527
-   ],
-   "area": 8959,
-   "neighbors": [
-    25,
-    30,
-    108,
-    124,
-    133
-   ],
-   "startOwner": 5,
-   "isCapital": true
-  },
-  {
-   "id": 96,
-   "name": "Honeymeadow",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    478,
-    137
-   ],
-   "area": 4754,
-   "neighbors": [
-    44,
-    79,
-    125
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 97,
-   "name": "Greenstead",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    764,
-    731
-   ],
-   "area": 8785,
-   "neighbors": [
-    14,
-    48,
-    53,
-    67,
-    68,
-    123
-   ],
-   "startOwner": 2,
-   "isCapital": false
-  },
-  {
-   "id": 98,
-   "name": "Silvershade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 3,
-   "center": [
-    1507,
-    476
-   ],
-   "area": 12303,
-   "neighbors": [
-    31,
-    59,
-    60,
-    72,
-    84,
-    106,
-    122,
-    143
-   ],
-   "startOwner": 6,
-   "isCapital": true
-  },
-  {
-   "id": 99,
-   "name": "Cloverwick",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    1522,
-    633
-   ],
-   "area": 9070,
-   "neighbors": [
-    55,
-    84,
-    113,
-    122,
-    137
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 100,
-   "name": "Heatherheath",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    1003,
-    116
-   ],
-   "area": 5365,
-   "neighbors": [
-    76,
-    87,
-    132,
-    142
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 101,
-   "name": "Faethicket",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1732,
-    632
-   ],
-   "area": 4450,
-   "neighbors": [
-    16,
-    28,
-    70,
-    103
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 102,
-   "name": "Fairford",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    674,
-    551
-   ],
-   "area": 9781,
-   "neighbors": [
-    1,
-    17,
-    25,
-    67,
-    133,
-    135
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 103,
-   "name": "Willowroot",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1683,
-    573
-   ],
-   "area": 9579,
-   "neighbors": [
-    16,
-    28,
-    31,
-    84,
-    101,
-    136
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 104,
-   "name": "Barleyvale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    696,
-    905
-   ],
-   "area": 8986,
-   "neighbors": [
-    48,
-    94,
-    107,
-    123
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 105,
-   "name": "Hoarhaven",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    844,
-    204
-   ],
-   "area": 8632,
-   "neighbors": [
-    3,
-    4,
-    34,
-    40,
-    87,
-    129,
-    132
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 106,
-   "name": "Rosemeadow",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    1534,
-    336
-   ],
-   "area": 11261,
-   "neighbors": [
-    23,
-    59,
-    60,
-    64,
-    80,
-    98
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 107,
-   "name": "Scorchrest",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 1,
-   "center": [
-    807,
-    938
-   ],
-   "area": 5284,
-   "neighbors": [
-    82,
-    104,
-    123
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 108,
-   "name": "Cloverdale",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    401,
-    516
-   ],
-   "area": 8611,
-   "neighbors": [
-    27,
-    30,
-    52,
-    69,
-    95,
-    124
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 109,
-   "name": "Clovermeadow",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    969,
-    597
-   ],
-   "area": 7709,
-   "neighbors": [
-    11,
-    12,
-    13,
-    18,
-    21,
-    115
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 110,
-   "name": "Duskwood",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1372,
-    133
-   ],
-   "area": 8771,
-   "neighbors": [
-    35,
-    62,
-    63,
-    85
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 111,
-   "name": "Clovershire",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 3,
-   "center": [
-    585,
-    206
-   ],
-   "area": 8755,
-   "neighbors": [
-    44,
-    71,
-    79,
-    93,
-    121,
-    141
-   ],
-   "startOwner": 7,
-   "isCapital": true
-  },
-  {
-   "id": 112,
-   "name": "Highcairn",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    1175,
-    203
-   ],
-   "area": 8940,
-   "neighbors": [
-    5,
-    62,
-    76,
-    85
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 113,
-   "name": "Duskbough",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1570,
-    710
-   ],
-   "area": 10241,
-   "neighbors": [
-    16,
-    29,
-    61,
-    84,
-    99,
-    137
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 114,
-   "name": "Moonglade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1743,
-    154
-   ],
-   "area": 5813,
-   "neighbors": [
-    46,
-    90,
-    138
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 115,
-   "name": "Fairwick",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    876,
-    581
-   ],
-   "area": 8853,
-   "neighbors": [
-    13,
-    14,
-    18,
-    39,
-    109,
-    135
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 116,
-   "name": "Thorngrove",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    650,
-    371
-   ],
-   "area": 8942,
-   "neighbors": [
-    1,
-    2,
-    25,
-    32,
-    93
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 117,
-   "name": "Ironfell",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    1334,
-    313
-   ],
-   "area": 9564,
-   "neighbors": [
-    6,
-    7,
-    60,
-    62,
-    63,
-    143
-   ],
-   "startOwner": 3,
-   "isCapital": false
-  },
-  {
-   "id": 118,
-   "name": "Briarbough",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    159,
-    781
-   ],
-   "area": 2310,
-   "neighbors": [
-    47,
-    83,
-    146
-   ],
-   "startOwner": 10,
-   "isCapital": false
-  },
-  {
-   "id": 119,
-   "name": "Heathercrest",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    355,
-    245
-   ],
-   "area": 4682,
-   "neighbors": [
-    43,
-    81,
-    125
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 120,
-   "name": "Brightfield",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    1105,
-    503
-   ],
-   "area": 7813,
-   "neighbors": [
-    21,
-    41,
-    74,
-    78
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 121,
-   "name": "Greenbury",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    531,
-    283
-   ],
-   "area": 8714,
-   "neighbors": [
-    32,
-    43,
-    44,
-    93,
-    111
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 122,
-   "name": "Silverroot",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1467,
-    568
-   ],
-   "area": 8917,
-   "neighbors": [
-    38,
-    55,
-    72,
-    84,
-    98,
-    99
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 123,
-   "name": "Cragheath",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    775,
-    859
-   ],
-   "area": 8417,
-   "neighbors": [
-    48,
-    68,
-    82,
-    97,
-    104,
-    107
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 124,
-   "name": "Fairstead",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    469,
-    434
-   ],
-   "area": 10742,
-   "neighbors": [
-    25,
-    27,
-    32,
-    43,
-    95,
-    108
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 125,
-   "name": "Heatherfell",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    406,
-    187
-   ],
-   "area": 4062,
-   "neighbors": [
-    43,
-    44,
-    96,
-    119
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 126,
-   "name": "Dunehaven",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 3,
-   "center": [
-    918,
-    817
-   ],
-   "area": 8495,
-   "neighbors": [
-    12,
-    13,
-    37,
-    68,
-    73,
-    82
-   ],
-   "startOwner": 8,
-   "isCapital": true
-  },
-  {
-   "id": 127,
-   "name": "Miragespire",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 2,
-   "center": [
-    1077,
-    827
-   ],
-   "area": 10101,
-   "neighbors": [
-    11,
-    37,
-    57,
-    73,
-    92
-   ],
-   "startOwner": 8,
-   "isCapital": false
-  },
-  {
-   "id": 128,
-   "name": "Briarhollow",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1912,
-    684
-   ],
-   "area": 4254,
-   "neighbors": [
-    58,
-    70
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 129,
-   "name": "Palewatch",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    773,
-    159
-   ],
-   "area": 6809,
-   "neighbors": [
-    34,
-    40,
-    71,
-    105
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 130,
-   "name": "Emberscar",
-   "terrain": "Hills",
-   "biome": "ashlands",
-   "development": 2,
-   "center": [
-    1340,
-    915
-   ],
-   "area": 7325,
-   "neighbors": [
-    15,
-    19,
-    75,
-    131
-   ],
-   "startOwner": 9,
-   "isCapital": false
-  },
-  {
-   "id": 131,
-   "name": "Scorchoasis",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 3,
-   "center": [
-    1276,
-    823
-   ],
-   "area": 9146,
-   "neighbors": [
-    15,
-    19,
-    24,
-    57,
-    92,
-    130
-   ],
-   "startOwner": 9,
-   "isCapital": true
-  },
-  {
-   "id": 132,
-   "name": "Frosthold",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    963,
-    224
-   ],
-   "area": 8991,
-   "neighbors": [
-    4,
-    33,
-    76,
-    87,
-    100,
-    105
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 133,
-   "name": "Faeroot",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    583,
-    543
-   ],
-   "area": 9515,
-   "neighbors": [
-    17,
-    25,
-    30,
-    95,
-    102
-   ],
-   "startOwner": 5,
-   "isCapital": false
-  },
-  {
-   "id": 134,
-   "name": "Mistthicket",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    536,
-    884
-   ],
-   "area": 4401,
-   "neighbors": [
-    26,
-    66,
-    94
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 135,
-   "name": "Ambershire",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    766,
-    567
-   ],
-   "area": 8610,
-   "neighbors": [
-    1,
-    14,
-    39,
-    67,
-    102,
-    115
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 136,
-   "name": "Thornshade",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1695,
-    475
-   ],
-   "area": 8432,
-   "neighbors": [
-    28,
-    31,
-    54,
-    59,
-    103
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 137,
-   "name": "Goldhaven",
-   "terrain": "Plains",
-   "biome": "dunes",
-   "development": 1,
-   "center": [
-    1452,
-    762
-   ],
-   "area": 9377,
-   "neighbors": [
-    15,
-    29,
-    55,
-    75,
-    99,
-    113
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 138,
-   "name": "Silvergrove",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1816,
-    153
-   ],
-   "area": 3335,
-   "neighbors": [
-    42,
-    46,
-    114
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 139,
-   "name": "Glimmerhollow",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1589,
-    183
-   ],
-   "area": 3836,
-   "neighbors": [
-    23,
-    35,
-    80
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 140,
-   "name": "Rosefield",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 4,
-   "center": [
-    1226,
-    488
-   ],
-   "area": 7431,
-   "neighbors": [
-    7,
-    8,
-    9,
-    41,
-    74
-   ],
-   "startOwner": null,
-   "isCapital": false,
-   "garrison": 3000
-  },
-  {
-   "id": 141,
-   "name": "Cragmoor",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    633,
-    135
-   ],
-   "area": 3816,
-   "neighbors": [
-    71,
-    79,
-    111
-   ],
-   "startOwner": 7,
-   "isCapital": false
-  },
-  {
-   "id": 142,
-   "name": "Snowmarch",
-   "terrain": "Plains",
-   "biome": "frostfields",
-   "development": 2,
-   "center": [
-    930,
-    68
-   ],
-   "area": 3593,
-   "neighbors": [
-    34,
-    87,
-    100
-   ],
-   "startOwner": 4,
-   "isCapital": false
-  },
-  {
-   "id": 143,
-   "name": "Faewood",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 2,
-   "center": [
-    1383,
-    413
-   ],
-   "area": 8542,
-   "neighbors": [
-    7,
-    8,
-    60,
-    72,
-    98,
-    117
-   ],
-   "startOwner": 6,
-   "isCapital": false
-  },
-  {
-   "id": 144,
-   "name": "Stormheath",
-   "terrain": "Hills",
-   "biome": "highlands",
-   "development": 2,
-   "center": [
-    373,
-    743
-   ],
-   "area": 2927,
-   "neighbors": [
-    36,
-    49,
-    69
-   ],
-   "startOwner": null,
-   "isCapital": false
-  },
-  {
-   "id": 145,
-   "name": "Barleywick",
-   "terrain": "Plains",
-   "biome": "meadow",
-   "development": 2,
-   "center": [
-    1925,
-    307
-   ],
-   "area": 2859,
-   "neighbors": [
-    42,
-    88
-   ],
-   "startOwner": 1,
-   "isCapital": false
-  },
-  {
-   "id": 146,
-   "name": "Moonroot",
-   "terrain": "Forest",
-   "biome": "wildwood",
-   "development": 3,
-   "center": [
-    191,
-    813
-   ],
-   "area": 3217,
-   "neighbors": [
-    22,
-    47,
-    91,
-    118
-   ],
-   "startOwner": 10,
-   "isCapital": true
-  }
- ],
- "straits": [
-  {
-   "a": 90,
-   "b": 54,
-   "from": [
-    1742,
-    311
-   ],
-   "to": [
-    1722,
-    314
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 20,
-   "b": 49,
-   "from": [
-    388,
-    878
-   ],
-   "to": [
-    415,
-    837
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 146,
-   "b": 91,
-   "from": [
-    261,
-    827
-   ],
-   "to": [
-    273,
-    872
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 22,
-   "b": 91,
-   "from": [
-    196,
-    928
-   ],
-   "to": [
-    248,
-    922
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 70,
-   "b": 101,
-   "from": [
-    1816,
-    681
-   ],
-   "to": [
-    1765,
-    638
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 90,
-   "b": 80,
-   "from": [
-    1726,
-    276
-   ],
-   "to": [
-    1711,
-    292
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 146,
-   "b": 22,
-   "from": [
-    188,
-    836
-   ],
-   "to": [
-    174,
-    888
-   ],
-   "wrap": false,
-   "auto": true
-  },
-  {
-   "a": 70,
-   "b": 16,
-   "from": [
-    1814,
-    686
-   ],
-   "to": [
-    1739,
-    686
-   ],
-   "wrap": false,
-   "auto": true
-  }
- ],
- "notes": [
-  "province spacing 80.9px",
-  "auto strait Mistgrove - Honeywick (20px)",
-  "auto strait Mistbough - Amberwick (49px)",
-  "auto strait Moonroot - Clovervale (47px)",
-  "auto strait Honeyfield - Clovervale (52px)",
-  "auto strait Eldershade - Faethicket (67px)",
-  "second strait Mistgrove - Duskshade (22px)",
-  "second strait Moonroot - Honeyfield (54px)",
-  "second strait Eldershade - Willowbough (75px)"
- ]
+  "id": "eldmoor",
+  "title": "Eldmoor",
+  "theme": "fantasy",
+  "imageSize": [2048, 1024],
+  "summary": {"provinces": 146, "Plains": 65, "Forest": 35, "Hills": 31, "Mountain": 15, "neutralAtStart": 51},
+  "nations": [
+    {"slot": 1, "name": "Mistborn", "capital": 46, "colorIndex": 1},
+    {"slot": 2, "name": "Saltmarsh", "capital": 53, "colorIndex": 2},
+    {"slot": 3, "name": "Ironholds", "capital": 63, "colorIndex": 3},
+    {"slot": 4, "name": "Frostmarch", "capital": 87, "colorIndex": 4},
+    {"slot": 5, "name": "Greenvale", "capital": 95, "colorIndex": 5},
+    {"slot": 6, "name": "Elderwood", "capital": 98, "colorIndex": 6},
+    {"slot": 7, "name": "Wyrmcoast", "capital": 111, "colorIndex": 7},
+    {"slot": 8, "name": "Sunscorch", "capital": 126, "colorIndex": 8},
+    {"slot": 9, "name": "Ashen Dominion", "capital": 131, "colorIndex": 9},
+    {"slot": 10, "name": "Corsairs", "capital": 146, "colorIndex": 10}
+  ],
+  "provinces": [
+    {"id": 1, "name": "Eaglecrown", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [712, 449], "area": 9739, "neighbors": [2, 25, 39, 102, 116, 135], "startOwner": null, "isCapital": false, "tris": [780.0, 432.0, 700.0, 391.0, 665.0, 421.0, 780.0, 432.0, 665.0, 421.0, 663.0, 421.0, 780.0, 432.0, 663.0, 421.0, 658.0, 427.0, 780.0, 432.0, 658.0, 427.0, 656.0, 427.0, 780.0, 432.0, 656.0, 427.0, 655.0, 483.0, 780.0, 432.0, 655.0, 483.0, 726.0, 509.0, 726.0, 509.0, 744.0, 502.0, 780.0, 432.0]},
+    {"id": 2, "name": "Gianttalon", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [752, 369], "area": 9377, "neighbors": [1, 3, 39, 40, 51, 93, 116], "startOwner": null, "isCapital": false, "tris": [756.0, 315.0, 749.0, 309.0, 709.0, 310.0, 756.0, 315.0, 709.0, 310.0, 704.0, 316.0, 756.0, 315.0, 704.0, 316.0, 700.0, 391.0, 700.0, 391.0, 780.0, 432.0, 805.0, 420.0, 700.0, 391.0, 805.0, 420.0, 814.0, 383.0, 700.0, 391.0, 814.0, 383.0, 769.0, 332.0, 700.0, 391.0, 769.0, 332.0, 769.0, 330.0, 700.0, 391.0, 769.0, 330.0, 762.0, 324.0, 700.0, 391.0, 762.0, 324.0, 762.0, 322.0, 700.0, 391.0, 762.0, 322.0, 756.0, 317.0, 700.0, 391.0, 756.0, 317.0, 756.0, 315.0]},
+    {"id": 3, "name": "Thunderspine", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [808, 319], "area": 8120, "neighbors": [2, 4, 40, 51, 105], "startOwner": null, "isCapital": false, "tris": [830.0, 262.0, 809.0, 257.0, 749.0, 309.0, 830.0, 262.0, 749.0, 309.0, 756.0, 315.0, 830.0, 262.0, 756.0, 315.0, 756.0, 317.0, 830.0, 262.0, 756.0, 317.0, 762.0, 322.0, 830.0, 262.0, 762.0, 322.0, 762.0, 324.0, 830.0, 262.0, 762.0, 324.0, 769.0, 330.0, 830.0, 262.0, 769.0, 330.0, 769.0, 332.0, 830.0, 262.0, 769.0, 332.0, 814.0, 383.0, 814.0, 383.0, 868.0, 344.0, 830.0, 262.0]},
+    {"id": 4, "name": "Grimhorn", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [894, 285], "area": 9344, "neighbors": [3, 33, 51, 77, 105, 132], "startOwner": null, "isCapital": false, "tris": [903.0, 226.0, 830.0, 262.0, 868.0, 344.0, 903.0, 226.0, 868.0, 344.0, 903.0, 346.0, 903.0, 226.0, 903.0, 346.0, 958.0, 305.0, 958.0, 305.0, 957.0, 294.0, 903.0, 226.0]},
+    {"id": 5, "name": "Dragonpeak", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1147, 297], "area": 11129, "neighbors": [6, 33, 62, 74, 76, 78, 112], "startOwner": null, "isCapital": false, "tris": [1218.0, 254.0, 1115.0, 240.0, 1098.0, 255.0, 1218.0, 254.0, 1098.0, 255.0, 1089.0, 320.0, 1218.0, 254.0, 1089.0, 320.0, 1142.0, 367.0, 1218.0, 254.0, 1142.0, 367.0, 1163.0, 366.0, 1163.0, 366.0, 1222.0, 259.0, 1218.0, 254.0]},
+    {"id": 6, "name": "Titanspine", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1231, 328], "area": 9139, "neighbors": [5, 7, 62, 74, 117], "startOwner": null, "isCapital": false, "tris": [1274.0, 275.0, 1222.0, 259.0, 1163.0, 366.0, 1274.0, 275.0, 1163.0, 366.0, 1212.0, 395.0, 1212.0, 395.0, 1283.0, 325.0, 1274.0, 275.0]},
+    {"id": 7, "name": "Eaglefang", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1276, 376], "area": 7575, "neighbors": [6, 8, 74, 117, 140, 143], "startOwner": null, "isCapital": false, "tris": [1338.0, 373.0, 1283.0, 325.0, 1212.0, 395.0, 1338.0, 373.0, 1212.0, 395.0, 1225.0, 423.0, 1338.0, 373.0, 1225.0, 423.0, 1250.0, 434.0, 1250.0, 434.0, 1330.0, 397.0, 1338.0, 373.0]},
+    {"id": 8, "name": "Skullspine", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1307, 447], "area": 6565, "neighbors": [7, 9, 72, 140, 143], "startOwner": null, "isCapital": false, "tris": [1330.0, 397.0, 1250.0, 434.0, 1276.0, 484.0, 1330.0, 397.0, 1276.0, 484.0, 1355.0, 487.0, 1355.0, 487.0, 1362.0, 471.0, 1330.0, 397.0]},
+    {"id": 9, "name": "Wyrmspine", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1304, 537], "area": 8981, "neighbors": [8, 38, 41, 45, 72, 140], "startOwner": null, "isCapital": false, "tris": [1355.0, 487.0, 1276.0, 484.0, 1246.0, 551.0, 1355.0, 487.0, 1246.0, 551.0, 1248.0, 562.0, 1355.0, 487.0, 1248.0, 562.0, 1302.0, 596.0, 1302.0, 596.0, 1367.0, 531.0, 1355.0, 487.0]},
+    {"id": 10, "name": "Dragonspire", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1126, 673], "area": 10493, "neighbors": [11, 21, 24, 41, 45, 92], "startOwner": null, "isCapital": false, "tris": [1162.0, 626.0, 1129.0, 609.0, 1068.0, 644.0, 1162.0, 626.0, 1068.0, 644.0, 1085.0, 750.0, 1162.0, 626.0, 1085.0, 750.0, 1184.0, 695.0, 1184.0, 695.0, 1188.0, 685.0, 1162.0, 626.0]},
+    {"id": 11, "name": "Grimpeak", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1036, 694], "area": 8019, "neighbors": [10, 12, 21, 37, 92, 109, 127], "startOwner": null, "isCapital": false, "tris": [1068.0, 644.0, 1018.0, 635.0, 999.0, 648.0, 1068.0, 644.0, 999.0, 648.0, 997.0, 726.0, 1068.0, 644.0, 997.0, 726.0, 1071.0, 758.0, 1068.0, 644.0, 1071.0, 758.0, 1083.0, 754.0, 1083.0, 754.0, 1085.0, 750.0, 1068.0, 644.0]},
+    {"id": 12, "name": "Titanpeak", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [959, 692], "area": 7640, "neighbors": [11, 13, 37, 109, 126], "startOwner": null, "isCapital": false, "tris": [999.0, 648.0, 932.0, 642.0, 909.0, 744.0, 999.0, 648.0, 909.0, 744.0, 940.0, 755.0, 940.0, 755.0, 997.0, 726.0, 999.0, 648.0]},
+    {"id": 13, "name": "Giantpeak", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [883, 679], "area": 7733, "neighbors": [12, 14, 68, 109, 115, 126], "startOwner": null, "isCapital": false, "tris": [924.0, 633.0, 864.0, 633.0, 836.0, 694.0, 924.0, 633.0, 836.0, 694.0, 829.0, 713.0, 924.0, 633.0, 829.0, 713.0, 903.0, 745.0, 924.0, 633.0, 903.0, 745.0, 909.0, 744.0, 909.0, 744.0, 932.0, 642.0, 924.0, 633.0]},
+    {"id": 14, "name": "Eaglespire", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [811, 644], "area": 8151, "neighbors": [13, 67, 97, 115, 135], "startOwner": null, "isCapital": false, "tris": [823.0, 581.0, 764.0, 623.0, 763.0, 672.0, 823.0, 581.0, 763.0, 672.0, 767.0, 673.0, 823.0, 581.0, 767.0, 673.0, 777.0, 681.0, 823.0, 581.0, 777.0, 681.0, 781.0, 682.0, 823.0, 581.0, 781.0, 682.0, 828, 713, 823.0, 581.0, 828, 713, 829.0, 713.0, 823.0, 581.0, 829.0, 713.0, 836.0, 694.0, 836.0, 694.0, 864.0, 633.0, 823.0, 581.0]},
+    {"id": 15, "name": "Mount Cinder", "terrain": "Mountain", "biome": "peaks", "development": 1, "center": [1364, 790], "area": 9947, "neighbors": [24, 55, 65, 75, 130, 131, 137], "startOwner": null, "isCapital": false, "tris": [1372.0, 723.0, 1310.0, 747.0, 1303.0, 765.0, 1372.0, 723.0, 1303.0, 765.0, 1337.0, 852.0, 1372.0, 723.0, 1337.0, 852.0, 1347.0, 854.0, 1372.0, 723.0, 1347.0, 854.0, 1421.0, 814.0, 1421.0, 814.0, 1396.0, 736.0, 1372.0, 723.0]},
+    {"id": 16, "name": "Willowbough", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1668, 696], "area": 9735, "neighbors": [61, 70, 84, 101, 103, 113], "startOwner": null, "isCapital": false, "tris": [1687.0, 649.0, 1653.0, 648.0, 1629.0, 662.0, 1687.0, 649.0, 1629.0, 662.0, 1616.0, 762.0, 1687.0, 649.0, 1616.0, 762.0, 1656.0, 780.0, 1687.0, 649.0, 1656.0, 780.0, 1662.0, 784.0, 1662.0, 784.0, 1681.0, 793.0, 1684.0, 790.0, 1662.0, 784.0, 1684.0, 790.0, 1678.0, 783.0, 1662.0, 784.0, 1678.0, 783.0, 1699.0, 773.0, 1662.0, 784.0, 1699.0, 773.0, 1699.0, 768.0, 1699.0, 768.0, 1690.0, 762.0, 1677.0, 763.0, 1699.0, 768.0, 1677.0, 763.0, 1684.0, 770.0, 1699.0, 768.0, 1684.0, 770.0, 1682.0, 775.0, 1662.0, 784.0, 1699.0, 768.0, 1682.0, 775.0, 1662.0, 784.0, 1682.0, 775.0, 1665.0, 769.0, 1687.0, 649.0, 1662.0, 784.0, 1665.0, 769.0, 1687.0, 649.0, 1665.0, 769.0, 1670.0, 759.0, 1670.0, 759.0, 1685.0, 752.0, 1679.0, 744.0, 1687.0, 649.0, 1670.0, 759.0, 1679.0, 744.0, 1679.0, 744.0, 1687.0, 733.0, 1682.0, 726.0, 1687.0, 649.0, 1679.0, 744.0, 1682.0, 726.0, 1714.0, 711.0, 1728.0, 709.0, 1730.0, 703.0, 1682.0, 726.0, 1714.0, 711.0, 1730.0, 703.0, 1682.0, 726.0, 1730.0, 703.0, 1710.0, 706.0, 1682.0, 726.0, 1710.0, 706.0, 1707.0, 701.0, 1687.0, 649.0, 1682.0, 726.0, 1707.0, 701.0, 1687.0, 649.0, 1707.0, 701.0, 1731.0, 696.0, 1731.0, 696.0, 1740.0, 688.0, 1718.0, 679.0, 1731.0, 696.0, 1718.0, 679.0, 1716.0, 679.0, 1731.0, 696.0, 1716.0, 679.0, 1687.0, 649.0]},
+    {"id": 17, "name": "Wolfheath", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [599, 653], "area": 10537, "neighbors": [26, 30, 53, 67, 86, 102, 133], "startOwner": 2, "isCapital": false, "tris": [649.0, 614.0, 625.0, 595.0, 539.0, 605.0, 649.0, 614.0, 539.0, 605.0, 533.0, 624.0, 649.0, 614.0, 533.0, 624.0, 583.0, 730.0, 649.0, 614.0, 583.0, 730.0, 587.0, 732.0, 587.0, 732.0, 654.0, 665.0, 649.0, 614.0]},
+    {"id": 18, "name": "Millbury", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [930, 517], "area": 8181, "neighbors": [21, 39, 51, 77, 109, 115], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [946.0, 447.0, 931.0, 447.0, 886.0, 480.0, 946.0, 447.0, 886.0, 480.0, 880.0, 516.0, 880.0, 516.0, 930.0, 560.0, 1007.0, 549.0, 880.0, 516.0, 1007.0, 549.0, 1026.0, 524.0, 1026.0, 524.0, 1028.0, 519.0, 1028, 518, 1026.0, 524.0, 1028, 518, 1004.0, 519.0, 880.0, 516.0, 1026.0, 524.0, 1004.0, 519.0, 880.0, 516.0, 1004.0, 519.0, 968.0, 513.0, 880.0, 516.0, 968.0, 513.0, 944.0, 486.0, 880.0, 516.0, 944.0, 486.0, 941.0, 477.0, 880.0, 516.0, 941.0, 477.0, 944.0, 465.0, 880.0, 516.0, 944.0, 465.0, 941.0, 458.0, 880.0, 516.0, 941.0, 458.0, 946.0, 447.0]},
+    {"id": 19, "name": "Dunedrift", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [1261, 901], "area": 5334, "neighbors": [57, 130, 131], "startOwner": 9, "isCapital": false, "tris": [1302.0, 876.0, 1225.0, 858.0, 1199.0, 900.0, 1302.0, 876.0, 1199.0, 900.0, 1212.0, 902.0, 1302.0, 876.0, 1212.0, 902.0, 1230.0, 918.0, 1302.0, 876.0, 1230.0, 918.0, 1252.0, 926.0, 1302.0, 876.0, 1252.0, 926.0, 1256.0, 939.0, 1302.0, 876.0, 1256.0, 939.0, 1280.0, 933.0, 1302.0, 876.0, 1280.0, 933.0, 1286.0, 937.0, 1302.0, 876.0, 1286.0, 937.0, 1286.0, 943.0, 1286.0, 943.0, 1292.0, 945.0, 1302.0, 876.0]},
+    {"id": 20, "name": "Mistbough", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [363, 908], "area": 5451, "neighbors": [49, 91], "startOwner": 10, "isCapital": false, "tris": [366.0, 869.0, 350.0, 868.0, 304.0, 949.0, 366.0, 869.0, 304.0, 949.0, 341.0, 950.0, 366.0, 869.0, 341.0, 950.0, 383.0, 942.0, 366.0, 869.0, 383.0, 942.0, 399.0, 932.0, 366.0, 869.0, 399.0, 932.0, 402.0, 922.0, 366.0, 869.0, 402.0, 922.0, 412.0, 916.0, 412.0, 916.0, 412.0, 904.0, 400.0, 898.0, 366.0, 869.0, 412.0, 916.0, 400.0, 898.0, 366.0, 869.0, 400.0, 898.0, 400.0, 890.0, 400.0, 890.0, 389.0, 878.0, 366.0, 869.0]},
+    {"id": 21, "name": "Barleybury", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [1064, 587], "area": 10517, "neighbors": [10, 11, 18, 41, 109, 120], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1116.0, 558.0, 1028.0, 519.0, 1026.0, 524.0, 1116.0, 558.0, 1026.0, 524.0, 1007.0, 549.0, 1116.0, 558.0, 1007.0, 549.0, 1018.0, 635.0, 1116.0, 558.0, 1018.0, 635.0, 1068.0, 644.0, 1068.0, 644.0, 1129.0, 609.0, 1116.0, 558.0]},
+    {"id": 22, "name": "Honeyfield", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [143, 923], "area": 5136, "neighbors": [91, 146], "startOwner": 10, "isCapital": false, "tris": [177.0, 889.0, 170.0, 888.0, 147.0, 892.0, 147.0, 892.0, 129.0, 889.0, 119.0, 896.0, 177.0, 889.0, 147.0, 892.0, 119.0, 896.0, 177.0, 889.0, 119.0, 896.0, 101.0, 899.0, 177.0, 889.0, 101.0, 899.0, 101.0, 906.0, 177.0, 889.0, 101.0, 906.0, 97.0, 909.0, 97.0, 909.0, 96.0, 936.0, 123.0, 956.0, 97.0, 909.0, 123.0, 956.0, 144.0, 955.0, 97.0, 909.0, 144.0, 955.0, 175.0, 946.0, 97.0, 909.0, 175.0, 946.0, 182.0, 934.0, 97.0, 909.0, 182.0, 934.0, 197.0, 929.0, 97.0, 909.0, 197.0, 929.0, 197.0, 926.0, 97.0, 909.0, 197.0, 926.0, 189.0, 922.0, 97.0, 909.0, 189.0, 922.0, 193.0, 913.0, 97.0, 909.0, 193.0, 913.0, 185.0, 906.0, 97.0, 909.0, 185.0, 906.0, 188.0, 898.0, 188.0, 898.0, 177.0, 889.0, 176.0, 894.0, 97.0, 909.0, 188.0, 898.0, 176.0, 894.0, 97.0, 909.0, 176.0, 894.0, 170.0, 895.0, 97.0, 909.0, 170.0, 895.0, 170.0, 891.0, 177.0, 889.0, 97.0, 909.0, 170.0, 891.0, 170.0, 891.0, 176.0, 894.0, 177.0, 889.0]},
+    {"id": 23, "name": "Raventor", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [1548, 228], "area": 8928, "neighbors": [35, 64, 80, 106, 139], "startOwner": null, "isCapital": false, "tris": [1529.0, 158.0, 1488.0, 214.0, 1532.0, 281.0, 1529.0, 158.0, 1532.0, 281.0, 1584.0, 288.0, 1584.0, 288.0, 1604.0, 221.0, 1529.0, 158.0]},
+    {"id": 24, "name": "Smokepit", "terrain": "Hills", "biome": "ashlands", "development": 2, "center": [1245, 735], "area": 9683, "neighbors": [10, 15, 45, 65, 92, 131], "startOwner": 9, "isCapital": false, "tris": [1263.0, 681.0, 1188.0, 685.0, 1184.0, 695.0, 1263.0, 681.0, 1184.0, 695.0, 1214.0, 797.0, 1263.0, 681.0, 1214.0, 797.0, 1303.0, 765.0, 1303.0, 765.0, 1310.0, 747.0, 1263.0, 681.0]},
+    {"id": 25, "name": "Brightvale", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [597, 440], "area": 10243, "neighbors": [1, 32, 95, 102, 116, 124, 133], "startOwner": 5, "isCapital": false, "tris": [656.0, 427.0, 597.0, 385.0, 529.0, 437.0, 656.0, 427.0, 529.0, 437.0, 527.0, 461.0, 656.0, 427.0, 527.0, 461.0, 551.0, 487.0, 656.0, 427.0, 551.0, 487.0, 633.0, 498.0, 633.0, 498.0, 655.0, 483.0, 656.0, 427.0]},
+    {"id": 26, "name": "Honeyvale", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [538, 792], "area": 10220, "neighbors": [17, 36, 53, 66, 86, 94, 134], "startOwner": 2, "isCapital": false, "tris": [587.0, 732.0, 583.0, 730.0, 499.0, 743.0, 587.0, 732.0, 499.0, 743.0, 473.0, 784.0, 587.0, 732.0, 473.0, 784.0, 532.0, 850.0, 587.0, 732.0, 532.0, 850.0, 547.0, 850.0, 587.0, 732.0, 547.0, 850.0, 549.0, 846.0, 549.0, 846.0, 611.0, 781.0, 587.0, 732.0]},
+    {"id": 27, "name": "Brightstead", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [370, 433], "area": 9957, "neighbors": [43, 52, 56, 81, 108, 124], "startOwner": null, "isCapital": false, "tris": [417.0, 366.0, 411.0, 364.0, 304.0, 415.0, 417.0, 366.0, 304.0, 415.0, 309.0, 460.0, 417.0, 366.0, 309.0, 460.0, 337.0, 490.0, 337.0, 490.0, 418.0, 467.0, 417.0, 366.0]},
+    {"id": 28, "name": "Duskhollow", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1749, 544], "area": 5781, "neighbors": [101, 103, 136], "startOwner": null, "isCapital": false, "tris": [1755.0, 488.0, 1749.0, 479.0, 1710.0, 526.0, 1755.0, 488.0, 1710.0, 526.0, 1735.0, 585.0, 1755.0, 488.0, 1735.0, 585.0, 1792.0, 586.0, 1792.0, 586.0, 1801.0, 582.0, 1790.0, 576.0, 1790.0, 576.0, 1790.0, 567.0, 1783.0, 561.0, 1792.0, 586.0, 1790.0, 576.0, 1783.0, 561.0, 1755.0, 488.0, 1792.0, 586.0, 1783.0, 561.0, 1783.0, 561.0, 1782.0, 543.0, 1775.0, 538.0, 1755.0, 488.0, 1783.0, 561.0, 1775.0, 538.0, 1775.0, 538.0, 1778.0, 527.0, 1772.0, 524.0, 1755.0, 488.0, 1775.0, 538.0, 1772.0, 524.0, 1755.0, 488.0, 1772.0, 524.0, 1773.0, 520.0, 1755.0, 488.0, 1773.0, 520.0, 1785.0, 516.0, 1755.0, 488.0, 1785.0, 516.0, 1784.0, 510.0, 1755.0, 488.0, 1784.0, 510.0, 1773.0, 501.0, 1773.0, 501.0, 1782.0, 491.0, 1755.0, 488.0]},
+    {"id": 29, "name": "Smokeforge", "terrain": "Hills", "biome": "ashlands", "development": 1, "center": [1534, 795], "area": 8929, "neighbors": [61, 75, 89, 113, 137], "startOwner": null, "isCapital": false, "tris": [1595.0, 771.0, 1511.0, 736.0, 1472.0, 834.0, 1595.0, 771.0, 1472.0, 834.0, 1479.0, 846.0, 1479.0, 846.0, 1568.0, 842.0, 1595.0, 771.0]},
+    {"id": 30, "name": "Briarshade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [468, 610], "area": 9903, "neighbors": [17, 36, 69, 86, 95, 108, 133], "startOwner": 5, "isCapital": false, "tris": [531.0, 590.0, 447.0, 552.0, 425.0, 567.0, 531.0, 590.0, 425.0, 567.0, 412.0, 663.0, 531.0, 590.0, 412.0, 663.0, 459.0, 671.0, 531.0, 590.0, 459.0, 671.0, 529.0, 625.0, 531.0, 590.0, 529.0, 625.0, 533.0, 624.0, 533.0, 624.0, 539.0, 605.0, 531.0, 590.0]},
+    {"id": 31, "name": "Silverhollow", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1604, 469], "area": 9601, "neighbors": [59, 84, 98, 103, 136], "startOwner": 6, "isCapital": false, "tris": [1652.0, 433.0, 1552.0, 415.0, 1561.0, 526.0, 1652.0, 433.0, 1561.0, 526.0, 1628.0, 531.0, 1628.0, 531.0, 1646.0, 519.0, 1652.0, 433.0]},
+    {"id": 32, "name": "Greytor", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [539, 379], "area": 9539, "neighbors": [25, 43, 93, 116, 121, 124], "startOwner": 5, "isCapital": false, "tris": [595.0, 329.0, 589.0, 323.0, 474.0, 338.0, 595.0, 329.0, 474.0, 338.0, 463.0, 354.0, 595.0, 329.0, 463.0, 354.0, 529.0, 437.0, 529.0, 437.0, 597.0, 385.0, 595.0, 329.0]},
+    {"id": 33, "name": "Palehold", "terrain": "Plains", "biome": "frostfields", "development": 1, "center": [1027, 282], "area": 11322, "neighbors": [4, 5, 76, 77, 78, 132], "startOwner": null, "isCapital": false, "tris": [1098.0, 255.0, 1019.0, 220.0, 957.0, 294.0, 1098.0, 255.0, 957.0, 294.0, 958.0, 305.0, 1098.0, 255.0, 958.0, 305.0, 1020.0, 346.0, 1020.0, 346.0, 1089.0, 320.0, 1098.0, 255.0]},
+    {"id": 34, "name": "Palemere", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [854, 113], "area": 5790, "neighbors": [87, 105, 129, 142], "startOwner": 4, "isCapital": false, "tris": [870.0, 70.0, 848.0, 73.0, 852.0, 79.0, 870.0, 70.0, 852.0, 79.0, 849.0, 83.0, 849.0, 83.0, 807.0, 89.0, 798.0, 95.0, 849.0, 83.0, 798.0, 95.0, 796.0, 108.0, 849.0, 83.0, 796.0, 108.0, 825.0, 153.0, 870.0, 70.0, 849.0, 83.0, 825.0, 153.0, 870.0, 70.0, 825.0, 153.0, 867.0, 154.0, 872.0, 60.0, 870.0, 70.0, 867.0, 154.0, 867.0, 154.0, 899.0, 98.0, 872.0, 60.0]},
+    {"id": 35, "name": "Palemarch", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [1465, 163], "area": 11522, "neighbors": [23, 63, 64, 110, 139], "startOwner": 3, "isCapital": false, "tris": [1430.0, 90.0, 1404.0, 184.0, 1430.0, 225.0, 1430.0, 90.0, 1430.0, 225.0, 1488.0, 214.0, 1430.0, 90.0, 1488.0, 214.0, 1529.0, 158.0, 1529.0, 158.0, 1529.0, 150.0, 1515.0, 144.0, 1430.0, 90.0, 1529.0, 158.0, 1515.0, 144.0, 1430.0, 90.0, 1515.0, 144.0, 1513.0, 138.0, 1430.0, 90.0, 1513.0, 138.0, 1518.0, 135.0, 1518.0, 135.0, 1524.0, 145.0, 1539.0, 144.0, 1430.0, 90.0, 1518.0, 135.0, 1539.0, 144.0, 1539.0, 144.0, 1537.0, 129.0, 1521.0, 128.0, 1521.0, 128.0, 1515.0, 122.0, 1500.0, 122.0, 1539.0, 144.0, 1521.0, 128.0, 1500.0, 122.0, 1430.0, 90.0, 1539.0, 144.0, 1500.0, 122.0, 1500.0, 122.0, 1495.0, 112.0, 1484.0, 105.0, 1500.0, 122.0, 1484.0, 105.0, 1464.0, 104.0, 1430.0, 90.0, 1500.0, 122.0, 1464.0, 104.0, 1464.0, 104.0, 1457.0, 97.0, 1443.0, 95.0, 1430.0, 90.0, 1464.0, 104.0, 1443.0, 95.0, 1443.0, 95.0, 1440.0, 85.0, 1430.0, 90.0]},
+    {"id": 36, "name": "Stormcrest", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [446, 735], "area": 9071, "neighbors": [26, 30, 49, 66, 69, 86, 144], "startOwner": null, "isCapital": false, "tris": [459.0, 671.0, 412.0, 663.0, 404.0, 667.0, 459.0, 671.0, 404.0, 667.0, 396.0, 756.0, 459.0, 671.0, 396.0, 756.0, 449.0, 789.0, 459.0, 671.0, 449.0, 789.0, 473.0, 784.0, 473.0, 784.0, 499.0, 743.0, 459.0, 671.0]},
+    {"id": 37, "name": "Sandsea", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [1001, 775], "area": 8261, "neighbors": [11, 12, 73, 126, 127], "startOwner": 8, "isCapital": false, "tris": [1071.0, 758.0, 997.0, 726.0, 940.0, 755.0, 1071.0, 758.0, 940.0, 755.0, 970.0, 818.0, 970.0, 818.0, 1025.0, 827.0, 1071.0, 758.0]},
+    {"id": 38, "name": "Glimmerthicket", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1366, 592], "area": 9197, "neighbors": [9, 45, 55, 65, 72, 122], "startOwner": null, "isCapital": false, "tris": [1406.0, 547.0, 1367.0, 531.0, 1302.0, 596.0, 1406.0, 547.0, 1302.0, 596.0, 1305.0, 609.0, 1406.0, 547.0, 1305.0, 609.0, 1373.0, 651.0, 1373.0, 651.0, 1429.0, 619.0, 1406.0, 547.0]},
+    {"id": 39, "name": "Amberford", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [811, 487], "area": 11391, "neighbors": [1, 2, 18, 51, 115, 135], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [886.0, 480.0, 805.0, 420.0, 780.0, 432.0, 886.0, 480.0, 780.0, 432.0, 744.0, 502.0, 886.0, 480.0, 744.0, 502.0, 827.0, 557.0, 827.0, 557.0, 880.0, 516.0, 886.0, 480.0]},
+    {"id": 40, "name": "Hoarfell", "terrain": "Plains", "biome": "frostfields", "development": 1, "center": [744, 249], "area": 9413, "neighbors": [2, 3, 71, 93, 105, 129], "startOwner": null, "isCapital": false, "tris": [788.0, 205.0, 738.0, 193.0, 688.0, 245.0, 788.0, 205.0, 688.0, 245.0, 709.0, 310.0, 788.0, 205.0, 709.0, 310.0, 749.0, 309.0, 749.0, 309.0, 809.0, 257.0, 788.0, 205.0]},
+    {"id": 41, "name": "Fairmeadow", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [1175, 558], "area": 9970, "neighbors": [9, 10, 21, 45, 74, 120, 140], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1170.0, 497.0, 1158.0, 499.0, 1116.0, 558.0, 1170.0, 497.0, 1116.0, 558.0, 1129.0, 609.0, 1170.0, 497.0, 1129.0, 609.0, 1162.0, 626.0, 1170.0, 497.0, 1162.0, 626.0, 1248.0, 562.0, 1248.0, 562.0, 1246.0, 551.0, 1170.0, 497.0]},
+    {"id": 42, "name": "Moonbough", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1898, 251], "area": 7943, "neighbors": [46, 88, 138, 145], "startOwner": 1, "isCapital": false, "tris": [1889.0, 189.0, 1878.0, 185.0, 1869.0, 190.0, 1889.0, 189.0, 1869.0, 190.0, 1841.0, 277.0, 1889.0, 189.0, 1841.0, 277.0, 1898.0, 300.0, 1898.0, 300.0, 1952.0, 264.0, 1949.0, 256.0, 1949.0, 256.0, 1956.0, 250.0, 1956.0, 241.0, 1898.0, 300.0, 1949.0, 256.0, 1956.0, 241.0, 1898.0, 300.0, 1956.0, 241.0, 1946.0, 236.0, 1898.0, 300.0, 1946.0, 236.0, 1946.0, 227.0, 1898.0, 300.0, 1946.0, 227.0, 1932.0, 217.0, 1898.0, 300.0, 1932.0, 217.0, 1915.0, 214.0, 1898.0, 300.0, 1915.0, 214.0, 1911.0, 205.0, 1898.0, 300.0, 1911.0, 205.0, 1896.0, 203.0, 1898.0, 300.0, 1896.0, 203.0, 1890.0, 197.0, 1898.0, 300.0, 1890.0, 197.0, 1889.0, 189.0]},
+    {"id": 43, "name": "Heathercairn", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [418, 288], "area": 10933, "neighbors": [27, 32, 44, 81, 119, 121, 124, 125], "startOwner": null, "isCapital": false, "tris": [416.0, 223.0, 397.0, 227.0, 359.0, 291.0, 416.0, 223.0, 359.0, 291.0, 411.0, 364.0, 416.0, 223.0, 411.0, 364.0, 417.0, 366.0, 416.0, 223.0, 417.0, 366.0, 463.0, 354.0, 416.0, 223.0, 463.0, 354.0, 474.0, 338.0, 474.0, 338.0, 476.0, 280.0, 416.0, 223.0]},
+    {"id": 44, "name": "Roseshire", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [477, 224], "area": 8460, "neighbors": [43, 79, 96, 111, 121, 125], "startOwner": 7, "isCapital": false, "tris": [525.0, 178.0, 513.0, 170.0, 447.0, 177.0, 525.0, 178.0, 447.0, 177.0, 416.0, 223.0, 525.0, 178.0, 416.0, 223.0, 476.0, 280.0, 476.0, 280.0, 535.0, 232.0, 525.0, 178.0]},
+    {"id": 45, "name": "Ashrift", "terrain": "Hills", "biome": "ashlands", "development": 1, "center": [1236, 627], "area": 11200, "neighbors": [9, 10, 24, 38, 41, 65], "startOwner": null, "isCapital": false, "tris": [1302.0, 596.0, 1248.0, 562.0, 1162.0, 626.0, 1302.0, 596.0, 1162.0, 626.0, 1188.0, 685.0, 1302.0, 596.0, 1188.0, 685.0, 1263.0, 681.0, 1263.0, 681.0, 1305.0, 609.0, 1302.0, 596.0]},
+    {"id": 46, "name": "Oakstead", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [1807, 225], "area": 9260, "neighbors": [42, 88, 90, 114, 138], "startOwner": 1, "isCapital": true, "tris": [1869.0, 190.0, 1785.0, 173.0, 1755.0, 200.0, 1755.0, 200.0, 1753.0, 200.0, 1746.0, 208.0, 1869.0, 190.0, 1755.0, 200.0, 1746.0, 208.0, 1746.0, 208.0, 1744.0, 208.0, 1801.0, 296.0, 1869.0, 190.0, 1746.0, 208.0, 1801.0, 296.0, 1801.0, 296.0, 1841.0, 277.0, 1869.0, 190.0]},
+    {"id": 47, "name": "Rosestead", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [237, 771], "area": 7309, "neighbors": [83, 118, 146], "startOwner": 10, "isCapital": false, "tris": [194.0, 728.0, 181.0, 726.0, 176.0, 733.0, 194.0, 728.0, 176.0, 733.0, 185.0, 786.0, 194.0, 728.0, 185.0, 786.0, 258.0, 817.0, 194.0, 728.0, 258.0, 817.0, 265.0, 822.0, 194.0, 728.0, 265.0, 822.0, 267.0, 815.0, 194.0, 728.0, 267.0, 815.0, 280.0, 808.0, 280.0, 808.0, 301.0, 785.0, 301.0, 781.0, 280.0, 808.0, 301.0, 781.0, 291.0, 777.0, 280.0, 808.0, 291.0, 777.0, 281.0, 762.0, 281.0, 762.0, 283.0, 753.0, 261.0, 739.0, 280.0, 808.0, 281.0, 762.0, 261.0, 739.0, 280.0, 808.0, 261.0, 739.0, 245.0, 738.0, 280.0, 808.0, 245.0, 738.0, 226.0, 731.0, 280.0, 808.0, 226.0, 731.0, 207.0, 737.0, 280.0, 808.0, 207.0, 737.0, 194.0, 728.0]},
+    {"id": 48, "name": "Ambermeadow", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [710, 808], "area": 8851, "neighbors": [53, 94, 97, 104, 123], "startOwner": 2, "isCapital": false, "tris": [711.0, 753.0, 639.0, 792.0, 669.0, 854.0, 711.0, 753.0, 669.0, 854.0, 721.0, 863.0, 721.0, 863.0, 774.0, 795.0, 711.0, 753.0]},
+    {"id": 49, "name": "Amberwick", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [411, 794], "area": 4178, "neighbors": [20, 36, 66, 144], "startOwner": 10, "isCapital": false, "tris": [396.0, 756.0, 364.0, 772.0, 360.0, 782.0, 396.0, 756.0, 360.0, 782.0, 368.0, 787.0, 396.0, 756.0, 368.0, 787.0, 368.0, 794.0, 396.0, 756.0, 368.0, 794.0, 390.0, 801.0, 396.0, 756.0, 390.0, 801.0, 390.0, 804.0, 390.0, 804.0, 375.0, 810.0, 386.0, 816.0, 390.0, 804.0, 386.0, 816.0, 391.0, 824.0, 396.0, 756.0, 390.0, 804.0, 391.0, 824.0, 396.0, 756.0, 391.0, 824.0, 406.0, 827.0, 396.0, 756.0, 406.0, 827.0, 412.0, 836.0, 396.0, 756.0, 412.0, 836.0, 427.0, 841.0, 427.0, 841.0, 449.0, 789.0, 396.0, 756.0]},
+    {"id": 50, "name": "Scorchspire", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [959, 936], "area": 4334, "neighbors": [73, 82], "startOwner": 8, "isCapital": false, "tris": [1019.0, 927.0, 930.0, 901.0, 892.0, 958.0, 892.0, 958.0, 930.0, 962.0, 936.0, 959.0, 892.0, 958.0, 936.0, 959.0, 924.0, 951.0, 1019.0, 927.0, 892.0, 958.0, 924.0, 951.0, 1019.0, 927.0, 924.0, 951.0, 941.0, 949.0, 1019.0, 927.0, 941.0, 949.0, 954.0, 956.0, 1019.0, 927.0, 954.0, 956.0, 948.0, 962.0, 948.0, 962.0, 950.0, 965.0, 958.0, 965.0, 948.0, 962.0, 958.0, 965.0, 968.0, 955.0, 1019.0, 927.0, 948.0, 962.0, 968.0, 955.0, 968.0, 955.0, 998.0, 949.0, 1000.0, 941.0, 968.0, 955.0, 1000.0, 941.0, 1019.0, 927.0]},
+    {"id": 51, "name": "Millwick", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [865, 406], "area": 10908, "neighbors": [2, 3, 4, 18, 39, 77], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [903.0, 346.0, 868.0, 344.0, 814.0, 383.0, 903.0, 346.0, 814.0, 383.0, 805.0, 420.0, 903.0, 346.0, 805.0, 420.0, 886.0, 480.0, 886.0, 480.0, 931.0, 447.0, 903.0, 346.0]},
+    {"id": 52, "name": "Oakford", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [280, 532], "area": 11221, "neighbors": [27, 56, 69, 108], "startOwner": null, "isCapital": false, "tris": [337.0, 490.0, 309.0, 460.0, 219.0, 509.0, 337.0, 490.0, 219.0, 509.0, 218.0, 515.0, 337.0, 490.0, 218.0, 515.0, 231.0, 518.0, 337.0, 490.0, 231.0, 518.0, 221.0, 535.0, 337.0, 490.0, 221.0, 535.0, 230.0, 545.0, 337.0, 490.0, 230.0, 545.0, 232.0, 564.0, 337.0, 490.0, 232.0, 564.0, 258.0, 575.0, 337.0, 490.0, 258.0, 575.0, 257.0, 580.0, 257.0, 580.0, 239.0, 591.0, 286.0, 595.0, 337.0, 490.0, 257.0, 580.0, 286.0, 595.0, 337.0, 490.0, 286.0, 595.0, 296.0, 602.0, 296.0, 602.0, 340.0, 543.0, 337.0, 490.0]},
+    {"id": 53, "name": "Thornthicket", "terrain": "Forest", "biome": "wildwood", "development": 3, "center": [654, 723], "area": 10330, "neighbors": [17, 26, 48, 67, 94, 97], "startOwner": 2, "isCapital": true, "tris": [715.0, 700.0, 654.0, 665.0, 587.0, 732.0, 715.0, 700.0, 587.0, 732.0, 611.0, 781.0, 715.0, 700.0, 611.0, 781.0, 639.0, 792.0, 639.0, 792.0, 711.0, 753.0, 715.0, 700.0]},
+    {"id": 54, "name": "Honeywick", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [1711, 403], "area": 7496, "neighbors": [59, 80, 90, 136], "startOwner": null, "isCapital": false, "tris": [1723.0, 316.0, 1708.0, 306.0, 1705.0, 310.0, 1705.0, 310.0, 1678.0, 330.0, 1671.0, 419.0, 1758.0, 454.0, 1765.0, 449.0, 1764.0, 446.0, 1758.0, 454.0, 1764.0, 446.0, 1748.0, 446.0, 1671.0, 419.0, 1758.0, 454.0, 1748.0, 446.0, 1671.0, 419.0, 1748.0, 446.0, 1743.0, 441.0, 1671.0, 419.0, 1743.0, 441.0, 1757.0, 434.0, 1671.0, 419.0, 1757.0, 434.0, 1754.0, 426.0, 1671.0, 419.0, 1754.0, 426.0, 1757.0, 423.0, 1671.0, 419.0, 1757.0, 423.0, 1774.0, 418.0, 1671.0, 419.0, 1774.0, 418.0, 1781.0, 412.0, 1671.0, 419.0, 1781.0, 412.0, 1770.0, 400.0, 1671.0, 419.0, 1770.0, 400.0, 1742.0, 389.0, 1671.0, 419.0, 1742.0, 389.0, 1735.0, 381.0, 1671.0, 419.0, 1735.0, 381.0, 1717.0, 377.0, 1671.0, 419.0, 1717.0, 377.0, 1717.0, 372.0, 1717.0, 372.0, 1731.0, 362.0, 1712.0, 351.0, 1671.0, 419.0, 1717.0, 372.0, 1712.0, 351.0, 1712.0, 351.0, 1722.0, 345.0, 1721.0, 342.0, 1712.0, 351.0, 1721.0, 342.0, 1703.0, 335.0, 1671.0, 419.0, 1712.0, 351.0, 1703.0, 335.0, 1703.0, 335.0, 1717.0, 329.0, 1704.0, 321.0, 1671.0, 419.0, 1703.0, 335.0, 1704.0, 321.0, 1705.0, 310.0, 1671.0, 419.0, 1704.0, 321.0, 1705.0, 310.0, 1704.0, 321.0, 1706.0, 318.0, 1705.0, 310.0, 1706.0, 318.0, 1723.0, 316.0]},
+    {"id": 55, "name": "Charforge", "terrain": "Hills", "biome": "ashlands", "development": 1, "center": [1424, 674], "area": 9936, "neighbors": [15, 38, 65, 99, 122, 137], "startOwner": null, "isCapital": false, "tris": [1464.0, 629.0, 1429.0, 619.0, 1373.0, 651.0, 1464.0, 629.0, 1373.0, 651.0, 1372.0, 723.0, 1464.0, 629.0, 1372.0, 723.0, 1396.0, 736.0, 1396.0, 736.0, 1495.0, 701.0, 1464.0, 629.0]},
+    {"id": 56, "name": "Greyheath", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [272, 448], "area": 5806, "neighbors": [27, 52, 81], "startOwner": null, "isCapital": false, "tris": [291.0, 405.0, 275.0, 390.0, 254.0, 390.0, 291.0, 405.0, 254.0, 390.0, 251.0, 398.0, 291.0, 405.0, 251.0, 398.0, 241.0, 405.0, 291.0, 405.0, 241.0, 405.0, 236.0, 419.0, 291.0, 405.0, 236.0, 419.0, 248.0, 422.0, 291.0, 405.0, 248.0, 422.0, 251.0, 431.0, 251.0, 431.0, 222.0, 435.0, 224.0, 440.0, 251.0, 431.0, 224.0, 440.0, 244.0, 444.0, 291.0, 405.0, 251.0, 431.0, 244.0, 444.0, 291.0, 405.0, 244.0, 444.0, 231.0, 461.0, 291.0, 405.0, 231.0, 461.0, 231.0, 467.0, 291.0, 405.0, 231.0, 467.0, 239.0, 473.0, 291.0, 405.0, 239.0, 473.0, 235.0, 480.0, 291.0, 405.0, 235.0, 480.0, 243.0, 481.0, 291.0, 405.0, 243.0, 481.0, 244.0, 485.0, 229.0, 495.0, 212.0, 491.0, 210.0, 496.0, 229.0, 495.0, 210.0, 496.0, 222.0, 502.0, 244.0, 485.0, 229.0, 495.0, 222.0, 502.0, 244.0, 485.0, 222.0, 502.0, 219.0, 509.0, 244.0, 485.0, 219.0, 509.0, 309.0, 460.0, 291.0, 405.0, 244.0, 485.0, 309.0, 460.0, 309.0, 460.0, 304.0, 415.0, 302.0, 415.0, 291.0, 405.0, 309.0, 460.0, 302.0, 415.0, 302.0, 415.0, 293.0, 405.0, 291.0, 405.0]},
+    {"id": 57, "name": "Sootpit", "terrain": "Hills", "biome": "ashlands", "development": 2, "center": [1167, 848], "area": 8155, "neighbors": [19, 92, 127, 131], "startOwner": 9, "isCapital": false, "tris": [1212.0, 802.0, 1132.0, 810.0, 1111.0, 889.0, 1212.0, 802.0, 1111.0, 889.0, 1166.0, 890.0, 1212.0, 802.0, 1166.0, 890.0, 1199.0, 900.0, 1199.0, 900.0, 1225.0, 858.0, 1212.0, 802.0]},
+    {"id": 58, "name": "Honeyshire", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [1889, 738], "area": 4531, "neighbors": [70, 128], "startOwner": null, "isCapital": false, "tris": [1947.0, 723.0, 1876.0, 704.0, 1840.0, 747.0, 1947.0, 723.0, 1840.0, 747.0, 1849.0, 755.0, 1947.0, 723.0, 1849.0, 755.0, 1847.0, 763.0, 1947.0, 723.0, 1847.0, 763.0, 1860.0, 763.0, 1947.0, 723.0, 1860.0, 763.0, 1877.0, 769.0, 1947.0, 723.0, 1877.0, 769.0, 1904.0, 769.0, 1947.0, 723.0, 1904.0, 769.0, 1923.0, 752.0, 1947.0, 723.0, 1923.0, 752.0, 1936.0, 746.0, 1936.0, 746.0, 1948.0, 731.0, 1947.0, 723.0]},
+    {"id": 59, "name": "Faeshade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1623, 377], "area": 10317, "neighbors": [31, 54, 80, 98, 106, 136], "startOwner": 6, "isCapital": false, "tris": [1678.0, 330.0, 1603.0, 316.0, 1551.0, 413.0, 1678.0, 330.0, 1551.0, 413.0, 1552.0, 415.0, 1678.0, 330.0, 1552.0, 415.0, 1652.0, 433.0, 1652.0, 433.0, 1671.0, 419.0, 1678.0, 330.0]},
+    {"id": 60, "name": "Heathertor", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [1426, 339], "area": 9299, "neighbors": [63, 64, 98, 106, 117, 143], "startOwner": 3, "isCapital": false, "tris": [1408.0, 272.0, 1397.0, 278.0, 1371.0, 359.0, 1408.0, 272.0, 1371.0, 359.0, 1461.0, 410.0, 1408.0, 272.0, 1461.0, 410.0, 1482.0, 398.0, 1482.0, 398.0, 1480.0, 330.0, 1408.0, 272.0]},
+    {"id": 61, "name": "Charscar", "terrain": "Hills", "biome": "ashlands", "development": 1, "center": [1620, 802], "area": 5752, "neighbors": [16, 29, 89, 113], "startOwner": null, "isCapital": false, "tris": [1656.0, 780.0, 1616.0, 762.0, 1595.0, 771.0, 1656.0, 780.0, 1595.0, 771.0, 1568.0, 842.0, 1568.0, 842.0, 1585.0, 865.0, 1607.0, 867.0, 1568.0, 842.0, 1607.0, 867.0, 1614.0, 864.0, 1568.0, 842.0, 1614.0, 864.0, 1617.0, 859.0, 1568.0, 842.0, 1617.0, 859.0, 1603.0, 853.0, 1568.0, 842.0, 1603.0, 853.0, 1607.0, 845.0, 1568.0, 842.0, 1607.0, 845.0, 1603.0, 839.0, 1603.0, 839.0, 1630.0, 838.0, 1631.0, 827.0, 1568.0, 842.0, 1603.0, 839.0, 1631.0, 827.0, 1568.0, 842.0, 1631.0, 827.0, 1646.0, 822.0, 1568.0, 842.0, 1646.0, 822.0, 1663.0, 797.0, 1663.0, 797.0, 1681.0, 793.0, 1662.0, 784.0, 1568.0, 842.0, 1663.0, 797.0, 1662.0, 784.0, 1568.0, 842.0, 1662.0, 784.0, 1654.0, 788.0, 1568.0, 842.0, 1654.0, 788.0, 1652.0, 783.0, 1568.0, 842.0, 1652.0, 783.0, 1656.0, 780.0]},
+    {"id": 62, "name": "Wintermarch", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [1265, 202], "area": 10597, "neighbors": [5, 6, 63, 85, 110, 112, 117], "startOwner": 3, "isCapital": false, "tris": [1314.0, 161.0, 1221.0, 144.0, 1218.0, 254.0, 1314.0, 161.0, 1218.0, 254.0, 1222.0, 259.0, 1314.0, 161.0, 1222.0, 259.0, 1274.0, 275.0, 1314.0, 161.0, 1274.0, 275.0, 1305.0, 255.0, 1305.0, 255.0, 1321.0, 173.0, 1314.0, 161.0]},
+    {"id": 63, "name": "Stoneridge", "terrain": "Hills", "biome": "highlands", "development": 3, "center": [1364, 224], "area": 9407, "neighbors": [35, 60, 62, 64, 110, 117], "startOwner": 3, "isCapital": true, "tris": [1404.0, 184.0, 1321.0, 173.0, 1305.0, 255.0, 1404.0, 184.0, 1305.0, 255.0, 1397.0, 278.0, 1404.0, 184.0, 1397.0, 278.0, 1408.0, 272.0, 1408.0, 272.0, 1430.0, 225.0, 1404.0, 184.0]},
+    {"id": 64, "name": "Ravenmoor", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [1476, 275], "area": 8485, "neighbors": [23, 35, 60, 63, 106], "startOwner": 3, "isCapital": false, "tris": [1488.0, 214.0, 1430.0, 225.0, 1408.0, 272.0, 1488.0, 214.0, 1408.0, 272.0, 1480.0, 330.0, 1480.0, 330.0, 1532.0, 281.0, 1488.0, 214.0]},
+    {"id": 65, "name": "Sootforge", "terrain": "Hills", "biome": "ashlands", "development": 2, "center": [1319, 678], "area": 9926, "neighbors": [15, 24, 38, 45, 55], "startOwner": 9, "isCapital": false, "tris": [1373.0, 651.0, 1305.0, 609.0, 1263.0, 681.0, 1373.0, 651.0, 1263.0, 681.0, 1310.0, 747.0, 1310.0, 747.0, 1372.0, 723.0, 1373.0, 651.0]},
+    {"id": 66, "name": "Fairfield", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [479, 833], "area": 5898, "neighbors": [26, 36, 49, 134], "startOwner": null, "isCapital": false, "tris": [473.0, 784.0, 449.0, 789.0, 427.0, 841.0, 473.0, 784.0, 427.0, 841.0, 431.0, 844.0, 473.0, 784.0, 431.0, 844.0, 428.0, 849.0, 473.0, 784.0, 428.0, 849.0, 441.0, 859.0, 473.0, 784.0, 441.0, 859.0, 464.0, 855.0, 473.0, 784.0, 464.0, 855.0, 466.0, 867.0, 473.0, 784.0, 466.0, 867.0, 477.0, 870.0, 473.0, 784.0, 477.0, 870.0, 483.0, 879.0, 483.0, 879.0, 483.0, 888.0, 489.0, 890.0, 473.0, 784.0, 483.0, 879.0, 489.0, 890.0, 489.0, 890.0, 532.0, 850.0, 473.0, 784.0]},
+    {"id": 67, "name": "Greenshire", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [709, 644], "area": 8866, "neighbors": [14, 17, 53, 97, 102, 135], "startOwner": 2, "isCapital": false, "tris": [764.0, 623.0, 712.0, 591.0, 649.0, 614.0, 764.0, 623.0, 649.0, 614.0, 654.0, 665.0, 764.0, 623.0, 654.0, 665.0, 715.0, 700.0, 715.0, 700.0, 763.0, 672.0, 764.0, 623.0]},
+    {"id": 68, "name": "Sunwell", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [838, 778], "area": 9352, "neighbors": [13, 82, 97, 123, 126], "startOwner": 8, "isCapital": false, "tris": [829.0, 713.0, 828.0, 713.0, 777.0, 795.0, 829.0, 713.0, 777.0, 795.0, 834.0, 841.0, 829.0, 713.0, 834.0, 841.0, 861.0, 835.0, 861.0, 835.0, 903.0, 745.0, 829.0, 713.0]},
+    {"id": 69, "name": "Willowthicket", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [381, 592], "area": 8179, "neighbors": [30, 36, 52, 108, 144], "startOwner": 5, "isCapital": false, "tris": [425.0, 567.0, 340.0, 543.0, 296.0, 602.0, 425.0, 567.0, 296.0, 602.0, 339.0, 612.0, 425.0, 567.0, 339.0, 612.0, 362.0, 626.0, 425.0, 567.0, 362.0, 626.0, 380.0, 628.0, 425.0, 567.0, 380.0, 628.0, 395.0, 654.0, 425.0, 567.0, 395.0, 654.0, 394.0, 665.0, 425.0, 567.0, 394.0, 665.0, 404.0, 667.0, 404.0, 667.0, 412.0, 663.0, 425.0, 567.0]},
+    {"id": 70, "name": "Eldershade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1843, 702], "area": 3565, "neighbors": [16, 58, 101, 128], "startOwner": null, "isCapital": false, "tris": [1859.0, 659.0, 1837.0, 665.0, 1814.0, 685.0, 1859.0, 659.0, 1814.0, 685.0, 1818.0, 696.0, 1859.0, 659.0, 1818.0, 696.0, 1813.0, 702.0, 1859.0, 659.0, 1813.0, 702.0, 1816.0, 728.0, 1859.0, 659.0, 1816.0, 728.0, 1828.0, 734.0, 1859.0, 659.0, 1828.0, 734.0, 1840.0, 747.0, 1840.0, 747.0, 1876.0, 704.0, 1859.0, 659.0]},
+    {"id": 71, "name": "Millford", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [685, 188], "area": 7832, "neighbors": [40, 93, 111, 129, 141], "startOwner": 7, "isCapital": false, "tris": [712.0, 130.0, 699.0, 131.0, 631.0, 169.0, 712.0, 130.0, 631.0, 169.0, 640.0, 222.0, 712.0, 130.0, 640.0, 222.0, 688.0, 245.0, 688.0, 245.0, 738.0, 193.0, 712.0, 130.0]},
+    {"id": 72, "name": "Briarthicket", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1416, 493], "area": 8322, "neighbors": [8, 9, 38, 98, 122, 143], "startOwner": 6, "isCapital": false, "tris": [1451.0, 432.0, 1362.0, 471.0, 1355.0, 487.0, 1451.0, 432.0, 1355.0, 487.0, 1367.0, 531.0, 1451.0, 432.0, 1367.0, 531.0, 1406.0, 547.0, 1451.0, 432.0, 1406.0, 547.0, 1442.0, 528.0, 1442.0, 528.0, 1466.0, 513.0, 1451.0, 432.0]},
+    {"id": 73, "name": "Sandoasis", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [987, 868], "area": 9600, "neighbors": [37, 50, 82, 126, 127], "startOwner": 8, "isCapital": false, "tris": [1025.0, 827.0, 970.0, 818.0, 925.0, 877.0, 1025.0, 827.0, 925.0, 877.0, 930.0, 901.0, 1025.0, 827.0, 930.0, 901.0, 1019.0, 927.0, 1025.0, 827.0, 1019.0, 927.0, 1024.0, 927.0, 1025.0, 827.0, 1024.0, 927.0, 1027.0, 920.0, 1027.0, 920.0, 1058.0, 907.0, 1025.0, 827.0]},
+    {"id": 74, "name": "Amberbury", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [1163, 432], "area": 9480, "neighbors": [5, 6, 7, 41, 78, 120, 140], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1163.0, 366.0, 1142.0, 367.0, 1106.0, 440.0, 1163.0, 366.0, 1106.0, 440.0, 1158.0, 499.0, 1163.0, 366.0, 1158.0, 499.0, 1170.0, 497.0, 1163.0, 366.0, 1170.0, 497.0, 1225.0, 423.0, 1225.0, 423.0, 1212.0, 395.0, 1163.0, 366.0]},
+    {"id": 75, "name": "Slagpit", "terrain": "Hills", "biome": "ashlands", "development": 2, "center": [1415, 872], "area": 10440, "neighbors": [15, 29, 89, 130, 137], "startOwner": 9, "isCapital": false, "tris": [1472.0, 834.0, 1421.0, 814.0, 1347.0, 854.0, 1472.0, 834.0, 1347.0, 854.0, 1350.0, 861.0, 1472.0, 834.0, 1350.0, 861.0, 1398.0, 934.0, 1472.0, 834.0, 1398.0, 934.0, 1403.0, 928.0, 1472.0, 834.0, 1403.0, 928.0, 1420.0, 928.0, 1472.0, 834.0, 1420.0, 928.0, 1430.0, 922.0, 1472.0, 834.0, 1430.0, 922.0, 1448.0, 923.0, 1472.0, 834.0, 1448.0, 923.0, 1471.0, 910.0, 1471.0, 910.0, 1479.0, 846.0, 1472.0, 834.0]},
+    {"id": 76, "name": "Hoarmarch", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [1064, 189], "area": 10220, "neighbors": [5, 33, 100, 112, 132], "startOwner": 4, "isCapital": false, "tris": [1086.0, 152.0, 1050.0, 126.0, 999.0, 157.0, 1086.0, 152.0, 999.0, 157.0, 1019.0, 220.0, 1086.0, 152.0, 1019.0, 220.0, 1098.0, 255.0, 1086.0, 152.0, 1098.0, 255.0, 1115.0, 240.0, 1115.0, 240.0, 1122.0, 163.0, 1086.0, 152.0]},
+    {"id": 77, "name": "Rosebury", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [963, 373], "area": 11280, "neighbors": [4, 18, 33, 51, 78], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1020.0, 346.0, 958.0, 305.0, 903.0, 346.0, 1020.0, 346.0, 903.0, 346.0, 931.0, 447.0, 1020.0, 346.0, 931.0, 447.0, 946.0, 447.0, 1020.0, 346.0, 946.0, 447.0, 961.0, 436.0, 1020.0, 346.0, 961.0, 436.0, 976.0, 433.0, 1020.0, 346.0, 976.0, 433.0, 986.0, 426.0, 986.0, 426.0, 1011.0, 423.0, 1020.0, 346.0]},
+    {"id": 78, "name": "Greenford", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [1072, 390], "area": 11415, "neighbors": [5, 33, 74, 77, 120], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1089.0, 320.0, 1020.0, 346.0, 1011.0, 423.0, 1089.0, 320.0, 1011.0, 423.0, 1046.0, 431.0, 1089.0, 320.0, 1046.0, 431.0, 1067.0, 450.0, 1089.0, 320.0, 1067.0, 450.0, 1106.0, 440.0, 1106.0, 440.0, 1142.0, 367.0, 1089.0, 320.0]},
+    {"id": 79, "name": "Greyfell", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [558, 128], "area": 6291, "neighbors": [44, 96, 111, 141], "startOwner": 7, "isCapital": false, "tris": [599.0, 99.0, 608.0, 91.0, 596.0, 89.0, 601.0, 150.0, 599.0, 99.0, 596.0, 89.0, 601.0, 150.0, 596.0, 89.0, 588.0, 82.0, 601.0, 150.0, 588.0, 82.0, 587.0, 90.0, 601.0, 150.0, 587.0, 90.0, 578.0, 96.0, 601.0, 150.0, 578.0, 96.0, 566.0, 97.0, 601.0, 150.0, 566.0, 97.0, 553.0, 98.0, 601.0, 150.0, 553.0, 98.0, 553.0, 101.0, 601.0, 150.0, 553.0, 101.0, 546.0, 101.0, 547.0, 98.0, 553.0, 98.0, 566.0, 97.0, 547.0, 98.0, 566.0, 97.0, 536.0, 90.0, 546.0, 101.0, 547.0, 98.0, 536.0, 90.0, 546.0, 101.0, 536.0, 90.0, 525.0, 95.0, 601.0, 150.0, 546.0, 101.0, 525.0, 95.0, 601.0, 150.0, 525.0, 95.0, 521.0, 106.0, 601.0, 150.0, 521.0, 106.0, 510.0, 107.0, 601.0, 150.0, 510.0, 107.0, 513.0, 170.0, 513.0, 170.0, 525.0, 178.0, 601.0, 150.0]},
+    {"id": 80, "name": "Duskshade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1632, 274], "area": 8740, "neighbors": [23, 54, 59, 90, 106, 139], "startOwner": 1, "isCapital": false, "tris": [1636.0, 211.0, 1627.0, 210.0, 1611.0, 219.0, 1611.0, 219.0, 1604.0, 221.0, 1584.0, 288.0, 1636.0, 211.0, 1611.0, 219.0, 1584.0, 288.0, 1636.0, 211.0, 1584.0, 288.0, 1603.0, 316.0, 1603.0, 316.0, 1678.0, 330.0, 1705.0, 310.0, 1603.0, 316.0, 1705.0, 310.0, 1708.0, 306.0, 1603.0, 316.0, 1708.0, 306.0, 1706.0, 299.0, 1603.0, 316.0, 1706.0, 299.0, 1713.0, 293.0, 1603.0, 316.0, 1713.0, 293.0, 1693.0, 294.0, 1603.0, 316.0, 1693.0, 294.0, 1689.0, 281.0, 1603.0, 316.0, 1689.0, 281.0, 1674.0, 272.0, 1603.0, 316.0, 1674.0, 272.0, 1677.0, 265.0, 1603.0, 316.0, 1677.0, 265.0, 1657.0, 246.0, 1603.0, 316.0, 1657.0, 246.0, 1664.0, 235.0, 1603.0, 316.0, 1664.0, 235.0, 1636.0, 230.0, 1636.0, 211.0, 1603.0, 316.0, 1636.0, 230.0, 1636.0, 230.0, 1641.0, 219.0, 1636.0, 211.0]},
+    {"id": 81, "name": "Millstead", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [333, 347], "area": 10969, "neighbors": [27, 43, 56, 119], "startOwner": null, "isCapital": false, "tris": [359.0, 291.0, 314.0, 291.0, 316.0, 299.0, 359.0, 291.0, 316.0, 299.0, 310.0, 308.0, 310.0, 308.0, 288.0, 315.0, 293.0, 335.0, 359.0, 291.0, 310.0, 308.0, 293.0, 335.0, 293.0, 335.0, 278.0, 345.0, 274.0, 360.0, 359.0, 291.0, 293.0, 335.0, 274.0, 360.0, 274.0, 360.0, 265.0, 360.0, 259.0, 366.0, 274.0, 360.0, 259.0, 366.0, 264.0, 372.0, 359.0, 291.0, 274.0, 360.0, 264.0, 372.0, 359.0, 291.0, 264.0, 372.0, 265.0, 382.0, 359.0, 291.0, 265.0, 382.0, 281.0, 384.0, 281.0, 384.0, 275.0, 390.0, 291.0, 405.0, 359.0, 291.0, 281.0, 384.0, 291.0, 405.0, 359.0, 291.0, 291.0, 405.0, 293.0, 405.0, 359.0, 291.0, 293.0, 405.0, 302.0, 415.0, 359.0, 291.0, 302.0, 415.0, 304.0, 415.0, 304.0, 415.0, 411.0, 364.0, 359.0, 291.0]},
+    {"id": 82, "name": "Sunreach", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [867, 897], "area": 9561, "neighbors": [50, 68, 73, 107, 123, 126], "startOwner": 8, "isCapital": false, "tris": [861.0, 835.0, 834.0, 841.0, 810.0, 904.0, 861.0, 835.0, 810.0, 904.0, 828.0, 921.0, 861.0, 835.0, 828.0, 921.0, 830.0, 921.0, 861.0, 835.0, 830.0, 921.0, 840.0, 932.0, 861.0, 835.0, 840.0, 932.0, 842.0, 932.0, 861.0, 835.0, 842.0, 932.0, 853.0, 944.0, 861.0, 835.0, 853.0, 944.0, 855.0, 944.0, 861.0, 835.0, 855.0, 944.0, 865.0, 955.0, 861.0, 835.0, 865.0, 955.0, 881.0, 956.0, 881.0, 956.0, 867.0, 962.0, 876.0, 970.0, 881.0, 956.0, 876.0, 970.0, 885.0, 969.0, 861.0, 835.0, 881.0, 956.0, 885.0, 969.0, 861.0, 835.0, 885.0, 969.0, 885.0, 958.0, 861.0, 835.0, 885.0, 958.0, 892.0, 958.0, 861.0, 835.0, 892.0, 958.0, 930.0, 901.0, 930.0, 901.0, 925.0, 877.0, 909.0, 868.0, 930.0, 901.0, 909.0, 868.0, 861.0, 835.0]},
+    {"id": 83, "name": "Fairdale", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [119, 684], "area": 7027, "neighbors": [47, 118], "startOwner": 10, "isCapital": false, "tris": [145.0, 713.0, 167.0, 697.0, 152.0, 664.0, 145.0, 713.0, 152.0, 664.0, 143.0, 660.0, 145.0, 713.0, 143.0, 660.0, 139.0, 652.0, 145.0, 713.0, 139.0, 652.0, 127.0, 650.0, 145.0, 713.0, 127.0, 650.0, 123.0, 641.0, 145.0, 713.0, 123.0, 641.0, 94.0, 643.0, 145.0, 713.0, 94.0, 643.0, 84.0, 646.0, 145.0, 713.0, 84.0, 646.0, 60.0, 667.0, 156.0, 722.0, 145.0, 713.0, 60.0, 667.0, 156.0, 722.0, 60.0, 667.0, 65.0, 674.0, 156.0, 722.0, 65.0, 674.0, 61.0, 688.0, 156.0, 722.0, 61.0, 688.0, 68.0, 698.0, 156.0, 722.0, 68.0, 698.0, 68.0, 705.0, 156.0, 722.0, 68.0, 705.0, 85.0, 716.0, 181.0, 726.0, 156.0, 722.0, 85.0, 716.0, 181.0, 726.0, 85.0, 716.0, 100.0, 719.0, 100.0, 719.0, 107.0, 727.0, 119.0, 728.0, 100.0, 719.0, 119.0, 728.0, 125.0, 724.0, 181.0, 726.0, 100.0, 719.0, 125.0, 724.0, 181.0, 726.0, 125.0, 724.0, 126.0, 729.0, 181.0, 726.0, 126.0, 729.0, 142.0, 733.0, 142.0, 733.0, 176.0, 733.0, 181.0, 726.0]},
+    {"id": 84, "name": "Silverglade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1591, 581], "area": 10883, "neighbors": [16, 31, 98, 99, 103, 113, 122], "startOwner": 6, "isCapital": false, "tris": [1628.0, 531.0, 1561.0, 526.0, 1534.0, 548.0, 1628.0, 531.0, 1534.0, 548.0, 1532.0, 561.0, 1628.0, 531.0, 1532.0, 561.0, 1587.0, 652.0, 1628.0, 531.0, 1587.0, 652.0, 1629.0, 662.0, 1629.0, 662.0, 1653.0, 648.0, 1628.0, 531.0]},
+    {"id": 85, "name": "Mistwood", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1284, 123], "area": 5396, "neighbors": [62, 110, 112], "startOwner": 3, "isCapital": false, "tris": [1344.0, 79.0, 1335.0, 80.0, 1327.0, 86.0, 1327.0, 86.0, 1312.0, 86.0, 1303.0, 98.0, 1344.0, 79.0, 1327.0, 86.0, 1303.0, 98.0, 1303.0, 98.0, 1284.0, 92.0, 1274.0, 103.0, 1274.0, 103.0, 1261.0, 99.0, 1253.0, 112.0, 1303.0, 98.0, 1274.0, 103.0, 1253.0, 112.0, 1303.0, 98.0, 1253.0, 112.0, 1240.0, 118.0, 1303.0, 98.0, 1240.0, 118.0, 1240.0, 125.0, 1303.0, 98.0, 1240.0, 125.0, 1235.0, 131.0, 1344.0, 79.0, 1303.0, 98.0, 1235.0, 131.0, 1344.0, 79.0, 1235.0, 131.0, 1217.0, 140.0, 1344.0, 79.0, 1217.0, 140.0, 1221.0, 144.0, 1221.0, 144.0, 1314.0, 161.0, 1344.0, 79.0]},
+    {"id": 86, "name": "Duskroot", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [517, 691], "area": 8511, "neighbors": [17, 26, 30, 36], "startOwner": 2, "isCapital": false, "tris": [533.0, 624.0, 529.0, 625.0, 459.0, 671.0, 533.0, 624.0, 459.0, 671.0, 499.0, 743.0, 499.0, 743.0, 583.0, 730.0, 533.0, 624.0]},
+    {"id": 87, "name": "Hoarreach", "terrain": "Plains", "biome": "frostfields", "development": 3, "center": [921, 146], "area": 8205, "neighbors": [34, 100, 105, 132, 142], "startOwner": 4, "isCapital": true, "tris": [993.0, 155.0, 948.0, 98.0, 899.0, 98.0, 993.0, 155.0, 899.0, 98.0, 867.0, 154.0, 867.0, 154.0, 906.0, 205.0, 993.0, 155.0]},
+    {"id": 88, "name": "Willowgrove", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1843, 325], "area": 9573, "neighbors": [42, 46, 90, 145], "startOwner": 1, "isCapital": false, "tris": [1841.0, 277.0, 1801.0, 296.0, 1783.0, 335.0, 1783.0, 335.0, 1781.0, 335.0, 1765.0, 351.0, 1783.0, 335.0, 1765.0, 351.0, 1770.0, 354.0, 1841.0, 277.0, 1783.0, 335.0, 1770.0, 354.0, 1841.0, 277.0, 1770.0, 354.0, 1769.0, 365.0, 1769.0, 365.0, 1805.0, 367.0, 1801.0, 359.0, 1841.0, 277.0, 1769.0, 365.0, 1801.0, 359.0, 1841.0, 277.0, 1801.0, 359.0, 1807.0, 358.0, 1841.0, 277.0, 1807.0, 358.0, 1817.0, 360.0, 1841.0, 277.0, 1817.0, 360.0, 1819.0, 363.0, 1819.0, 363.0, 1814.0, 368.0, 1829.0, 374.0, 1841.0, 277.0, 1819.0, 363.0, 1829.0, 374.0, 1841.0, 277.0, 1829.0, 374.0, 1846.0, 370.0, 1841.0, 277.0, 1846.0, 370.0, 1864.0, 373.0, 1841.0, 277.0, 1864.0, 373.0, 1871.0, 366.0, 1841.0, 277.0, 1871.0, 366.0, 1880.0, 373.0, 1841.0, 277.0, 1880.0, 373.0, 1891.0, 374.0, 1891.0, 374.0, 1895.0, 372.0, 1896.0, 363.0, 1891.0, 374.0, 1896.0, 363.0, 1891.0, 356.0, 1891.0, 374.0, 1891.0, 356.0, 1883.0, 358.0, 1841.0, 277.0, 1891.0, 374.0, 1883.0, 358.0, 1841.0, 277.0, 1883.0, 358.0, 1886.0, 353.0, 1841.0, 277.0, 1886.0, 353.0, 1891.0, 356.0, 1841.0, 277.0, 1891.0, 356.0, 1896.0, 363.0, 1841.0, 277.0, 1896.0, 363.0, 1908.0, 358.0, 1841.0, 277.0, 1908.0, 358.0, 1900.0, 348.0, 1841.0, 277.0, 1900.0, 348.0, 1911.0, 350.0, 1911.0, 350.0, 1898.0, 300.0, 1841.0, 277.0]},
+    {"id": 89, "name": "Sootgate", "terrain": "Hills", "biome": "ashlands", "development": 1, "center": [1513, 875], "area": 5453, "neighbors": [29, 61, 75], "startOwner": null, "isCapital": false, "tris": [1568.0, 842.0, 1479.0, 846.0, 1471.0, 910.0, 1471.0, 910.0, 1518.0, 907.0, 1525.0, 903.0, 1471.0, 910.0, 1525.0, 903.0, 1529.0, 891.0, 1568.0, 842.0, 1471.0, 910.0, 1529.0, 891.0, 1568.0, 842.0, 1529.0, 891.0, 1549.0, 895.0, 1549.0, 895.0, 1553.0, 892.0, 1553.0, 884.0, 1568.0, 842.0, 1549.0, 895.0, 1553.0, 884.0, 1568.0, 842.0, 1553.0, 884.0, 1566.0, 874.0, 1566.0, 874.0, 1586.0, 878.0, 1587.0, 875.0, 1566.0, 874.0, 1587.0, 875.0, 1581.0, 872.0, 1568.0, 842.0, 1566.0, 874.0, 1581.0, 872.0, 1581.0, 872.0, 1585.0, 865.0, 1568.0, 842.0]},
+    {"id": 90, "name": "Mistgrove", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1746, 265], "area": 6801, "neighbors": [46, 54, 80, 88, 114], "startOwner": 1, "isCapital": false, "tris": [1744.0, 208.0, 1710.0, 205.0, 1715.0, 210.0, 1744.0, 208.0, 1715.0, 210.0, 1729.0, 213.0, 1744.0, 208.0, 1729.0, 213.0, 1712.0, 227.0, 1744.0, 208.0, 1712.0, 227.0, 1712.0, 231.0, 1744.0, 208.0, 1712.0, 231.0, 1730.0, 242.0, 1725.0, 245.0, 1707.0, 242.0, 1706.0, 247.0, 1725.0, 245.0, 1706.0, 247.0, 1724.0, 254.0, 1730.0, 242.0, 1725.0, 245.0, 1724.0, 254.0, 1724.0, 254.0, 1709.0, 262.0, 1737.0, 290.0, 1730.0, 242.0, 1724.0, 254.0, 1737.0, 290.0, 1744.0, 208.0, 1730.0, 242.0, 1737.0, 290.0, 1744.0, 208.0, 1737.0, 290.0, 1749.0, 345.0, 1744.0, 208.0, 1749.0, 345.0, 1765.0, 351.0, 1744.0, 208.0, 1765.0, 351.0, 1781.0, 335.0, 1744.0, 208.0, 1781.0, 335.0, 1783.0, 335.0, 1783.0, 335.0, 1801.0, 296.0, 1744.0, 208.0]},
+    {"id": 91, "name": "Clovervale", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [292, 900], "area": 5486, "neighbors": [20, 22, 146], "startOwner": 10, "isCapital": false, "tris": [304.0, 949.0, 350.0, 868.0, 295.0, 860.0, 304.0, 949.0, 295.0, 860.0, 288.0, 869.0, 304.0, 949.0, 288.0, 869.0, 251.0, 878.0, 304.0, 949.0, 251.0, 878.0, 245.0, 885.0, 245.0, 885.0, 245.0, 898.0, 257.0, 906.0, 304.0, 949.0, 245.0, 885.0, 257.0, 906.0, 257.0, 906.0, 248.0, 923.0, 286.0, 934.0, 304.0, 949.0, 257.0, 906.0, 286.0, 934.0, 286.0, 934.0, 292.0, 946.0, 304.0, 949.0]},
+    {"id": 92, "name": "Slagwaste", "terrain": "Hills", "biome": "ashlands", "development": 2, "center": [1155, 760], "area": 8947, "neighbors": [10, 11, 24, 57, 127, 131], "startOwner": 9, "isCapital": false, "tris": [1184.0, 695.0, 1085.0, 750.0, 1083.0, 754.0, 1184.0, 695.0, 1083.0, 754.0, 1132.0, 810.0, 1184.0, 695.0, 1132.0, 810.0, 1212.0, 802.0, 1212.0, 802.0, 1214.0, 797.0, 1184.0, 695.0]},
+    {"id": 93, "name": "Stonebarrow", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [639, 274], "area": 9556, "neighbors": [2, 32, 40, 71, 111, 116, 121], "startOwner": 7, "isCapital": false, "tris": [688.0, 245.0, 640.0, 222.0, 583.0, 262.0, 688.0, 245.0, 583.0, 262.0, 589.0, 323.0, 688.0, 245.0, 589.0, 323.0, 595.0, 329.0, 688.0, 245.0, 595.0, 329.0, 704.0, 316.0, 704.0, 316.0, 709.0, 310.0, 688.0, 245.0]},
+    {"id": 94, "name": "Rosedale", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [609, 855], "area": 10788, "neighbors": [26, 48, 53, 104, 134], "startOwner": 2, "isCapital": false, "tris": [639.0, 792.0, 611.0, 781.0, 549.0, 846.0, 639.0, 792.0, 549.0, 846.0, 547.0, 850.0, 639.0, 792.0, 547.0, 850.0, 598.0, 925.0, 639.0, 792.0, 598.0, 925.0, 616.0, 925.0, 615.0, 930.0, 603.0, 933.0, 602.0, 939.0, 615.0, 930.0, 602.0, 939.0, 621.0, 936.0, 616.0, 925.0, 615.0, 930.0, 621.0, 936.0, 639.0, 792.0, 616.0, 925.0, 621.0, 936.0, 621.0, 936.0, 669.0, 854.0, 639.0, 792.0]},
+    {"id": 95, "name": "Stoneheath", "terrain": "Hills", "biome": "highlands", "development": 3, "center": [497, 527], "area": 8959, "neighbors": [25, 30, 108, 124, 133], "startOwner": 5, "isCapital": true, "tris": [551.0, 487.0, 527.0, 461.0, 453.0, 493.0, 551.0, 487.0, 453.0, 493.0, 447.0, 552.0, 447.0, 552.0, 531.0, 590.0, 551.0, 487.0]},
+    {"id": 96, "name": "Honeymeadow", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [478, 137], "area": 4754, "neighbors": [44, 79, 125], "startOwner": 7, "isCapital": false, "tris": [510.0, 107.0, 488.0, 101.0, 455.0, 112.0, 510.0, 107.0, 455.0, 112.0, 447.0, 119.0, 510.0, 107.0, 447.0, 119.0, 458.0, 124.0, 510.0, 107.0, 458.0, 124.0, 456.0, 128.0, 510.0, 107.0, 456.0, 128.0, 446.0, 133.0, 446.0, 133.0, 421.0, 130.0, 428.0, 137.0, 446.0, 133.0, 428.0, 137.0, 427.0, 142.0, 510.0, 107.0, 446.0, 133.0, 427.0, 142.0, 510.0, 107.0, 427.0, 142.0, 447.0, 177.0, 447.0, 177.0, 513.0, 170.0, 510.0, 107.0]},
+    {"id": 97, "name": "Greenstead", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [764, 731], "area": 8785, "neighbors": [14, 48, 53, 67, 68, 123], "startOwner": 2, "isCapital": false, "tris": [767.0, 673.0, 763.0, 672.0, 715.0, 700.0, 767.0, 673.0, 715.0, 700.0, 711.0, 753.0, 767.0, 673.0, 711.0, 753.0, 774.0, 795.0, 767.0, 673.0, 774.0, 795.0, 777.0, 795.0, 777.0, 795.0, 828.0, 713.0, 781.0, 682.0, 777.0, 795.0, 781.0, 682.0, 777.0, 681.0, 777.0, 795.0, 777.0, 681.0, 767.0, 673.0]},
+    {"id": 98, "name": "Silvershade", "terrain": "Forest", "biome": "wildwood", "development": 3, "center": [1507, 476], "area": 12303, "neighbors": [31, 59, 60, 72, 84, 106, 122, 143], "startOwner": 6, "isCapital": true, "tris": [1482.0, 398.0, 1461.0, 410.0, 1451.0, 432.0, 1482.0, 398.0, 1451.0, 432.0, 1466.0, 513.0, 1482.0, 398.0, 1466.0, 513.0, 1534.0, 548.0, 1482.0, 398.0, 1534.0, 548.0, 1561.0, 526.0, 1482.0, 398.0, 1561.0, 526.0, 1552.0, 415.0, 1552.0, 415.0, 1551.0, 413.0, 1482.0, 398.0]},
+    {"id": 99, "name": "Cloverwick", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [1522, 633], "area": 9070, "neighbors": [55, 84, 113, 122, 137], "startOwner": null, "isCapital": false, "tris": [1532.0, 561.0, 1464.0, 629.0, 1495.0, 701.0, 1532.0, 561.0, 1495.0, 701.0, 1497.0, 702.0, 1497.0, 702.0, 1587.0, 652.0, 1532.0, 561.0]},
+    {"id": 100, "name": "Heatherheath", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [1003, 116], "area": 5365, "neighbors": [76, 87, 132, 142], "startOwner": 4, "isCapital": false, "tris": [983.0, 55.0, 966.0, 54.0, 948.0, 98.0, 948.0, 98.0, 993.0, 155.0, 999.0, 157.0, 948.0, 98.0, 999.0, 157.0, 1050.0, 126.0, 948.0, 98.0, 1050.0, 126.0, 1026.0, 99.0, 948.0, 98.0, 1026.0, 99.0, 1019.0, 96.0, 948.0, 98.0, 1019.0, 96.0, 1023.0, 90.0, 948.0, 98.0, 1023.0, 90.0, 1021.0, 84.0, 948.0, 98.0, 1021.0, 84.0, 1010.0, 80.0, 948.0, 98.0, 1010.0, 80.0, 991.0, 80.0, 948.0, 98.0, 991.0, 80.0, 984.0, 70.0, 983.0, 55.0, 948.0, 98.0, 984.0, 70.0, 983.0, 55.0, 984.0, 70.0, 990.0, 63.0, 990.0, 63.0, 989.0, 59.0, 983.0, 55.0]},
+    {"id": 101, "name": "Faethicket", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1732, 632], "area": 4450, "neighbors": [16, 28, 70, 103], "startOwner": null, "isCapital": false, "tris": [1735.0, 585.0, 1687.0, 649.0, 1716.0, 679.0, 1735.0, 585.0, 1716.0, 679.0, 1718.0, 679.0, 1735.0, 585.0, 1718.0, 679.0, 1725.0, 666.0, 1735.0, 585.0, 1725.0, 666.0, 1747.0, 652.0, 1735.0, 585.0, 1747.0, 652.0, 1750.0, 644.0, 1735.0, 585.0, 1750.0, 644.0, 1766.0, 639.0, 1735.0, 585.0, 1766.0, 639.0, 1758.0, 620.0, 1735.0, 585.0, 1758.0, 620.0, 1767.0, 616.0, 1735.0, 585.0, 1767.0, 616.0, 1768.0, 596.0, 1735.0, 585.0, 1768.0, 596.0, 1772.0, 593.0, 1792.0, 586.0, 1735.0, 585.0, 1772.0, 593.0, 1772.0, 593.0, 1786.0, 595.0, 1792.0, 586.0]},
+    {"id": 102, "name": "Fairford", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [674, 551], "area": 9781, "neighbors": [1, 17, 25, 67, 133, 135], "startOwner": null, "isCapital": false, "tris": [726.0, 509.0, 655.0, 483.0, 633.0, 498.0, 726.0, 509.0, 633.0, 498.0, 625.0, 595.0, 726.0, 509.0, 625.0, 595.0, 649.0, 614.0, 649.0, 614.0, 712.0, 591.0, 726.0, 509.0]},
+    {"id": 103, "name": "Willowroot", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1683, 573], "area": 9579, "neighbors": [16, 28, 31, 84, 101, 136], "startOwner": null, "isCapital": false, "tris": [1710.0, 526.0, 1646.0, 519.0, 1628.0, 531.0, 1710.0, 526.0, 1628.0, 531.0, 1653.0, 648.0, 1710.0, 526.0, 1653.0, 648.0, 1687.0, 649.0, 1687.0, 649.0, 1735.0, 585.0, 1710.0, 526.0]},
+    {"id": 104, "name": "Barleyvale", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [696, 905], "area": 8986, "neighbors": [48, 94, 107, 123], "startOwner": null, "isCapital": false, "tris": [721.0, 863.0, 669.0, 854.0, 621.0, 936.0, 721.0, 863.0, 621.0, 936.0, 628.0, 938.0, 721.0, 863.0, 628.0, 938.0, 632.0, 945.0, 721.0, 863.0, 632.0, 945.0, 669.0, 942.0, 721.0, 863.0, 669.0, 942.0, 688.0, 947.0, 721.0, 863.0, 688.0, 947.0, 695.0, 950.0, 721.0, 863.0, 695.0, 950.0, 702.0, 960.0, 721.0, 863.0, 702.0, 960.0, 713.0, 959.0, 721.0, 863.0, 713.0, 959.0, 721.0, 952.0, 721.0, 863.0, 721.0, 952.0, 740.0, 955.0, 740.0, 955.0, 755.0, 920.0, 721.0, 863.0]},
+    {"id": 105, "name": "Hoarhaven", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [844, 204], "area": 8632, "neighbors": [3, 4, 34, 40, 87, 129, 132], "startOwner": 4, "isCapital": false, "tris": [867.0, 154.0, 825.0, 153.0, 788.0, 205.0, 867.0, 154.0, 788.0, 205.0, 809.0, 257.0, 867.0, 154.0, 809.0, 257.0, 830.0, 262.0, 867.0, 154.0, 830.0, 262.0, 903.0, 226.0, 903.0, 226.0, 906.0, 205.0, 867.0, 154.0]},
+    {"id": 106, "name": "Rosemeadow", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [1534, 336], "area": 11261, "neighbors": [23, 59, 60, 64, 80, 98], "startOwner": 6, "isCapital": false, "tris": [1584.0, 288.0, 1532.0, 281.0, 1480.0, 330.0, 1584.0, 288.0, 1480.0, 330.0, 1482.0, 398.0, 1584.0, 288.0, 1482.0, 398.0, 1551.0, 413.0, 1551.0, 413.0, 1603.0, 316.0, 1584.0, 288.0]},
+    {"id": 107, "name": "Scorchrest", "terrain": "Plains", "biome": "dunes", "development": 1, "center": [807, 938], "area": 5284, "neighbors": [82, 104, 123], "startOwner": null, "isCapital": false, "tris": [828.0, 921.0, 810.0, 904.0, 755.0, 920.0, 828.0, 921.0, 755.0, 920.0, 740.0, 955.0, 828.0, 921.0, 740.0, 955.0, 751.0, 959.0, 828.0, 921.0, 751.0, 959.0, 792.0, 958.0, 828.0, 921.0, 792.0, 958.0, 801.0, 963.0, 801.0, 963.0, 795.0, 967.0, 797.0, 972.0, 828.0, 921.0, 801.0, 963.0, 797.0, 972.0, 828.0, 921.0, 797.0, 972.0, 806.0, 973.0, 828.0, 921.0, 806.0, 973.0, 809.0, 968.0, 828.0, 921.0, 809.0, 968.0, 825.0, 969.0, 828.0, 921.0, 825.0, 969.0, 826.0, 972.0, 826.0, 972.0, 813.0, 977.0, 821.0, 982.0, 826.0, 972.0, 821.0, 982.0, 833.0, 982.0, 828.0, 921.0, 826.0, 972.0, 833.0, 982.0, 833.0, 982.0, 854.0, 976.0, 847.0, 971.0, 833.0, 982.0, 847.0, 971.0, 836.0, 970.0, 828.0, 921.0, 833.0, 982.0, 836.0, 970.0, 828.0, 921.0, 836.0, 970.0, 837.0, 963.0, 837.0, 963.0, 865.0, 955.0, 855.0, 944.0, 837.0, 963.0, 855.0, 944.0, 853.0, 944.0, 828.0, 921.0, 837.0, 963.0, 853.0, 944.0, 853.0, 944.0, 842.0, 932.0, 840.0, 932.0, 828.0, 921.0, 853.0, 944.0, 840.0, 932.0, 840.0, 932.0, 830.0, 921.0, 828.0, 921.0]},
+    {"id": 108, "name": "Cloverdale", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [401, 516], "area": 8611, "neighbors": [27, 30, 52, 69, 95, 124], "startOwner": 5, "isCapital": false, "tris": [453.0, 493.0, 418.0, 467.0, 337.0, 490.0, 453.0, 493.0, 337.0, 490.0, 340.0, 543.0, 453.0, 493.0, 340.0, 543.0, 425.0, 567.0, 425.0, 567.0, 447.0, 552.0, 453.0, 493.0]},
+    {"id": 109, "name": "Clovermeadow", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [969, 597], "area": 7709, "neighbors": [11, 12, 13, 18, 21, 115], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1007.0, 549.0, 930.0, 560.0, 924.0, 633.0, 1007.0, 549.0, 924.0, 633.0, 932.0, 642.0, 1007.0, 549.0, 932.0, 642.0, 999.0, 648.0, 999.0, 648.0, 1018.0, 635.0, 1007.0, 549.0]},
+    {"id": 110, "name": "Duskwood", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1372, 133], "area": 8771, "neighbors": [35, 62, 63, 85], "startOwner": 3, "isCapital": false, "tris": [1357.0, 74.0, 1344.0, 79.0, 1314.0, 161.0, 1357.0, 74.0, 1314.0, 161.0, 1321.0, 173.0, 1357.0, 74.0, 1321.0, 173.0, 1404.0, 184.0, 1404.0, 184.0, 1430.0, 90.0, 1379.0, 87.0, 1404.0, 184.0, 1379.0, 87.0, 1362.0, 80.0, 1404.0, 184.0, 1362.0, 80.0, 1357.0, 74.0]},
+    {"id": 111, "name": "Clovershire", "terrain": "Plains", "biome": "meadow", "development": 3, "center": [585, 206], "area": 8755, "neighbors": [44, 71, 79, 93, 121, 141], "startOwner": 7, "isCapital": true, "tris": [631.0, 169.0, 601.0, 150.0, 525.0, 178.0, 631.0, 169.0, 525.0, 178.0, 535.0, 232.0, 631.0, 169.0, 535.0, 232.0, 583.0, 262.0, 583.0, 262.0, 640.0, 222.0, 631.0, 169.0]},
+    {"id": 112, "name": "Highcairn", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [1175, 203], "area": 8940, "neighbors": [5, 62, 76, 85], "startOwner": null, "isCapital": false, "tris": [1221.0, 144.0, 1217.0, 140.0, 1200.0, 153.0, 1200.0, 153.0, 1183.0, 156.0, 1162.0, 167.0, 1162.0, 167.0, 1122.0, 163.0, 1115.0, 240.0, 1200.0, 153.0, 1162.0, 167.0, 1115.0, 240.0, 1221.0, 144.0, 1200.0, 153.0, 1115.0, 240.0, 1115.0, 240.0, 1218.0, 254.0, 1221.0, 144.0]},
+    {"id": 113, "name": "Duskbough", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1570, 710], "area": 10241, "neighbors": [16, 29, 61, 84, 99, 137], "startOwner": null, "isCapital": false, "tris": [1629.0, 662.0, 1587.0, 652.0, 1497.0, 702.0, 1629.0, 662.0, 1497.0, 702.0, 1511.0, 736.0, 1629.0, 662.0, 1511.0, 736.0, 1595.0, 771.0, 1595.0, 771.0, 1616.0, 762.0, 1629.0, 662.0]},
+    {"id": 114, "name": "Moonglade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1743, 154], "area": 5813, "neighbors": [46, 90, 138], "startOwner": 1, "isCapital": false, "tris": [1782.0, 118.0, 1741.0, 116.0, 1724.0, 125.0, 1782.0, 118.0, 1724.0, 125.0, 1719.0, 132.0, 1782.0, 118.0, 1719.0, 132.0, 1705.0, 137.0, 1782.0, 118.0, 1705.0, 137.0, 1703.0, 153.0, 1782.0, 118.0, 1703.0, 153.0, 1706.0, 164.0, 1782.0, 118.0, 1706.0, 164.0, 1712.0, 169.0, 1782.0, 118.0, 1712.0, 169.0, 1710.0, 178.0, 1782.0, 118.0, 1710.0, 178.0, 1718.0, 192.0, 1782.0, 118.0, 1718.0, 192.0, 1718.0, 196.0, 1718.0, 196.0, 1709.0, 201.0, 1710.0, 205.0, 1718.0, 196.0, 1710.0, 205.0, 1744.0, 208.0, 1782.0, 118.0, 1718.0, 196.0, 1744.0, 208.0, 1782.0, 118.0, 1744.0, 208.0, 1746.0, 208.0, 1782.0, 118.0, 1746.0, 208.0, 1753.0, 200.0, 1782.0, 118.0, 1753.0, 200.0, 1755.0, 200.0, 1755.0, 200.0, 1785.0, 173.0, 1782.0, 118.0]},
+    {"id": 115, "name": "Fairwick", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [876, 581], "area": 8853, "neighbors": [13, 14, 18, 39, 109, 135], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [930.0, 560.0, 880.0, 516.0, 827.0, 557.0, 930.0, 560.0, 827.0, 557.0, 823.0, 581.0, 930.0, 560.0, 823.0, 581.0, 864.0, 633.0, 864.0, 633.0, 924.0, 633.0, 930.0, 560.0]},
+    {"id": 116, "name": "Thorngrove", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [650, 371], "area": 8942, "neighbors": [1, 2, 25, 32, 93], "startOwner": null, "isCapital": false, "tris": [704.0, 316.0, 595.0, 329.0, 597.0, 385.0, 704.0, 316.0, 597.0, 385.0, 656.0, 427.0, 704.0, 316.0, 656.0, 427.0, 658.0, 427.0, 704.0, 316.0, 658.0, 427.0, 663.0, 421.0, 704.0, 316.0, 663.0, 421.0, 665.0, 421.0, 665.0, 421.0, 700.0, 391.0, 704.0, 316.0]},
+    {"id": 117, "name": "Ironfell", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [1334, 313], "area": 9564, "neighbors": [6, 7, 60, 62, 63, 143], "startOwner": 3, "isCapital": false, "tris": [1397.0, 278.0, 1305.0, 255.0, 1274.0, 275.0, 1397.0, 278.0, 1274.0, 275.0, 1283.0, 325.0, 1397.0, 278.0, 1283.0, 325.0, 1338.0, 373.0, 1338.0, 373.0, 1371.0, 359.0, 1397.0, 278.0]},
+    {"id": 118, "name": "Briarbough", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [159, 781], "area": 2310, "neighbors": [47, 83, 146], "startOwner": 10, "isCapital": false, "tris": [176.0, 733.0, 142.0, 733.0, 162.0, 749.0, 162.0, 749.0, 150.0, 754.0, 154.0, 759.0, 176.0, 733.0, 162.0, 749.0, 154.0, 759.0, 176.0, 733.0, 154.0, 759.0, 152.0, 767.0, 152.0, 767.0, 135.0, 771.0, 136.0, 786.0, 152.0, 767.0, 136.0, 786.0, 152.0, 796.0, 176.0, 733.0, 152.0, 767.0, 152.0, 796.0, 176.0, 733.0, 152.0, 796.0, 150.0, 807.0, 176.0, 733.0, 150.0, 807.0, 155.0, 812.0, 155.0, 812.0, 185.0, 786.0, 176.0, 733.0]},
+    {"id": 119, "name": "Heathercrest", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [355, 245], "area": 4682, "neighbors": [43, 81, 125], "startOwner": null, "isCapital": false, "tris": [348.0, 205.0, 333.0, 207.0, 340.0, 212.0, 348.0, 205.0, 340.0, 212.0, 351.0, 211.0, 358.0, 195.0, 348.0, 205.0, 351.0, 211.0, 358.0, 195.0, 351.0, 211.0, 354.0, 216.0, 354.0, 216.0, 342.0, 219.0, 345.0, 227.0, 345.0, 227.0, 332.0, 226.0, 326.0, 230.0, 345.0, 227.0, 326.0, 230.0, 334.0, 238.0, 334.0, 238.0, 324.0, 243.0, 331.0, 249.0, 345.0, 227.0, 334.0, 238.0, 331.0, 249.0, 354.0, 216.0, 345.0, 227.0, 331.0, 249.0, 354.0, 216.0, 331.0, 249.0, 330.0, 253.0, 325.0, 256.0, 309.0, 255.0, 311.0, 259.0, 325.0, 256.0, 311.0, 259.0, 325.0, 258.0, 330.0, 253.0, 325.0, 256.0, 325.0, 258.0, 330.0, 253.0, 325.0, 258.0, 329.0, 264.0, 354.0, 216.0, 330.0, 253.0, 329.0, 264.0, 329.0, 264.0, 303.0, 266.0, 303.0, 270.0, 329.0, 264.0, 303.0, 270.0, 312.0, 273.0, 329.0, 264.0, 312.0, 273.0, 314.0, 291.0, 329.0, 264.0, 314.0, 291.0, 359.0, 291.0, 354.0, 216.0, 329.0, 264.0, 359.0, 291.0, 358.0, 195.0, 354.0, 216.0, 359.0, 291.0, 359.0, 291.0, 397.0, 227.0, 358.0, 195.0]},
+    {"id": 120, "name": "Brightfield", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [1105, 503], "area": 7813, "neighbors": [21, 41, 74, 78], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1106.0, 440.0, 1067.0, 450.0, 1077.0, 470.0, 1106.0, 440.0, 1077.0, 470.0, 1069.0, 479.0, 1106.0, 440.0, 1069.0, 479.0, 1073.0, 489.0, 1073.0, 489.0, 1061.0, 495.0, 1043.0, 512.0, 1043.0, 512.0, 1028, 518, 1028.0, 519.0, 1043.0, 512.0, 1028.0, 519.0, 1116.0, 558.0, 1073.0, 489.0, 1043.0, 512.0, 1116.0, 558.0, 1106.0, 440.0, 1073.0, 489.0, 1116.0, 558.0, 1116.0, 558.0, 1158.0, 499.0, 1106.0, 440.0]},
+    {"id": 121, "name": "Greenbury", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [531, 283], "area": 8714, "neighbors": [32, 43, 44, 93, 111], "startOwner": 7, "isCapital": false, "tris": [583.0, 262.0, 535.0, 232.0, 476.0, 280.0, 583.0, 262.0, 476.0, 280.0, 474.0, 338.0, 474.0, 338.0, 589.0, 323.0, 583.0, 262.0]},
+    {"id": 122, "name": "Silverroot", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1467, 568], "area": 8917, "neighbors": [38, 55, 72, 84, 98, 99], "startOwner": 6, "isCapital": false, "tris": [1534.0, 548.0, 1466.0, 513.0, 1442.0, 528.0, 1534.0, 548.0, 1442.0, 528.0, 1406.0, 547.0, 1534.0, 548.0, 1406.0, 547.0, 1429.0, 619.0, 1534.0, 548.0, 1429.0, 619.0, 1464.0, 629.0, 1464.0, 629.0, 1532.0, 561.0, 1534.0, 548.0]},
+    {"id": 123, "name": "Cragheath", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [775, 859], "area": 8417, "neighbors": [48, 68, 82, 97, 104, 107], "startOwner": 8, "isCapital": false, "tris": [777.0, 795.0, 774.0, 795.0, 721.0, 863.0, 777.0, 795.0, 721.0, 863.0, 755.0, 920.0, 777.0, 795.0, 755.0, 920.0, 810.0, 904.0, 810.0, 904.0, 834.0, 841.0, 777.0, 795.0]},
+    {"id": 124, "name": "Fairstead", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [469, 434], "area": 10742, "neighbors": [25, 27, 32, 43, 95, 108], "startOwner": 5, "isCapital": false, "tris": [529.0, 437.0, 463.0, 354.0, 417.0, 366.0, 529.0, 437.0, 417.0, 366.0, 418.0, 467.0, 529.0, 437.0, 418.0, 467.0, 453.0, 493.0, 453.0, 493.0, 527.0, 461.0, 529.0, 437.0]},
+    {"id": 125, "name": "Heatherfell", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [406, 187], "area": 4062, "neighbors": [43, 44, 96, 119], "startOwner": null, "isCapital": false, "tris": [447.0, 177.0, 427.0, 142.0, 415.0, 145.0, 447.0, 177.0, 415.0, 145.0, 413.0, 154.0, 447.0, 177.0, 413.0, 154.0, 389.0, 164.0, 447.0, 177.0, 389.0, 164.0, 382.0, 181.0, 447.0, 177.0, 382.0, 181.0, 359.0, 183.0, 447.0, 177.0, 359.0, 183.0, 357.0, 186.0, 447.0, 177.0, 357.0, 186.0, 363.0, 193.0, 447.0, 177.0, 363.0, 193.0, 358.0, 195.0, 447.0, 177.0, 358.0, 195.0, 397.0, 227.0, 397.0, 227.0, 416.0, 223.0, 447.0, 177.0]},
+    {"id": 126, "name": "Dunehaven", "terrain": "Plains", "biome": "dunes", "development": 3, "center": [918, 817], "area": 8495, "neighbors": [12, 13, 37, 68, 73, 82], "startOwner": 8, "isCapital": true, "tris": [940.0, 755.0, 909.0, 744.0, 903.0, 745.0, 940.0, 755.0, 903.0, 745.0, 861.0, 835.0, 940.0, 755.0, 861.0, 835.0, 909.0, 868.0, 940.0, 755.0, 909.0, 868.0, 925.0, 877.0, 925.0, 877.0, 970.0, 818.0, 940.0, 755.0]},
+    {"id": 127, "name": "Miragespire", "terrain": "Plains", "biome": "dunes", "development": 2, "center": [1077, 827], "area": 10101, "neighbors": [11, 37, 57, 73, 92], "startOwner": 8, "isCapital": false, "tris": [1083.0, 754.0, 1071.0, 758.0, 1025.0, 827.0, 1083.0, 754.0, 1025.0, 827.0, 1058.0, 907.0, 1083.0, 754.0, 1058.0, 907.0, 1062.0, 902.0, 1083.0, 754.0, 1062.0, 902.0, 1084.0, 900.0, 1083.0, 754.0, 1084.0, 900.0, 1087.0, 894.0, 1083.0, 754.0, 1087.0, 894.0, 1111.0, 889.0, 1111.0, 889.0, 1132.0, 810.0, 1083.0, 754.0]},
+    {"id": 128, "name": "Briarhollow", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1912, 684], "area": 4254, "neighbors": [58, 70], "startOwner": null, "isCapital": false, "tris": [1907.0, 657.0, 1859.0, 659.0, 1876.0, 704.0, 1907.0, 657.0, 1876.0, 704.0, 1947.0, 723.0, 1907.0, 657.0, 1947.0, 723.0, 1957.0, 709.0, 1907.0, 657.0, 1957.0, 709.0, 1943.0, 689.0, 1907.0, 657.0, 1943.0, 689.0, 1944.0, 682.0, 1907.0, 657.0, 1944.0, 682.0, 1948.0, 680.0, 1907.0, 657.0, 1948.0, 680.0, 1946.0, 672.0, 1946.0, 672.0, 1932.0, 663.0, 1907.0, 657.0]},
+    {"id": 129, "name": "Palewatch", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [773, 159], "area": 6809, "neighbors": [34, 40, 71, 105], "startOwner": 4, "isCapital": false, "tris": [777.0, 117.0, 763.0, 118.0, 753.0, 125.0, 753.0, 125.0, 737.0, 124.0, 712.0, 130.0, 753.0, 125.0, 712.0, 130.0, 738.0, 193.0, 777.0, 117.0, 753.0, 125.0, 738.0, 193.0, 796.0, 108.0, 777.0, 117.0, 738.0, 193.0, 796.0, 108.0, 738.0, 193.0, 788.0, 205.0, 788.0, 205.0, 825.0, 153.0, 796.0, 108.0]},
+    {"id": 130, "name": "Emberscar", "terrain": "Hills", "biome": "ashlands", "development": 2, "center": [1340, 915], "area": 7325, "neighbors": [15, 19, 75, 131], "startOwner": 9, "isCapital": false, "tris": [1347.0, 854.0, 1337.0, 852.0, 1302.0, 876.0, 1347.0, 854.0, 1302.0, 876.0, 1292.0, 945.0, 1347.0, 854.0, 1292.0, 945.0, 1318.0, 955.0, 1347.0, 854.0, 1318.0, 955.0, 1355.0, 959.0, 1347.0, 854.0, 1355.0, 959.0, 1372.0, 955.0, 1347.0, 854.0, 1372.0, 955.0, 1380.0, 941.0, 1380.0, 941.0, 1398.0, 934.0, 1350.0, 861.0, 1380.0, 941.0, 1350.0, 861.0, 1347.0, 854.0]},
+    {"id": 131, "name": "Scorchoasis", "terrain": "Plains", "biome": "dunes", "development": 3, "center": [1276, 823], "area": 9146, "neighbors": [15, 19, 24, 57, 92, 130], "startOwner": 9, "isCapital": true, "tris": [1303.0, 765.0, 1214.0, 797.0, 1212.0, 802.0, 1303.0, 765.0, 1212.0, 802.0, 1225.0, 858.0, 1303.0, 765.0, 1225.0, 858.0, 1302.0, 876.0, 1302.0, 876.0, 1337.0, 852.0, 1303.0, 765.0]},
+    {"id": 132, "name": "Frosthold", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [963, 224], "area": 8991, "neighbors": [4, 33, 76, 87, 100, 105], "startOwner": 4, "isCapital": false, "tris": [999.0, 157.0, 993.0, 155.0, 906.0, 205.0, 999.0, 157.0, 906.0, 205.0, 903.0, 226.0, 999.0, 157.0, 903.0, 226.0, 957.0, 294.0, 957.0, 294.0, 1019.0, 220.0, 999.0, 157.0]},
+    {"id": 133, "name": "Faeroot", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [583, 543], "area": 9515, "neighbors": [17, 25, 30, 95, 102], "startOwner": 5, "isCapital": false, "tris": [633.0, 498.0, 551.0, 487.0, 531.0, 590.0, 633.0, 498.0, 531.0, 590.0, 539.0, 605.0, 539.0, 605.0, 625.0, 595.0, 633.0, 498.0]},
+    {"id": 134, "name": "Mistthicket", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [536, 884], "area": 4401, "neighbors": [26, 66, 94], "startOwner": null, "isCapital": false, "tris": [547.0, 850.0, 532.0, 850.0, 489.0, 890.0, 547.0, 850.0, 489.0, 890.0, 500.0, 891.0, 547.0, 850.0, 500.0, 891.0, 494.0, 905.0, 547.0, 850.0, 494.0, 905.0, 503.0, 907.0, 547.0, 850.0, 503.0, 907.0, 512.0, 900.0, 547.0, 850.0, 512.0, 900.0, 520.0, 900.0, 547.0, 850.0, 520.0, 900.0, 520.0, 913.0, 547.0, 850.0, 520.0, 913.0, 543.0, 917.0, 543.0, 917.0, 545.0, 927.0, 554.0, 927.0, 543.0, 917.0, 554.0, 927.0, 560.0, 922.0, 543.0, 917.0, 560.0, 922.0, 553.0, 916.0, 543.0, 917.0, 553.0, 916.0, 546.0, 916.0, 543.0, 917.0, 546.0, 916.0, 545.0, 911.0, 547.0, 850.0, 543.0, 917.0, 545.0, 911.0, 547.0, 850.0, 545.0, 911.0, 553.0, 916.0, 547.0, 850.0, 553.0, 916.0, 560.0, 922.0, 547.0, 850.0, 560.0, 922.0, 575.0, 923.0, 547.0, 850.0, 575.0, 923.0, 581.0, 929.0, 581.0, 929.0, 598.0, 925.0, 547.0, 850.0]},
+    {"id": 135, "name": "Ambershire", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [766, 567], "area": 8610, "neighbors": [1, 14, 39, 67, 102, 115], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [827.0, 557.0, 744.0, 502.0, 726.0, 509.0, 827.0, 557.0, 726.0, 509.0, 712.0, 591.0, 827.0, 557.0, 712.0, 591.0, 764.0, 623.0, 764.0, 623.0, 823.0, 581.0, 827.0, 557.0]},
+    {"id": 136, "name": "Thornshade", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1695, 475], "area": 8432, "neighbors": [28, 31, 54, 59, 103], "startOwner": null, "isCapital": false, "tris": [1671.0, 419.0, 1652.0, 433.0, 1646.0, 519.0, 1671.0, 419.0, 1646.0, 519.0, 1710.0, 526.0, 1671.0, 419.0, 1710.0, 526.0, 1749.0, 479.0, 1671.0, 419.0, 1749.0, 479.0, 1749.0, 471.0, 1671.0, 419.0, 1749.0, 471.0, 1765.0, 469.0, 1671.0, 419.0, 1765.0, 469.0, 1768.0, 465.0, 1671.0, 419.0, 1768.0, 465.0, 1768.0, 459.0, 1768.0, 459.0, 1758.0, 454.0, 1671.0, 419.0]},
+    {"id": 137, "name": "Goldhaven", "terrain": "Plains", "biome": "dunes", "development": 1, "center": [1452, 762], "area": 9377, "neighbors": [15, 29, 55, 75, 99, 113], "startOwner": null, "isCapital": false, "tris": [1497.0, 702.0, 1495.0, 701.0, 1396.0, 736.0, 1497.0, 702.0, 1396.0, 736.0, 1421.0, 814.0, 1497.0, 702.0, 1421.0, 814.0, 1472.0, 834.0, 1472.0, 834.0, 1511.0, 736.0, 1497.0, 702.0]},
+    {"id": 138, "name": "Silvergrove", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1816, 153], "area": 3335, "neighbors": [42, 46, 114], "startOwner": 1, "isCapital": false, "tris": [1795.0, 120.0, 1782.0, 118.0, 1785.0, 173.0, 1795.0, 120.0, 1785.0, 173.0, 1869.0, 190.0, 1869.0, 190.0, 1878.0, 185.0, 1858.0, 173.0, 1869.0, 190.0, 1858.0, 173.0, 1843.0, 152.0, 1869.0, 190.0, 1843.0, 152.0, 1830.0, 144.0, 1830.0, 144.0, 1825.0, 132.0, 1805.0, 129.0, 1869.0, 190.0, 1830.0, 144.0, 1805.0, 129.0, 1869.0, 190.0, 1805.0, 129.0, 1795.0, 120.0]},
+    {"id": 139, "name": "Glimmerhollow", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1589, 183], "area": 3836, "neighbors": [23, 35, 80], "startOwner": null, "isCapital": false, "tris": [1540.0, 152.0, 1529.0, 150.0, 1529.0, 158.0, 1540.0, 152.0, 1529.0, 158.0, 1604.0, 221.0, 1540.0, 152.0, 1604.0, 221.0, 1611.0, 219.0, 1540.0, 152.0, 1611.0, 219.0, 1627.0, 210.0, 1627.0, 210.0, 1626.0, 197.0, 1610.0, 197.0, 1540.0, 152.0, 1627.0, 210.0, 1610.0, 197.0, 1540.0, 152.0, 1610.0, 197.0, 1626.0, 190.0, 1540.0, 152.0, 1626.0, 190.0, 1619.0, 182.0, 1619.0, 182.0, 1620.0, 174.0, 1612.0, 170.0, 1619.0, 182.0, 1612.0, 170.0, 1598.0, 170.0, 1540.0, 152.0, 1619.0, 182.0, 1598.0, 170.0, 1540.0, 152.0, 1598.0, 170.0, 1598.0, 167.0, 1598.0, 167.0, 1611.0, 163.0, 1609.0, 159.0, 1598.0, 167.0, 1609.0, 159.0, 1585.0, 161.0, 1540.0, 152.0, 1598.0, 167.0, 1585.0, 161.0, 1540.0, 152.0, 1585.0, 161.0, 1582.0, 155.0, 1582.0, 155.0, 1588.0, 147.0, 1567.0, 150.0, 1540.0, 152.0, 1582.0, 155.0, 1567.0, 150.0, 1540.0, 152.0, 1567.0, 150.0, 1563.0, 141.0, 1563.0, 141.0, 1558.0, 139.0, 1542.0, 142.0, 1563.0, 141.0, 1542.0, 142.0, 1543.0, 150.0, 1563.0, 141.0, 1543.0, 150.0, 1540.0, 152.0]},
+    {"id": 140, "name": "Rosefield", "terrain": "Plains", "biome": "meadow", "development": 4, "center": [1226, 488], "area": 7431, "neighbors": [7, 8, 9, 41, 74], "startOwner": null, "isCapital": false, "garrison": 3000, "tris": [1250.0, 434.0, 1225.0, 423.0, 1170.0, 497.0, 1250.0, 434.0, 1170.0, 497.0, 1246.0, 551.0, 1246.0, 551.0, 1276.0, 484.0, 1250.0, 434.0]},
+    {"id": 141, "name": "Cragmoor", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [633, 135], "area": 3816, "neighbors": [71, 79, 111], "startOwner": 7, "isCapital": false, "tris": [632.0, 104.0, 599.0, 99.0, 601.0, 150.0, 632.0, 104.0, 601.0, 150.0, 631.0, 169.0, 631.0, 169.0, 699.0, 131.0, 661.0, 121.0, 631.0, 169.0, 661.0, 121.0, 632.0, 104.0]},
+    {"id": 142, "name": "Snowmarch", "terrain": "Plains", "biome": "frostfields", "development": 2, "center": [930, 68], "area": 3593, "neighbors": [34, 87, 100], "startOwner": 4, "isCapital": false, "tris": [946.0, 49.0, 938.0, 42.0, 930.0, 42.0, 946.0, 49.0, 930.0, 42.0, 917.0, 51.0, 966.0, 54.0, 946.0, 49.0, 917.0, 51.0, 917.0, 51.0, 892.0, 49.0, 886.0, 58.0, 966.0, 54.0, 917.0, 51.0, 886.0, 58.0, 966.0, 54.0, 886.0, 58.0, 872.0, 60.0, 966.0, 54.0, 872.0, 60.0, 899.0, 98.0, 899.0, 98.0, 948.0, 98.0, 966.0, 54.0]},
+    {"id": 143, "name": "Faewood", "terrain": "Forest", "biome": "wildwood", "development": 2, "center": [1383, 413], "area": 8542, "neighbors": [7, 8, 60, 72, 98, 117], "startOwner": 6, "isCapital": false, "tris": [1461.0, 410.0, 1371.0, 359.0, 1338.0, 373.0, 1461.0, 410.0, 1338.0, 373.0, 1330.0, 397.0, 1461.0, 410.0, 1330.0, 397.0, 1362.0, 471.0, 1362.0, 471.0, 1451.0, 432.0, 1461.0, 410.0]},
+    {"id": 144, "name": "Stormheath", "terrain": "Hills", "biome": "highlands", "development": 2, "center": [373, 743], "area": 2927, "neighbors": [36, 49, 69], "startOwner": null, "isCapital": false, "tris": [404.0, 667.0, 394.0, 665.0, 397.0, 679.0, 397.0, 679.0, 380.0, 693.0, 384.0, 708.0, 404.0, 667.0, 397.0, 679.0, 384.0, 708.0, 384.0, 708.0, 366.0, 719.0, 363.0, 733.0, 358.0, 729.0, 363.0, 733.0, 366.0, 719.0, 353.0, 732.0, 358.0, 729.0, 366.0, 719.0, 353.0, 732.0, 366.0, 719.0, 343.0, 723.0, 354.0, 737.0, 353.0, 732.0, 343.0, 723.0, 354.0, 737.0, 343.0, 723.0, 337.0, 735.0, 354.0, 737.0, 337.0, 735.0, 338.0, 739.0, 354.0, 737.0, 338.0, 739.0, 347.0, 740.0, 354.0, 737.0, 347.0, 740.0, 356.0, 748.0, 363.0, 733.0, 354.0, 737.0, 356.0, 748.0, 384.0, 708.0, 363.0, 733.0, 356.0, 748.0, 384.0, 708.0, 356.0, 748.0, 358.0, 756.0, 384.0, 708.0, 358.0, 756.0, 364.0, 760.0, 404.0, 667.0, 384.0, 708.0, 364.0, 760.0, 404.0, 667.0, 364.0, 760.0, 364.0, 772.0, 364.0, 772.0, 396.0, 756.0, 404.0, 667.0]},
+    {"id": 145, "name": "Barleywick", "terrain": "Plains", "biome": "meadow", "development": 2, "center": [1925, 307], "area": 2859, "neighbors": [42, 88], "startOwner": 1, "isCapital": false, "tris": [1958.0, 267.0, 1952.0, 264.0, 1898.0, 300.0, 1898.0, 300.0, 1911.0, 350.0, 1923.0, 346.0, 1898.0, 300.0, 1923.0, 346.0, 1925.0, 330.0, 1898.0, 300.0, 1925.0, 330.0, 1943.0, 329.0, 1898.0, 300.0, 1943.0, 329.0, 1945.0, 317.0, 1898.0, 300.0, 1945.0, 317.0, 1956.0, 305.0, 1898.0, 300.0, 1956.0, 305.0, 1954.0, 299.0, 1898.0, 300.0, 1954.0, 299.0, 1941.0, 299.0, 1898.0, 300.0, 1941.0, 299.0, 1937.0, 294.0, 1958.0, 267.0, 1898.0, 300.0, 1937.0, 294.0, 1958.0, 267.0, 1937.0, 294.0, 1955.0, 294.0, 1955.0, 294.0, 1965.0, 289.0, 1958.0, 267.0]},
+    {"id": 146, "name": "Moonroot", "terrain": "Forest", "biome": "wildwood", "development": 3, "center": [191, 813], "area": 3217, "neighbors": [22, 47, 91, 118], "startOwner": 10, "isCapital": true, "tris": [258.0, 817.0, 185.0, 786.0, 155.0, 812.0, 258.0, 817.0, 155.0, 812.0, 165.0, 831.0, 258.0, 817.0, 165.0, 831.0, 188.0, 837.0, 188.0, 837.0, 199.0, 837.0, 210.0, 831.0, 258.0, 817.0, 188.0, 837.0, 210.0, 831.0, 210.0, 831.0, 235.0, 835.0, 244.0, 827.0, 258.0, 817.0, 210.0, 831.0, 244.0, 827.0, 258.0, 817.0, 244.0, 827.0, 262.0, 828.0, 262.0, 828.0, 265.0, 822.0, 258.0, 817.0]}
+  ],
+  "straits": [
+    {"a": 90, "b": 54, "from": [1742, 311], "to": [1722, 314], "wrap": false, "auto": true},
+    {"a": 20, "b": 49, "from": [388, 878], "to": [415, 837], "wrap": false, "auto": true},
+    {"a": 146, "b": 91, "from": [261, 827], "to": [273, 872], "wrap": false, "auto": true},
+    {"a": 22, "b": 91, "from": [196, 928], "to": [248, 922], "wrap": false, "auto": true},
+    {"a": 70, "b": 101, "from": [1816, 681], "to": [1765, 638], "wrap": false, "auto": true},
+    {"a": 90, "b": 80, "from": [1726, 276], "to": [1711, 292], "wrap": false, "auto": true},
+    {"a": 146, "b": 22, "from": [188, 836], "to": [174, 888], "wrap": false, "auto": true},
+    {"a": 70, "b": 16, "from": [1814, 686], "to": [1739, 686], "wrap": false, "auto": true}
+  ],
+  "borders": [
+    {"a": 100, "b": 142, "points": [966.0, 54.0, 948.0, 98.0]},
+    {"a": 34, "b": 142, "points": [872.0, 60.0, 899.0, 98.0]},
+    {"a": 85, "b": 110, "points": [1344.0, 79.0, 1314.0, 161.0]},
+    {"a": 35, "b": 110, "points": [1430.0, 90.0, 1404.0, 184.0]},
+    {"a": 87, "b": 142, "points": [948.0, 98.0, 899.0, 98.0]},
+    {"a": 87, "b": 100, "points": [948.0, 98.0, 993.0, 155.0]},
+    {"a": 79, "b": 141, "points": [599.0, 99.0, 601.0, 150.0]},
+    {"a": 34, "b": 87, "points": [899.0, 98.0, 867.0, 154.0]},
+    {"a": 79, "b": 96, "points": [510.0, 107.0, 513.0, 170.0]},
+    {"a": 34, "b": 129, "points": [796.0, 108.0, 825.0, 153.0]},
+    {"a": 114, "b": 138, "points": [1782.0, 118.0, 1785.0, 173.0]},
+    {"a": 76, "b": 100, "points": [1050.0, 126.0, 999.0, 157.0]},
+    {"a": 71, "b": 141, "points": [699.0, 131.0, 631.0, 169.0]},
+    {"a": 71, "b": 129, "points": [712.0, 130.0, 738.0, 193.0]},
+    {"a": 85, "b": 112, "points": [1217.0, 140.0, 1221.0, 144.0]},
+    {"a": 96, "b": 125, "points": [427.0, 142.0, 447.0, 177.0]},
+    {"a": 62, "b": 112, "points": [1221.0, 144.0, 1218.0, 254.0]},
+    {"a": 62, "b": 85, "points": [1221.0, 144.0, 1314.0, 161.0]},
+    {"a": 79, "b": 111, "points": [601.0, 150.0, 525.0, 178.0]},
+    {"a": 111, "b": 141, "points": [601.0, 150.0, 631.0, 169.0]},
+    {"a": 35, "b": 139, "points": [1529.0, 150.0, 1529.0, 158.0]},
+    {"a": 105, "b": 129, "points": [825.0, 153.0, 788.0, 205.0]},
+    {"a": 34, "b": 105, "points": [825.0, 153.0, 867.0, 154.0]},
+    {"a": 87, "b": 105, "points": [867.0, 154.0, 906.0, 205.0]},
+    {"a": 87, "b": 132, "points": [993.0, 155.0, 906.0, 205.0]},
+    {"a": 100, "b": 132, "points": [993.0, 155.0, 999.0, 157.0]},
+    {"a": 76, "b": 132, "points": [999.0, 157.0, 1019.0, 220.0]},
+    {"a": 23, "b": 139, "points": [1529.0, 158.0, 1604.0, 221.0]},
+    {"a": 23, "b": 35, "points": [1529.0, 158.0, 1488.0, 214.0]},
+    {"a": 62, "b": 110, "points": [1314.0, 161.0, 1321.0, 173.0]},
+    {"a": 76, "b": 112, "points": [1122.0, 163.0, 1115.0, 240.0]},
+    {"a": 44, "b": 96, "points": [513.0, 170.0, 447.0, 177.0]},
+    {"a": 44, "b": 79, "points": [513.0, 170.0, 525.0, 178.0]},
+    {"a": 71, "b": 111, "points": [631.0, 169.0, 640.0, 222.0]},
+    {"a": 46, "b": 114, "points": [1785.0, 173.0, 1755.0, 200.0, 1753.0, 200.0, 1746.0, 208.0, 1744.0, 208.0]},
+    {"a": 46, "b": 138, "points": [1785.0, 173.0, 1869.0, 190.0]},
+    {"a": 62, "b": 63, "points": [1321.0, 173.0, 1305.0, 255.0]},
+    {"a": 63, "b": 110, "points": [1321.0, 173.0, 1404.0, 184.0]},
+    {"a": 44, "b": 125, "points": [447.0, 177.0, 416.0, 223.0]},
+    {"a": 44, "b": 111, "points": [525.0, 178.0, 535.0, 232.0]},
+    {"a": 35, "b": 63, "points": [1404.0, 184.0, 1430.0, 225.0]},
+    {"a": 42, "b": 138, "points": [1878.0, 185.0, 1869.0, 190.0]},
+    {"a": 42, "b": 46, "points": [1869.0, 190.0, 1841.0, 277.0]},
+    {"a": 40, "b": 71, "points": [738.0, 193.0, 688.0, 245.0]},
+    {"a": 40, "b": 129, "points": [738.0, 193.0, 788.0, 205.0]},
+    {"a": 119, "b": 125, "points": [358.0, 195.0, 397.0, 227.0]},
+    {"a": 40, "b": 105, "points": [788.0, 205.0, 809.0, 257.0]},
+    {"a": 105, "b": 132, "points": [906.0, 205.0, 903.0, 226.0]},
+    {"a": 90, "b": 114, "points": [1710.0, 205.0, 1744.0, 208.0]},
+    {"a": 46, "b": 90, "points": [1744.0, 208.0, 1801.0, 296.0]},
+    {"a": 80, "b": 139, "points": [1627.0, 210.0, 1611.0, 219.0, 1604.0, 221.0]},
+    {"a": 23, "b": 64, "points": [1488.0, 214.0, 1532.0, 281.0]},
+    {"a": 35, "b": 64, "points": [1488.0, 214.0, 1430.0, 225.0]},
+    {"a": 33, "b": 132, "points": [1019.0, 220.0, 957.0, 294.0]},
+    {"a": 33, "b": 76, "points": [1019.0, 220.0, 1098.0, 255.0]},
+    {"a": 93, "b": 111, "points": [640.0, 222.0, 583.0, 262.0]},
+    {"a": 71, "b": 93, "points": [640.0, 222.0, 688.0, 245.0]},
+    {"a": 23, "b": 80, "points": [1604.0, 221.0, 1584.0, 288.0]},
+    {"a": 43, "b": 44, "points": [416.0, 223.0, 476.0, 280.0]},
+    {"a": 43, "b": 125, "points": [416.0, 223.0, 397.0, 227.0]},
+    {"a": 63, "b": 64, "points": [1430.0, 225.0, 1408.0, 272.0]},
+    {"a": 4, "b": 132, "points": [903.0, 226.0, 957.0, 294.0]},
+    {"a": 4, "b": 105, "points": [903.0, 226.0, 830.0, 262.0]},
+    {"a": 43, "b": 119, "points": [397.0, 227.0, 359.0, 291.0]},
+    {"a": 44, "b": 121, "points": [535.0, 232.0, 476.0, 280.0]},
+    {"a": 111, "b": 121, "points": [535.0, 232.0, 583.0, 262.0]},
+    {"a": 5, "b": 76, "points": [1115.0, 240.0, 1098.0, 255.0]},
+    {"a": 5, "b": 112, "points": [1115.0, 240.0, 1218.0, 254.0]},
+    {"a": 40, "b": 93, "points": [688.0, 245.0, 709.0, 310.0]},
+    {"a": 5, "b": 62, "points": [1218.0, 254.0, 1222.0, 259.0]},
+    {"a": 5, "b": 33, "points": [1098.0, 255.0, 1089.0, 320.0]},
+    {"a": 62, "b": 117, "points": [1305.0, 255.0, 1274.0, 275.0]},
+    {"a": 63, "b": 117, "points": [1305.0, 255.0, 1397.0, 278.0]},
+    {"a": 3, "b": 40, "points": [809.0, 257.0, 749.0, 309.0]},
+    {"a": 3, "b": 105, "points": [809.0, 257.0, 830.0, 262.0]},
+    {"a": 5, "b": 6, "points": [1222.0, 259.0, 1163.0, 366.0]},
+    {"a": 6, "b": 62, "points": [1222.0, 259.0, 1274.0, 275.0]},
+    {"a": 93, "b": 121, "points": [583.0, 262.0, 589.0, 323.0]},
+    {"a": 3, "b": 4, "points": [830.0, 262.0, 868.0, 344.0]},
+    {"a": 42, "b": 145, "points": [1952.0, 264.0, 1898.0, 300.0]},
+    {"a": 60, "b": 64, "points": [1408.0, 272.0, 1480.0, 330.0]},
+    {"a": 60, "b": 63, "points": [1408.0, 272.0, 1397.0, 278.0]},
+    {"a": 6, "b": 117, "points": [1274.0, 275.0, 1283.0, 325.0]},
+    {"a": 42, "b": 88, "points": [1841.0, 277.0, 1898.0, 300.0]},
+    {"a": 46, "b": 88, "points": [1841.0, 277.0, 1801.0, 296.0]},
+    {"a": 60, "b": 117, "points": [1397.0, 278.0, 1371.0, 359.0]},
+    {"a": 43, "b": 121, "points": [476.0, 280.0, 474.0, 338.0]},
+    {"a": 64, "b": 106, "points": [1532.0, 281.0, 1480.0, 330.0]},
+    {"a": 23, "b": 106, "points": [1532.0, 281.0, 1584.0, 288.0]},
+    {"a": 80, "b": 106, "points": [1584.0, 288.0, 1603.0, 316.0]},
+    {"a": 81, "b": 119, "points": [314.0, 291.0, 359.0, 291.0]},
+    {"a": 43, "b": 81, "points": [359.0, 291.0, 411.0, 364.0]},
+    {"a": 4, "b": 33, "points": [957.0, 294.0, 958.0, 305.0]},
+    {"a": 88, "b": 90, "points": [1801.0, 296.0, 1783.0, 335.0, 1781.0, 335.0, 1765.0, 351.0]},
+    {"a": 88, "b": 145, "points": [1898.0, 300.0, 1911.0, 350.0]},
+    {"a": 4, "b": 77, "points": [958.0, 305.0, 903.0, 346.0]},
+    {"a": 33, "b": 77, "points": [958.0, 305.0, 1020.0, 346.0]},
+    {"a": 54, "b": 80, "points": [1708.0, 306.0, 1705.0, 310.0, 1678.0, 330.0]},
+    {"a": 2, "b": 40, "points": [749.0, 309.0, 709.0, 310.0]},
+    {"a": 2, "b": 3, "points": [749.0, 309.0, 756.0, 315.0, 756.0, 317.0, 762.0, 322.0, 762.0, 324.0, 769.0, 330.0, 769.0, 332.0, 814.0, 383.0]},
+    {"a": 2, "b": 93, "points": [709.0, 310.0, 704.0, 316.0]},
+    {"a": 2, "b": 116, "points": [704.0, 316.0, 700.0, 391.0]},
+    {"a": 93, "b": 116, "points": [704.0, 316.0, 595.0, 329.0]},
+    {"a": 59, "b": 106, "points": [1603.0, 316.0, 1551.0, 413.0]},
+    {"a": 59, "b": 80, "points": [1603.0, 316.0, 1678.0, 330.0]},
+    {"a": 5, "b": 78, "points": [1089.0, 320.0, 1142.0, 367.0]},
+    {"a": 33, "b": 78, "points": [1089.0, 320.0, 1020.0, 346.0]},
+    {"a": 32, "b": 121, "points": [589.0, 323.0, 474.0, 338.0]},
+    {"a": 32, "b": 93, "points": [589.0, 323.0, 595.0, 329.0]},
+    {"a": 6, "b": 7, "points": [1283.0, 325.0, 1212.0, 395.0]},
+    {"a": 7, "b": 117, "points": [1283.0, 325.0, 1338.0, 373.0]},
+    {"a": 32, "b": 116, "points": [595.0, 329.0, 597.0, 385.0]},
+    {"a": 54, "b": 59, "points": [1678.0, 330.0, 1671.0, 419.0]},
+    {"a": 60, "b": 106, "points": [1480.0, 330.0, 1482.0, 398.0]},
+    {"a": 32, "b": 43, "points": [474.0, 338.0, 463.0, 354.0]},
+    {"a": 3, "b": 51, "points": [868.0, 344.0, 814.0, 383.0]},
+    {"a": 4, "b": 51, "points": [868.0, 344.0, 903.0, 346.0]},
+    {"a": 51, "b": 77, "points": [903.0, 346.0, 931.0, 447.0]},
+    {"a": 77, "b": 78, "points": [1020.0, 346.0, 1011.0, 423.0]},
+    {"a": 43, "b": 124, "points": [463.0, 354.0, 417.0, 366.0]},
+    {"a": 32, "b": 124, "points": [463.0, 354.0, 529.0, 437.0]},
+    {"a": 117, "b": 143, "points": [1371.0, 359.0, 1338.0, 373.0]},
+    {"a": 60, "b": 143, "points": [1371.0, 359.0, 1461.0, 410.0]},
+    {"a": 27, "b": 81, "points": [411.0, 364.0, 304.0, 415.0]},
+    {"a": 27, "b": 43, "points": [411.0, 364.0, 417.0, 366.0]},
+    {"a": 27, "b": 124, "points": [417.0, 366.0, 418.0, 467.0]},
+    {"a": 74, "b": 78, "points": [1142.0, 367.0, 1106.0, 440.0]},
+    {"a": 5, "b": 74, "points": [1142.0, 367.0, 1163.0, 366.0]},
+    {"a": 6, "b": 74, "points": [1163.0, 366.0, 1212.0, 395.0]},
+    {"a": 7, "b": 143, "points": [1338.0, 373.0, 1330.0, 397.0]},
+    {"a": 2, "b": 51, "points": [814.0, 383.0, 805.0, 420.0]},
+    {"a": 25, "b": 32, "points": [597.0, 385.0, 529.0, 437.0]},
+    {"a": 25, "b": 116, "points": [597.0, 385.0, 656.0, 427.0]},
+    {"a": 56, "b": 81, "points": [275.0, 390.0, 291.0, 405.0, 293.0, 405.0, 302.0, 415.0, 304.0, 415.0]},
+    {"a": 1, "b": 116, "points": [700.0, 391.0, 665.0, 421.0, 663.0, 421.0, 658.0, 427.0, 656.0, 427.0]},
+    {"a": 1, "b": 2, "points": [700.0, 391.0, 780.0, 432.0]},
+    {"a": 7, "b": 74, "points": [1212.0, 395.0, 1225.0, 423.0]},
+    {"a": 8, "b": 143, "points": [1330.0, 397.0, 1362.0, 471.0]},
+    {"a": 7, "b": 8, "points": [1330.0, 397.0, 1250.0, 434.0]},
+    {"a": 98, "b": 106, "points": [1482.0, 398.0, 1551.0, 413.0]},
+    {"a": 60, "b": 98, "points": [1482.0, 398.0, 1461.0, 410.0]},
+    {"a": 98, "b": 143, "points": [1461.0, 410.0, 1451.0, 432.0]},
+    {"a": 59, "b": 98, "points": [1551.0, 413.0, 1552.0, 415.0]},
+    {"a": 27, "b": 56, "points": [304.0, 415.0, 309.0, 460.0]},
+    {"a": 31, "b": 98, "points": [1552.0, 415.0, 1561.0, 526.0]},
+    {"a": 31, "b": 59, "points": [1552.0, 415.0, 1652.0, 433.0]},
+    {"a": 54, "b": 136, "points": [1671.0, 419.0, 1758.0, 454.0]},
+    {"a": 59, "b": 136, "points": [1671.0, 419.0, 1652.0, 433.0]},
+    {"a": 2, "b": 39, "points": [805.0, 420.0, 780.0, 432.0]},
+    {"a": 39, "b": 51, "points": [805.0, 420.0, 886.0, 480.0]},
+    {"a": 74, "b": 140, "points": [1225.0, 423.0, 1170.0, 497.0]},
+    {"a": 7, "b": 140, "points": [1225.0, 423.0, 1250.0, 434.0]},
+    {"a": 1, "b": 25, "points": [656.0, 427.0, 655.0, 483.0]},
+    {"a": 1, "b": 39, "points": [780.0, 432.0, 744.0, 502.0]},
+    {"a": 72, "b": 98, "points": [1451.0, 432.0, 1466.0, 513.0]},
+    {"a": 72, "b": 143, "points": [1451.0, 432.0, 1362.0, 471.0]},
+    {"a": 31, "b": 136, "points": [1652.0, 433.0, 1646.0, 519.0]},
+    {"a": 8, "b": 140, "points": [1250.0, 434.0, 1276.0, 484.0]},
+    {"a": 25, "b": 124, "points": [529.0, 437.0, 527.0, 461.0]},
+    {"a": 74, "b": 120, "points": [1106.0, 440.0, 1158.0, 499.0]},
+    {"a": 78, "b": 120, "points": [1106.0, 440.0, 1067.0, 450.0]},
+    {"a": 18, "b": 51, "points": [931.0, 447.0, 886.0, 480.0]},
+    {"a": 18, "b": 77, "points": [931.0, 447.0, 946.0, 447.0]},
+    {"a": 52, "b": 56, "points": [309.0, 460.0, 219.0, 509.0]},
+    {"a": 27, "b": 52, "points": [309.0, 460.0, 337.0, 490.0]},
+    {"a": 95, "b": 124, "points": [527.0, 461.0, 453.0, 493.0]},
+    {"a": 25, "b": 95, "points": [527.0, 461.0, 551.0, 487.0]},
+    {"a": 27, "b": 108, "points": [418.0, 467.0, 337.0, 490.0]},
+    {"a": 108, "b": 124, "points": [418.0, 467.0, 453.0, 493.0]},
+    {"a": 8, "b": 72, "points": [1362.0, 471.0, 1355.0, 487.0]},
+    {"a": 28, "b": 136, "points": [1749.0, 479.0, 1710.0, 526.0]},
+    {"a": 18, "b": 39, "points": [886.0, 480.0, 880.0, 516.0]},
+    {"a": 25, "b": 102, "points": [655.0, 483.0, 633.0, 498.0]},
+    {"a": 1, "b": 102, "points": [655.0, 483.0, 726.0, 509.0]},
+    {"a": 9, "b": 140, "points": [1276.0, 484.0, 1246.0, 551.0]},
+    {"a": 8, "b": 9, "points": [1276.0, 484.0, 1355.0, 487.0]},
+    {"a": 95, "b": 133, "points": [551.0, 487.0, 531.0, 590.0]},
+    {"a": 25, "b": 133, "points": [551.0, 487.0, 633.0, 498.0]},
+    {"a": 9, "b": 72, "points": [1355.0, 487.0, 1367.0, 531.0]},
+    {"a": 52, "b": 108, "points": [337.0, 490.0, 340.0, 543.0]},
+    {"a": 95, "b": 108, "points": [453.0, 493.0, 447.0, 552.0]},
+    {"a": 41, "b": 140, "points": [1170.0, 497.0, 1246.0, 551.0]},
+    {"a": 41, "b": 74, "points": [1170.0, 497.0, 1158.0, 499.0]},
+    {"a": 102, "b": 133, "points": [633.0, 498.0, 625.0, 595.0]},
+    {"a": 41, "b": 120, "points": [1158.0, 499.0, 1116.0, 558.0]},
+    {"a": 1, "b": 135, "points": [744.0, 502.0, 726.0, 509.0]},
+    {"a": 39, "b": 135, "points": [744.0, 502.0, 827.0, 557.0]},
+    {"a": 102, "b": 135, "points": [726.0, 509.0, 712.0, 591.0]},
+    {"a": 72, "b": 122, "points": [1466.0, 513.0, 1442.0, 528.0, 1406.0, 547.0]},
+    {"a": 98, "b": 122, "points": [1466.0, 513.0, 1534.0, 548.0]},
+    {"a": 39, "b": 115, "points": [880.0, 516.0, 827.0, 557.0]},
+    {"a": 18, "b": 115, "points": [880.0, 516.0, 930.0, 560.0]},
+    {"a": 18, "b": 120, "points": [1028, 518, 1028, 519]},
+    {"a": 18, "b": 21, "points": [1028.0, 519.0, 1026.0, 524.0, 1007.0, 549.0]},
+    {"a": 21, "b": 120, "points": [1028.0, 519.0, 1116.0, 558.0]},
+    {"a": 31, "b": 103, "points": [1646.0, 519.0, 1628.0, 531.0]},
+    {"a": 103, "b": 136, "points": [1646.0, 519.0, 1710.0, 526.0]},
+    {"a": 84, "b": 98, "points": [1561.0, 526.0, 1534.0, 548.0]},
+    {"a": 31, "b": 84, "points": [1561.0, 526.0, 1628.0, 531.0]},
+    {"a": 28, "b": 103, "points": [1710.0, 526.0, 1735.0, 585.0]},
+    {"a": 9, "b": 38, "points": [1367.0, 531.0, 1302.0, 596.0]},
+    {"a": 38, "b": 72, "points": [1367.0, 531.0, 1406.0, 547.0]},
+    {"a": 84, "b": 103, "points": [1628.0, 531.0, 1653.0, 648.0]},
+    {"a": 52, "b": 69, "points": [340.0, 543.0, 296.0, 602.0]},
+    {"a": 69, "b": 108, "points": [340.0, 543.0, 425.0, 567.0]},
+    {"a": 38, "b": 122, "points": [1406.0, 547.0, 1429.0, 619.0]},
+    {"a": 84, "b": 122, "points": [1534.0, 548.0, 1532.0, 561.0]},
+    {"a": 21, "b": 109, "points": [1007.0, 549.0, 1018.0, 635.0]},
+    {"a": 18, "b": 109, "points": [1007.0, 549.0, 930.0, 560.0]},
+    {"a": 9, "b": 41, "points": [1246.0, 551.0, 1248.0, 562.0]},
+    {"a": 30, "b": 108, "points": [447.0, 552.0, 425.0, 567.0]},
+    {"a": 30, "b": 95, "points": [447.0, 552.0, 531.0, 590.0]},
+    {"a": 115, "b": 135, "points": [827.0, 557.0, 823.0, 581.0]},
+    {"a": 21, "b": 41, "points": [1116.0, 558.0, 1129.0, 609.0]},
+    {"a": 109, "b": 115, "points": [930.0, 560.0, 924.0, 633.0]},
+    {"a": 84, "b": 99, "points": [1532.0, 561.0, 1587.0, 652.0]},
+    {"a": 99, "b": 122, "points": [1532.0, 561.0, 1464.0, 629.0]},
+    {"a": 41, "b": 45, "points": [1248.0, 562.0, 1162.0, 626.0]},
+    {"a": 9, "b": 45, "points": [1248.0, 562.0, 1302.0, 596.0]},
+    {"a": 30, "b": 69, "points": [425.0, 567.0, 412.0, 663.0]},
+    {"a": 14, "b": 115, "points": [823.0, 581.0, 864.0, 633.0]},
+    {"a": 14, "b": 135, "points": [823.0, 581.0, 764.0, 623.0]},
+    {"a": 101, "b": 103, "points": [1735.0, 585.0, 1687.0, 649.0]},
+    {"a": 28, "b": 101, "points": [1735.0, 585.0, 1792.0, 586.0]},
+    {"a": 30, "b": 133, "points": [531.0, 590.0, 539.0, 605.0]},
+    {"a": 67, "b": 102, "points": [712.0, 591.0, 649.0, 614.0]},
+    {"a": 67, "b": 135, "points": [712.0, 591.0, 764.0, 623.0]},
+    {"a": 17, "b": 133, "points": [625.0, 595.0, 539.0, 605.0]},
+    {"a": 17, "b": 102, "points": [625.0, 595.0, 649.0, 614.0]},
+    {"a": 38, "b": 45, "points": [1302.0, 596.0, 1305.0, 609.0]},
+    {"a": 17, "b": 30, "points": [539.0, 605.0, 533.0, 624.0]},
+    {"a": 10, "b": 21, "points": [1129.0, 609.0, 1068.0, 644.0]},
+    {"a": 10, "b": 41, "points": [1129.0, 609.0, 1162.0, 626.0]},
+    {"a": 45, "b": 65, "points": [1305.0, 609.0, 1263.0, 681.0]},
+    {"a": 38, "b": 65, "points": [1305.0, 609.0, 1373.0, 651.0]},
+    {"a": 17, "b": 67, "points": [649.0, 614.0, 654.0, 665.0]},
+    {"a": 38, "b": 55, "points": [1429.0, 619.0, 1373.0, 651.0]},
+    {"a": 55, "b": 122, "points": [1429.0, 619.0, 1464.0, 629.0]},
+    {"a": 17, "b": 86, "points": [533.0, 624.0, 583.0, 730.0]},
+    {"a": 30, "b": 86, "points": [533.0, 624.0, 529.0, 625.0, 459.0, 671.0]},
+    {"a": 14, "b": 67, "points": [764.0, 623.0, 763.0, 672.0]},
+    {"a": 10, "b": 45, "points": [1162.0, 626.0, 1188.0, 685.0]},
+    {"a": 55, "b": 99, "points": [1464.0, 629.0, 1495.0, 701.0]},
+    {"a": 13, "b": 14, "points": [864.0, 633.0, 836.0, 694.0, 829.0, 713.0]},
+    {"a": 13, "b": 115, "points": [864.0, 633.0, 924.0, 633.0]},
+    {"a": 13, "b": 109, "points": [924.0, 633.0, 932.0, 642.0]},
+    {"a": 11, "b": 109, "points": [1018.0, 635.0, 999.0, 648.0]},
+    {"a": 11, "b": 21, "points": [1018.0, 635.0, 1068.0, 644.0]},
+    {"a": 12, "b": 13, "points": [932.0, 642.0, 909.0, 744.0]},
+    {"a": 12, "b": 109, "points": [932.0, 642.0, 999.0, 648.0]},
+    {"a": 10, "b": 11, "points": [1068.0, 644.0, 1085.0, 750.0]},
+    {"a": 16, "b": 84, "points": [1653.0, 648.0, 1629.0, 662.0]},
+    {"a": 16, "b": 103, "points": [1653.0, 648.0, 1687.0, 649.0]},
+    {"a": 11, "b": 12, "points": [999.0, 648.0, 997.0, 726.0]},
+    {"a": 16, "b": 101, "points": [1687.0, 649.0, 1716.0, 679.0, 1718.0, 679.0]},
+    {"a": 55, "b": 65, "points": [1373.0, 651.0, 1372.0, 723.0]},
+    {"a": 99, "b": 113, "points": [1587.0, 652.0, 1497.0, 702.0]},
+    {"a": 84, "b": 113, "points": [1587.0, 652.0, 1629.0, 662.0]},
+    {"a": 70, "b": 128, "points": [1859.0, 659.0, 1876.0, 704.0]},
+    {"a": 16, "b": 113, "points": [1629.0, 662.0, 1616.0, 762.0]},
+    {"a": 36, "b": 69, "points": [412.0, 663.0, 404.0, 667.0]},
+    {"a": 30, "b": 36, "points": [412.0, 663.0, 459.0, 671.0]},
+    {"a": 69, "b": 144, "points": [394.0, 665.0, 404.0, 667.0]},
+    {"a": 17, "b": 53, "points": [654.0, 665.0, 587.0, 732.0]},
+    {"a": 53, "b": 67, "points": [654.0, 665.0, 715.0, 700.0]},
+    {"a": 36, "b": 144, "points": [404.0, 667.0, 396.0, 756.0]},
+    {"a": 36, "b": 86, "points": [459.0, 671.0, 499.0, 743.0]},
+    {"a": 67, "b": 97, "points": [763.0, 672.0, 715.0, 700.0]},
+    {"a": 14, "b": 97, "points": [763.0, 672.0, 767.0, 673.0, 777.0, 681.0, 781.0, 682.0, 828.0, 713.0]},
+    {"a": 24, "b": 65, "points": [1263.0, 681.0, 1310.0, 747.0]},
+    {"a": 24, "b": 45, "points": [1263.0, 681.0, 1188.0, 685.0]},
+    {"a": 10, "b": 24, "points": [1188.0, 685.0, 1184.0, 695.0]},
+    {"a": 24, "b": 92, "points": [1184.0, 695.0, 1214.0, 797.0]},
+    {"a": 10, "b": 92, "points": [1184.0, 695.0, 1085.0, 750.0]},
+    {"a": 53, "b": 97, "points": [715.0, 700.0, 711.0, 753.0]},
+    {"a": 55, "b": 137, "points": [1495.0, 701.0, 1396.0, 736.0]},
+    {"a": 99, "b": 137, "points": [1495.0, 701.0, 1497.0, 702.0]},
+    {"a": 113, "b": 137, "points": [1497.0, 702.0, 1511.0, 736.0]},
+    {"a": 58, "b": 70, "points": [1876.0, 704.0, 1840.0, 747.0]},
+    {"a": 58, "b": 128, "points": [1876.0, 704.0, 1947.0, 723.0]},
+    {"a": 68, "b": 97, "points": [828.0, 713.0, 777.0, 795.0]},
+    {"a": 14, "b": 68, "points": [828, 713, 829, 713]},
+    {"a": 13, "b": 68, "points": [829.0, 713.0, 903.0, 745.0]},
+    {"a": 15, "b": 55, "points": [1372.0, 723.0, 1396.0, 736.0]},
+    {"a": 15, "b": 65, "points": [1372.0, 723.0, 1310.0, 747.0]},
+    {"a": 12, "b": 37, "points": [997.0, 726.0, 940.0, 755.0]},
+    {"a": 11, "b": 37, "points": [997.0, 726.0, 1071.0, 758.0]},
+    {"a": 47, "b": 83, "points": [181.0, 726.0, 176.0, 733.0]},
+    {"a": 26, "b": 86, "points": [583.0, 730.0, 499.0, 743.0]},
+    {"a": 17, "b": 26, "points": [583.0, 730.0, 587.0, 732.0]},
+    {"a": 26, "b": 53, "points": [587.0, 732.0, 611.0, 781.0]},
+    {"a": 47, "b": 118, "points": [176.0, 733.0, 185.0, 786.0]},
+    {"a": 83, "b": 118, "points": [176.0, 733.0, 142.0, 733.0]},
+    {"a": 29, "b": 137, "points": [1511.0, 736.0, 1472.0, 834.0]},
+    {"a": 29, "b": 113, "points": [1511.0, 736.0, 1595.0, 771.0]},
+    {"a": 15, "b": 137, "points": [1396.0, 736.0, 1421.0, 814.0]},
+    {"a": 26, "b": 36, "points": [499.0, 743.0, 473.0, 784.0]},
+    {"a": 13, "b": 126, "points": [909.0, 744.0, 903.0, 745.0]},
+    {"a": 12, "b": 126, "points": [909.0, 744.0, 940.0, 755.0]},
+    {"a": 68, "b": 126, "points": [903.0, 745.0, 861.0, 835.0]},
+    {"a": 15, "b": 24, "points": [1310.0, 747.0, 1303.0, 765.0]},
+    {"a": 11, "b": 92, "points": [1085.0, 750.0, 1083.0, 754.0]},
+    {"a": 48, "b": 97, "points": [711.0, 753.0, 774.0, 795.0]},
+    {"a": 48, "b": 53, "points": [711.0, 753.0, 639.0, 792.0]},
+    {"a": 92, "b": 127, "points": [1083.0, 754.0, 1132.0, 810.0]},
+    {"a": 11, "b": 127, "points": [1083.0, 754.0, 1071.0, 758.0]},
+    {"a": 37, "b": 126, "points": [940.0, 755.0, 970.0, 818.0]},
+    {"a": 36, "b": 49, "points": [396.0, 756.0, 449.0, 789.0]},
+    {"a": 49, "b": 144, "points": [396.0, 756.0, 364.0, 772.0]},
+    {"a": 37, "b": 127, "points": [1071.0, 758.0, 1025.0, 827.0]},
+    {"a": 61, "b": 113, "points": [1616.0, 762.0, 1595.0, 771.0]},
+    {"a": 16, "b": 61, "points": [1616.0, 762.0, 1656.0, 780.0]},
+    {"a": 15, "b": 131, "points": [1303.0, 765.0, 1337.0, 852.0]},
+    {"a": 24, "b": 131, "points": [1303.0, 765.0, 1214.0, 797.0]},
+    {"a": 29, "b": 61, "points": [1595.0, 771.0, 1568.0, 842.0]},
+    {"a": 26, "b": 94, "points": [611.0, 781.0, 549.0, 846.0, 547.0, 850.0]},
+    {"a": 53, "b": 94, "points": [611.0, 781.0, 639.0, 792.0]},
+    {"a": 16, "b": 61, "points": [1662.0, 784.0, 1681.0, 793.0]},
+    {"a": 26, "b": 66, "points": [473.0, 784.0, 532.0, 850.0]},
+    {"a": 36, "b": 66, "points": [473.0, 784.0, 449.0, 789.0]},
+    {"a": 118, "b": 146, "points": [185.0, 786.0, 155.0, 812.0]},
+    {"a": 47, "b": 146, "points": [185.0, 786.0, 258.0, 817.0, 265.0, 822.0]},
+    {"a": 49, "b": 66, "points": [449.0, 789.0, 427.0, 841.0]},
+    {"a": 48, "b": 94, "points": [639.0, 792.0, 669.0, 854.0]},
+    {"a": 68, "b": 123, "points": [777.0, 795.0, 834.0, 841.0]},
+    {"a": 97, "b": 123, "points": [777.0, 795.0, 774.0, 795.0]},
+    {"a": 48, "b": 123, "points": [774.0, 795.0, 721.0, 863.0]},
+    {"a": 92, "b": 131, "points": [1214.0, 797.0, 1212.0, 802.0]},
+    {"a": 57, "b": 131, "points": [1212.0, 802.0, 1225.0, 858.0]},
+    {"a": 57, "b": 92, "points": [1212.0, 802.0, 1132.0, 810.0]},
+    {"a": 57, "b": 127, "points": [1132.0, 810.0, 1111.0, 889.0]},
+    {"a": 15, "b": 75, "points": [1421.0, 814.0, 1347.0, 854.0]},
+    {"a": 75, "b": 137, "points": [1421.0, 814.0, 1472.0, 834.0]},
+    {"a": 73, "b": 126, "points": [970.0, 818.0, 925.0, 877.0]},
+    {"a": 37, "b": 73, "points": [970.0, 818.0, 1025.0, 827.0]},
+    {"a": 73, "b": 127, "points": [1025.0, 827.0, 1058.0, 907.0]},
+    {"a": 29, "b": 75, "points": [1472.0, 834.0, 1479.0, 846.0]},
+    {"a": 82, "b": 126, "points": [861.0, 835.0, 909.0, 868.0, 925.0, 877.0]},
+    {"a": 68, "b": 82, "points": [861.0, 835.0, 834.0, 841.0]},
+    {"a": 82, "b": 123, "points": [834.0, 841.0, 810.0, 904.0]},
+    {"a": 61, "b": 89, "points": [1568.0, 842.0, 1585.0, 865.0]},
+    {"a": 29, "b": 89, "points": [1568.0, 842.0, 1479.0, 846.0]},
+    {"a": 75, "b": 89, "points": [1479.0, 846.0, 1471.0, 910.0]},
+    {"a": 66, "b": 134, "points": [532.0, 850.0, 489.0, 890.0]},
+    {"a": 26, "b": 134, "points": [532.0, 850.0, 547.0, 850.0]},
+    {"a": 94, "b": 134, "points": [547.0, 850.0, 598.0, 925.0]},
+    {"a": 130, "b": 131, "points": [1337.0, 852.0, 1302.0, 876.0]},
+    {"a": 15, "b": 130, "points": [1337.0, 852.0, 1347.0, 854.0]},
+    {"a": 94, "b": 104, "points": [669.0, 854.0, 621.0, 936.0]},
+    {"a": 48, "b": 104, "points": [669.0, 854.0, 721.0, 863.0]},
+    {"a": 75, "b": 130, "points": [1347.0, 854.0, 1350.0, 861.0, 1398.0, 934.0]},
+    {"a": 19, "b": 57, "points": [1225.0, 858.0, 1199.0, 900.0]},
+    {"a": 19, "b": 131, "points": [1225.0, 858.0, 1302.0, 876.0]},
+    {"a": 104, "b": 123, "points": [721.0, 863.0, 755.0, 920.0]},
+    {"a": 20, "b": 91, "points": [350.0, 868.0, 304.0, 949.0]},
+    {"a": 19, "b": 130, "points": [1302.0, 876.0, 1292.0, 945.0]},
+    {"a": 73, "b": 82, "points": [925.0, 877.0, 930.0, 901.0]},
+    {"a": 50, "b": 82, "points": [930.0, 901.0, 892.0, 958.0]},
+    {"a": 50, "b": 73, "points": [930.0, 901.0, 1019.0, 927.0]},
+    {"a": 107, "b": 123, "points": [810.0, 904.0, 755.0, 920.0]},
+    {"a": 82, "b": 107, "points": [810.0, 904.0, 828.0, 921.0, 830.0, 921.0, 840.0, 932.0, 842.0, 932.0, 853.0, 944.0, 855.0, 944.0, 865.0, 955.0]},
+    {"a": 104, "b": 107, "points": [755.0, 920.0, 740.0, 955.0]}
+  ],
+  "notes": ["province spacing 80.9px", "auto strait Mistgrove - Honeywick (20px)", "auto strait Mistbough - Amberwick (49px)", "auto strait Moonroot - Clovervale (47px)", "auto strait Honeyfield - Clovervale (52px)", "auto strait Eldershade - Faethicket (67px)", "second strait Mistgrove - Duskshade (22px)", "second strait Moonroot - Honeyfield (54px)", "second strait Eldershade - Willowbough (75px)"]
 }

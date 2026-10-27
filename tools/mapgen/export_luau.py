@@ -37,6 +37,10 @@ def ids(xs) -> str:
     return "{ " + ", ".join(str(x) for x in xs) + " }" if xs else "{}"
 
 
+def nums(xs) -> str:
+    return "{ " + ", ".join(f"{x:g}" for x in xs) + " }" if xs else "{}"
+
+
 def to_luau(layout: dict) -> str:
     key = layout["id"]
     lines = [
@@ -76,6 +80,7 @@ def to_luau(layout: dict) -> str:
         fields.append(f"isCapital = {'true' if p['isCapital'] else 'false'}")
         if p.get("garrison"):
             fields.append(f"garrison = {p['garrison']}")
+        fields.append(f"tris = {nums(p.get('tris', []))}")
         lines.append("\t\t{ " + ", ".join(fields) + " },")
     lines.append("\t},")
     lines.append("\tstraits = {")
@@ -84,6 +89,10 @@ def to_luau(layout: dict) -> str:
             f"\t\t{{ a = {s['a']}, b = {s['b']}, from = {point(s['from'])}, to = {point(s['to'])}, "
             f"wrap = {'true' if s['wrap'] else 'false'} }},"
         )
+    lines.append("\t},")
+    lines.append("\tborders = {")
+    for b in layout.get("borders", []):
+        lines.append(f"\t\t{{ a = {b['a']}, b = {b['b']}, points = {nums(b['points'])} }},")
     lines.append("\t},")
     lines.append("}")
     lines.append("")

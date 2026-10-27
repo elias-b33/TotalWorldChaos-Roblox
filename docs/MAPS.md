@@ -170,7 +170,13 @@ Everything here comes from `python3 tools/mapgen/generate.py` (about 1–2 minut
 
 ### Province shapes: generated, not hand-made
 
-This answers the open question "keep the hex grid or switch to hand-made provinces?": **neither**. Hand-tracing 3 × 150 provinces in Studio would take weeks and drift from the data. Instead, a small export step traces each province outline from `province_ids.png`, simplifies it, triangulates it, and writes one `.obj` file per map with one object per province (named `P001`, `P002`, …) and flat top-down UVs. Studio's 3D Importer brings that in as MeshParts in one go, and `MapRenderer` finds them by name. If a map changes, regenerate and re-import.
+This answers the open question "keep the hex grid or switch to hand-made provinces?": **neither**. Hand-tracing 3 × 150 provinces in Studio would take weeks and drift from the data. Instead `tools/mapgen/shapes.py` traces every province outline from the province id grid:
+
+1. Walk the pixel edges between each pair of provinces (and between land and sea) into border chains.
+2. Simplify each chain once (Douglas–Peucker: 1.2 px for borders, 2.5 px for coasts), so two neighbours share exactly the same points and never leave gaps.
+3. Join each province's chains into rings, bridge any holes (lakes, enclaves) into the outer ring, and triangulate by ear clipping.
+
+The triangles go into `layout.json` and `MapData` as `tris`, and the shared chains as `borders`. The client builds each triangle from two `WedgePart`s at match start (`MapSurface`), so there is no import step: regenerate the map and the game draws the new shapes. Islands smaller than 150 px are dropped from the drawing (never from the rules). The validator checks every province got a shape.
 
 ## Roadmap changes
 
@@ -178,7 +184,7 @@ This answers the open question "keep the hex grid or switch to hand-made provinc
 | --- | --- | --- |
 | 1 | Generated hex map | **Skyshards `MapData`** converted from `layout.json`, drawn as simple flat discs at province centres with lines for neighbours. Real data from day one, and symmetric, so early tests are fair. |
 | 2–3 | (one map) | Build and test on Skyshards. Add Eldmoor once war works (Gate 2). |
-| 4 | Hand-made final map | **Province meshes and textures for all three maps**, plus the **map vote** with the three cards. |
+| 4 | Hand-made final map | **Province shapes for all three maps** (done early, built from `MapData`), a **custom texture pack**, plus the **map vote** with the three cards. |
 | 5 | A second map | **Per-map balance** from win rate by start position. Earth needs it most. |
 
 ## Task cards
@@ -199,14 +205,11 @@ Done when: lune run tests/run passes for all three maps; rojo build passes
 ```
 
 ```text
-## Task: Province meshes
-Phase: 4   Service: tools/mapgen + MapRenderer
-Goal: every map has real province shapes in Studio, textured with assets/textures.
-Read first: docs/MAPS.md "Province shapes", tools/mapgen/render.py
-Do:
-- tools/mapgen/export_obj.py: trace each province in province_ids.png, simplify to <= 60 points, triangulate, write one OBJ per map (objects P001..., planar UVs, 1 px = 0.5 stud, 2-stud thick slab)
-- MapRenderer: find P### MeshParts, apply MapArt textures (terrain and political views)
-Done when: all three maps import in one go and colour by owner on a phone with no frame drops
+## Task: Province shapes (done, without meshes)
+Phase: 4   Service: tools/mapgen + MapSurface
+Goal: every map has real province shapes.
+Done: tools/mapgen/shapes.py traces and triangulates provinces into MapData (tris, borders); MapSurface builds
+them from wedges with biome materials, relief, Terrain water and border lines. No OBJ import is needed.
 ```
 
 ```text

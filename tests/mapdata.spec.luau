@@ -24,6 +24,27 @@ for _, id in Maps.ids do
 		end
 	end)
 
+	T.test(id .. ": every province has a drawable shape about its size", function()
+		for _, p in provinces do
+			local tris = p.tris
+			T.expect(#tris > 0 and #tris % 6 == 0, p.name .. " has no triangles")
+			local area = 0
+			for i = 1, #tris, 6 do
+				local ax, ay, bx, by, cx, cy = tris[i], tris[i + 1], tris[i + 2], tris[i + 3], tris[i + 4], tris[i + 5]
+				area += math.abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay)) / 2
+			end
+			-- simplified outlines may trim small islands a little
+			T.expect(area > p.area * 0.6 and area < p.area * 1.25, p.name .. " shape area " .. area .. " vs " .. p.area)
+		end
+	end)
+
+	T.test(id .. ": border lines join two different provinces", function()
+		for _, b in map.borders do
+			T.expect(provinces[b.a] ~= nil and provinces[b.b] ~= nil and b.a ~= b.b, "border " .. b.a .. "-" .. b.b)
+			T.expect(#b.points >= 4 and #b.points % 2 == 0, "border " .. b.a .. "-" .. b.b .. " points")
+		end
+	end)
+
 	T.test(id .. ": every strait is a neighbour link", function()
 		for _, s in map.straits do
 			T.expect(table.find(provinces[s.a].neighbors, s.b) ~= nil, "strait " .. s.a .. "-" .. s.b)

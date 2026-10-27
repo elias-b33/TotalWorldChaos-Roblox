@@ -4,6 +4,7 @@
 --   mkdir -p build && rojo build -o build/game.rbxlx
 --   lune run tools/harness/play smoke          # one scenario
 --   lune run tools/harness/play all            # every scenario
+--   MAP=earth lune run tools/harness/play smoke  # on another map (default: Config.DefaultMap)
 --
 -- Screenshots go to tools/harness/out/<scenario>/NN_name.png (rendered by render_scene.py).
 -- A scenario fails on any script error, any warn(), any table Roblox would mangle over the network,
@@ -30,7 +31,9 @@ function H.shot(client, name: string)
 	if not r.ok then
 		error("render failed: " .. r.stderr)
 	end
-	fs.removeFile(base .. ".json")
+	if process.env.KEEP_SCENE == nil then
+		fs.removeFile(base .. ".json")
+	end
 	print("  📸 " .. base .. ".png")
 end
 
@@ -133,6 +136,41 @@ function scenarios.smoke()
 	Emulator.run(30)
 	H.expect(nation.gold > gold0, "Income arrives every month")
 	H.expect(ClientState.nation(me).gold == nation.gold, "The client's gold matches the server")
+end
+
+-- The map's look at three zooms: whole map, region around the capital, the capital close up.
+function scenarios.look()
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	Emulator.run(2)
+	H.shot(alice, "whole_map")
+	local state = H.state()
+	local capital = state.nations[H.myNation(alice)].capital
+	local CameraController = H.client(alice, "CameraController")
+	CameraController.centreOn(H.provinceWorld(alice, capital), false)
+	Emulator.pinch(alice, 3.5)
+	Emulator.run(2)
+	H.shot(alice, "region")
+	Emulator.pinch(alice, 3)
+	Emulator.run(2)
+	H.shot(alice, "close_up")
+
+	-- the nearest mountain, close up
+	local map = H.client(alice, "ClientState").map()
+	local here = H.provinceWorld(alice, capital)
+	local best, bestD = nil, math.huge
+	for _, def in map.provinces do
+		local d = (H.provinceWorld(alice, def.id) - here).Magnitude
+		if def.terrain == "Mountain" and d < bestD then
+			best, bestD = def.id, d
+		end
+	end
+	if best then
+		CameraController.centreOn(H.provinceWorld(alice, best), false)
+		Emulator.pinch(alice, 2)
+		Emulator.run(2)
+		H.shot(alice, "mountain")
+	end
 end
 
 local function provinceByName(name: string): number
@@ -285,7 +323,7 @@ local function runScenario(name: string)
 		fs.removeDir(shotDir)
 	end
 	fs.writeDir(shotDir)
-	Emulator.boot(fs.readFile("build/game.rbxlx"))
+	Emulator.boot(fs.readFile("build/game.rbxlx"), process.env.MAP)
 	scenarios[name]()
 	Emulator.assertClean(name)
 	print(string.format("== %s passed (%.0f s of game time) ==", name, Emulator.now()))

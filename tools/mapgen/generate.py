@@ -22,6 +22,7 @@ sys.path.insert(0, HERE)
 
 import export_luau  # noqa: E402
 import render  # noqa: E402
+import shapes  # noqa: E402
 from layout import to_json, validate, write_json  # noqa: E402
 from maps import earth, fantasy, sky  # noqa: E402
 from tiles import THEMES, detail_of, make_tile  # noqa: E402
@@ -74,7 +75,11 @@ def make_map(key: str) -> None:
     mod, style, title, subtitle = MAPS[key]
     t0 = time.time()
     lay = mod.build()
+    lay.shapes, lay.borders = shapes.province_shapes(lay.labels, len(lay.seeds))
     problems = validate(lay)
+    for i, sh in enumerate(lay.shapes):
+        if not sh["tris"]:
+            problems.append(f"province '{lay.seeds[i].name}' has no shape")
     out = os.path.join(ASSETS, "maps", key)
     os.makedirs(out, exist_ok=True)
     write_json(lay, os.path.join(out, "layout.json"))

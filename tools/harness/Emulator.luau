@@ -410,6 +410,21 @@ end)
 -- Players.LocalPlayer, Workspace.CurrentCamera and Camera.ViewportSize already exist in the API, and Lune can't
 -- override existing properties, so addClient sets them directly instead.
 
+-- Terrain: remember water fills so screenshots can draw the sea.
+local terrainBlocks: { [any]: { { cf: any, size: any, material: any } } } = {}
+
+roblox.implementMethod("Terrain", "FillBlock", function(terrain, cf, size, material)
+	terrainBlocks[terrain] = terrainBlocks[terrain] or {}
+	table.insert(terrainBlocks[terrain], { cf = cf, size = size, material = material })
+end)
+roblox.implementMethod("Terrain", "Clear", function(terrain)
+	terrainBlocks[terrain] = {}
+end)
+
+function Emulator.terrainBlocks(client: Machine)
+	return terrainBlocks[client.dm:GetService("Workspace"):FindFirstChildOfClass("Terrain")] or {}
+end
+
 ---------------------------------------------------------------------------------------------- camera maths
 
 local function cameraRay(cam, x: number, y: number)
@@ -446,7 +461,8 @@ function Emulator.worldToScreen(m: Machine, p)
 	return (nx + 1) / 2 * m.viewport.X, (1 - ny) / 2 * m.viewport.Y, z > 0
 end
 
--- Raycast against parts: cylinders as discs/columns (axis along their local X), everything else as boxes.
+-- Raycast against parts: cylinders as discs/columns (axis along their local X), wedges as boxes cut by their slope
+-- (cross-section in local Y/Z keeps the bottom and back faces), everything else as boxes.
 local function intersectPart(part, origin, dir)
 	local cf = part.CFrame
 	local size = part.Size
@@ -471,11 +487,32 @@ local function intersectPart(part, origin, dir)
 			end
 		end
 	end
+	if part:IsA("WedgePart") then
+		-- inside when y * hz - z * hy <= 0 (below the slope from front-bottom to back-top)
+		local ny, nz = half.Z, -half.Y
+		local o = lo.Y * ny + lo.Z * nz
+		local d = ld.Y * ny + ld.Z * nz
+		if math.abs(d) < 1e-9 then
+			if o > 0 then
+				return nil
+			end
+		else
+			local t = -o / d
+			if d < 0 then
+				tmin = math.max(tmin, t)
+			else
+				tmax = math.min(tmax, t)
+			end
+			if tmin > tmax then
+				return nil
+			end
+		end
+	end
 	if tmax < 0 then
 		return nil
 	end
 	local t = math.max(tmin, 0)
-	if part.Shape == roblox.Enum.PartType.Cylinder then
+	if part:IsA("Part") and part.Shape == roblox.Enum.PartType.Cylinder then
 		-- inside the box; also require the hit to be within the circular cross-section (Y/Z plane)
 		local p = lo + ld * t
 		local r = math.min(half.Y, half.Z)
@@ -680,9 +717,13 @@ end
 
 ---------------------------------------------------------------------------------------------- public API
 
-function Emulator.boot(placeBytes: string)
+-- mapId (optional) picks the map the way the Workspace "MapId" attribute does in Studio.
+function Emulator.boot(placeBytes: string, mapId: string?)
 	Emulator.placeBytes = placeBytes
 	local dm = roblox.deserializePlace(placeBytes)
+	if mapId then
+		dm:GetService("Workspace"):SetAttribute("MapId", mapId)
+	end
 	local server = newMachine("server", dm, true)
 	Emulator.server = server
 	for _, s in dm:GetService("ServerScriptService"):GetDescendants() do
@@ -713,6 +754,11 @@ function Emulator.addClient(name: string, viewport: any?): Machine
 			child:Clone().Parent = clientRs
 		end
 	end
+	local terrain = Instance.new("Terrain")
+	terrain.Parent = dm:GetService("Workspace")
+	pcall(function()
+		dm:GetService("Workspace").Terrain = terrain
+	end)
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 70
 	cam.ViewportSize = client.viewport

@@ -11,6 +11,7 @@ local TAP_SLOP = 8 -- pixels a press may move and still count as a tap
 local ZOOM_LEVELS = 3 -- whole map, region, province (mouse wheel steps between them)
 local CLOSEST_SHARE = 0.08 -- the province zoom shows this share of the whole-map view
 local SMOOTHING = 12 -- higher = snappier
+local TILT = 0.3 -- the eye sits this far south of the focus per stud of height: a slight tilt shows the relief
 
 local CameraController = {}
 
@@ -189,8 +190,8 @@ function CameraController.init(tapHandler: TapHandler)
 		targetHeight = math.clamp(targetHeight, minHeight(), maxHeight())
 		height += (targetHeight - height) * a
 		focus = focus:Lerp(targetFocus, a)
-		-- straight down, north (-Z) at the top of the screen
-		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, height, 0), focus, Vector3.new(0, 0, -1))
+		-- looking down at the map with a slight tilt, north (-Z) at the top of the screen
+		camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, height, height * TILT), focus, Vector3.yAxis)
 	end)
 end
 

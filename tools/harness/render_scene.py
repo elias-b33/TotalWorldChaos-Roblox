@@ -14,6 +14,7 @@ import math
 import os
 import sys
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 SCALE = 2  # render at 2x so small phone text stays legible
@@ -159,64 +160,258 @@ def local_to_world(cf, v):
     )
 
 
-def footprint(part):
-    """World-space outline of a part's top surface, plus its top height (for draw order)."""
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+TEX = os.path.join(ROOT, "assets", "textures")
+# Stand-ins for Roblox's built-in materials: our own tiles' luminance, tinted by the part colour.
+MATERIAL_TEXTURES = {
+    "Grass": "earth/grassland",
+    "LeafyGrass": "earth/forest",
+    "Sand": "earth/desert",
+    "Snow": "earth/ice",
+    "Rock": "earth/mountains",
+    "Ground": "earth/hills",
+    "Sandstone": "earth/drylands",
+    "CrackedLava": "fantasy/ashlands",
+    "Marble": "sky/heartruins",
+    "Slate": "sky/crags",
+    "Basalt": "sky/stormspire",
+    "Water": "earth/sea",
+}
+TEXTURE_PERIOD = 18.0  # studs per texture repeat
+SUN = np.array([-0.35, 1.0, 0.45]) / np.linalg.norm([-0.35, 1.0, 0.45])
+AMBIENT = 0.58
+_details: dict = {}
+
+
+def detail(material: str):
+    """Mip chain of a grey detail map (mean 1) for a material, or None for flat materials."""
+    if material not in MATERIAL_TEXTURES:
+        return None
+    if material not in _details:
+        path = os.path.join(TEX, MATERIAL_TEXTURES[material] + ".png")
+        if not os.path.exists(path):
+            _details[material] = None
+        else:
+            lum = np.asarray(Image.open(path).convert("L"), dtype=np.float64)
+            lum = np.clip(1 + (lum / max(lum.mean(), 1) - 1) * 0.9, 0.45, 1.6)
+            chain = [lum]
+            while chain[-1].shape[0] > 4:
+                a = chain[-1]
+                chain.append((a[0::2, 0::2] + a[1::2, 0::2] + a[0::2, 1::2] + a[1::2, 1::2]) / 4)
+            _details[material] = chain
+    return _details[material]
+
+
+def part_faces(part):
+    """World-space faces [(points, normal)] of a part, by shape."""
     cf, (sx, sy, sz) = part["cf"], part["size"]
-    if part["shape"] == "Cylinder":
-        axis = (cf[3], cf[6], cf[9])  # local X in world space
-        top_sign = 1 if axis[1] >= 0 else -1
-        r = min(sy, sz) / 2
-        pts = [
-            local_to_world(cf, (top_sign * sx / 2, r * math.cos(a), r * math.sin(a)))
-            for a in (i * math.tau / 40 for i in range(40))
-        ]
+    hx, hy, hz = sx / 2, sy / 2, sz / 2
+    shape = part["shape"]
+
+    def w(v):
+        return np.array(local_to_world(cf, v))
+
+    if shape == "Wedge":
+        # cross-section in local Y/Z: front-bottom, back-bottom, back-top (the front-top corner is cut away)
+        cross = [(-hy, -hz), (-hy, hz), (hy, hz)]
+        left = [w((-hx, y, z)) for y, z in cross]
+        right = [w((hx, y, z)) for y, z in cross]
+        faces = [left[::-1], right]
+        for i in range(3):
+            j = (i + 1) % 3
+            faces.append([left[i], left[j], right[j], right[i]])
+    elif shape == "Cylinder":
+        axis_top = 1 if cf[6] >= 0 else -1
+        r = min(hy, hz)
+        faces = [[w((axis_top * hx, r * math.cos(a), r * math.sin(a))) for a in (i * math.tau / 32 for i in range(32))]]
     else:
-        corners = [local_to_world(cf, (dx * sx / 2, dy * sy / 2, dz * sz / 2)) for dx in (-1, 1) for dy in (-1, 1) for dz in (-1, 1)]
-        corners.sort(key=lambda p: -p[1])
-        top = corners[:4]
-        cx = sum(p[0] for p in top) / 4
-        cz = sum(p[2] for p in top) / 4
-        pts = sorted(top, key=lambda p: math.atan2(p[2] - cz, p[0] - cx))
-    return pts, max(p[1] for p in pts)
+        c = [w((dx * hx, dy * hy, dz * hz)) for dx in (-1, 1) for dy in (-1, 1) for dz in (-1, 1)]
+        idx = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+        faces = [[c[i] for i in q] for q in idx]
+    centre = w((0, 0, 0))
+    out = []
+    for f in faces:
+        n = np.cross(f[1] - f[0], f[2] - f[0])
+        if np.linalg.norm(n) < 1e-9 and len(f) > 3:
+            n = np.cross(f[2] - f[0], f[3] - f[0])
+        norm = np.linalg.norm(n)
+        if norm < 1e-9:
+            continue
+        n = n / norm
+        fc = sum(f) / len(f)
+        if np.dot(n, fc - centre) < 0:
+            n = -n  # outward
+        out.append((f, n))
+    return out
+
+
+NEAR = 0.5
+
+
+def project_face(cam, face):
+    """Screen points (x, y, depth) of a world-space polygon, clipped against the near plane; None if all behind."""
+    pos = np.asarray(cam.pos)
+    pts = []
+    for p in face:
+        rel = np.asarray(p) - pos
+        pts.append((float(np.dot(rel, cam.right)), float(np.dot(rel, cam.up)), float(np.dot(rel, cam.look))))
+    clipped = []
+    for i, a in enumerate(pts):
+        b = pts[(i + 1) % len(pts)]
+        if a[2] >= NEAR:
+            clipped.append(a)
+        if (a[2] >= NEAR) != (b[2] >= NEAR):
+            t = (NEAR - a[2]) / (b[2] - a[2])
+            clipped.append(tuple(a[k] + (b[k] - a[k]) * t for k in range(3)))
+    if len(clipped) < 3:
+        return None
+    aspect = cam.w / cam.h
+    return [
+        ((x / (z * cam.tan * aspect) + 1) / 2 * cam.w, (1 - y / (z * cam.tan)) / 2 * cam.h, z) for x, y, z in clipped
+    ]
+
+
+def rasterize(polys, w, h):
+    """Z-buffer: polys are lists of (x, y, z) screen points. Returns (id buffer, depth buffer); id 0 = nothing."""
+    zbuf = np.full((h, w), np.inf)
+    ids = np.zeros((h, w), dtype=np.int32)
+    for k, poly in enumerate(polys, start=1):
+        for i in range(1, len(poly) - 1):
+            (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) = poly[0], poly[i], poly[i + 1]
+            area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
+            if abs(area) < 1e-6:
+                continue
+            bx0 = max(int(math.floor(min(x0, x1, x2))), 0)
+            bx1 = min(int(math.ceil(max(x0, x1, x2))), w - 1)
+            by0 = max(int(math.floor(min(y0, y1, y2))), 0)
+            by1 = min(int(math.ceil(max(y0, y1, y2))), h - 1)
+            if bx0 > bx1 or by0 > by1:
+                continue
+            py, px = np.mgrid[by0 : by1 + 1, bx0 : bx1 + 1].astype(np.float64)
+            px += 0.5
+            py += 0.5
+            b0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) / area
+            b1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) / area
+            b2 = 1 - b0 - b1
+            eps = -0.02
+            inside = (b0 >= eps) & (b1 >= eps) & (b2 >= eps)
+            if not inside.any():
+                continue
+            z = 1 / (b0 / z0 + b1 / z1 + b2 / z2)  # perspective-correct depth
+            zb = zbuf[by0 : by1 + 1, bx0 : bx1 + 1]
+            win = inside & (z < zb)
+            zb[win] = z[win]
+            ids[by0 : by1 + 1, bx0 : bx1 + 1][win] = k
+    return ids, zbuf
 
 
 def render_world(img, scene, cam):
-    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    items = []
-    for part in scene["parts"]:
-        pts, top = footprint(part)
-        items.append((top, part, pts))
-    items.sort(key=lambda t: t[0])
-    for _, part, pts in items:
-        proj = [cam.project(p) for p in pts]
-        if any(p is None for p in proj):
+    w, h = img.size
+    campos = np.array(cam.pos)
+    parts = list(scene["parts"])
+    for wblock in scene.get("water", []):
+        parts.append({"shape": "Block", "cf": wblock["cf"], "size": wblock["size"], "color": wblock["color"],
+                      "transparency": 0, "material": "Water"})
+    opaque, translucent = [], []  # (screen poly, colour, shade, material, alpha)
+    for part in parts:
+        if part["transparency"] >= 0.95:
             continue
-        color = list(part["color"])
-        if part["material"] == "Neon":
-            color = [min(1.0, c * 1.3 + 0.1) for c in color]
-        d.polygon(proj, fill=rgba(color, 1 - part["transparency"]))
-        if part["shape"] == "Cylinder":
-            d.line(proj + [proj[0]], fill=(0, 0, 0, 90), width=1)
+        for f, n in part_faces(part):
+            fc = sum(f) / len(f)
+            if np.dot(n, campos - fc) <= 0:
+                continue  # facing away
+            proj = project_face(cam, f)
+            if proj is None:
+                continue
+            shade = AMBIENT + (1 - AMBIENT) * max(0.0, float(np.dot(n, SUN)))
+            if part["material"] == "Neon":
+                shade = 1.25
+            item = (proj, part["color"], shade, part["material"], 1 - part["transparency"])
+            (opaque if part["transparency"] < 0.001 else translucent).append(item)
+
+    ids, zbuf = rasterize([it[0] for it in opaque], w, h)
+    colors = np.array([[0.04, 0.04, 0.06]] + [list(it[1]) for it in opaque])
+    shades = np.array([1.0] + [it[2] for it in opaque])
+    out = colors[ids] * shades[ids][..., None]
+
+    # world position under every pixel, from its depth, for material texture lookups (planar, from above)
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
+    nx = (2 * (xs + 0.5) / w - 1) * cam.tan * (w / h)
+    ny = (1 - 2 * (ys + 0.5) / h) * cam.tan
+    right, up, look = (np.array(v) for v in (cam.right, cam.up, cam.look))
+    depth = np.where(np.isfinite(zbuf), zbuf, 0)
+    wx = campos[0] + (right[0] * nx + up[0] * ny + look[0]) * depth
+    wz = campos[2] + (right[2] * nx + up[2] * ny + look[2]) * depth
+    mats = [""] + [it[3] for it in opaque]
+    for material in set(mats):
+        tex = detail(material)
+        if tex is None:
+            continue
+        mask = np.isin(ids, [i for i, m in enumerate(mats) if m == material])
+        if not mask.any():
+            continue
+        # pick the mip level whose texels match the pixel's footprint on the ground, like a GPU would
+        footprint = depth[mask] * 2 * cam.tan / h * tex[0].shape[0] / TEXTURE_PERIOD
+        level = np.clip(np.floor(np.log2(np.maximum(footprint, 1e-6))), 0, len(tex) - 1).astype(int)
+        vals = np.empty(level.shape)
+        for k, lvl in enumerate(tex):
+            sel = level == k
+            if sel.any():
+                tn = lvl.shape[0]
+                u = ((wx[mask][sel] / TEXTURE_PERIOD) % 1.0 * tn).astype(int) % tn
+                v = ((wz[mask][sel] / TEXTURE_PERIOD) % 1.0 * tn).astype(int) % tn
+                vals[sel] = lvl[v, u]
+        out[mask] *= vals[:, None]
+    rgb = Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8), "RGB").convert("RGBA")
+    img.alpha_composite(rgb)
+
+    # translucent faces (inner borders) and highlights on top, only where they are in front of the solid world
+    layer = np.zeros((h, w, 4))
+    for proj, color, shade, _, alpha in translucent:
+        lid, lz = rasterize([proj], w, h)
+        m = (lid > 0) & (lz <= zbuf + 0.05)
+        c = np.clip(np.array(color) * shade, 0, 1)
+        layer[m, :3] = layer[m, :3] * (1 - alpha) + c * alpha
+        layer[m, 3] = layer[m, 3] * (1 - alpha) + alpha
+    for hl in scene.get("highlights", []):
+        for f, n in part_faces({**hl, "transparency": 0}):
+            if n[1] > 0.5:
+                proj = project_face(cam, f)
+                if proj is not None:
+                    lid, lz = rasterize([proj], w, h)
+                    m = (lid > 0) & (lz <= zbuf + 0.05)
+                    a = hl["alpha"]
+                    layer[m, :3] = layer[m, :3] * (1 - a) + np.array(hl["color"]) * a
+                    layer[m, 3] = layer[m, 3] * (1 - a) + a
+    if layer[..., 3].any():
+        over = np.zeros((h, w, 4), dtype=np.uint8)
+        alpha = layer[..., 3:4]
+        over[..., :3] = (np.clip(np.divide(layer[..., :3], alpha, out=np.zeros_like(layer[..., :3]),
+                                           where=alpha > 0), 0, 1) * 255).astype(np.uint8)
+        over[..., 3] = (np.clip(layer[..., 3], 0, 1) * 255).astype(np.uint8)
+        img.alpha_composite(Image.fromarray(over, "RGBA"))
+
+    sel_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(sel_layer)
     for sel in scene["selections"]:
-        pts, _ = footprint(sel)
-        proj = [cam.project(p) for p in pts]
-        if all(p is not None for p in proj):
-            d.line(proj + [proj[0]], fill=rgba(sel["color"]), width=3 * SCALE)
-    img.alpha_composite(layer)
+        for f, n in part_faces({**sel, "transparency": 0}):
+            if n[1] > 0.5:
+                proj = [cam.project(tuple(p)) for p in f]
+                if all(p is not None for p in proj):
+                    sd.line(proj + [proj[0]], fill=rgba(sel["color"]), width=2 * SCALE)
+    img.alpha_composite(sel_layer)
+
     for bb in scene["billboards"]:
         if cam.distance(bb["pos"]) > bb["maxDistance"]:
             continue
         p = cam.project(bb["pos"])
         if p is None:
             continue
-        w = bb["size"][1] * SCALE
-        h = bb["size"][3] * SCALE
-        rect = (p[0] - w / 2, p[1] - h / 2, p[0] + w / 2, p[1] + h / 2)
-        draw_text_block(img, rect, bb["text"], int(bb["textSize"] * SCALE), rgba(bb["textColor"]), stroke=True)
-
-
-# ------------------------------------------------------------------------------------------- GUI
+        bw = bb["size"][1] * SCALE
+        bh = bb["size"][3] * SCALE
+        out = []
+        layout(bb["gui"], p[0] - bw / 2, p[1] - bh / 2, bw, bh, out)
+        draw_nodes(img, out)
 
 
 def child_of(node, cls):
@@ -298,6 +493,36 @@ def place(node, x, y, w, h, out, fixed, anchor=(0, 0)):
     return out[index][1]
 
 
+def draw_nodes(img, out):
+    """Draw laid-out GUI nodes: rounded backgrounds and text."""
+    for node, rect in out:
+        if not node.get("visible", True):
+            continue
+        x0, y0, x1, y1 = rect
+        if x1 - x0 < 1 or y1 - y0 < 1:
+            continue
+        alpha = 1 - node.get("bgT", 0)
+        if alpha > 0.01:
+            corner = child_of(node, "UICorner")
+            radius = 0
+            if corner:
+                radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
+                radius = min(radius, min(x1 - x0, y1 - y0) / 2)
+            overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+            ImageDraw.Draw(overlay).rounded_rectangle(rect, radius=radius, fill=rgba(node["bg"], alpha))
+            img.alpha_composite(overlay)
+        if node.get("text"):
+            draw_text_block(
+                img,
+                rect,
+                node["text"],
+                int(node["textSize"] * SCALE),
+                rgba(node["textColor"]),
+                align=node.get("textXAlign", "Center"),
+                stroke=node.get("stroke", False),
+            )
+
+
 def render_gui(img, scene):
     d = ImageDraw.Draw(img)
     vw, vh = img.size
@@ -306,31 +531,7 @@ def render_gui(img, scene):
             continue
         out = []
         layout(sg, 0, 0, vw, vh, out)
-        for node, rect in out:
-            if not node.get("visible", True):
-                continue
-            x0, y0, x1, y1 = rect
-            if x1 - x0 < 1 or y1 - y0 < 1:
-                continue
-            alpha = 1 - node.get("bgT", 0)
-            if alpha > 0.01:
-                corner = child_of(node, "UICorner")
-                radius = 0
-                if corner:
-                    radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
-                    radius = min(radius, min(x1 - x0, y1 - y0) / 2)
-                overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-                ImageDraw.Draw(overlay).rounded_rectangle(rect, radius=radius, fill=rgba(node["bg"], alpha))
-                img.alpha_composite(overlay)
-            if node.get("text"):
-                draw_text_block(
-                    img,
-                    rect,
-                    node["text"],
-                    int(node["textSize"] * SCALE),
-                    rgba(node["textColor"]),
-                    align=node.get("textXAlign", "Center"),
-                )
+        draw_nodes(img, out)
     return d
 
 
