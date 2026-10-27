@@ -330,6 +330,92 @@ function scenarios.war()
 	H.expect(H.state().phase == "Peace", "the new match is in Peace")
 end
 
+-- Phase 3: Bob is eliminated, rises as a Primordial and drops a Meteor on Alice's army through the power UI.
+function scenarios.primordial()
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	local bob = Emulator.addClient("Bob")
+	Emulator.run(2)
+	local state = H.state()
+	local A, B = H.myNation(alice), H.myNation(bob)
+	H.expect(A == 1 and B == 2, "Alice is Aurora, Bob is Zephyr")
+	H.expect(Emulator.findText(alice, "⚡0") ~= nil, "a living nation sees the power button with its charges")
+
+	-- open war; Aurora takes Zephyr's capital and all but two provinces: Zephyr is eliminated next tick
+	state.tick = 10 * 60
+	local kept = 0
+	for _, p in state.provinces do
+		if p.owner == B then
+			if p.isCapital or kept >= 2 then
+				p.owner = A
+			else
+				kept += 1
+			end
+		end
+	end
+	Emulator.run(2)
+	local bobId = bob.serverPlayer.UserId
+	H.expect(state.nations[B].eliminated, "Zephyr was eliminated")
+	H.expect(state.primordials[bobId] ~= nil, "Bob rose as a Primordial")
+	H.expect(Emulator.findText(bob, "You rose as a Primordial") ~= nil, "Bob sees the Primordial banner")
+	H.expect(Emulator.findText(bob, "✨ Primordial") ~= nil, "Bob's top bar says Primordial")
+	H.shot(bob, "primordial")
+	Emulator.run(2.5) -- after the War toast
+	H.expect(Emulator.findText(alice, "Zephyr was eliminated") ~= nil, "Alice hears about it")
+
+	-- Bob has no orders to give, only powers
+	tapProvince(bob, state.nations[A].capital)
+	H.expect(Emulator.findText(bob, "Declare") == nil and Emulator.findText(bob, "Develop") == nil, "no orders")
+	Emulator.press(bob, "✕")
+
+	-- charges and a target: a 4k Aurora army at its capital
+	state.primordials[bobId].charges = 3
+	local Army = require("../../src/shared/Sim/Army")
+	local capital = state.nations[A].capital
+	local army = Army.spawn(state, A, capital, 4000)
+	local dev = state.provinces[capital].development
+	Emulator.run(1.5)
+	H.expect(Emulator.findText(bob, "⚡3") ~= nil, "the power button shows Bob's 3 charges")
+
+	-- button -> pick Meteor -> tap the army -> Confirm
+	Emulator.press(bob, "⚡3")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(bob, "Meteor") ~= nil and Emulator.findText(bob, "Shield") ~= nil, "the picker lists powers")
+	H.shot(bob, "picker")
+	Emulator.press(bob, "Meteor")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(bob, "Tap an army") ~= nil, "Meteor asks for an army")
+	local MapView = H.client(bob, "MapView")
+	local spot = H.provinceMap(bob, capital) + Emulator.roblox.Vector2.new(0, -4)
+	MapView.centreOn(spot, true)
+	Emulator.run(1.5)
+	local screen = MapView.toScreen(spot)
+	Emulator.tapScreen(bob, screen.X, screen.Y)
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(bob, "Aurora's army (4k)") ~= nil, "the target is Aurora's 4k army")
+	H.shot(bob, "target")
+	Emulator.press(bob, "Confirm")
+	Emulator.run(1.5)
+	H.expect(army.men == 2000, "the Meteor killed half the army")
+	H.expect(state.provinces[capital].development == math.max(1, dev - 1), "and cost the capital a development level")
+	H.expect(state.primordials[bobId].charges == 1, "Bob paid 2 charges")
+	H.expect(Emulator.findText(alice, "Meteor struck your army") ~= nil, "Alice gets the toast")
+	H.expect(Emulator.findText(bob, "⚡1") ~= nil, "Bob's button shows 1 charge left")
+	H.shot(alice, "meteor_alice")
+	H.shot(bob, "meteor_bob")
+
+	-- the 30 s immunity: a second harmful power on Aurora is refused at once
+	state.primordials[bobId].charges = 3
+	Emulator.run(1.5)
+	Emulator.press(bob, "⚡3")
+	Emulator.press(bob, "Plague")
+	tapProvince(bob, capital)
+	Emulator.press(bob, "Confirm")
+	Emulator.run(1.5)
+	H.expect(state.nations[A].plagueUntil == nil, "Aurora is immune for 30 s")
+	H.expect(Emulator.findText(bob, "less than 30 s ago") ~= nil, "Bob is told why")
+end
+
 ---------------------------------------------------------------------------------------------- main
 
 local function runScenario(name: string)

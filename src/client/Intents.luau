@@ -37,6 +37,12 @@ local REASONS: { [string]: string } = {
 	NotAtWar = "🕊 You're not at war",
 	AllianceFull = "🤝 Alliance is full (3)",
 	NoOffer = "⌛ That offer expired",
+	NotEnoughCharges = "⚡ Not enough charges",
+	Immune = "🛡 Hit by a power less than 30 s ago",
+	NoBuilding = "🏚 No building there",
+	OwnTarget = "🚫 Not on yourself",
+	NoPowersYet = "⏳ Powers unlock at 3:00",
+	Primordial = "✨ Primordials only use powers",
 }
 
 local Intents = {}
@@ -77,6 +83,11 @@ end
 -- action: War | Ally | AcceptAlly | Peace | AcceptPeace
 function Intents.diplomacy(action: string, target: number, gold: number?)
 	send("RequestDiplomacy", action, target, gold or 0)
+end
+
+-- power: Meteor | Plague | Rebels | Earthquake | Blessing | Shield; target: army, nation or province id
+function Intents.power(power: string, target: number)
+	send("RequestPower", power, target)
 end
 
 return Intents

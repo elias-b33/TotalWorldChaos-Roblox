@@ -3,6 +3,7 @@
 --
 -- Taps: your army -> pick it up; then a province -> route preview + Go. Any other province -> its sheet.
 -- Someone else's army -> the sheet of the province it stands in. Empty space -> close everything.
+-- While a Primordial power waits for a target, every tap goes to the power instead.
 
 local Client = script.Parent
 local ArmySheet = require(Client.UI.ArmySheet)
@@ -13,6 +14,7 @@ local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
 local Nations = require(Client.UI.Nations)
 local Offers = require(Client.UI.Offers)
+local Powers = require(Client.UI.Powers)
 local ProvinceSheet = require(Client.UI.ProvinceSheet)
 local Relations = require(Client.Relations)
 local Results = require(Client.UI.Results)
@@ -64,6 +66,10 @@ local function chooseDestination(provinceId: number)
 end
 
 local function onTap(kind: "Army" | "Province" | nil, id: number?)
+	if Powers.targeting() then
+		Powers.tap(kind, id)
+		return
+	end
 	local me = ClientState.myNation()
 	if kind == "Army" and id then
 		local army = ClientState.army(id)
@@ -109,6 +115,9 @@ ArmySheet.init(function(armyId: number, dest: number)
 	clearArmy()
 end, clearArmy)
 Offers.init()
+Powers.init(Hud.toast, function()
+	selectProvince(nil) -- the power picker replaces any open sheet
+end)
 Nations.init()
 Results.init(function()
 	selectProvince(nil)

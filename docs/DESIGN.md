@@ -50,6 +50,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 
 - A nation is eliminated when it has lost its capital and holds fewer than 3 provinces.
 - Eliminated players rise as **Primordials**: they stay in the server, see the whole map and use Primordial powers. Nobody sits out a match.
+- An eliminated nation's armies disband and its last provinces turn neutral, each with a fresh garrison unless another army stands there. It leaves its wars, alliance (a one-nation alliance dissolves) and offers. A player keeps the nation's unspent charges as a Primordial; an eliminated bot simply ends.
 - A player who leaves is replaced by a bot instantly, so the map never has dead nations.
 
 ## Core systems
@@ -110,6 +111,13 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 | Earthquake | Destroys the building in one province | 1 |
 | Blessing | +100% gold from one province for 60 s | 1 |
 | Divine shield | One province can't be sieged for 30 s | 1 |
+
+- Targets: Meteor an army; Plague a nation; Rebels, Blessing and Divine shield a nation's province; Earthquake a province with a building. Mountains are never a target.
+- Powers work in War and Cataclysm, not in Peace. Charges stop at `Config.Primordial.MaxCharges` (5).
+- The 30 s limit applies to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Divine shield are gifts and ignore it.
+- Rebels besiege the province they rise in; when the siege ends it turns neutral.
+- A Primordial may target anyone, including the nation that eliminated them.
+- Cataclysm disasters are a random harmful power on a random valid nation target (seeded), every 60 s from 21:00.
 
 ### Catch-up
 

@@ -36,6 +36,7 @@ export type Nation = {
 	charges: number,
 	allianceId: number?,
 	powerImmuneUntil: number, -- 30 s Primordial-power protection
+	plagueUntil: number?, -- tick when a Plague ends (nil = none)
 	eliminated: boolean,
 	battlesWon: number, -- counts towards the score
 }
@@ -75,7 +76,9 @@ export type Offer = {
 
 -- Something worth telling players about (a toast). Cleared after every tick's delta.
 -- kinds: WarDeclared(a attacks b), PeaceMade(a, b), AllianceFormed(a, b), Offer(a -> b, province = offer id),
--- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a)
+-- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a),
+-- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province), Disaster (same fields),
+-- Eliminated(a)
 export type MatchEvent = { kind: string, a: number, b: number, province: number }
 
 export type MatchResult = {
@@ -149,5 +152,7 @@ export type Command =
 	| { kind: "Recruit", province: ProvinceId, regiments: number }
 	| { kind: "Move", army: ArmyId, to: ProvinceId }
 	| { kind: "Diplomacy", action: DiplomacyAction, target: NationId, gold: number }
+	-- target is an army, nation or province id, depending on the power (Sim.Primordial.TARGETS)
+	| { kind: "Power", power: PrimordialPower, target: number }
 
 return {}

@@ -11,6 +11,7 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Commands = require(Shared.Sim.Commands)
 local Config = require(Shared.Config)
+local Primordial = require(Shared.Sim.Primordial)
 local RateLimit = require(Shared.RateLimit)
 local Remotes = require(Shared.Remotes)
 local Types = require(Shared.Types)
@@ -127,6 +128,16 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			end)
 		end)
 
+	Remotes.event("RequestPower").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, power: unknown, target: unknown)
+			accept(player, requestId, function()
+				if type(power) ~= "string" or Primordial.TARGETS[power] == nil or not isId(target) then
+					return nil
+				end
+				return { kind = "Power", power = power :: Types.PrimordialPower, target = target :: number }
+			end)
+		end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
 	end)
@@ -143,14 +154,21 @@ function CommandRouter.applyQueued(state: Types.MatchState)
 	queue = {}
 	for _, item in pending do
 		local nationId = item.botNation
+		local userId: number? = nil
 		if item.player then
-			nationId = if item.player.Parent == Players then nationOf(item.player) else nil
+			local present = item.player.Parent == Players
+			nationId = if present then nationOf(item.player) else nil
+			userId = if present then item.player.UserId else nil
 		end
+		local nation = if nationId then state.nations[nationId] else nil
 		local ok, reason
-		if nationId == nil then
-			ok, reason = false, "NoNation"
-		else
+		if nationId and nation and not nation.eliminated then
 			ok, reason = Commands.apply(state, nationId, item.command)
+		elseif userId and state.primordials[userId] then
+			-- an eliminated player acts as their Primordial
+			ok, reason = Commands.applyPrimordial(state, userId, item.command)
+		else
+			ok, reason = false, "NoNation"
 		end
 		reply(item.player, item.requestId, ok, reason)
 	end

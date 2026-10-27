@@ -2,6 +2,7 @@
 -- Income, upkeep and costs (docs/DESIGN.md "Economy"). Paid once per month.
 
 local Config = require("../Config")
+local Primordial = require("./Primordial")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -62,10 +63,11 @@ function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 	for _, province in state.provinces do
 		if province.owner == nationId then
 			local g, m = Economy.provinceYield(province)
-			gold += g
+			gold += g * Primordial.goldMultiplier(state, province) -- Blessing
 			manpower += m
 		end
 	end
+	manpower *= Primordial.manpowerMultiplier(state, nationId) -- Plague
 	local nation = state.nations[nationId]
 	local capital = nation and state.provinces[nation.capital]
 	if capital and capital.owner == nationId then

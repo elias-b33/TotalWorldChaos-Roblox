@@ -38,6 +38,7 @@ local size = Vector2.new(1024, 512)
 local layers: { [string]: Frame } = {}
 local labels: { [number]: { frame: Frame, pips: TextLabel, width: number } } = {}
 local markers: { [number]: TextLabel } = {}
+local effects: { [number]: TextLabel } = {}
 local tokens: { [number]: Token } = {}
 local selectedArmy: number? = nil
 
@@ -119,6 +120,7 @@ end
 local function build(map: Types.MapDef)
 	labels = {}
 	markers = {}
+	effects = {}
 	tokens = {}
 	layers = {}
 	selectedArmy = nil
@@ -207,9 +209,9 @@ local function paintOwners()
 	end
 end
 
--- Battle and siege badges, made on demand.
-local function setMarker(provinceId: number, value: string?)
-	local marker = markers[provinceId]
+-- Badges above a province, made on demand: battle and siege (markers), Primordial-power effects (effects, higher up).
+local function setBadge(store: { [number]: TextLabel }, provinceId: number, value: string?, lift: number, width: number)
+	local marker = store[provinceId]
 	if value == nil then
 		if marker then
 			marker.Visible = false
@@ -217,21 +219,34 @@ local function setMarker(provinceId: number, value: string?)
 		return
 	end
 	if marker == nil then
+		if layers.Markers == nil then
+			return
+		end
 		local label = textLabel(layers.Markers, "", 13)
 		label.AnchorPoint = Vector2.new(0.5, 1)
-		label.Position = at(MapRenderer.centerOf(provinceId)) + UDim2.fromOffset(0, -10)
-		label.Size = UDim2.fromOffset(64, 22)
+		label.Position = at(MapRenderer.centerOf(provinceId)) + UDim2.fromOffset(0, -lift)
+		label.Size = UDim2.fromOffset(width, 22)
 		label.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
 		label.BackgroundTransparency = 0.2
 		local corner = Instance.new("UICorner")
 		corner.CornerRadius = UDim.new(1, 0)
 		corner.Parent = label
-		markers[provinceId] = label
+		store[provinceId] = label
 		marker = label
 	end
 	local m = assert(marker, "marker")
 	m.Text = value
 	m.Visible = true
+end
+
+local function setMarker(provinceId: number, value: string?)
+	setBadge(markers, provinceId, value, 10, 64)
+end
+
+-- A Primordial-power badge over a province (a strike, a shield, a blessing), above the battle/siege badge.
+-- nil hides it.
+function MapRenderer.setEffect(provinceId: number, value: string?)
+	setBadge(effects, provinceId, value, 34, 84)
 end
 
 local function refreshProvince(record: Snapshot.ProvinceRecord)
@@ -241,7 +256,7 @@ local function refreshProvince(record: Snapshot.ProvinceRecord)
 	end
 	if record.battle then
 		setMarker(record.id, "💥")
-	elseif record.siegeBy ~= 0 and record.siegeRequired > 0 then
+	elseif record.siegeRequired > 0 then -- siegeBy is 0 for Rebels
 		setMarker(record.id, string.format("⏳ %d%%", math.floor(100 * record.siegeProgress / record.siegeRequired)))
 	else
 		setMarker(record.id, nil)

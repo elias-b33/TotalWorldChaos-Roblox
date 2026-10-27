@@ -8,6 +8,7 @@ local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Match = require("./Match")
 local Movement = require("./Movement")
+local Primordial = require("./Primordial")
 local Rng = require("./Rng")
 local Siege = require("./Siege")
 local Types = require("../Types")
@@ -31,7 +32,8 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	if state.tick % Config.MonthTicks == 0 then -- 5
 		Economy.payMonth(state)
 	end
-	-- 6-7: Primordial charges and bots (Phase 3)
+	Primordial.step(state, rng) -- 6: eliminations, charges, effect timers, Cataclysm disasters
+	-- 7: bots (Phase 3)
 	Diplomacy.expire(state) -- 8
 	local result = Victory.check(state)
 	if result == nil and state.phase == "Results" then
