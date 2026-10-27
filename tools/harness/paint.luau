@@ -7,19 +7,21 @@ local MapGrid = require("../../src/shared/MapGrid")
 local Maps = require("../../src/shared/Maps")
 local PixelArt = require("../../src/client/PixelArt")
 
-local NATIONS = { 0xd7263d, 0x26358f, 0xf4c430, 0x8e44ad, 0xf17c1f, 0x17b8b8, 0xe84aa6, 0x7ac943, 0x8b5a2b, 0x3c3c46 }
+local NATIONS = { 0xe6194b, 0x6c89f6, 0xffe119, 0x911eb4, 0xf58231, 0x469990, 0xf032e6, 0x3cd74b, 0x9a6324, 0x353535 }
+local BORDERS = { 0x97233d, 0x517aa8, 0xbeab23, 0x75298a, 0xb76c33, 0x145a4f, 0xb436ab, 0x47b052, 0x7b572a, 0x2d2e2b }
 
 local map = Maps.get(process.args[1])
 local t0 = os.clock()
 local grid = MapGrid.decode(map)
 local art = PixelArt.new(map, grid)
-local owners, colors = {}, {}
+local owners, colors, borders = {}, {}, {}
 for _, p in map.provinces do
 	owners[p.id] = p.startOwner or 0
 end
 for _, n in map.nations do
 	colors[n.slot] = NATIONS[n.colorIndex]
+	borders[n.slot] = BORDERS[n.colorIndex]
 end
-PixelArt.setOwners(art, owners, colors)
+PixelArt.setOwners(art, owners, colors, borders)
 print(string.format("%s %dx%d painted in %.2f s", map.id, grid.width, grid.height, os.clock() - t0))
 fs.writeFile(process.args[2], buffer.tostring(art.pixels))

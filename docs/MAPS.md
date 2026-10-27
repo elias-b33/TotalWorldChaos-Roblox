@@ -4,7 +4,8 @@ Total World Chaos ships with three maps. All three play by the same rules in `DE
 
 | | Earth | Eldmoor | Skyshards |
 | --- | --- | --- | --- |
-| Picture | ![Earth](images/map_earth.jpg) | ![Eldmoor](images/map_eldmoor.jpg) | ![Skyshards](images/map_skyshards.jpg) |
+| In game | ![Earth](images/pixel_earth.png) | ![Eldmoor](images/pixel_eldmoor.png) | ![Skyshards](images/pixel_skyshards.png) |
+| Preview | ![Earth](images/map_earth.jpg) | ![Eldmoor](images/map_eldmoor.jpg) | ![Skyshards](images/map_skyshards.jpg) |
 | Idea | The real world, 1:1 coastlines | Fantasy continent around a rich heartland | A shattered world of floating islands |
 | Provinces | 150 (11 mountains) | 146 (15 mountains) | 131 (11 mountains) |
 | Straits | 26 sea lanes (1 wraps around the map) | 8 sea lanes | 30 rope bridges |
@@ -12,7 +13,10 @@ Total World Chaos ships with three maps. All three play by the same rules in `DE
 | Fairness | Asymmetric geography, equal start | Semi-balanced | Perfectly symmetric |
 | Feel | Familiar, epic, great for clips | Chokepoint fights over the centre | Fast and aggressive, competitive |
 
-The pictures above show each map at the start of a match (political view: nation colours, stars on capitals, grey neutral land).
+The pictures above show each map at the start of a match.
+
+- **In game:** the 2D pixel art the game paints. Rebuild it with `python3 tools/harness/paint_maps.py`.
+- **Preview:** the generator's political view (nation colours, stars on capitals, grey neutral land), used for vote cards.
 
 ## Rules every map follows
 
@@ -113,21 +117,26 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 ## Art direction
 
 - **2D pixel art, like WorldBox.** One map pixel is one stud; trees, peaks, dunes and castles are little sprites a few pixels big, and the camera zooms in until pixels are chunky. Painted at runtime by `src/client/PixelArt.luau`.
-- **Map colour is power.** Each owned province shows its nation colour shaded by the terrain underneath, so colour is the loudest signal but trees and peaks still show, inside a bold two-pixel nation border. Neutral land shows its natural colours.
-- **One palette for nations** (`Nation.colorIndex`, 1–10). These colours stay clear of every terrain colour:
+- **Map colour is power.** Owned provinces are washed with their nation's colour at 59% opacity over the terrain, WorldBox's kingdom overlay, so trees, ridges and specks still show through. Each nation has a 1-pixel border in its darker border colour. Neutral land shows its natural colours.
+- **WorldBox's colours.** The terrain uses WorldBox's tile colours, taken from the game's data:
+  - Ocean in three depth bands: shallow `#55aef0`, close `#4084e2`, deep `#3370cc`. A `#2d61af` shadow line runs just south of land.
+  - Beaches are `#f7e898`.
+  - Mountains are grey: hills rock `#5b5e5c`, ridges `#414545`, summits `#333333`, a few snow caps `#fcfdfd`. Each step has a dark lip on its south side.
+  - The biome colours are listed in `PixelArt`'s `BIOMES` table.
+- **Nation palette** (`Nation.colorIndex`, 1–10). These are WorldBox's kingdom colours, each with the darker border colour WorldBox pairs with it. Blues close to the sea colour are left out.
 
-| Index | Colour | Hex |
-| --- | --- | --- |
-| 1 | Crimson | `#d7263d` |
-| 2 | Navy | `#26358f` |
-| 3 | Gold | `#f4c430` |
-| 4 | Violet | `#8e44ad` |
-| 5 | Orange | `#f17c1f` |
-| 6 | Teal | `#17b8b8` |
-| 7 | Magenta | `#e84aa6` |
-| 8 | Lime | `#7ac943` |
-| 9 | Bronze | `#8b5a2b` |
-| 10 | Charcoal | `#3c3c46` |
+| Index | Colour | Fill | Border |
+| --- | --- | --- | --- |
+| 1 | Red | `#e6194b` | `#97233d` |
+| 2 | Blue | `#6c89f6` | `#517aa8` |
+| 3 | Yellow | `#ffe119` | `#beab23` |
+| 4 | Purple | `#911eb4` | `#75298a` |
+| 5 | Orange | `#f58231` | `#b76c33` |
+| 6 | Teal | `#469990` | `#145a4f` |
+| 7 | Magenta | `#f032e6` | `#b436ab` |
+| 8 | Green | `#3cd74b` | `#47b052` |
+| 9 | Brown | `#9a6324` | `#7b572a` |
+| 10 | Charcoal | `#353535` | `#2d2e2b` |
 
 ### Terrain textures
 

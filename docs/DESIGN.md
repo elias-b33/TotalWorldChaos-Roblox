@@ -205,10 +205,20 @@ tools/mapgen/                  -- Python generator for everything in assets/
 The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. There are no 3D map parts.
 
 - **Province grid:** `MapData` carries each map's province grid (`grid`): which province every map pixel belongs to, at 1 pixel = 1 stud (Earth and Eldmoor 1024×512, Skyshards 1024×768), run-length encoded. `MapGrid` decodes it once per match, and a tap looks up the province under the finger in it.
-- **Painting:** `PixelArt` paints the whole map into an RGBA buffer at match start (about half a second). It draws water with shallows and foam (space with a faint grid on Skyshards), each biome's base colour with specks, and small sprites: trees, pines, peaks, hills, dunes, crystals and towers. Owned provinces take their nation's colour, shaded by the terrain underneath, inside a two-pixel nation border; province borders are dotted. Capitals get a castle (a dome on Skyshards).
+- **Painting:** `PixelArt` paints the whole map into an RGBA buffer at match start, in about half a second, using WorldBox's colours (docs/MAPS.md "Art direction"). Skyshards gets space with a faint grid instead of sea.
+  - **Sea:** ocean in three depth bands, with beaches and a shadow under the coast.
+  - **Land:** each biome's base colour, with specks and patches of higher ground.
+  - **Mountains:** grey ridges with a few snow caps.
+  - **Sprites:** small ones for trees, pines, palms, crystals and towers.
+  - **Owners:** an owned province is washed with its nation's colour at 59%, and each nation has a 1-pixel border in its darker colour (WorldBox's kingdom look). Thin darker lines separate provinces.
+  - **Capitals:** a castle, or a dome on Skyshards.
 - **On screen:** the buffer goes into one `EditableImage`, shown by an `ImageLabel` with pixelated resampling on a canvas that `MapView` pans and zooms (from the whole map down to 10 screen pixels per map pixel). An ownership change repaints only the provinces involved and their neighbours, and the image is uploaded at most once a frame.
 - **On top:** province names and development pips (shown once a province is about 70 screen pixels wide), army tokens gliding between province centres, battle and siege badges, and dotted straits and routes. All of them are GUI objects placed on the canvas.
-- **Requirement:** `EditableImage` works in Studio. In a published game Roblox only allows it when the owner is 13+ and ID-verified. Without it the map still shows names, tokens and routes, but no image, and warns once.
+- **Requirement:** `EditableImage` works in Studio, but fails by default in a published game.
+  - **Turning it on:** the owner enables *Allow Mesh / Image APIs*. In Studio it's under Experience Settings → Security; on the Creator Dashboard it's in the game's Configure settings.
+  - **Owner verification:** older Roblox guidance also required the owner to be 13+ and ID-verified. Check the current rule before launch. The launch checklist already asks for ID verification.
+  - **Memory:** phones give these images a strict memory budget. If the full-size image can't be made, the map uses a half-size one.
+  - **No image at all:** the map still shows names, tokens and routes, and tells the player the map art is off.
 
 ### Performance budget
 

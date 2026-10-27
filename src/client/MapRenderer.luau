@@ -181,10 +181,12 @@ local function paintOwners()
 		owners[record.id] = record.owner
 	end
 	local colors: { [number]: number } = {}
+	local borders: { [number]: number } = {}
 	for _, nation in snapshot.nations do
 		colors[nation.id] = packed(Palette.nation(nation.colorIndex))
+		borders[nation.id] = packed(Palette.border(nation.colorIndex))
 	end
-	PixelArt.setOwners(a, owners, colors)
+	PixelArt.setOwners(a, owners, colors, borders)
 end
 
 local function build(map: Types.MapDef)

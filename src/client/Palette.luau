@@ -1,24 +1,39 @@
 --!strict
 -- Nation colours by Nation.colorIndex (docs/MAPS.md "Art direction"), and the few fixed colours of the 2D map.
 
+-- WorldBox's kingdom colours: each nation's main colour and the darker border colour WorldBox pairs with it.
+-- Blues and cyans close to the sea are left out.
 local nations: { Color3 } = {
-	Color3.fromHex("#d7263d"), -- 1 crimson
-	Color3.fromHex("#26358f"), -- 2 navy (clear of the sea's blues)
-	Color3.fromHex("#f4c430"), -- 3 gold
-	Color3.fromHex("#8e44ad"), -- 4 violet
-	Color3.fromHex("#f17c1f"), -- 5 orange
-	Color3.fromHex("#17b8b8"), -- 6 teal
-	Color3.fromHex("#e84aa6"), -- 7 magenta
-	Color3.fromHex("#7ac943"), -- 8 lime
-	Color3.fromHex("#8b5a2b"), -- 9 bronze
-	Color3.fromHex("#3c3c46"), -- 10 charcoal
+	Color3.fromHex("#e6194b"), -- 1 red
+	Color3.fromHex("#6c89f6"), -- 2 blue
+	Color3.fromHex("#ffe119"), -- 3 yellow
+	Color3.fromHex("#911eb4"), -- 4 purple
+	Color3.fromHex("#f58231"), -- 5 orange
+	Color3.fromHex("#469990"), -- 6 teal
+	Color3.fromHex("#f032e6"), -- 7 magenta
+	Color3.fromHex("#3cd74b"), -- 8 green
+	Color3.fromHex("#9a6324"), -- 9 brown
+	Color3.fromHex("#353535"), -- 10 charcoal
 }
 
--- Around the map, by MapDef.theme: the deep sea, or space for Skyshards (PixelArt paints the same colours).
+local borders: { Color3 } = {
+	Color3.fromHex("#97233d"),
+	Color3.fromHex("#517aa8"),
+	Color3.fromHex("#beab23"),
+	Color3.fromHex("#75298a"),
+	Color3.fromHex("#b76c33"),
+	Color3.fromHex("#145a4f"),
+	Color3.fromHex("#b436ab"),
+	Color3.fromHex("#47b052"),
+	Color3.fromHex("#7b572a"),
+	Color3.fromHex("#2d2e2b"),
+}
+
+-- Around the map, by MapDef.theme: WorldBox's deep ocean, or space for Skyshards (PixelArt paints the same).
 local background: { [string]: Color3 } = {
-	earth = Color3.fromHex("#2a5fc4"),
-	fantasy = Color3.fromHex("#2470c8"),
-	sky = Color3.fromHex("#070a1c"),
+	earth = Color3.fromHex("#3370cc"),
+	fantasy = Color3.fromHex("#3370cc"),
+	sky = Color3.fromHex("#05003f"),
 }
 
 local Palette = {
@@ -26,11 +41,16 @@ local Palette = {
 	background = background,
 	garrison = Color3.fromHex("#9a9aa2"), -- neutral garrison tokens
 	strait = Color3.fromHex("#ffffff"), -- sea lanes
-	energyLink = Color3.fromHex("#3ff0ff"), -- Skyshards' bridges between platforms
+	energyLink = Color3.fromHex("#7cfbef"), -- Skyshards' bridges between platforms
 }
 
 function Palette.nation(colorIndex: number): Color3
 	return nations[colorIndex] or Palette.garrison
+end
+
+-- The nation's border colour on the map.
+function Palette.border(colorIndex: number): Color3
+	return borders[colorIndex] or Palette.garrison
 end
 
 return Palette

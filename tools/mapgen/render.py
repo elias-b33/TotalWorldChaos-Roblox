@@ -12,19 +12,19 @@ from layout import Layout
 from noise import hex_rgb, mix
 from tiles import biome_map, detail_of, make_tile
 
-# Nation palette, indexed by Nation.colorIndex (1-based). Chosen to stay apart from
-# terrain colours and from each other; the client owns the Color3 version of this list.
+# Nation palette, indexed by Nation.colorIndex (1-based): WorldBox's kingdom colours, the same as the
+# client's Palette.luau (docs/MAPS.md "Art direction").
 PALETTE = [
-    "#d7263d",  # 1 crimson
-    "#1e6fd9",  # 2 royal blue
-    "#f4c430",  # 3 gold
-    "#8e44ad",  # 4 violet
-    "#f17c1f",  # 5 orange
-    "#17b8b8",  # 6 teal
-    "#e84aa6",  # 7 magenta
-    "#7ac943",  # 8 lime
-    "#8b5a2b",  # 9 bronze
-    "#3c3c46",  # 10 charcoal
+    "#e6194b",  # 1 red
+    "#6c89f6",  # 2 blue
+    "#ffe119",  # 3 yellow
+    "#911eb4",  # 4 purple
+    "#f58231",  # 5 orange
+    "#469990",  # 6 teal
+    "#f032e6",  # 7 magenta
+    "#3cd74b",  # 8 green
+    "#9a6324",  # 9 brown
+    "#353535",  # 10 charcoal
 ]
 
 FONT_PATHS = [
