@@ -456,7 +456,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 3: Bots and Primordials
 
-- [ ] `AIService` on Normal; bots fill empty slots and replace leavers
+- [x] `AIService` on Normal; bots fill empty slots and replace leavers
 - [x] Elimination and the Primordial role
 - [x] 6 Primordial powers with charges and cooldowns
 - [ ] Catch-up rules: overextension, underdog, coalition

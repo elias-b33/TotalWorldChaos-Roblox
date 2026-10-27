@@ -128,12 +128,20 @@ Config.Net = {
 -- Bots -------------------------------------------------------------------------------------------
 
 Config.Bots = {
-	Easy = { planTicks = 6, attackRatio = 1.6, noPlayerWarTicks = 8 * 60 },
-	Normal = { planTicks = 3, attackRatio = 1.3 },
-	Hard = { planTicks = 2, attackRatio = 1.1 },
+	-- noPlayerWarTicks: no war declared on a player before this tick; targetsLeadingPlayer: wars go to the player
+	-- holding the most provinces first
+	Easy = { planTicks = 6, attackRatio = 1.6, noPlayerWarTicks = 8 * 60, targetsLeadingPlayer = false },
+	Normal = { planTicks = 3, attackRatio = 1.3, noPlayerWarTicks = 0, targetsLeadingPlayer = false },
+	Hard = { planTicks = 2, attackRatio = 1.1, noPlayerWarTicks = 0, targetsLeadingPlayer = true },
+	Difficulty = "Normal", -- what every bot plays on; private servers may pick later
 	DefendRatio = 0.8,
 	MenPerProvince = 800,
 	BotsPlanningPerTick = 2,
+	RecruitBatch = 3, -- regiments per Recruit when topping up (defending recruits what the threat needs)
+	PeaceLossShare = 0.3, -- accept (and offer) white peace after losing this share of my provinces in a war
+	UpkeepReserveMonths = 2, -- build only with gold left over after this many months of upkeep
+	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
+	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
 }
 
 return Config
