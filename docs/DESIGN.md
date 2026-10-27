@@ -487,8 +487,7 @@ Answered:
 
 - Working title: **Total World Chaos**.
 - Real-world map or fictional continents? **Both**: Earth (region names, never countries), Eldmoor and Skyshards. See `docs/MAPS.md`.
-- Hex grid or hand-made provinces for the final map? **Neither**: province meshes generated from the map data. See `docs/MAPS.md`.
-
+- Hex grid or hand-made provinces for the final map? **Neither**: a province pixel grid generated from the map data, drawn as pixel art. See `docs/MAPS.md`.
 - Can a Primordial target the nation that eliminated them? **Yes** (the simplest rule; revisit after playtests).
 
 Still open:
