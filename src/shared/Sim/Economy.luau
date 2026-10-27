@@ -1,6 +1,7 @@
 --!strict
 -- Income, upkeep and costs (docs/DESIGN.md "Economy"). Paid once per month.
 
+local CatchUp = require("./CatchUp")
 local Config = require("../Config")
 local Primordial = require("./Primordial")
 local Types = require("../Types")
@@ -9,7 +10,7 @@ type MatchState = Types.MatchState
 type Province = Types.Province
 
 export type Income = {
-	gold: number, -- gross gold from provinces and capital
+	gold: number, -- gross gold from provinces and capital, after overextension
 	manpower: number,
 	upkeep: number, -- gold paid for regiments
 }
@@ -73,6 +74,7 @@ function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 	if capital and capital.owner == nationId then
 		gold += Config.Economy.CapitalGold
 	end
+	gold *= CatchUp.goldMultiplier(state, nationId) -- overextension
 	return {
 		gold = gold,
 		manpower = manpower,

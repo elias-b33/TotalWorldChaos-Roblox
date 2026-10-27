@@ -307,14 +307,24 @@ function scenarios.war()
 	H.shot(alice, "nations")
 	Emulator.press(alice, "🌍")
 
-	-- give Aurora 40% of the world: domination and the results screen
-	local need = math.ceil(0.4 * 131)
+	-- give Aurora 30% of the world: the coalition crown, then 40%: domination and the results screen
 	local given = 0
 	for _, p in state.provinces do
 		if p.owner == A then
 			given += 1
 		end
 	end
+	local need = math.ceil(0.3 * 131)
+	for _, p in state.provinces do
+		if given < need and p.owner ~= A and p.terrain ~= "Mountain" then
+			p.owner = A
+			given += 1
+		end
+	end
+	Emulator.run(1.5)
+	H.expect(Emulator.findText(alice, "👑") ~= nil, "the coalition leader wears a crown")
+	H.shot(alice, "crown")
+	need = math.ceil(0.4 * 131)
 	for _, p in state.provinces do
 		if given < need and p.owner ~= A and p.terrain ~= "Mountain" then
 			p.owner = A

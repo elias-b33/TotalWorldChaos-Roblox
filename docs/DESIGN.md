@@ -121,9 +121,10 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 
 ### Catch-up
 
-- **Overextension:** above 20 provinces, every 5 extra provinces cut gold income by 5%.
-- **Underdog:** the 3 nations with the fewest provinces get +20% defence.
-- **Coalition** against the leader (see Diplomacy).
+- **Overextension:** above 20 provinces, every 5 extra provinces cut gold income by 5%. Only full steps count (21–24 provinces: −0%, 25–29: −5%, 30–34: −10%), and the cut applies to gross gold (provinces + capital) before upkeep, never below zero. Manpower is not cut.
+- **Underdog:** the 3 nations with the fewest provinces get +20% defence: +20% combat strength when their side is the defender in a battle (not sieges, not when attacking). Only living nations count. A tie at the cut-off leaves everyone in the tie out, so there are never more than 3 underdogs, nobody is one while every nation is level, and the largest nation never is.
+- **Coalition** against the leader (see Diplomacy): every living nation with 25%+ of all provinces wears the crown, and any nation's side fighting a crowned nation gets +10% combat strength, attacking or defending (neutral garrisons and Rebels don't). Two crowned nations fighting each other both get it.
+- Combat bonuses add to the other modifiers (terrain, fort, the random roll). Rules: `Sim/CatchUp.luau`; numbers and their effect: `docs/BALANCE.md`.
 
 ## Technical architecture
 
@@ -459,7 +460,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] `AIService` on Normal; bots fill empty slots and replace leavers
 - [x] Elimination and the Primordial role
 - [x] 6 Primordial powers with charges and cooldowns
-- [ ] Catch-up rules: overextension, underdog, coalition
+- [x] Catch-up rules: overextension, underdog, coalition
 - [x] Cataclysm phase
 
 **Gate 3:** 1 player against 9 bots is fun for 25 minutes, and no single bot wins most matches.

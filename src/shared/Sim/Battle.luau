@@ -3,6 +3,7 @@
 -- one per tick. Each round, each side kills enemy men equal to KillRatePerRound × its own strength × modifiers.
 -- Then the side with fewer men retreats to its nearest owned province, and armies under MinArmyMen are destroyed.
 
+local CatchUp = require("./CatchUp")
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Events = require("./Events")
@@ -24,11 +25,7 @@ export type BonusFn = (state: MatchState, owners: { number }, enemies: { number 
 
 local Battle = {}
 
-local function noBonus(): number
-	return 0
-end
-
-Battle.bonus = noBonus :: BonusFn
+Battle.bonus = CatchUp.battleBonus :: BonusFn
 
 -- Who fights whom in a province. Defenders: the province owner's side if present, else the neutral garrison,
 -- else whoever is first (lowest army id). Attackers: every army hostile to the defenders.
