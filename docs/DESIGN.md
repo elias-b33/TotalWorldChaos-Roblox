@@ -266,6 +266,7 @@ export type Truce = { a: NationId, b: NationId, untilTick: number }
 export type God = { userId: number, charges: number }
 
 export type MatchState = {
+    mapId: string,             -- which MapDef this match is played on
     tick: number,
     phase: Phase,
     provinces: { [ProvinceId]: Province },
@@ -291,6 +292,7 @@ export type ProvinceDef = {
     development: number,
     neighbors: { ProvinceId }, -- includes straits
     center: { x: number, y: number }, -- map pixels; 1 px = 0.5 stud
+    area: number,              -- map pixels (the prototype sizes its discs by it)
     startOwner: number?,       -- start slot 1..10, nil = neutral
     isCapital: boolean,
     garrison: number?,         -- neutral garrison override, men
@@ -305,6 +307,15 @@ export type MapDef = {
     provinces: { ProvinceDef },
     straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean } },
 }
+```
+
+Intents are typed too. `CommandRouter` checks their shape; `Sim/Commands` checks the rules.
+
+```lua
+export type Command =
+    { kind: "Develop", province: ProvinceId }
+    | { kind: "Build", province: ProvinceId, building: Building }
+    | { kind: "Recruit", province: ProvinceId, regiments: number }
 ```
 
 ### Remotes
@@ -390,12 +401,12 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 1: Foundation
 
-- [ ] Rojo project, StyLua, Selene, strict mode, Lune test runner
-- [ ] `Types.luau` and `Config.luau` from this doc
-- [ ] `MapData` generated from `assets/maps/*/layout.json`; Skyshards is the test map
-- [ ] `MapRenderer` colours provinces by owner; camera pan and zoom on phone
-- [ ] `GameLoop` with a 1 s tick; economy pays income
-- [ ] Recruit, develop and build through `CommandRouter`
+- [x] Rojo project, StyLua, Selene, strict mode, Lune test runner
+- [x] `Types.luau` and `Config.luau` from this doc
+- [x] `MapData` generated from `assets/maps/*/layout.json`; Skyshards is the test map
+- [x] `MapRenderer` colours provinces by owner; camera pan and zoom on phone
+- [x] `GameLoop` with a 1 s tick; economy pays income
+- [x] Recruit, develop and build through `CommandRouter`
 
 **Gate 1:** one player can grow a nation for 25 minutes on a phone with no errors.
 

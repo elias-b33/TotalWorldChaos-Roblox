@@ -186,7 +186,7 @@ This answers the open question "keep the hex grid or switch to hand-made provinc
 Paste one per Claude Code session, in order. Each follows the design doc's task template.
 
 ```text
-## Task: MapData from layout.json
+## Task: MapData from layout.json (done)
 Phase: 1   Service: MapData
 Goal: the game loads Skyshards (and the other maps) from generated Luau data.
 Read first: docs/MAPS.md, src/shared/Types.luau, assets/maps/skyshards/layout.json

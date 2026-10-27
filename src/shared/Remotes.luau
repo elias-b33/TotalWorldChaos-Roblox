@@ -1,0 +1,48 @@
+--!strict
+-- The remotes from docs/DESIGN.md "Remotes". The server creates them; clients wait for them.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local FOLDER_NAME = "Remotes"
+
+local EVENTS = {
+	-- client -> server
+	"RequestMove",
+	"RequestRecruit",
+	"RequestBuild",
+	"RequestDevelop",
+	"RequestDiplomacy",
+	"RequestGodPower",
+	-- server -> client
+	"CommandResult",
+	"Snapshot",
+	"Delta",
+	"Notify",
+}
+local UNRELIABLE_EVENTS = { "ArmyPositions" }
+
+local Remotes = {}
+
+-- Server only.
+function Remotes.create()
+	local folder = Instance.new("Folder")
+	folder.Name = FOLDER_NAME
+	for _, name in EVENTS do
+		local remote = Instance.new("RemoteEvent")
+		remote.Name = name
+		remote.Parent = folder
+	end
+	for _, name in UNRELIABLE_EVENTS do
+		local remote = Instance.new("UnreliableRemoteEvent")
+		remote.Name = name
+		remote.Parent = folder
+	end
+	folder.Parent = ReplicatedStorage
+end
+
+function Remotes.event(name: string): RemoteEvent
+	local folder = ReplicatedStorage:WaitForChild(FOLDER_NAME)
+	return folder:WaitForChild(name) :: RemoteEvent
+end
+
+return Remotes

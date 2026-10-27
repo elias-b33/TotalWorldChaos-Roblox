@@ -23,7 +23,7 @@ The full spec is `docs/DESIGN.md`; the three maps, textures and map data pipelin
 | Build the place file | `mkdir -p build && rojo build -o build/game.rbxlx` |
 | Format | `stylua src tests` |
 | Check formatting | `stylua --check src tests` |
-| Lint | `selene src` |
+| Lint | `RUST_MIN_STACK=67108864 selene src` (the cloud's debug-built Selene needs the bigger stack) |
 | Run Sim tests | `lune run tests/run` |
 | Install missing tools | `bash scripts/cloud-setup.sh` |
 | Regenerate maps and textures | `python3 tools/mapgen/generate.py` (or `--only earth`, `--only tiles`, …) |

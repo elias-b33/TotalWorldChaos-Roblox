@@ -15,6 +15,7 @@ The output is deterministic. The run prints notes (straits it added, seeds it mo
 | `noise.py` | Tileable noise, cellular noise, lighting, colour ramps |
 | `tiles.py` | Biome recipes and the three texture themes (`EARTH`, `FANTASY`, `SKY`) |
 | `layout.py` | Land mask + seed points → provinces, neighbours, straits, start territories, balance, validation, `layout.json` |
+| `export_luau.py` | `layout.json` → `src/shared/MapData/<Map>.luau` (also run by `generate.py`; run it alone to re-export without regenerating) |
 | `render.py` | Terrain and political views, province id map, atlas, vote card, nation palette |
 | `maps/earth.py` | Natural Earth coastlines, 150 named regions, curated sea lanes |
 | `maps/fantasy.py` | Eldmoor: continent shape, zones, Dragonspine, name lists |

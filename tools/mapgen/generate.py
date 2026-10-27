@@ -20,8 +20,9 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import export_luau  # noqa: E402
 import render  # noqa: E402
-from layout import validate, write_json  # noqa: E402
+from layout import to_json, validate, write_json  # noqa: E402
 from maps import earth, fantasy, sky  # noqa: E402
 from tiles import THEMES, detail_of, make_tile  # noqa: E402
 
@@ -77,6 +78,7 @@ def make_map(key: str) -> None:
     out = os.path.join(ASSETS, "maps", key)
     os.makedirs(out, exist_ok=True)
     write_json(lay, os.path.join(out, "layout.json"))
+    export_luau.write(to_json(lay))
     bg = mod.background(lay)
     terrain = render.render(lay, bg, style)
     political = render.render(lay, bg, style, political=True)
