@@ -46,8 +46,6 @@ class Layout:
     owner: list[int | None] = field(default_factory=list)  # nation slot index or None
     nations: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
-    shapes: list[dict] = field(default_factory=list)  # per province: triangles (see shapes.py)
-    borders: list[dict] = field(default_factory=list)  # simplified borders between two provinces
 
     def terrain(self, i: int) -> str:
         return self.terrain_of[self.seeds[i].biome]
@@ -467,8 +465,6 @@ def to_json(lay: Layout) -> dict:
                 "startOwner": None if lay.owner[i] is None else lay.owner[i] + 1,
                 "isCapital": bool(s.nation),
                 **({"garrison": s.garrison} if s.garrison else {}),
-                # triangles as flat x0,y0,x1,y1,x2,y2,... in map pixels
-                "tris": [round(c, 1) for t in lay.shapes[i]["tris"] for c in t] if lay.shapes else [],
             }
         )
     straits = [
@@ -488,29 +484,11 @@ def to_json(lay: Layout) -> dict:
         "nations": [{**n, "capital": n["capital"] + 1} for n in lay.nations],
         "provinces": provinces,
         "straits": straits,
-        "borders": [
-            {"a": b["a"] + 1, "b": b["b"] + 1, "points": [round(c, 1) for pt in b["points"] for c in pt]}
-            for b in lay.borders
-        ],
         "notes": lay.notes,
     }
 
 
 def write_json(lay: Layout, path: str) -> None:
-    """Readable on top, one line per province / strait / border (the triangle lists are long)."""
-    data = to_json(lay)
-    lines = ["{"]
-    keys = list(data.keys())
-    for k, key in enumerate(keys):
-        value = data[key]
-        comma = "," if k < len(keys) - 1 else ""
-        if isinstance(value, list) and value and isinstance(value[0], dict):
-            lines.append(f"  {json.dumps(key)}: [")
-            for i, item in enumerate(value):
-                lines.append("    " + json.dumps(item) + ("," if i < len(value) - 1 else ""))
-            lines.append("  ]" + comma)
-        else:
-            lines.append(f"  {json.dumps(key)}: {json.dumps(value)}{comma}")
-    lines.append("}")
     with open(path, "w") as f:
-        f.write("\n".join(lines) + "\n")
+        json.dump(to_json(lay), f, indent=1)
+        f.write("\n")

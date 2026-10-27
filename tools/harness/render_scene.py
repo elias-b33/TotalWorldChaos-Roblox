@@ -181,10 +181,6 @@ TEXTURE_PERIOD = 18.0  # studs per texture repeat
 SUN = np.array([-0.35, 1.0, 0.45]) / np.linalg.norm([-0.35, 1.0, 0.45])
 AMBIENT = 0.58
 _details: dict = {}
-sys.path.insert(0, os.path.join(ROOT, "tools", "mapgen"))
-from materials import MATERIALS  # noqa: E402
-
-HD_STUDS = {m.name: m.studs for m in MATERIALS}
 
 
 def mips(a):
@@ -196,18 +192,11 @@ def mips(a):
 
 
 def texture_of(key: str):
-    """Colour detail (mean ~1) and optional normal-map mip chains for a material or a TWC_ variant, or None."""
+    """Colour detail (mean ~1) and optional normal-map mip chains for a material, or None."""
     if key in _details:
         return _details[key]
     tex = None
-    if key.startswith("TWC_") and key[4:] in HD_STUDS:
-        name = key[4:]
-        folder = os.path.join(TEX, "hd", name)
-        color = np.asarray(Image.open(os.path.join(folder, f"{name}_color.png")).convert("L"), dtype=np.float64) / 255
-        normal = np.asarray(Image.open(os.path.join(folder, f"{name}_normal.png")).convert("RGB"), dtype=np.float64)
-        normal /= 255
-        tex = {"color": mips(color * 1.15), "normal": mips(normal * 2 - 1), "studs": HD_STUDS[key[4:]]}
-    elif key in MATERIAL_TEXTURES:
+    if key in MATERIAL_TEXTURES:
         path = os.path.join(TEX, MATERIAL_TEXTURES[key] + ".png")
         if os.path.exists(path):
             lum = np.asarray(Image.open(path).convert("L"), dtype=np.float64)
@@ -545,13 +534,52 @@ def place(node, x, y, w, h, out, fixed, anchor=(0, 0)):
     return out[index][1]
 
 
-def draw_nodes(img, out):
-    """Draw laid-out GUI nodes: rounded backgrounds and text."""
+_images: dict = {}
+
+
+def draw_image(img, rect, info, images):
+    """An EditableImage shown by an ImageLabel: crop to the screen first (a zoomed map can be huge), then scale."""
+    path = images[info["index"] - 1]
+    if path not in _images:
+        with open(path, "rb") as f:
+            _images[path] = Image.frombytes("RGBA", (info["width"], info["height"]), f.read())
+    src = _images[path]
+    x0, y0, x1, y1 = rect
+    vx0, vy0, vx1, vy1 = max(x0, 0), max(y0, 0), min(x1, img.width), min(y1, img.height)
+    if vx1 - vx0 < 1 or vy1 - vy0 < 1:
+        return
+    sx, sy = src.width / (x1 - x0), src.height / (y1 - y0)
+    box = ((vx0 - x0) * sx, (vy0 - y0) * sy, (vx1 - x0) * sx, (vy1 - y0) * sy)
+    resample = Image.NEAREST if info.get("pixelated") else Image.BILINEAR
+    part = src.resize((int(vx1 - vx0), int(vy1 - vy0)), resample, box=box)
+    img.alpha_composite(part, (int(vx0), int(vy0)))
+
+
+def fill(img, rect, color, alpha, radius):
+    x0, y0, x1, y1 = rect
+    if x1 <= 0 or y1 <= 0 or x0 >= img.width or y0 >= img.height:
+        return
+    if alpha >= 0.999 and radius <= 0:
+        ImageDraw.Draw(img).rectangle(rect, fill=rgba(color))
+        return
+    cx0, cy0 = max(int(x0), 0), max(int(y0), 0)
+    cx1, cy1 = min(int(math.ceil(x1)), img.width), min(int(math.ceil(y1)), img.height)
+    overlay = Image.new("RGBA", (cx1 - cx0, cy1 - cy0), (0, 0, 0, 0))
+    ImageDraw.Draw(overlay).rounded_rectangle(
+        (x0 - cx0, y0 - cy0, x1 - cx0, y1 - cy0), radius=radius, fill=rgba(color, alpha)
+    )
+    img.alpha_composite(overlay, (cx0, cy0))
+
+
+def draw_nodes(img, out, images=()):
+    """Draw laid-out GUI nodes: backgrounds, images, strokes and text."""
     for node, rect in out:
         if not node.get("visible", True):
             continue
         x0, y0, x1, y1 = rect
         if x1 - x0 < 1 or y1 - y0 < 1:
+            continue
+        if x1 < 0 or y1 < 0 or x0 > img.width or y0 > img.height:
             continue
         alpha = 1 - node.get("bgT", 0)
         if alpha > 0.01:
@@ -560,9 +588,15 @@ def draw_nodes(img, out):
             if corner:
                 radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
                 radius = min(radius, min(x1 - x0, y1 - y0) / 2)
-            overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-            ImageDraw.Draw(overlay).rounded_rectangle(rect, radius=radius, fill=rgba(node["bg"], alpha))
-            img.alpha_composite(overlay)
+            fill(img, rect, node["bg"], alpha, radius)
+        if node.get("image") and images:
+            draw_image(img, rect, node["image"], images)
+        stroke = node.get("uiStroke")
+        if stroke:
+            t = stroke["thickness"] * SCALE
+            ImageDraw.Draw(img).rectangle(
+                (x0 - t, y0 - t, x1 + t - 1, y1 + t - 1), outline=rgba(stroke["color"]), width=max(1, int(t))
+            )
         if node.get("text"):
             draw_text_block(
                 img,
@@ -583,7 +617,7 @@ def render_gui(img, scene):
             continue
         out = []
         layout(sg, 0, 0, vw, vh, out)
-        draw_nodes(img, out)
+        draw_nodes(img, out, scene.get("images", []))
     return d
 
 

@@ -421,6 +421,43 @@ roblox.implementMethod("Terrain", "Clear", function(terrain)
 	terrainBlocks[terrain] = {}
 end)
 
+-- EditableImage: a plain table with the methods the client uses; Content.fromObject turns it into an
+-- "rbxtemp://editable/<n>" content so an ImageLabel can hold it (see makeEnv), and screenshots can find it.
+local editables: { [number]: any } = {}
+
+roblox.implementMethod("AssetService", "CreateEditableImage", function(_service, options)
+	local size = (options and options.Size) or roblox.Vector2.new(512, 512)
+	local image = {
+		id = #editables + 1,
+		Size = size,
+		pixels = buffer.create(size.X * size.Y * 4),
+	}
+	function image.WritePixelsBuffer(self, position, rectSize, data)
+		local w = self.Size.X
+		for row = 0, rectSize.Y - 1 do
+			buffer.copy(
+				self.pixels,
+				((position.Y + row) * w + position.X) * 4,
+				data,
+				row * rectSize.X * 4,
+				rectSize.X * 4
+			)
+		end
+	end
+	function image.Destroy(_self) end
+	editables[image.id] = image
+	return image
+end)
+
+function Emulator.editableImage(uri: string)
+	local id = tonumber(string.match(uri, "^rbxtemp://editable/(%d+)$"))
+	return if id then editables[id] else nil
+end
+
+roblox.implementMethod("GuiService", "GetGuiInset", function()
+	return roblox.Vector2.zero, roblox.Vector2.zero
+end)
+
 function Emulator.terrainBlocks(client: Machine)
 	return terrainBlocks[client.dm:GetService("Workspace"):FindFirstChildOfClass("Terrain")] or {}
 end
@@ -654,6 +691,17 @@ makeEnv = function(m: Machine, scriptInst)
 		ColorSequence = roblox.ColorSequence,
 		ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
 		Font = roblox.Font,
+		Content = {
+			fromObject = function(object)
+				if type(object) == "table" and object.id then
+					return roblox.Content.fromUri("rbxtemp://editable/" .. object.id)
+				end
+				return roblox.Content.fromObject(object)
+			end,
+			fromUri = roblox.Content.fromUri,
+			fromAssetId = roblox.Content.fromAssetId,
+			none = roblox.Content.none,
+		},
 		RaycastParams = RaycastParams,
 		os = {
 			clock = function()

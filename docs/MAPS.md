@@ -104,20 +104,22 @@ Province names are generated from per-region word lists (Hoarreach, Silvershade,
 - **Drift isles:** 10 two-province islets between neighbouring shards. These are the first contested land.
 - **The Heartstone:** 10 Approaches (development 3, 2,000-man garrisons) and 10 Sanctums (development 4, 3,000-man garrisons) around the Heartstone Spire. That's almost two-thirds of the map's neutral development in one place.
 
+**The look (sci-fi):** the shards are platforms hanging in deep space, with neon rims and dark hulls underneath. The Heartstone is a steel station around a reactor spire, home shards grow crops in rows, crystal groves glow, the storm spires are reactor towers, and the bridges are energy links. The biome keys (`skymeadow`, `heartruins`, …) keep their names; only the drawing is sci-fi.
+
 **How it plays:** every nation owns its whole shard at the start, so the Peace phase is a race for drift isles and Heartstone Approaches. It's the fastest and most aggressive map, and the one to run playtests on, because symmetry means any imbalance is the rules' fault, not the map's.
 
 Skyshards uses no new rules: shards are islands and bridges are straits, both already in the design doc.
 
 ## Art direction
 
-- **Map colour is power.** In the Political view each owned province shows its nation colour multiplied by a greyscale "detail" version of its terrain texture, so colour is the loudest signal but terrain still shows through. Neutral land shows washed-out terrain. Mountains always show bare rock.
-- **Stylised low-poly.** Faceted peaks, round tree crowns, sculpted dunes. Every tile is lit from the top-left so the whole map shares one light.
+- **2D pixel art, like WorldBox.** One map pixel is one stud; trees, peaks, dunes and castles are little sprites a few pixels big, and the camera zooms in until pixels are chunky. Painted at runtime by `src/client/PixelArt.luau`.
+- **Map colour is power.** Each owned province shows its nation colour shaded by the terrain underneath, so colour is the loudest signal but trees and peaks still show, inside a bold two-pixel nation border. Neutral land shows its natural colours.
 - **One palette for nations** (`Nation.colorIndex`, 1–10). These colours stay clear of every terrain colour:
 
 | Index | Colour | Hex |
 | --- | --- | --- |
 | 1 | Crimson | `#d7263d` |
-| 2 | Royal blue | `#1e6fd9` |
+| 2 | Navy | `#26358f` |
 | 3 | Gold | `#f4c430` |
 | 4 | Violet | `#8e44ad` |
 | 5 | Orange | `#f17c1f` |
@@ -129,7 +131,7 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 
 ### Terrain textures
 
-Every tile is 512×512 and seamless. `detail/` holds the greyscale version for tinting. Each look maps to one of the four terrains in the rules:
+These 512×512 seamless tiles are used for the previews and vote cards; the game itself draws the pixel art. `detail/` holds the greyscale version for tinting. Each look maps to one of the four terrains in the rules:
 
 | Theme | Plains | Forest | Hills | Mountain | Background |
 | --- | --- | --- | --- | --- | --- |
@@ -141,36 +143,6 @@ Every tile is 512×512 and seamless. `detail/` holds the greyscale version for t
 ![Fantasy tiles](images/tiles_fantasy.jpg)
 ![Sky tiles](images/tiles_sky.jpg)
 
-### Custom texture pack
-
-The 512 px tiles above are for previews and the vote cards. In the game, provinces use Roblox materials: the built-in ones by default, or our own **texture pack** once it is imported. The pack has 11 material variants, each a seamless 1024 px colour map (greyscale, so the part colour tints it), normal map and roughness map, made by `python3 tools/mapgen/generate.py --only materials` into `assets/textures/hd/<Name>/`:
-
-| Variant | Replaces | Used for | Studs per tile |
-| --- | --- | --- | --- |
-| `TWC_Grass` | Grass | grassland, steppe, savanna, meadow, skymeadow | 64 |
-| `TWC_Forest` | LeafyGrass | forest, taiga, jungle, wildwood, crystalgrove | 40 |
-| `TWC_Sand` | Sand | desert, dunes | 64 |
-| `TWC_Ground` | Ground | hills, tundra, highlands | 48 |
-| `TWC_Sandstone` | Sandstone | drylands | 64 |
-| `TWC_Rock` | Rock | mountains, peaks, mountain ridges | 48 |
-| `TWC_Snow` | Snow | ice, frostfields, snow caps | 64 |
-| `TWC_Ash` | CrackedLava | ashlands | 48 |
-| `TWC_Marble` | Marble | heartruins | 48 |
-| `TWC_Slate` | Slate | crags | 48 |
-| `TWC_Basalt` | Basalt | stormspire | 40 |
-
-![Texture pack](images/materials.jpg)
-
-`src/client/MaterialPack.luau` puts a variant on every part of its base material when the variant exists; until then the built-in material shows, so the game always works. Import the pack one of two ways:
-
-**A. In Studio, no code (about 15 minutes).** Open the place, then **Model tab → Material Manager**. For each row of the table: pick the base material in the list, press **+** (Create Material Variant), name it exactly as in the table, import `<Name>_color.png`, `<Name>_normal.png` and `<Name>_roughness.png` from `assets/textures/hd/<Name>/` into Color, Normal and Roughness, and set **Studs Per Tile**. Studio uploads the images and keeps the variants in `MaterialService`. Rojo doesn't manage `MaterialService`, so syncing never removes them. Publish the place.
-
-**B. By asset id.** Upload all 33 PNGs at once with **View → Asset Manager → Bulk Import**, right-click each image → **Copy ID**, and paste the ids (`rbxassetid://…`) into the `color`, `normal` and `roughness` fields of `src/client/MaterialPack.luau`. The client then creates the variants itself, so every build has them.
-
-Roblox lays a material's texture out in each part's own space, and every province is many triangles, so strongly patterned materials (Marble, Basalt, Sandstone) can show faint seams between triangles. The pack keeps patterns irregular to hide this.
-
-To preview the pack without Studio, run the harness with it imported: `TEXTURES=1 MAP=earth lune run tools/harness/play look`.
-
 ## Map data pipeline
 
 Everything here comes from `python3 tools/mapgen/generate.py` (about 1–2 minutes; needs Python 3 with numpy and Pillow). Output is deterministic.
@@ -178,26 +150,19 @@ Everything here comes from `python3 tools/mapgen/generate.py` (about 1–2 minut
 | File | What it is | Used by |
 | --- | --- | --- |
 | `assets/maps/<map>/layout.json` | Provinces, neighbours, straits, nations, start owners, development, garrisons | Converted into `src/shared/MapData/<Map>.luau` |
-| `assets/maps/<map>/province_ids.png` | Every pixel's province id (`R + 256·G`, 0 = none) | Province mesh export (Phase 4) |
+| `assets/maps/<map>/province_ids.png` | Every pixel's province id (`R + 256·G`, 0 = none) | The province grid in `MapData` (half resolution) |
 | `assets/maps/<map>/terrain.jpg`, `political.jpg` | Full-size previews | Reviews and Studio reference |
 | `assets/maps/<map>/atlas.jpg` | Terrain view with province ids printed | Debugging, bug reports ("army stuck in 57") |
 | `assets/maps/<map>/vote_card.jpg` | 1024×512 lobby card | Map vote |
-| `assets/textures/<theme>/…` | 512 px terrain tiles | Previews, vote cards, harness stand-ins for built-in materials |
-| `assets/textures/hd/<Name>/…` | 1024 px texture pack (colour, normal, roughness) | `MaterialPack` (material variants) |
+| `assets/textures/<theme>/…` | 512 px terrain tiles | Previews and vote cards |
 
-**Scale:** 1 image pixel = 0.5 stud, so Earth and Eldmoor are 1024×512 studs and Skyshards is 1024×768. `center` in `layout.json` is where the province label and garrison token sit.
+**Scale:** 1 layout pixel = 0.5 stud, so Earth and Eldmoor are 1024×512 studs and Skyshards is 1024×768, and the 2D map has one pixel per stud. `center` in `layout.json` is where the province label and garrison token sit.
 
 **Never hand-edit `layout.json`.** Change the generator (`tools/mapgen/maps/*.py`) and regenerate. The validator then re-checks every rule above.
 
-### Province shapes: generated, not hand-made
+### Province grid: generated, not hand-made
 
-This answers the open question "keep the hex grid or switch to hand-made provinces?": **neither**. Hand-tracing 3 × 150 provinces in Studio would take weeks and drift from the data. Instead `tools/mapgen/shapes.py` traces every province outline from the province id grid:
-
-1. Walk the pixel edges between each pair of provinces (and between land and sea) into border chains.
-2. Simplify each chain once (Douglas–Peucker: 1.2 px for borders, 2.5 px for coasts), so two neighbours share exactly the same points and never leave gaps.
-3. Join each province's chains into rings, bridge any holes (lakes, enclaves) into the outer ring, and triangulate by ear clipping.
-
-The triangles go into `layout.json` and `MapData` as `tris`, and the shared chains as `borders`. The client builds each triangle from two `WedgePart`s at match start (`MapSurface`), so there is no import step: regenerate the map and the game draws the new shapes. Islands smaller than 150 px are dropped from the drawing (never from the rules). The validator checks every province got a shape.
+This answers the open question "keep the hex grid or switch to hand-made provinces?": **neither**. Hand-tracing 3 × 150 provinces in Studio would take weeks and drift from the data. Instead `tools/mapgen/export_luau.py` takes `province_ids.png` at half resolution (one pixel per stud) and writes it into each `MapData` module as `grid`: run-length encoded (id, length) runs in base64, 30–50 KB per map. The client decodes it with `MapGrid`, paints the pixel art from it and looks up taps in it, so there is no import step: regenerate a map and the game draws it. A Lune test checks that every province covers about its area in the grid and that its centre lies inside it.
 
 ## Roadmap changes
 
@@ -205,7 +170,7 @@ The triangles go into `layout.json` and `MapData` as `tris`, and the shared chai
 | --- | --- | --- |
 | 1 | Generated hex map | **Skyshards `MapData`** converted from `layout.json`, drawn as simple flat discs at province centres with lines for neighbours. Real data from day one, and symmetric, so early tests are fair. |
 | 2–3 | (one map) | Build and test on Skyshards. Add Eldmoor once war works (Gate 2). |
-| 4 | Hand-made final map | **Province shapes for all three maps** (done early, built from `MapData`), a **custom texture pack**, plus the **map vote** with the three cards. |
+| 4 | Hand-made final map | **2D pixel-art maps for all three** (done early, painted from `MapData`), plus the **map vote** with the three cards. |
 | 5 | A second map | **Per-map balance** from win rate by start position. Earth needs it most. |
 
 ## Task cards
@@ -226,11 +191,11 @@ Done when: lune run tests/run passes for all three maps; rojo build passes
 ```
 
 ```text
-## Task: Province shapes (done, without meshes)
-Phase: 4   Service: tools/mapgen + MapSurface
-Goal: every map has real province shapes.
-Done: tools/mapgen/shapes.py traces and triangulates provinces into MapData (tris, borders); MapSurface builds
-them from wedges with biome materials, relief, Terrain water and border lines. No OBJ import is needed.
+## Task: Province map (done, as 2D pixel art)
+Phase: 4   Service: tools/mapgen + PixelArt + MapView
+Goal: every map shows its real province shapes.
+Done: export_luau.py puts each map's province grid into MapData; PixelArt paints a WorldBox-style pixel map from
+it at runtime (EditableImage), MapView pans and zooms it, and taps look provinces up in the grid.
 ```
 
 ```text

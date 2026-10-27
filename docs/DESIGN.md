@@ -150,22 +150,20 @@ src/
       MatchService.luau        -- phases, win checks, scoring
       PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
   client/
-    MapRenderer.luau           -- colours provinces, draws armies, labels and markers
-    MapSurface.luau            -- builds the land from MapData shapes: wedges, relief, water, borders
-    MapStyle.luau              -- biome look: material, colour, height
-    MaterialPack.luau          -- custom material variants (texture pack), when imported
-    CameraController.luau      -- pan, pinch zoom, tap selection
+    MapView.luau               -- the 2D map GUI: pan, pinch zoom, taps
+    PixelArt.luau              -- paints the pixel-art map (terrain, owners, borders) into an image buffer
+    MapRenderer.luau           -- what is drawn on the map: the pixel art, names, armies, markers, routes
     UI/                        -- HUD, province sheet, diplomacy, powers
   shared/
     Types.luau
     Config.luau                -- every balance number
     MapData/                   -- Earth, Eldmoor, Skyshards (generated from assets/maps)
+    MapGrid.luau               -- decodes a map's province grid (which province each map pixel belongs to)
     Sim/                       -- pure game rules, no Roblox APIs (tested with Lune)
 tests/                         -- Lune test files for shared/Sim
 assets/
   maps/<map>/                  -- layout.json, province_ids.png, previews, vote card
   textures/<theme>/            -- 512 px seamless terrain tiles (+ detail/ for tinting)
-  textures/hd/<Name>/          -- 1024 px texture pack: colour, normal, roughness per material variant
 tools/mapgen/                  -- Python generator for everything in assets/
 ```
 
@@ -196,19 +194,21 @@ tools/mapgen/                  -- Python generator for everything in assets/
 
 ### Map rendering
 
-- **Province shapes:** `tools/mapgen` traces every province outline from `province_ids.png`, simplifies and triangulates it, and stores the triangles in `MapData` (`tris`) with the shared border lines (`borders`). At match start the client builds each province from its triangles (two `WedgePart`s per triangle) under a `Model` named `P<id>`. Nothing is imported into Studio, so a regenerated map just works.
-- **Look:** each biome has a built-in Roblox material and colour (`MapStyle`). In the political view the part colour is the owner's nation colour with a touch of the terrain colour, so the material still shows. Hills and mountains stand higher than plains; mountains get rock ridges with snow caps and are never painted. Seas are Roblox `Terrain` water; Skyshards floats over a deep sky.
-- **Borders:** thin lines between provinces of one owner, bold where two owners meet; redrawn when ownership changes.
-- **Labels:** a province's name and development pips show once the camera is within about four province widths, so big provinces are named from far away and small ones only up close.
-- **Texture pack:** if `MaterialService` holds the `TWC_*` material variants from `assets/textures/hd/` (or their image ids are filled in `MaterialPack`), provinces use them instead of the built-in materials (see `docs/MAPS.md` "Custom texture pack").
-- Colour changes only when ownership changes; nothing updates per frame except army tokens.
+The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. There are no 3D map parts.
+
+- **Province grid:** `MapData` carries each map's province grid (`grid`): which province every map pixel belongs to, at 1 pixel = 1 stud (Earth and Eldmoor 1024×512, Skyshards 1024×768), run-length encoded. `MapGrid` decodes it once per match, and a tap looks up the province under the finger in it.
+- **Painting:** `PixelArt` paints the whole map into an RGBA buffer at match start (about half a second). It draws water with shallows and foam (space with a faint grid on Skyshards), each biome's base colour with specks, and small sprites: trees, pines, peaks, hills, dunes, crystals and towers. Owned provinces take their nation's colour, shaded by the terrain underneath, inside a two-pixel nation border; province borders are dotted. Capitals get a castle (a dome on Skyshards).
+- **On screen:** the buffer goes into one `EditableImage`, shown by an `ImageLabel` with pixelated resampling on a canvas that `MapView` pans and zooms (from the whole map down to 10 screen pixels per map pixel). An ownership change repaints only the provinces involved and their neighbours, and the image is uploaded at most once a frame.
+- **On top:** province names and development pips (shown once a province is about 70 screen pixels wide), army tokens gliding between province centres, battle and siege badges, and dotted straits and routes. All of them are GUI objects placed on the canvas.
+- **Requirement:** `EditableImage` works in Studio. In a published game Roblox only allows it when the owner is 13+ and ID-verified. Without it the map still shows names, tokens and routes, but no image, and warns once.
 
 ### Performance budget
 
 | Budget | Target |
 | --- | --- |
 | Provinces | ≤ 150 |
-| Map parts (static, anchored, no collision or shadows) | ≤ 7,000 (Earth 6.4k, Eldmoor 3.1k, Skyshards 1.9k) |
+| Map image | one `EditableImage` per match, ≤ 1024×1024 (Earth 1024×512 = 2 MB) |
+| Map GUI objects (names, tokens, dots) | ≤ 2,000 |
 | Armies on the map | ≤ 60 |
 | Server work per tick | < 5 ms |
 | Network per client | < 10 KB/s |
@@ -298,15 +298,15 @@ export type ProvinceDef = {
     biome: string,             -- cosmetic: picks the texture, never a rule
     development: number,
     neighbors: { ProvinceId }, -- includes straits
-    center: { x: number, y: number }, -- map pixels; 1 px = 0.5 stud
-    area: number,              -- map pixels (sizes the label distance)
+    center: { x: number, y: number }, -- layout pixels (imageSize); the 2D map grid is half that resolution
+    area: number,              -- layout pixels (sizes the label distance)
     startOwner: number?,       -- start slot 1..10, nil = neutral
     isCapital: boolean,
     garrison: number?,         -- neutral garrison override, men
-    tris: { number },          -- the province's shape: triangles as flat x1, y1, x2, y2, x3, y3, ... in map pixels
 }
 
-export type BorderDef = { a: ProvinceId, b: ProvinceId, points: { number } } -- a shared border line, flat x, y, ...
+-- Which province each pixel of the 2D map belongs to (0 = sea or space), run-length encoded (see MapGrid).
+export type GridDef = { width: number, height: number, rle: string }
 
 export type MapDef = {
     id: string,                -- "earth" | "eldmoor" | "skyshards"
@@ -316,7 +316,7 @@ export type MapDef = {
     nations: { { slot: number, name: string, capital: ProvinceId, colorIndex: number } },
     provinces: { ProvinceDef },
     straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean } },
-    borders: { BorderDef },
+    grid: GridDef,
 }
 ```
 
@@ -443,8 +443,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 4: Polish and shop
 
-- [x] Province shapes for Earth, Eldmoor and Skyshards (built from `MapData` triangles, materials by biome)
-- [x] Custom terrain texture pack as material variants (the owner imports it once in Studio)
+- [x] 2D pixel-art map for Earth, Eldmoor and Skyshards (WorldBox style, painted at runtime)
 - [ ] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
 - [ ] `PlayerDataService`: XP, ranks, daily quests

@@ -52,12 +52,12 @@ The first task creates `tests/run.luau` (a small runner that executes every `tes
 
 ```text
 default.project.json   Rojo project: shared → ReplicatedStorage.Shared, server → ServerScriptService.Server, client → StarterPlayerScripts.Client
-src/shared/            Types, Config, MapData, Sim (pure rules)
+src/shared/            Types, Config, MapData, MapGrid, Sim (pure rules)
 src/server/            GameLoop, CommandRouter, Replicator, Services
-src/client/            MapRenderer, CameraController, UI
-tests/                 Lune tests for src/shared/Sim
+src/client/            MapView (2D map GUI), PixelArt (pixel-art painter), MapRenderer, UI
+tests/                 Lune tests for src/shared/Sim (and the pure client painter, PixelArt)
 docs/DESIGN.md         The spec and the roadmap checkboxes
-docs/MAPS.md           The three maps, art direction, textures, map data pipeline
+docs/MAPS.md           The three maps, art direction, the pixel-art map, map data pipeline
 assets/maps/           Generated per-map data (layout.json, province_ids.png) and previews
 assets/textures/       Generated seamless terrain tiles per theme
 tools/mapgen/          Python (numpy + Pillow) generator for everything in assets/

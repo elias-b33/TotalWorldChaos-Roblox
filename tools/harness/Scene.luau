@@ -25,6 +25,9 @@ local function textOf(inst)
 	return label
 end
 
+-- EditableImages shown by ImageLabels, written next to the scene as raw RGBA when it is saved.
+local images = {}
+
 local function dumpGui(inst)
 	local node = {
 		class = inst.ClassName,
@@ -48,6 +51,22 @@ local function dumpGui(inst)
 			node.textXAlign = enumName(inst.TextXAlignment)
 			node.textWrapped = inst.TextWrapped
 			node.stroke = inst.TextStrokeTransparency < 0.9
+		end
+		if inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
+			local image = Emulator.editableImage(inst.ImageContent.Uri or "")
+			if image then
+				table.insert(images, image)
+				node.image = {
+					index = #images,
+					width = image.Size.X,
+					height = image.Size.Y,
+					pixelated = enumName(inst.ResampleMode) == "Pixelated",
+				}
+			end
+		end
+		local stroke = inst:FindFirstChildOfClass("UIStroke")
+		if stroke and stroke.Enabled then
+			node.uiStroke = { color = c3(stroke.Color), thickness = stroke.Thickness }
 		end
 	elseif inst:IsA("UIListLayout") then
 		node.fill = enumName(inst.FillDirection)
@@ -160,7 +179,15 @@ function Scene.capture(client)
 end
 
 function Scene.save(client, path: string)
-	fs.writeFile(path, serde.encode("json", Scene.capture(client)))
+	images = {}
+	local scene = Scene.capture(client)
+	for i, image in images do
+		local file = string.format("%s.img%d.rgba", path, i)
+		fs.writeFile(file, buffer.tostring(image.pixels))
+		scene.images = scene.images or {}
+		scene.images[i] = file
+	end
+	fs.writeFile(path, serde.encode("json", scene))
 end
 
 return Scene

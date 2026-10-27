@@ -3,12 +3,21 @@
     python3 tools/mapgen/export_luau.py      # all maps, from the existing layout.json files
 
 generate.py also calls this after every map build, so the Luau data never drifts from the JSON.
+
+Besides the JSON, each module carries the map's province grid (`grid`): which province every pixel of the 2D
+pixel-art map belongs to, at half the resolution of province_ids.png (1 grid pixel = 2x2 map pixels = 1 stud).
+It is run-length encoded as (id: u8, length: u16 little-endian) triples over the rows top to bottom, in base64.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import os
+import struct
+
+import numpy as np
+from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -37,11 +46,28 @@ def ids(xs) -> str:
     return "{ " + ", ".join(str(x) for x in xs) + " }" if xs else "{}"
 
 
-def nums(xs) -> str:
-    return "{ " + ", ".join(f"{x:g}" for x in xs) + " }" if xs else "{}"
+GRID_STEP = 2  # map pixels per grid pixel
 
 
-def to_luau(layout: dict) -> str:
+def grid_of(ids_path: str) -> tuple[int, int, str]:
+    """(width, height, base64 RLE) of the province grid from province_ids.png (id = R + 256 * G)."""
+    rgb = np.asarray(Image.open(ids_path).convert("RGB")).astype(np.int64)
+    ids = (rgb[..., 0] + 256 * rgb[..., 1])[::GRID_STEP, ::GRID_STEP]
+    assert ids.max() < 256, "grid ids must fit in one byte"
+    flat = ids.ravel()
+    starts = np.concatenate([[0], np.flatnonzero(np.diff(flat)) + 1])
+    ends = np.concatenate([starts[1:], [flat.size]])
+    out = bytearray()
+    for a, b in zip(starts, ends):
+        n = int(b - a)
+        while n > 0:
+            take = min(n, 0xFFFF)
+            out += struct.pack("<BH", int(flat[a]), take)
+            n -= take
+    return ids.shape[1], ids.shape[0], base64.b64encode(bytes(out)).decode("ascii")
+
+
+def to_luau(layout: dict, ids_path: str) -> str:
     key = layout["id"]
     lines = [
         "--!strict",
@@ -80,7 +106,6 @@ def to_luau(layout: dict) -> str:
         fields.append(f"isCapital = {'true' if p['isCapital'] else 'false'}")
         if p.get("garrison"):
             fields.append(f"garrison = {p['garrison']}")
-        fields.append(f"tris = {nums(p.get('tris', []))}")
         lines.append("\t\t{ " + ", ".join(fields) + " },")
     lines.append("\t},")
     lines.append("\tstraits = {")
@@ -90,10 +115,8 @@ def to_luau(layout: dict) -> str:
             f"wrap = {'true' if s['wrap'] else 'false'} }},"
         )
     lines.append("\t},")
-    lines.append("\tborders = {")
-    for b in layout.get("borders", []):
-        lines.append(f"\t\t{{ a = {b['a']}, b = {b['b']}, points = {nums(b['points'])} }},")
-    lines.append("\t},")
+    width, height, rle = grid_of(ids_path)
+    lines.append(f'\tgrid = {{ width = {width}, height = {height}, rle = "{rle}" }},')
     lines.append("}")
     lines.append("")
     lines.append("return map")
@@ -104,8 +127,9 @@ def to_luau(layout: dict) -> str:
 def write(layout: dict) -> str:
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, MODULE_NAMES[layout["id"]] + ".luau")
+    ids_path = os.path.join(ROOT, "assets", "maps", layout["id"], "province_ids.png")
     with open(path, "w") as f:
-        f.write(to_luau(layout))
+        f.write(to_luau(layout, ids_path))
     return path
 
 

@@ -1,5 +1,6 @@
 --!strict
 -- The generated maps follow the rules in docs/MAPS.md.
+local MapGrid = require("../src/shared/MapGrid")
 local Maps = require("../src/shared/Maps")
 local T = require("./TestKit")
 
@@ -24,25 +25,25 @@ for _, id in Maps.ids do
 		end
 	end)
 
-	T.test(id .. ": every province has a drawable shape about its size", function()
+	T.test(id .. ": the province grid covers every province about its size", function()
+		local grid = MapGrid.decode(map)
+		T.equal(buffer.len(grid.ids), grid.width * grid.height)
+		T.equal(map.imageSize.y / grid.height, grid.scale, "same scale on both axes")
+		local count: { [number]: number } = {}
+		for i = 0, buffer.len(grid.ids) - 1 do
+			local pid = buffer.readu8(grid.ids, i)
+			count[pid] = (count[pid] or 0) + 1
+		end
+		local centred = 0
 		for _, p in provinces do
-			local tris = p.tris
-			T.expect(#tris > 0 and #tris % 6 == 0, p.name .. " has no triangles")
-			local area = 0
-			for i = 1, #tris, 6 do
-				local ax, ay, bx, by, cx, cy = tris[i], tris[i + 1], tris[i + 2], tris[i + 3], tris[i + 4], tris[i + 5]
-				area += math.abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay)) / 2
+			local expected = p.area / (grid.scale * grid.scale)
+			local n = count[p.id] or 0
+			T.expect(n > expected * 0.7 and n < expected * 1.3, p.name .. " has " .. n .. " grid pixels")
+			if MapGrid.at(grid, p.center.x / grid.scale, p.center.y / grid.scale) == p.id then
+				centred += 1
 			end
-			-- simplified outlines may trim small islands a little
-			T.expect(area > p.area * 0.6 and area < p.area * 1.25, p.name .. " shape area " .. area .. " vs " .. p.area)
 		end
-	end)
-
-	T.test(id .. ": border lines join two different provinces", function()
-		for _, b in map.borders do
-			T.expect(provinces[b.a] ~= nil and provinces[b.b] ~= nil and b.a ~= b.b, "border " .. b.a .. "-" .. b.b)
-			T.expect(#b.points >= 4 and #b.points % 2 == 0, "border " .. b.a .. "-" .. b.b .. " points")
-		end
+		T.expect(centred >= #provinces * 0.95, "province centres lie in their province: " .. centred)
 	end)
 
 	T.test(id .. ": every strait is a neighbour link", function()

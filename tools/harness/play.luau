@@ -15,6 +15,7 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 
 local Emulator = require("./Emulator")
+local MapGrid = require("../../src/shared/MapGrid")
 local Scene = require("./Scene")
 
 local OUT = "tools/harness/out"
@@ -34,6 +35,11 @@ function H.shot(client, name: string)
 	end
 	if process.env.KEEP_SCENE == nil then
 		fs.removeFile(base .. ".json")
+		for _, entry in fs.readDir(shotDir) do
+			if string.find(entry, "%.rgba$") then
+				fs.removeFile(shotDir .. "/" .. entry)
+			end
+		end
 	end
 	print("  📸 " .. base .. ".png")
 end
@@ -71,10 +77,31 @@ function H.myNation(client)
 	return H.client(client, "ClientState").myNation()
 end
 
-function H.provinceWorld(client, provinceId: number)
-	local MapRenderer = H.client(client, "MapRenderer")
+-- A province's centre in map pixels (the 2D map's coordinates).
+function H.provinceMap(client, provinceId: number)
+	return H.client(client, "MapRenderer").centerOf(provinceId)
+end
+
+-- Centre the view on a province, wait for the camera to settle, and tap a pixel of it on screen, away from the
+-- tokens standing at its centre.
+function H.tapProvince(client, provinceId: number, closeUp: boolean?)
+	local MapView = H.client(client, "MapView")
+	MapView.centreOn(H.provinceMap(client, provinceId), closeUp ~= false)
+	Emulator.run(1.5)
 	local map = H.client(client, "ClientState").map()
-	return MapRenderer.toWorld(map.provinces[provinceId].center)
+	local grid = MapGrid.decode(map)
+	local c = H.provinceMap(client, provinceId)
+	local spot = c
+	for r = 12, 3, -1 do
+		local p = c + Emulator.roblox.Vector2.new(0, r)
+		if MapGrid.at(grid, p.X, p.Y) == provinceId then
+			spot = p
+			break
+		end
+	end
+	local screen = MapView.toScreen(spot)
+	Emulator.tapScreen(client, screen.X, screen.Y)
+	Emulator.run(0.3)
 end
 
 local scenarios = {}
@@ -113,7 +140,7 @@ function scenarios.smoke()
 	H.expect(armies == 1, "Recruit created an army")
 	H.shot(alice, "built")
 
-	-- tap a foreign province through the camera and raycast
+	-- tap a foreign province on the 2D map
 	local foreign
 	for id, p in state.provinces do
 		if p.owner ~= nil and p.owner ~= me then
@@ -124,11 +151,7 @@ function scenarios.smoke()
 	Emulator.press(alice, "✕")
 	Emulator.run(0.5)
 	local ClientState = H.client(alice, "ClientState")
-	local CameraController = H.client(alice, "CameraController")
-	CameraController.centreOn(H.provinceWorld(alice, foreign), true)
-	Emulator.run(2)
-	Emulator.tapWorld(alice, H.provinceWorld(alice, foreign) + Emulator.roblox.Vector3.new(0, 1, 0))
-	Emulator.run(0.5)
+	H.tapProvince(alice, foreign)
 	local owner = ClientState.nation(state.provinces[foreign].owner)
 	H.expect(Emulator.findText(alice, owner.name) ~= nil, "Tapping a foreign province shows its owner")
 	H.shot(alice, "foreign")
@@ -147,8 +170,8 @@ function scenarios.look()
 	H.shot(alice, "whole_map")
 	local state = H.state()
 	local capital = state.nations[H.myNation(alice)].capital
-	local CameraController = H.client(alice, "CameraController")
-	CameraController.centreOn(H.provinceWorld(alice, capital), false)
+	local MapView = H.client(alice, "MapView")
+	MapView.centreOn(H.provinceMap(alice, capital), false)
 	Emulator.pinch(alice, 3.5)
 	Emulator.run(2)
 	H.shot(alice, "region")
@@ -158,16 +181,16 @@ function scenarios.look()
 
 	-- the nearest mountain, close up
 	local map = H.client(alice, "ClientState").map()
-	local here = H.provinceWorld(alice, capital)
+	local here = H.provinceMap(alice, capital)
 	local best, bestD = nil, math.huge
 	for _, def in map.provinces do
-		local d = (H.provinceWorld(alice, def.id) - here).Magnitude
+		local d = (H.provinceMap(alice, def.id) - here).Magnitude
 		if def.terrain == "Mountain" and d < bestD then
 			best, bestD = def.id, d
 		end
 	end
 	if best then
-		CameraController.centreOn(H.provinceWorld(alice, best), false)
+		MapView.centreOn(H.provinceMap(alice, best), false)
 		Emulator.pinch(alice, 2)
 		Emulator.run(2)
 		H.shot(alice, "mountain")
@@ -184,14 +207,7 @@ local function provinceByName(name: string): number
 	error("no province " .. name)
 end
 
-local function tapProvince(client, provinceId: number)
-	local CameraController = H.client(client, "CameraController")
-	CameraController.centreOn(H.provinceWorld(client, provinceId), true)
-	Emulator.run(1.5)
-	-- aim a little off-centre so army tokens standing at the centre don't catch the tap
-	Emulator.tapWorld(client, H.provinceWorld(client, provinceId) + Emulator.roblox.Vector3.new(0, 1, 4))
-	Emulator.run(0.3)
-end
+local tapProvince = H.tapProvince
 
 -- Phase 2: march on a garrison, win the battle, siege and take the province; war, peace and results.
 function scenarios.war()

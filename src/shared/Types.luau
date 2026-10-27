@@ -118,15 +118,15 @@ export type ProvinceDef = {
 	startOwner: number?, -- start slot 1..10, nil = neutral
 	isCapital: boolean,
 	garrison: number?, -- neutral garrison override, men
-	tris: { number }, -- the province's shape: triangles as flat x0, y0, x1, y1, x2, y2, ... in map pixels
 }
 
 export type NationDef = { slot: number, name: string, capital: ProvinceId, colorIndex: number }
 
 export type StraitDef = { a: ProvinceId, b: ProvinceId, from: Point, to: Point, wrap: boolean }
 
--- The simplified border line between two neighbouring provinces: flat x0, y0, x1, y1, ... in map pixels.
-export type BorderDef = { a: ProvinceId, b: ProvinceId, points: { number } }
+-- Which province each pixel of the 2D map belongs to (0 = sea or sky), 1 pixel = 1 stud: run-length encoded
+-- (id: u8, length: u16 little-endian) triples in base64, decoded by MapGrid.
+export type GridDef = { width: number, height: number, rle: string }
 
 export type MapDef = {
 	id: string, -- "earth" | "eldmoor" | "skyshards"
@@ -136,7 +136,7 @@ export type MapDef = {
 	nations: { NationDef },
 	provinces: { ProvinceDef },
 	straits: { StraitDef },
-	borders: { BorderDef },
+	grid: GridDef,
 }
 
 -- Intents: what a player or bot asks for. CommandRouter checks the shape, Sim/Commands checks the rules.

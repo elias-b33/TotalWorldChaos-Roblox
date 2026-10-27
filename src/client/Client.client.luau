@@ -1,16 +1,16 @@
 --!strict
--- Client bootstrap: map, camera, HUD, sheets and panels, all fed by ClientState. The client only sends intents.
+-- Client bootstrap: the 2D map, HUD, sheets and panels, all fed by ClientState. The client only sends intents.
 --
 -- Taps: your army -> pick it up; then a province -> route preview + Go. Any other province -> its sheet.
 -- Someone else's army -> the sheet of the province it stands in. Empty space -> close everything.
 
 local Client = script.Parent
 local ArmySheet = require(Client.UI.ArmySheet)
-local CameraController = require(Client.CameraController)
 local ClientState = require(Client.ClientState)
 local Hud = require(Client.UI.Hud)
 local Intents = require(Client.Intents)
 local MapRenderer = require(Client.MapRenderer)
+local MapView = require(Client.MapView)
 local Nations = require(Client.UI.Nations)
 local Offers = require(Client.UI.Offers)
 local ProvinceSheet = require(Client.UI.ProvinceSheet)
@@ -92,7 +92,7 @@ local function centreOnCapital()
 	local map = ClientState.map()
 	local me = ClientState.nation(ClientState.myNation())
 	if map and me then
-		CameraController.centreOn(MapRenderer.toWorld(map.provinces[me.capital].center), true)
+		MapView.centreOn(MapRenderer.centerOf(me.capital), true)
 		selectProvince(me.capital)
 	end
 end
@@ -114,9 +114,10 @@ Results.init(function()
 	selectProvince(nil)
 end)
 Intents.init(Hud.toast)
-CameraController.init(onTap)
+MapView.init(function(screenPos: Vector2)
+	onTap(MapRenderer.pick(screenPos))
+end)
 ClientState.onReset(function()
 	selectedArmy = nil
-	CameraController.showWholeMap()
 end)
 ClientState.init()
