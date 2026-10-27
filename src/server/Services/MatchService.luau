@@ -18,13 +18,19 @@ local MatchService = {}
 local state: Types.MatchState? = nil
 local rng = Rng.new(1)
 
--- Map for the next match: set a "MapId" attribute on Workspace in Studio to test another map.
-function MatchService.chooseMap(): string
+-- A map the server is locked to: set a "MapId" attribute on Workspace in Studio to test another map. It also
+-- skips the Lobby's map vote. (Later: private-server settings.)
+function MatchService.lockedMap(): string?
 	local override = workspace:GetAttribute("MapId")
 	if type(override) == "string" and table.find(Maps.ids, override) then
 		return override
 	end
-	return Config.DefaultMap
+	return nil
+end
+
+-- Map for a match that skips the Lobby (Workspace "SkipLobby").
+function MatchService.chooseMap(): string
+	return MatchService.lockedMap() or Config.DefaultMap
 end
 
 function MatchService.start(mapId: string): Types.MatchState
@@ -36,6 +42,11 @@ end
 
 function MatchService.state(): Types.MatchState
 	assert(state, "no match running")
+	return state
+end
+
+-- The current match, or nil before the first one (the first Lobby).
+function MatchService.current(): Types.MatchState?
 	return state
 end
 

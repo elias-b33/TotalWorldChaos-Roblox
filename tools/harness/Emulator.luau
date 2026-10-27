@@ -770,12 +770,16 @@ end
 
 ---------------------------------------------------------------------------------------------- public API
 
--- mapId (optional) picks the map the way the Workspace "MapId" attribute does in Studio.
-function Emulator.boot(placeBytes: string, mapId: string?)
+-- mapId (optional) picks the map the way the Workspace "MapId" attribute does in Studio. attributes (optional)
+-- are more Workspace attributes, e.g. { SkipLobby = true }.
+function Emulator.boot(placeBytes: string, mapId: string?, attributes: { [string]: any }?)
 	Emulator.placeBytes = placeBytes
 	local dm = roblox.deserializePlace(placeBytes)
 	if mapId then
 		dm:GetService("Workspace"):SetAttribute("MapId", mapId)
+	end
+	for name, value in attributes or {} do
+		dm:GetService("Workspace"):SetAttribute(name, value)
 	end
 	local server = newMachine("server", dm, true)
 	Emulator.server = server
@@ -829,6 +833,7 @@ function Emulator.addClient(name: string, viewport: any?): Machine
 	nextUserId += 1
 	local serverPlayer = Instance.new("Player")
 	serverPlayer.Name = name
+	serverPlayer.DisplayName = name -- Lune has no default for it
 	serverPlayer.UserId = nextUserId
 	local localPlayer = Instance.new("Player")
 	localPlayer.Name = name

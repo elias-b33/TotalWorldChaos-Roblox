@@ -6,16 +6,17 @@ local Config = {}
 
 -- Match ------------------------------------------------------------------------------------------
 
-Config.DefaultMap = "skyshards" -- "earth" | "eldmoor" | "skyshards"; the map vote arrives in Phase 4
+Config.DefaultMap = "skyshards" -- "earth" | "eldmoor" | "skyshards"; used when the Lobby is skipped (SkipLobby)
 Config.MaxPlayers = 12
 Config.NationsPerMatch = 10
 Config.TickSeconds = 1
 Config.MonthTicks = 10 -- income and upkeep are paid every month
 
 Config.Phases = {
-	-- Lobby and Pick come with the map vote and nation draft; until then a match starts in Peace
-	LobbyTicks = 60,
-	PickTicks = 30,
+	LobbyTicks = 60, -- the map vote (also after Results, for the next map)
+	PickTicks = 30, -- the whole nation draft; whoever is still waiting when it runs out gets a random nation
+	PickTurnMaxTicks = 8, -- one player's turn in the draft: PickTicks / players, within these bounds
+	PickTurnMinTicks = 3,
 	PeaceEndTick = 3 * 60, -- no wars between nations before this
 	WarEndTick = 20 * 60, -- Cataclysm from here
 	MatchEndTick = 25 * 60, -- Results from here

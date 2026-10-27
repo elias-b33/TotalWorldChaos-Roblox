@@ -72,7 +72,7 @@ function Match.new(map: MapDef): MatchState
 	return state
 end
 
--- Phase for a match tick. Lobby and Pick are not used until the map vote and draft exist.
+-- Phase for a match tick. Lobby and Pick come before tick 0 and are run by Sim.Lobby.
 function Match.phaseAt(tick: number): Phase
 	local p = Config.Phases
 	if tick < p.PeaceEndTick then

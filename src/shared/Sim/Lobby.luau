@@ -1,0 +1,319 @@
+--!strict
+-- The lobby before every match (docs/DESIGN.md "Match structure"):
+-- 1. Lobby: players join and vote on the map. Most votes wins; a tie (or no votes) is settled by the Rng.
+--    A map the server set (Workspace "MapId", later private servers) skips the vote.
+-- 2. Pick: on the chosen map, players pick a start nation one at a time in a random draft order. A turn that runs
+--    out picks a random free nation for that player. Bots keep every nation nobody picked.
+-- Pure: takes the lobby (and the new match during the draft) plus an Rng, and changes them.
+
+local Config = require("../Config")
+local Match = require("./Match")
+local Rng = require("./Rng")
+local Types = require("../Types")
+
+type LobbyState = Types.LobbyState
+type MatchState = Types.MatchState
+
+-- What clients are told about the lobby (the Lobby remote). Flat arrays only, so it survives the network.
+export type LobbyView = {
+	phase: string, -- "Lobby" | "Pick" | "None" (no lobby: a match is running)
+	ticksLeft: number,
+	maps: { string },
+	locked: boolean,
+	counts: { number }, -- votes for maps[i]
+	votes: { { userId: number, map: string } },
+	mapId: string, -- "" until the vote is over
+	order: { { userId: number, name: string, nation: number } }, -- the draft order; nation 0 = not picked yet
+	turn: number, -- index in order of who picks now
+	turnTicksLeft: number,
+}
+
+local Lobby = {}
+
+-- A fresh lobby: the vote on these maps, or no vote when the server locked one.
+function Lobby.new(maps: { string }, locked: string?): LobbyState
+	return {
+		phase = "Lobby",
+		ticksLeft = Config.Phases.LobbyTicks,
+		maps = if locked then { locked } else table.clone(maps),
+		locked = locked,
+		votes = {},
+		mapId = nil,
+		order = {},
+		turn = 1,
+		turnTicks = Config.Phases.PickTurnMaxTicks,
+		turnTicksLeft = 0,
+		picks = {},
+	}
+end
+
+-- Votes per map, in the order of lobby.maps.
+function Lobby.tally(lobby: LobbyState): { [string]: number }
+	local counts: { [string]: number } = {}
+	for _, id in lobby.maps do
+		counts[id] = 0
+	end
+	for _, id in lobby.votes do
+		if counts[id] then
+			counts[id] += 1
+		end
+	end
+	return counts
+end
+
+-- The map with the most votes; ties (and a vote nobody took part in) go to the Rng.
+function Lobby.winner(lobby: LobbyState, rng: Rng.Rng): string
+	if lobby.locked then
+		return lobby.locked
+	end
+	local counts = Lobby.tally(lobby)
+	local best = -1
+	local tied: { string } = {}
+	for _, id in lobby.maps do
+		if counts[id] > best then
+			best = counts[id]
+			tied = { id }
+		elseif counts[id] == best then
+			table.insert(tied, id)
+		end
+	end
+	return tied[Rng.int(rng, 1, #tied)]
+end
+
+function Lobby.vote(lobby: LobbyState, userId: number, mapId: string): (boolean, string?)
+	if lobby.phase ~= "Lobby" then
+		return false, "WrongPhase"
+	end
+	if lobby.locked then
+		return false, "Locked"
+	end
+	if table.find(lobby.maps, mapId) == nil then
+		return false, "UnknownMap"
+	end
+	lobby.votes[userId] = mapId
+	return true, nil
+end
+
+local function isFree(nation: Types.Nation): boolean
+	return nation.controller == "Bot" and nation.userId == nil and not nation.eliminated
+end
+
+local function nationCount(match: MatchState): number
+	local n = 0
+	for _ in match.nations do
+		n += 1
+	end
+	return n
+end
+
+-- How long one turn lasts with this many players: the whole draft fits in Config.Phases.PickTicks.
+function Lobby.turnTicks(players: number): number
+	local p = Config.Phases
+	return math.clamp(p.PickTicks // math.max(players, 1), p.PickTurnMinTicks, p.PickTurnMaxTicks)
+end
+
+-- The vote is over: the draft starts on `match` (a fresh match on the chosen map). `userIds` are the players in
+-- the server; they are shuffled into the draft order (beyond one per nation, the rest watch).
+function Lobby.startPick(lobby: LobbyState, match: MatchState, userIds: { number }, rng: Rng.Rng)
+	local order = table.clone(userIds)
+	for i = #order, 2, -1 do
+		local j = Rng.int(rng, 1, i)
+		order[i], order[j] = order[j], order[i]
+	end
+	local seats = nationCount(match)
+	while #order > seats do
+		table.remove(order)
+	end
+	lobby.phase = "Pick"
+	lobby.mapId = match.mapId
+	lobby.ticksLeft = Config.Phases.PickTicks
+	lobby.order = order
+	lobby.turn = 1
+	lobby.turnTicks = Lobby.turnTicks(#order)
+	lobby.turnTicksLeft = lobby.turnTicks
+	lobby.picks = {}
+	match.phase = "Pick"
+end
+
+-- Who picks now (nil once the draft is done).
+function Lobby.current(lobby: LobbyState): number?
+	if lobby.phase ~= "Pick" then
+		return nil
+	end
+	return lobby.order[lobby.turn]
+end
+
+local function seat(lobby: LobbyState, match: MatchState, userId: number, nationId: number)
+	local nation = match.nations[nationId]
+	nation.controller = "Player"
+	nation.userId = userId
+	lobby.picks[userId] = nationId
+	lobby.turn += 1
+	lobby.turnTicksLeft = lobby.turnTicks
+end
+
+-- A random free nation for a player whose turn ran out.
+local function autoPick(lobby: LobbyState, match: MatchState, userId: number, rng: Rng.Rng)
+	local free: { number } = {}
+	for id, nation in match.nations do
+		if isFree(nation) then
+			table.insert(free, id)
+		end
+	end
+	table.sort(free)
+	if #free == 0 then
+		lobby.turn += 1 -- nothing left: they watch
+		lobby.turnTicksLeft = lobby.turnTicks
+		return
+	end
+	seat(lobby, match, userId, free[Rng.int(rng, 1, #free)])
+end
+
+function Lobby.pick(lobby: LobbyState, match: MatchState, userId: number, nationId: number): (boolean, string?)
+	if lobby.phase ~= "Pick" then
+		return false, "WrongPhase"
+	end
+	if Lobby.current(lobby) ~= userId then
+		return false, "NotYourTurn"
+	end
+	local nation = match.nations[nationId]
+	if nation == nil then
+		return false, "BadTarget"
+	end
+	if not isFree(nation) then
+		return false, "Taken"
+	end
+	seat(lobby, match, userId, nationId)
+	return true, nil
+end
+
+-- One lobby intent from a player. `match` is the new match during the draft (nil while voting).
+function Lobby.apply(
+	lobby: LobbyState,
+	match: MatchState?,
+	userId: number,
+	intent: Types.LobbyIntent
+): (boolean, string?)
+	if intent.kind == "Vote" then
+		return Lobby.vote(lobby, userId, intent.map)
+	elseif intent.kind == "Pick" then
+		if match == nil then
+			return false, "WrongPhase"
+		end
+		return Lobby.pick(lobby, match, userId, intent.nation)
+	end
+	return false, "BadRequest"
+end
+
+-- A player joined. While voting there is nothing to do; during the draft they join the end of the order if a
+-- nation is left for them.
+function Lobby.join(lobby: LobbyState, match: MatchState?, userId: number)
+	if lobby.phase ~= "Pick" or match == nil or table.find(lobby.order, userId) then
+		return
+	end
+	if #lobby.order < nationCount(match) then
+		table.insert(lobby.order, userId)
+	end
+end
+
+-- A player left: their vote goes, and during the draft their place in the order and any nation they picked.
+function Lobby.leave(lobby: LobbyState, match: MatchState?, userId: number)
+	lobby.votes[userId] = nil
+	local index = table.find(lobby.order, userId)
+	if lobby.phase ~= "Pick" or index == nil then
+		return
+	end
+	table.remove(lobby.order, index)
+	if lobby.picks[userId] then
+		lobby.picks[userId] = nil
+		if match then
+			Match.unseatPlayer(match, userId)
+		end
+	end
+	if index < lobby.turn then
+		lobby.turn -= 1
+	elseif index == lobby.turn then
+		lobby.turnTicksLeft = lobby.turnTicks -- the next player starts a full turn
+	end
+end
+
+-- One second of lobby time. Returns true when this phase is over: the vote (then call Lobby.startPick) or the
+-- draft (then Lobby.finish). During the draft a turn that runs out picks for that player, and when the whole
+-- draft time runs out everyone still waiting gets a random nation.
+function Lobby.step(lobby: LobbyState, match: MatchState?, rng: Rng.Rng): boolean
+	lobby.ticksLeft -= 1
+	if lobby.phase == "Lobby" then
+		return lobby.ticksLeft <= 0
+	end
+	if match == nil then
+		return true
+	end
+	local current = Lobby.current(lobby)
+	if current then
+		lobby.turnTicksLeft -= 1
+		if lobby.turnTicksLeft <= 0 then
+			autoPick(lobby, match, current, rng)
+		end
+	end
+	if lobby.ticksLeft <= 0 then
+		local waiting = Lobby.current(lobby)
+		while waiting do
+			autoPick(lobby, match, waiting, rng)
+			waiting = Lobby.current(lobby)
+		end
+	end
+	return Lobby.current(lobby) == nil
+end
+
+-- The draft is over: the match starts at tick 0 in Peace.
+function Lobby.finish(match: MatchState)
+	match.phase = Match.phaseAt(match.tick)
+end
+
+-- The lobby as clients see it. `names` maps userIds to display names. nil = no lobby (a match is running).
+function Lobby.view(lobby: LobbyState?, names: { [number]: string }): LobbyView
+	if lobby == nil then
+		return {
+			phase = "None",
+			ticksLeft = 0,
+			maps = {},
+			locked = false,
+			counts = {},
+			votes = {},
+			mapId = "",
+			order = {},
+			turn = 0,
+			turnTicksLeft = 0,
+		}
+	end
+	local tally = Lobby.tally(lobby)
+	local counts = {}
+	for i, id in lobby.maps do
+		counts[i] = tally[id]
+	end
+	local votes = {}
+	for userId, map in lobby.votes do
+		table.insert(votes, { userId = userId, map = map })
+	end
+	table.sort(votes, function(a, b)
+		return a.userId < b.userId
+	end)
+	local order = {}
+	for _, userId in lobby.order do
+		table.insert(order, { userId = userId, name = names[userId] or "?", nation = lobby.picks[userId] or 0 })
+	end
+	return {
+		phase = lobby.phase,
+		ticksLeft = math.max(lobby.ticksLeft, 0),
+		maps = table.clone(lobby.maps),
+		locked = lobby.locked ~= nil,
+		counts = counts,
+		votes = votes,
+		mapId = lobby.mapId or "",
+		order = order,
+		turn = lobby.turn,
+		turnTicksLeft = math.max(lobby.turnTicksLeft, 0),
+	}
+end
+
+return Lobby

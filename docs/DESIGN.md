@@ -33,12 +33,14 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 
 **Phases**
 
-1. **Lobby (60 s):** players join and vote on the map.
-2. **Pick (30 s):** players pick a start nation in random draft order; bots take the rest.
+1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, later private servers) shows only that card and skips the vote.
+2. **Pick (up to 30 s):** the chosen map shows every nation's start territory, and players pick a start nation one at a time in a random draft order, by tapping its land (then confirming) or its name in the list. Each turn lasts 30 s ÷ players (3–8 s); a turn that runs out picks a random free nation. Someone who joins during the draft goes to the end of the order. Bots take the rest. The match clock starts at 0:00 when the draft ends.
 3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
 4. **Open war (3–20 min):** everything unlocked.
 5. **Cataclysm (20–25 min):** Primordial powers recharge twice as fast and a random disaster hits every 60 s.
-6. **Results (30 s):** winner, stats and XP; the server votes on the next map.
+6. **Results (30 s):** winner, stats and XP. Then the Lobby opens again to vote on the next map; everyone stays in the server.
+
+Joining mid-match takes over a bot's nation. For Studio solo tests (and the harness) the Workspace attribute `SkipLobby` starts every match straight in Peace.
 
 **Win conditions**
 

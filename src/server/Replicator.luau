@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Lobby = require(Shared.Sim.Lobby)
 local Pathing = require(Shared.Sim.Pathing)
 local Remotes = require(Shared.Remotes)
 local Snapshot = require(Shared.Snapshot)
@@ -19,6 +20,7 @@ local snapshotRemote: RemoteEvent
 local deltaRemote: RemoteEvent
 local notifyRemote: RemoteEvent
 local positionsRemote: UnreliableRemoteEvent
+local lobbyRemote: RemoteEvent
 local lastSent: Snapshot.SnapshotData? = nil
 
 function Replicator.init()
@@ -26,6 +28,7 @@ function Replicator.init()
 	deltaRemote = Remotes.event("Delta")
 	notifyRemote = Remotes.event("Notify")
 	positionsRemote = Remotes.unreliableEvent("ArmyPositions")
+	lobbyRemote = Remotes.event("Lobby")
 end
 
 -- Snapshot(data, yourNationId or 0)
@@ -65,6 +68,15 @@ function Replicator.broadcast(state: Types.MatchState)
 			positionsRemote:FireAllClients(state.tick, flat)
 			flat = {}
 		end
+	end
+end
+
+-- The lobby (map vote, draft, or "None" once the match starts) to one player, or to everyone.
+function Replicator.sendLobby(view: Lobby.LobbyView, player: Player?)
+	if player then
+		lobbyRemote:FireClient(player, view)
+	else
+		lobbyRemote:FireAllClients(view)
 	end
 end
 

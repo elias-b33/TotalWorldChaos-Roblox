@@ -43,6 +43,10 @@ local REASONS: { [string]: string } = {
 	OwnTarget = "🚫 Not on yourself",
 	NoPowersYet = "⏳ Powers unlock at 3:00",
 	Primordial = "✨ Primordials only use powers",
+	Locked = "🔒 This server's map is set",
+	UnknownMap = "🚫 Unknown map",
+	NotYourTurn = "⏳ Wait for your turn",
+	Taken = "🚫 Already taken",
 }
 
 local Intents = {}
@@ -88,6 +92,15 @@ end
 -- power: Meteor | Plague | Rebels | Earthquake | Blessing | Shield; target: army, nation or province id
 function Intents.power(power: string, target: number)
 	send("RequestPower", power, target)
+end
+
+-- Lobby: vote for a map, pick a start nation in the draft.
+function Intents.vote(mapId: string)
+	send("RequestVote", mapId)
+end
+
+function Intents.pick(nationId: number)
+	send("RequestPick", nationId)
 end
 
 return Intents

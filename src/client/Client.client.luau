@@ -8,10 +8,13 @@
 local Client = script.Parent
 local ArmySheet = require(Client.UI.ArmySheet)
 local ClientState = require(Client.ClientState)
+local Draft = require(Client.UI.Draft)
 local Hud = require(Client.UI.Hud)
 local Intents = require(Client.Intents)
+local LobbyState = require(Client.LobbyState)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
+local MapVote = require(Client.UI.MapVote)
 local Nations = require(Client.UI.Nations)
 local Offers = require(Client.UI.Offers)
 local Powers = require(Client.UI.Powers)
@@ -66,6 +69,10 @@ local function chooseDestination(provinceId: number)
 end
 
 local function onTap(kind: "Army" | "Province" | nil, id: number?)
+	if Draft.active() then -- the nation draft: a tap chooses a nation
+		Draft.tap(kind, id)
+		return
+	end
 	if Powers.targeting() then
 		Powers.tap(kind, id)
 		return
@@ -126,7 +133,10 @@ Intents.init(Hud.toast)
 MapView.init(function(screenPos: Vector2)
 	onTap(MapRenderer.pick(screenPos))
 end)
+MapVote.init()
+Draft.init()
 ClientState.onReset(function()
 	selectedArmy = nil
 end)
+LobbyState.init()
 ClientState.init()
