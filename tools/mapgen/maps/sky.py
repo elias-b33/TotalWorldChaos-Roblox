@@ -1,4 +1,4 @@
-"""Skyshards: the world after the last god war, shattered into floating islands.
+"""Skyshards: the world after the last Primordial war, shattered into floating islands.
 
 Ten identical home shards circle the Heartstone. Each shard is a ring of 8
 provinces around an impassable storm spire, so every nation starts with the

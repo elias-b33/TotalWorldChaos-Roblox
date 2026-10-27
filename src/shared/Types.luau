@@ -8,7 +8,7 @@ export type ArmyId = number
 export type Terrain = "Plains" | "Forest" | "Hills" | "Mountain"
 export type Building = "None" | "Farm" | "Barracks" | "Fort"
 export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
-export type GodPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
+export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
 
 export type Province = {
 	id: ProvinceId,
@@ -35,7 +35,7 @@ export type Nation = {
 	manpower: number,
 	charges: number,
 	allianceId: number?,
-	powerImmuneUntil: number, -- 30 s god-power protection
+	powerImmuneUntil: number, -- 30 s Primordial-power protection
 	eliminated: boolean,
 }
 
@@ -52,7 +52,7 @@ export type Army = {
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
 export type Alliance = { id: number, members: { NationId } }
 export type Truce = { a: NationId, b: NationId, untilTick: number }
-export type God = { userId: number, charges: number }
+export type Primordial = { userId: number, charges: number }
 
 export type MatchState = {
 	mapId: string,
@@ -64,7 +64,7 @@ export type MatchState = {
 	wars: { [number]: War },
 	alliances: { [number]: Alliance },
 	truces: { Truce },
-	gods: { [number]: God }, -- keyed by userId
+	primordials: { [number]: Primordial }, -- keyed by userId
 }
 
 -- Static map definitions (src/shared/MapData, generated from assets/maps/*/layout.json).

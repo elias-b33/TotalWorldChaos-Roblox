@@ -1,6 +1,6 @@
 --!strict
 -- Boots the server and runs the 1-second tick (docs/DESIGN.md "Tick order").
--- Phase 1 runs steps 1, 5, 8 and 9; armies, battles, sieges, gods and bots plug in here as they arrive.
+-- Phase 1 runs steps 1, 5, 8 and 9; armies, battles, sieges, Primordials and bots plug in here as they arrive.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,7 +21,7 @@ local Replicator = require(Server.Replicator)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
-	Cataclysm = "Cataclysm! The gods are restless",
+	Cataclysm = "Cataclysm! The Primordials stir",
 	Results = "The match is over",
 }
 
@@ -55,7 +55,7 @@ local function tick()
 	local newPhase = MatchService.advance()
 	-- 2-4. move armies, resolve battles, advance sieges (Phase 2)
 	EconomyService.onTick(state) -- 5. income and upkeep every month
-	-- 6-7. god-power charges, bots plan (Phase 3)
+	-- 6-7. Primordial-power charges, bots plan (Phase 3)
 	if newPhase and PHASE_TOASTS[newPhase] then -- 8. phase changes (win checks arrive in Phase 2)
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end

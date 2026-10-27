@@ -4,19 +4,19 @@ Source of truth for the game design. Mirrors the design doc in Claude (claude.ai
 
 ## Overview
 
-A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and players who get knocked out come back as gods with disaster powers. Built for Roblox players aged 13–18+, most of them on phones.
+A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and players who get knocked out rise as Primordials with world-breaking powers. Built for Roblox players aged 13–18+, most of them on phones.
 
 **Design pillars**
 
 1. **Readable at a glance.** Map colour is power; a new player understands the state of the match in 5 seconds.
 2. **Two taps per decision.** Every action is reachable in two taps on a phone.
-3. **Chaos is fun.** God powers and disasters shake up every match so the leader is never safe.
+3. **Chaos is fun.** Primordial powers and disasters shake up every match so the leader is never safe.
 4. **Short matches, long progression.** A match ends in 25 minutes; account XP and cosmetics carry over.
 
 | Source | Keep | Cut |
 | --- | --- | --- |
 | EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
-| WorldBox | God powers, disasters, watching borders spread across the map | Pixel terrain, individual units, creatures, sandbox world editing |
+| WorldBox | God powers (here: Primordial powers), disasters, watching borders spread across the map | Pixel terrain, individual units, creatures, sandbox world editing |
 
 ## Match structure
 
@@ -37,7 +37,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 2. **Pick (30 s):** players pick a start nation in random draft order; bots take the rest.
 3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
 4. **Open war (3–20 min):** everything unlocked.
-5. **Cataclysm (20–25 min):** god powers recharge twice as fast and a random disaster hits every 60 s.
+5. **Cataclysm (20–25 min):** Primordial powers recharge twice as fast and a random disaster hits every 60 s.
 6. **Results (30 s):** winner, stats and XP; the server votes on the next map.
 
 **Win conditions**
@@ -49,7 +49,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 **Elimination and leavers**
 
 - A nation is eliminated when it has lost its capital and holds fewer than 3 provinces.
-- Eliminated players become **gods**: they stay in the server, see the whole map and use god powers. Nobody sits out a match.
+- Eliminated players rise as **Primordials**: they stay in the server, see the whole map and use Primordial powers. Nobody sits out a match.
 - A player who leaves is replaced by a bot instantly, so the map never has dead nations.
 
 ## Core systems
@@ -98,9 +98,9 @@ Income is paid every month (10 s).
 - **Peace:** white peace, or peace plus a gold tribute. A 3-minute truce follows.
 - **Coalition:** a nation holding 25%+ of provinces gets a crown on the map, and every other nation gets +10% combat strength against it.
 
-### God powers
+### Primordial powers
 
-Living nations earn 1 charge every 4 minutes; gods earn 1 charge every 60 s. A nation can be hit by a god power at most once per 30 s.
+Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s. A nation can be hit by a Primordial power at most once per 30 s.
 
 | Power | Effect | Charges |
 | --- | --- | --- |
@@ -145,7 +145,7 @@ src/
       EconomyService.luau      -- income, upkeep, buildings, development
       ArmyService.luau         -- movement, battles, sieges
       DiplomacyService.luau    -- war, alliances, peace, truces
-      GodService.luau          -- charges, powers, cooldowns
+      PrimordialService.luau   -- charges, powers, cooldowns
       AIService.luau           -- bot nations
       MatchService.luau        -- phases, win checks, scoring
       PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
@@ -173,7 +173,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 3. Resolve battles.
 4. Advance sieges and flip provinces.
 5. Every 10th tick: pay income and upkeep.
-6. Update god-power charges and timers.
+6. Update Primordial-power charges and timers.
 7. Bots plan (staggered: 1–2 bots per tick).
 8. Check win conditions and phase changes.
 9. Send one delta to every client.
@@ -219,7 +219,7 @@ export type ArmyId = number
 export type Terrain = "Plains" | "Forest" | "Hills" | "Mountain"
 export type Building = "None" | "Farm" | "Barracks" | "Fort"
 export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
-export type GodPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
+export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
 
 export type Province = {
     id: ProvinceId,
@@ -246,7 +246,7 @@ export type Nation = {
     manpower: number,
     charges: number,
     allianceId: number?,
-    powerImmuneUntil: number,  -- 30 s god-power protection
+    powerImmuneUntil: number,  -- 30 s Primordial-power protection
     eliminated: boolean,
 }
 
@@ -263,7 +263,7 @@ export type Army = {
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
 export type Alliance = { id: number, members: { NationId } }
 export type Truce = { a: NationId, b: NationId, untilTick: number }
-export type God = { userId: number, charges: number }
+export type Primordial = { userId: number, charges: number }
 
 export type MatchState = {
     mapId: string,             -- which MapDef this match is played on
@@ -275,7 +275,7 @@ export type MatchState = {
     wars: { [number]: War },
     alliances: { [number]: Alliance },
     truces: { Truce },
-    gods: { [number]: God },   -- keyed by userId
+    primordials: { [number]: Primordial }, -- keyed by userId
 }
 ```
 
@@ -327,7 +327,7 @@ export type Command =
 | `RequestBuild` | client → server | provinceId, building |
 | `RequestDevelop` | client → server | provinceId |
 | `RequestDiplomacy` | client → server | action (War, Ally, AcceptAlly, Peace, AcceptPeace), targetNation, gold? |
-| `RequestGodPower` | client → server | power, target province or nation |
+| `RequestPower` | client → server | power, target province or nation |
 | `CommandResult` | server → client | requestId, ok, reason |
 | `Snapshot` | server → client | full match state, sent on join |
 | `Delta` | server → client | changed provinces, nations, armies, events |
@@ -339,11 +339,11 @@ export type Command =
 Phone first: the map fills the screen, the HUD stays on the edges, and every action is a tap on the map followed by a tap in a bottom sheet.
 
 - **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
-- **Top bar:** gold, manpower, god-power charges, match timer, your rank.
+- **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank.
 - **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce).
 - **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit, or Declare war and Ally on foreign provinces.
 - **Moving armies:** tap the army, tap the destination, see the path with arrival time, tap Confirm.
-- **God powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
+- **Primordial powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
 - **Map modes:** Political (default), Diplomacy (allies green, enemies red), Terrain.
 - **Feedback:** toasts for war declared, province lost and battle won; a short screen shake for a meteor.
 
@@ -353,7 +353,7 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - Icons and numbers over words; no paragraphs anywhere in the HUD.
 - Every UI change is checked in Studio's phone emulator before it's merged.
 
-**Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit, siege, make an ally, declare war, use a god power.
+**Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit, siege, make an ally, declare war, use a Primordial power.
 
 ## Bot AI
 
@@ -367,7 +367,7 @@ Each bot checks a short priority list every few seconds and does the first actio
 4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
 5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders, then develop.
 6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
-7. **God power:** spend a charge on the biggest enemy army in a war I'm in.
+7. **Primordial power:** spend a charge on the biggest enemy army in a war I'm in.
 
 | Difficulty | Plans every | Attack ratio | Behaviour |
 | --- | --- | --- | --- |
@@ -385,13 +385,13 @@ Sell looks, convenience and private play, never strength.
 | --- | --- | --- |
 | Nation skins: flag, colour palette, army token | Shop item | 49–149 |
 | Map themes: re-skins of the three maps (e.g. Winter Skyshards) | Shop item | 99 |
-| God-power effects: meteor style, plague colour | Shop item | 49–99 |
+| Primordial-power effects: meteor style, plague colour | Shop item | 49–99 |
 | Map emotes shown over your capital | Shop item | 25–49 |
 | VIP: exclusive colours, +25% XP, chat tag | Game pass | 199 |
 | Private servers: pick map, timer, bot count | Private server | 100 per month |
 | Seasonal pass with cosmetic tiers | Pass | 299 |
 
-**Never sell:** gold, regiments, manpower, god-power charges, combat bonuses or anything else that changes a match. No paid random items (loot boxes).
+**Never sell:** gold, regiments, manpower, Primordial-power charges, combat bonuses or anything else that changes a match. No paid random items (loot boxes).
 
 **Retention:** account XP and ranks; 3 daily quests; the same server votes on the next map after Results; global leaderboard and weekly ranks; parties start next to each other.
 
@@ -420,11 +420,11 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 **Gate 2:** 4 friends play 3 matches and ask for a 4th.
 
-### Phase 3: Bots and gods
+### Phase 3: Bots and Primordials
 
 - [ ] `AIService` on Normal; bots fill empty slots and replace leavers
-- [ ] Elimination and the god role
-- [ ] 6 god powers with charges and cooldowns
+- [ ] Elimination and the Primordial role
+- [ ] 6 Primordial powers with charges and cooldowns
 - [ ] Catch-up rules: overextension, underdog, coalition
 - [ ] Cataclysm phase
 
@@ -437,7 +437,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [ ] Tutorial match
 - [ ] `PlayerDataService`: XP, ranks, daily quests
 - [ ] Shop: nation skins, map themes, VIP pass
-- [ ] Sound and effects for battles and god powers
+- [ ] Sound and effects for battles and Primordial powers
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 
@@ -459,6 +459,6 @@ Answered:
 Still open:
 
 - Art style beyond the maps: historical, fantasy or meme?
-- Can a god target the nation that eliminated them?
+- Can a Primordial target the nation that eliminated them?
 - Casual only, or a ranked mode after launch?
 - Provinces flip when a siege ends (current rule) or only through peace deals?

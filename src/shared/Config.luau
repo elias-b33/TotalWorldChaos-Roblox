@@ -78,11 +78,11 @@ Config.Diplomacy = {
 	CoalitionThreshold = 0.25, -- share of all provinces that puts a crown on a nation
 }
 
--- God powers -------------------------------------------------------------------------------------
+-- Primordial powers ------------------------------------------------------------------------------
 
-Config.Gods = {
+Config.Primordial = {
 	NationChargeTicks = 4 * 60,
-	GodChargeTicks = 60,
+	PrimordialChargeTicks = 60,
 	ImmunityTicks = 30, -- a nation is hit at most once per 30 s
 	CataclysmChargeMultiplier = 2,
 	CataclysmDisasterTicks = 60,

@@ -55,7 +55,7 @@ function Match.new(map: MapDef): MatchState
 		wars = {},
 		alliances = {},
 		truces = {},
-		gods = {},
+		primordials = {},
 	}
 end
 

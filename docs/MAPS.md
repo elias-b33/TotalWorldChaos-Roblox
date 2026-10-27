@@ -1,6 +1,6 @@
 # Maps and art plan
 
-Total World Chaos ships with three maps. All three play by the same rules in `DESIGN.md`; only the geography changes, so every system (economy, armies, sieges, gods, bots) works on every map without special cases.
+Total World Chaos ships with three maps. All three play by the same rules in `DESIGN.md`; only the geography changes, so every system (economy, armies, sieges, Primordials, bots) works on every map without special cases.
 
 | | Earth | Eldmoor | Skyshards |
 | --- | --- | --- | --- |
@@ -83,7 +83,7 @@ Province names are generated from per-region word lists (Hoarreach, Silvershade,
 
 ## Skyshards (new map)
 
-**The story:** the last war of the gods shattered the world. What's left floats above the clouds: ten home shards circling the **Heartstone**, the glowing core that still holds the old world's riches. Losing players become gods in every match, so this map is the world those gods broke.
+**The story:** the last war of the Primordials shattered the world. What's left floats above the clouds: ten home shards circling the **Heartstone**, the glowing core that still holds the old world's riches. Knocked-out players rise as Primordials in every match, so this is the world they broke.
 
 **The layout:** perfectly symmetric (10-fold rotation), so every nation has exactly the same land, terrain and routes.
 

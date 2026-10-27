@@ -12,7 +12,7 @@ local EVENTS = {
 	"RequestBuild",
 	"RequestDevelop",
 	"RequestDiplomacy",
-	"RequestGodPower",
+	"RequestPower",
 	-- server -> client
 	"CommandResult",
 	"Snapshot",
