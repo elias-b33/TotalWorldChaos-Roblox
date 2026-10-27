@@ -37,8 +37,6 @@ T.test("phases follow the match clock", function()
 	T.equal(Match.phaseAt(p.PeaceEndTick), "War")
 	T.equal(Match.phaseAt(p.WarEndTick), "Cataclysm")
 	T.equal(Match.phaseAt(p.MatchEndTick), "Results")
-	T.expect(not Match.isOver(p.MatchEndTick))
-	T.expect(Match.isOver(p.MatchEndTick + p.ResultsTicks))
 end)
 
 T.test("players take the lowest free nation and bots take it back when they leave", function()
@@ -60,6 +58,33 @@ T.test("seats run out after ten players", function()
 		T.equal(Match.seatPlayer(state, i), i)
 	end
 	T.equal(Match.seatPlayer(state, 11), nil)
+end)
+
+T.test("neutral land starts garrisoned; owned land and mountains do not", function()
+	local map = Maps.get("eldmoor")
+	local state = Match.new(map)
+	local garrisoned: { [number]: number } = {}
+	for _, a in state.armies do
+		T.equal(a.owner, 0)
+		garrisoned[a.location] = a.men
+	end
+	for _, def in map.provinces do
+		if def.startOwner == nil and def.terrain ~= "Mountain" then
+			T.equal(garrisoned[def.id], def.garrison or Config.NeutralGarrison, def.name)
+		else
+			T.equal(garrisoned[def.id], nil, def.name)
+		end
+	end
+end)
+
+T.test("the match is over once Results has been shown", function()
+	local state = Match.new(Maps.get("skyshards"))
+	T.expect(not Match.isOver(state))
+	state.result = { kind = "Score", winners = { 1 }, scores = {}, endedAt = 100 }
+	state.tick = 100 + Config.Phases.ResultsTicks - 1
+	T.expect(not Match.isOver(state))
+	state.tick += 1
+	T.expect(Match.isOver(state))
 end)
 
 T.test("each nation starts with eight provinces", function()

@@ -237,7 +237,11 @@ end
 function MapRenderer.select(provinceId: number?)
 	local box = selectionBox
 	if box then
-		box.Adornee = if provinceId then discs[provinceId] else nil
+		-- hide instead of clearing Adornee, so the same code also runs in the headless harness
+		if provinceId and discs[provinceId] then
+			box.Adornee = discs[provinceId]
+		end
+		box.Visible = provinceId ~= nil
 	end
 end
 

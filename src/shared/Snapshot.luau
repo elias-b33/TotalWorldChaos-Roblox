@@ -12,6 +12,11 @@ export type ProvinceRecord = {
 	owner: number, -- 0 = neutral
 	development: number,
 	building: Types.Building,
+	siegeBy: number, -- 0 = no siege
+	siegeProgress: number,
+	siegeRequired: number,
+	battle: boolean,
+	shieldUntil: number, -- tick; 0 = never shielded
 }
 
 export type NationRecord = {
@@ -25,6 +30,8 @@ export type NationRecord = {
 	manpower: number,
 	charges: number,
 	eliminated: boolean,
+	allianceId: number, -- 0 = none
+	battlesWon: number,
 }
 
 export type ArmyRecord = {
@@ -32,7 +39,21 @@ export type ArmyRecord = {
 	owner: number,
 	location: number,
 	men: number,
+	next: number, -- next province on its route, 0 = standing still
+	dest: number, -- end of its route, 0 = standing still
+	inBattle: boolean,
 }
+
+-- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes.
+export type DiplomacyData = {
+	wars: { { id: number, attackers: { number }, defenders: { number } } },
+	alliances: { { id: number, members: { number } } },
+	truces: { { a: number, b: number, untilTick: number } },
+	offers: { Types.Offer },
+}
+
+-- Unreliable position updates for moving armies: the client slides tokens between province centres.
+export type ArmyPosition = { id: number, from: number, to: number, progress: number }
 
 export type SnapshotData = {
 	mapId: string,
@@ -41,6 +62,8 @@ export type SnapshotData = {
 	provinces: { ProvinceRecord },
 	nations: { NationRecord },
 	armies: { ArmyRecord },
+	diplomacy: DiplomacyData,
+	result: Types.MatchResult?,
 }
 
 export type DeltaData = {
@@ -50,6 +73,9 @@ export type DeltaData = {
 	nations: { NationRecord },
 	armies: { ArmyRecord },
 	removedArmies: { number },
+	diplomacy: DiplomacyData?, -- only when it changed
+	result: Types.MatchResult?, -- only when it changed
+	events: { Types.MatchEvent },
 }
 
 local Snapshot = {}
@@ -67,11 +93,17 @@ function Snapshot.full(state: MatchState): SnapshotData
 	local provinces = {}
 	for _, id in sortedKeys(state.provinces) do
 		local p = state.provinces[id]
+		local siege = p.siege
 		table.insert(provinces, {
 			id = p.id,
 			owner = p.owner or 0,
 			development = p.development,
 			building = p.building,
+			siegeBy = if siege then siege.by else 0,
+			siegeProgress = if siege then siege.progress else 0,
+			siegeRequired = if siege then siege.required else 0,
+			battle = state.battles[p.id] ~= nil,
+			shieldUntil = p.shieldUntil or 0,
 		})
 	end
 	local nations = {}
@@ -88,12 +120,22 @@ function Snapshot.full(state: MatchState): SnapshotData
 			manpower = n.manpower,
 			charges = n.charges,
 			eliminated = n.eliminated,
+			allianceId = n.allianceId or 0,
+			battlesWon = n.battlesWon,
 		})
 	end
 	local armies = {}
 	for _, id in sortedKeys(state.armies) do
 		local a = state.armies[id]
-		table.insert(armies, { id = a.id, owner = a.owner, location = a.location, men = a.men })
+		table.insert(armies, {
+			id = a.id,
+			owner = a.owner,
+			location = a.location,
+			men = a.men,
+			next = a.path[1] or 0,
+			dest = a.path[#a.path] or 0,
+			inBattle = a.inBattle,
+		})
 	end
 	return {
 		mapId = state.mapId,
@@ -102,7 +144,70 @@ function Snapshot.full(state: MatchState): SnapshotData
 		provinces = provinces,
 		nations = nations,
 		armies = armies,
+		diplomacy = Snapshot.diplomacy(state),
+		result = state.result,
 	}
+end
+
+function Snapshot.diplomacy(state: MatchState): DiplomacyData
+	local wars = {}
+	for _, id in sortedKeys(state.wars) do
+		local w = state.wars[id]
+		table.insert(wars, { id = w.id, attackers = table.clone(w.attackers), defenders = table.clone(w.defenders) })
+	end
+	local alliances = {}
+	for _, id in sortedKeys(state.alliances) do
+		local a = state.alliances[id]
+		table.insert(alliances, { id = a.id, members = table.clone(a.members) })
+	end
+	local truces = {}
+	for _, t in state.truces do
+		table.insert(truces, { a = t.a, b = t.b, untilTick = t.untilTick })
+	end
+	local offers = {}
+	for _, o in state.offers do
+		table.insert(offers, table.clone(o))
+	end
+	return { wars = wars, alliances = alliances, truces = truces, offers = offers }
+end
+
+-- Moving armies, for the unreliable ArmyPositions remote. `progress` is 0..1 towards `to`.
+function Snapshot.positions(state: MatchState, ticksToEnter: (number) -> number): { ArmyPosition }
+	local out = {}
+	for _, id in sortedKeys(state.armies) do
+		local a = state.armies[id]
+		local nextId = a.path[1]
+		if nextId and not a.inBattle then
+			table.insert(out, {
+				id = a.id,
+				from = a.location,
+				to = nextId,
+				progress = math.clamp(a.moveProgress / ticksToEnter(nextId), 0, 1),
+			})
+		end
+	end
+	return out
+end
+
+-- Order-independent text form of a plain value, for cheap "did this change" checks.
+local function encode(v: any): string
+	if type(v) ~= "table" then
+		return tostring(v)
+	end
+	local keys = {}
+	for k in v do
+		table.insert(keys, tostring(k))
+	end
+	table.sort(keys)
+	local parts = {}
+	for _, k in keys do
+		local val = v[k]
+		if val == nil then
+			val = v[tonumber(k)]
+		end
+		table.insert(parts, k .. "=" .. encode(val))
+	end
+	return "{" .. table.concat(parts, ",") .. "}"
 end
 
 local function sameRecord(a: { [string]: any }, b: { [string]: any }): boolean
@@ -134,8 +239,8 @@ local function changed<T>(before: { T }, after: { T }): { T }
 	return out
 end
 
--- Records that differ between two snapshots. Returns nil when nothing changed but the tick.
-function Snapshot.diff(before: SnapshotData, after: SnapshotData): DeltaData?
+-- Records that differ between two snapshots, plus this tick's events. Returns nil when nothing changed but the tick.
+function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Types.MatchEvent }?): DeltaData?
 	local removed = {}
 	local alive: { [number]: boolean } = {}
 	for _, a in after.armies do
@@ -153,6 +258,9 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData): DeltaData?
 		nations = changed(before.nations, after.nations),
 		armies = changed(before.armies, after.armies),
 		removedArmies = removed,
+		diplomacy = if encode(before.diplomacy) ~= encode(after.diplomacy) then after.diplomacy else nil,
+		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
+		events = if events then table.clone(events) else {},
 	}
 	if
 		#delta.provinces == 0
@@ -160,6 +268,9 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData): DeltaData?
 		and #delta.armies == 0
 		and #removed == 0
 		and before.phase == after.phase
+		and delta.diplomacy == nil
+		and delta.result == nil
+		and #delta.events == 0
 	then
 		return nil
 	end
@@ -190,6 +301,12 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	merge(snapshot.provinces, delta.provinces)
 	merge(snapshot.nations, delta.nations)
 	merge(snapshot.armies, delta.armies)
+	if delta.diplomacy then
+		snapshot.diplomacy = delta.diplomacy
+	end
+	if delta.result then
+		snapshot.result = delta.result
+	end
 	if #delta.removedArmies > 0 then
 		local gone: { [number]: boolean } = {}
 		for _, id in delta.removedArmies do

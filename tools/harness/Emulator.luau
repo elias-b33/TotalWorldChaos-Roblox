@@ -1,0 +1,887 @@
+--!nocheck
+-- A small Roblox emulator for Lune, so the real server and client scripts can run headlessly.
+--
+-- What it gives the scripts: real Roblox instances (from @lune/roblox, so property names are checked against the
+-- Roblox API), plus the parts Lune lacks: events, remotes between a server and several clients, Players,
+-- a task scheduler on virtual time (a 25-minute match runs in seconds), RunService frames, touch input,
+-- a camera with real projection maths and raycasts against parts.
+--
+-- It is a test tool, not a perfect Roblox: physics, rendering and replication of workspace are not emulated.
+
+local luau = require("@lune/luau")
+local roblox = require("@lune/roblox")
+local stdio = require("@lune/stdio")
+
+local Instance = roblox.Instance
+
+local Emulator = {}
+
+---------------------------------------------------------------------------------------------- logging
+
+local errors: { string } = {}
+local warnings: { string } = {}
+local logLines: { string } = {}
+local quiet = false
+
+function Emulator.setQuiet(q: boolean)
+	quiet = q
+end
+
+local function log(line: string)
+	table.insert(logLines, line)
+	if not quiet then
+		print(line)
+	end
+end
+
+function Emulator.errors()
+	return errors
+end
+
+function Emulator.warnings()
+	return warnings
+end
+
+function Emulator.log()
+	return logLines
+end
+
+---------------------------------------------------------------------------------------------- scheduler
+
+local now = 0
+local seq = 0
+local queue = {} -- { at, seq, co, args }
+local cancelled: { [thread]: boolean } = {}
+local threadMachine: { [thread]: any } = {}
+
+local function resume(co: thread, ...)
+	if cancelled[co] or coroutine.status(co) == "dead" then
+		return
+	end
+	local ok, err = coroutine.resume(co, ...)
+	if not ok then
+		local who = threadMachine[co] and threadMachine[co].name or "?"
+		local msg = string.format("[%s] ERROR %s\n%s", who, tostring(err), debug.traceback(co))
+		table.insert(errors, msg)
+		log(msg)
+	end
+end
+
+local function schedule(co: thread, at: number, ...)
+	seq += 1
+	table.insert(queue, { at = at, seq = seq, co = co, args = table.pack(...) })
+end
+
+local function newThread(fn: any, owner: any): thread
+	if type(fn) == "thread" then
+		return fn
+	end
+	local co = coroutine.create(fn)
+	threadMachine[co] = owner or threadMachine[coroutine.running()]
+	return co
+end
+
+local task = {}
+
+function task.spawn(fn, ...)
+	local co = newThread(fn)
+	resume(co, ...)
+	return co
+end
+
+function task.defer(fn, ...)
+	local co = newThread(fn)
+	schedule(co, now, ...)
+	return co
+end
+
+function task.delay(t, fn, ...)
+	local co = newThread(fn)
+	schedule(co, now + (t or 0), ...)
+	return co
+end
+
+function task.wait(t)
+	local co = coroutine.running()
+	local start = now
+	schedule(co, now + math.max(t or 0, 1 / 60))
+	coroutine.yield()
+	return now - start
+end
+
+function task.cancel(co)
+	cancelled[co] = true
+end
+
+function Emulator.now(): number
+	return now
+end
+
+-- Run every thread due up to `untilTime`, in time order.
+local function runDue(untilTime: number)
+	while true do
+		local bestIndex, best = nil, nil
+		for i, item in queue do
+			if item.at <= untilTime and (best == nil or item.at < best.at or (item.at == best.at and item.seq < best.seq)) then
+				bestIndex, best = i, item
+			end
+		end
+		if best == nil then
+			break
+		end
+		table.remove(queue, bestIndex)
+		now = math.max(now, best.at)
+		resume(best.co, table.unpack(best.args, 1, best.args.n))
+	end
+end
+
+---------------------------------------------------------------------------------------------- signals
+
+local Signal = {}
+Signal.__index = Signal
+
+function Signal.new(queueWhenUnconnected: boolean?)
+	return setmetatable({ conns = {}, queued = if queueWhenUnconnected then {} else nil, waiting = {} }, Signal)
+end
+
+function Signal:Connect(fn)
+	local conn = { Connected = true }
+	function conn.Disconnect()
+		conn.Connected = false
+	end
+	conn.fn = fn
+	table.insert(self.conns, conn)
+	if self.queued and #self.queued > 0 then
+		local pending = self.queued
+		self.queued = {}
+		for _, args in pending do
+			task.spawn(fn, table.unpack(args, 1, args.n))
+		end
+	end
+	return setmetatable(conn, {
+		__index = function(_, k)
+			if k == "Disconnect" then
+				return function()
+					conn.Connected = false
+				end
+			end
+			return nil
+		end,
+	})
+end
+
+function Signal:Once(fn)
+	local conn
+	conn = self:Connect(function(...)
+		conn.Connected = false
+		fn(...)
+	end)
+	return conn
+end
+
+function Signal:Wait()
+	local co = coroutine.running()
+	table.insert(self.waiting, co)
+	return coroutine.yield()
+end
+
+function Signal:Fire(...)
+	local live = {}
+	for _, c in self.conns do
+		if c.Connected then
+			table.insert(live, c)
+		end
+	end
+	self.conns = live
+	if #live == 0 and #self.waiting == 0 and self.queued then
+		table.insert(self.queued, table.pack(...))
+		return
+	end
+	for _, c in live do
+		task.spawn(c.fn, ...)
+	end
+	local waiting = self.waiting
+	self.waiting = {}
+	for _, co in waiting do
+		resume(co, ...)
+	end
+end
+
+local events: { [any]: { [string]: any } } = {} -- strong keys: Lune hands out the same wrapper only while it is alive
+
+local function eventOf(inst, name: string, queueWhenUnconnected: boolean?)
+	local byName = events[inst]
+	if byName == nil then
+		byName = {}
+		events[inst] = byName
+	end
+	local sig = byName[name]
+	if sig == nil then
+		sig = Signal.new(queueWhenUnconnected)
+		byName[name] = sig
+	end
+	return sig
+end
+
+Emulator.eventOf = eventOf
+
+local EVENT_PROPS = {
+	{ "RemoteEvent", { "OnServerEvent", "OnClientEvent" }, true },
+	{ "UnreliableRemoteEvent", { "OnServerEvent", "OnClientEvent" }, false },
+	{ "Players", { "PlayerAdded", "PlayerRemoving" }, false },
+	{
+		"UserInputService",
+		{ "InputBegan", "InputChanged", "InputEnded", "TouchTap", "TouchPan", "TouchPinch", "TouchStarted", "TouchEnded" },
+		false,
+	},
+	{ "RunService", { "Heartbeat", "RenderStepped", "Stepped" }, false },
+	{ "GuiButton", { "Activated", "MouseButton1Click" }, false },
+	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged" }, false },
+}
+for _, spec in EVENT_PROPS do
+	local class, names, queued = spec[1], spec[2], spec[3]
+	for _, name in names do
+		roblox.implementProperty(class, name, function(inst)
+			return eventOf(inst, name, queued)
+		end)
+	end
+end
+
+---------------------------------------------------------------------------------------------- machines
+
+export type Machine = {
+	name: string,
+	dm: any,
+	isServer: boolean,
+	modules: { [any]: any },
+	loading: { [any]: boolean },
+	renderSteps: { [string]: { priority: number, fn: any } },
+	viewport: any,
+	camera: any,
+	localPlayer: any,
+	serverPlayer: any,
+}
+
+local machineOfDm: { [any]: Machine } = {}
+local machineOfInst: { [any]: Machine } = {}
+local clientOfServerPlayer: { [any]: Machine } = {}
+local machines: { Machine } = {}
+
+local function machineOf(inst): Machine?
+	local m = machineOfInst[inst]
+	if m then
+		return m
+	end
+	local node = inst
+	while node do
+		if machineOfDm[node] then
+			return machineOfDm[node]
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+-- Roblox copies remote arguments; it also turns sparse arrays and non-string dictionary keys into surprises.
+-- Copy the same way and record a warning for anything that would arrive changed.
+local function netCopy(v, path: string, problems: { string })
+	if type(v) ~= "table" then
+		return v
+	end
+	local n = #v
+	local count = 0
+	local hasStringKey, hasOtherKey = false, false
+	for k in v do
+		count += 1
+		if type(k) == "string" then
+			hasStringKey = true
+		elseif not (type(k) == "number" and k >= 1 and k <= n and k == math.floor(k)) then
+			hasOtherKey = true
+		end
+	end
+	if hasOtherKey or (hasStringKey and n > 0) then
+		table.insert(problems, path .. " is a sparse or mixed table; Roblox would mangle it over the network")
+	end
+	local out = {}
+	for k, val in v do
+		out[k] = netCopy(val, path .. "." .. tostring(k), problems)
+	end
+	return out
+end
+
+local function sendArgs(label: string, ...)
+	local problems = {}
+	local args = table.pack(...)
+	local copied = { n = args.n }
+	for i = 1, args.n do
+		copied[i] = netCopy(args[i], label .. "#" .. i, problems)
+	end
+	for _, p in problems do
+		local msg = "NETWORK " .. p
+		table.insert(warnings, msg)
+		log(msg)
+	end
+	return copied
+end
+
+-- remote instance -> its peers on the other side, keyed by remote name
+local function serverRemoteFor(clientRemote)
+	return Emulator.server.dm:GetService("ReplicatedStorage").Remotes:FindFirstChild(clientRemote.Name)
+end
+
+local function clientRemoteFor(serverRemote, client: Machine)
+	local folder = client.dm:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+	return folder and folder:FindFirstChild(serverRemote.Name)
+end
+
+for _, class in { "RemoteEvent", "UnreliableRemoteEvent" } do
+	roblox.implementMethod(class, "FireServer", function(remote, ...)
+		local client = machineOf(remote)
+		local target = serverRemoteFor(remote)
+		local args = sendArgs(client.name .. "->" .. remote.Name, ...)
+		task.defer(function()
+			eventOf(target, "OnServerEvent", class == "RemoteEvent")
+				:Fire(client.serverPlayer, table.unpack(args, 1, args.n))
+		end)
+	end)
+	roblox.implementMethod(class, "FireClient", function(remote, player, ...)
+		local client = clientOfServerPlayer[player]
+		if client == nil then
+			return
+		end
+		local target = clientRemoteFor(remote, client)
+		local args = sendArgs("server->" .. client.name .. ":" .. remote.Name, ...)
+		task.defer(function()
+			eventOf(target, "OnClientEvent", class == "RemoteEvent"):Fire(table.unpack(args, 1, args.n))
+		end)
+	end)
+	roblox.implementMethod(class, "FireAllClients", function(remote, ...)
+		for _, m in machines do
+			if not m.isServer and m.serverPlayer and m.serverPlayer.Parent then
+				remote:FireClient(m.serverPlayer, ...)
+			end
+		end
+	end)
+end
+
+roblox.implementMethod("Instance", "WaitForChild", function(inst, name, timeout)
+	local found = inst:FindFirstChild(name)
+	local waited = 0
+	while found == nil do
+		if coroutine.isyieldable() then
+			waited += task.wait(0.05)
+		else
+			error("WaitForChild(" .. name .. ") on " .. inst:GetFullName() .. " outside a thread", 2)
+		end
+		found = inst:FindFirstChild(name)
+		if found == nil and waited > (timeout or 10) then
+			error(string.format("WaitForChild timed out: %s.%s", inst:GetFullName(), name), 2)
+		end
+	end
+	return found
+end)
+
+roblox.implementMethod("Players", "GetPlayers", function(players)
+	local out = {}
+	for _, child in players:GetChildren() do
+		if child.ClassName == "Player" then
+			table.insert(out, child)
+		end
+	end
+	return out
+end)
+
+roblox.implementMethod("RunService", "BindToRenderStep", function(rs, name, priority, fn)
+	machineOf(rs).renderSteps[name] = { priority = priority, fn = fn }
+end)
+roblox.implementMethod("RunService", "UnbindFromRenderStep", function(rs, name)
+	machineOf(rs).renderSteps[name] = nil
+end)
+roblox.implementMethod("RunService", "IsServer", function(rs)
+	return machineOf(rs).isServer
+end)
+roblox.implementMethod("RunService", "IsClient", function(rs)
+	return not machineOf(rs).isServer
+end)
+roblox.implementMethod("RunService", "IsStudio", function()
+	return true
+end)
+
+-- Players.LocalPlayer, Workspace.CurrentCamera and Camera.ViewportSize already exist in the API, and Lune can't
+-- override existing properties, so addClient sets them directly instead.
+
+---------------------------------------------------------------------------------------------- camera maths
+
+local function cameraRay(cam, x: number, y: number)
+	local m = machineOf(cam)
+	local vp = m.viewport
+	local cf = cam.CFrame
+	local tanV = math.tan(math.rad(cam.FieldOfView) / 2)
+	local aspect = vp.X / vp.Y
+	local nx = (2 * x / vp.X - 1) * tanV * aspect
+	local ny = (1 - 2 * y / vp.Y) * tanV
+	local dir = (cf.RightVector * nx + cf.UpVector * ny + cf.LookVector).Unit
+	return { Origin = cf.Position, Direction = dir }
+end
+
+roblox.implementMethod("Camera", "ScreenPointToRay", function(cam, x, y, depth)
+	local r = cameraRay(cam, x, y)
+	return { Origin = r.Origin, Direction = r.Direction * (depth or 1), Unit = r }
+end)
+roblox.implementMethod("Camera", "ViewportPointToRay", function(cam, x, y, depth)
+	local r = cameraRay(cam, x, y)
+	return { Origin = r.Origin, Direction = r.Direction * (depth or 1) }
+end)
+
+-- World point -> (screen x, screen y, in front of camera)
+function Emulator.worldToScreen(m: Machine, p)
+	local cam = m.camera
+	local cf = cam.CFrame
+	local rel = p - cf.Position
+	local z = rel:Dot(cf.LookVector)
+	local tanV = math.tan(math.rad(cam.FieldOfView) / 2)
+	local aspect = m.viewport.X / m.viewport.Y
+	local nx = rel:Dot(cf.RightVector) / (z * tanV * aspect)
+	local ny = rel:Dot(cf.UpVector) / (z * tanV)
+	return (nx + 1) / 2 * m.viewport.X, (1 - ny) / 2 * m.viewport.Y, z > 0
+end
+
+-- Raycast against parts: cylinders as discs/columns (axis along their local X), everything else as boxes.
+local function intersectPart(part, origin, dir)
+	local cf = part.CFrame
+	local size = part.Size
+	local lo = cf:PointToObjectSpace(origin)
+	local ld = cf:VectorToObjectSpace(dir)
+	local half = size / 2
+	local tmin, tmax = -math.huge, math.huge
+	for _, axis in { "X", "Y", "Z" } do
+		local o, d, h = lo[axis], ld[axis], half[axis]
+		if math.abs(d) < 1e-9 then
+			if o < -h or o > h then
+				return nil
+			end
+		else
+			local t1, t2 = (-h - o) / d, (h - o) / d
+			if t1 > t2 then
+				t1, t2 = t2, t1
+			end
+			tmin, tmax = math.max(tmin, t1), math.min(tmax, t2)
+			if tmin > tmax then
+				return nil
+			end
+		end
+	end
+	if tmax < 0 then
+		return nil
+	end
+	local t = math.max(tmin, 0)
+	if part.Shape == roblox.Enum.PartType.Cylinder then
+		-- inside the box; also require the hit to be within the circular cross-section (Y/Z plane)
+		local p = lo + ld * t
+		local r = math.min(half.Y, half.Z)
+		if p.Y * p.Y + p.Z * p.Z > r * r + 1e-6 then
+			return nil
+		end
+	end
+	return t
+end
+
+roblox.implementMethod("Workspace", "Raycast", function(ws, origin, direction, params)
+	local candidates = {}
+	if params and params.FilterType == roblox.Enum.RaycastFilterType.Include then
+		for _, root in params.FilterDescendantsInstances do
+			if root:IsA("BasePart") then
+				table.insert(candidates, root)
+			end
+			for _, d in root:GetDescendants() do
+				if d:IsA("BasePart") then
+					table.insert(candidates, d)
+				end
+			end
+		end
+	else
+		for _, d in ws:GetDescendants() do
+			if d:IsA("BasePart") then
+				table.insert(candidates, d)
+			end
+		end
+	end
+	local best, bestT = nil, math.huge
+	local len = direction.Magnitude
+	local unit = direction.Unit
+	for _, part in candidates do
+		if part.CanQuery then
+			local t = intersectPart(part, origin, unit)
+			if t and t <= len and t < bestT then
+				best, bestT = part, t
+			end
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	return { Instance = best, Position = origin + unit * bestT, Distance = bestT }
+end)
+
+---------------------------------------------------------------------------------------------- scripts
+
+local RaycastParams = {}
+function RaycastParams.new()
+	return { FilterType = roblox.Enum.RaycastFilterType.Exclude, FilterDescendantsInstances = {}, IgnoreWater = false }
+end
+
+local function resolveStringRequire(from, path: string)
+	local node
+	local parts = string.split(path, "/")
+	local i = 1
+	if parts[1] == "." then
+		node = from.Parent
+		i = 2
+	elseif parts[1] == ".." then
+		node = from.Parent.Parent
+		i = 2
+	else
+		error("unsupported require path " .. path)
+	end
+	while parts[i] == ".." do
+		node = node.Parent
+		i += 1
+	end
+	for j = i, #parts do
+		local child = node:FindFirstChild(parts[j])
+		if child == nil then
+			error(string.format("require(%q) from %s: %s has no child %s", path, from:GetFullName(), node:GetFullName(), parts[j]))
+		end
+		node = child
+	end
+	return node
+end
+
+local makeEnv
+
+local function requireModule(m: Machine, target, from)
+	if type(target) == "string" then
+		target = resolveStringRequire(from, target)
+	end
+	if m.modules[target] ~= nil then
+		return m.modules[target]
+	end
+	if target.ClassName ~= "ModuleScript" then
+		error("require expects a ModuleScript, got " .. target:GetFullName())
+	end
+	if m.loading[target] then
+		error("cyclic require of " .. target:GetFullName())
+	end
+	m.loading[target] = true
+	local chunk = luau.load(target.Source, { debugName = target:GetFullName(), environment = makeEnv(m, target) })
+	local result = chunk()
+	m.loading[target] = nil
+	m.modules[target] = result
+	return result
+end
+
+makeEnv = function(m: Machine, scriptInst)
+	local env = {
+		game = m.dm,
+		workspace = m.dm:GetService("Workspace"),
+		script = scriptInst,
+		require = function(target)
+			return requireModule(m, target, scriptInst)
+		end,
+		task = task,
+		wait = task.wait,
+		spawn = task.spawn,
+		delay = task.delay,
+		Instance = {
+			new = function(className, parent)
+				local inst = Instance.new(className)
+				machineOfInst[inst] = m
+				if parent then
+					inst.Parent = parent
+				end
+				return inst
+			end,
+		},
+		Enum = roblox.Enum,
+		Vector2 = roblox.Vector2,
+		Vector3 = roblox.Vector3,
+		CFrame = roblox.CFrame,
+		Color3 = roblox.Color3,
+		UDim = roblox.UDim,
+		UDim2 = roblox.UDim2,
+		BrickColor = roblox.BrickColor,
+		Rect = roblox.Rect,
+		NumberRange = roblox.NumberRange,
+		NumberSequence = roblox.NumberSequence,
+		NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
+		ColorSequence = roblox.ColorSequence,
+		ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,
+		Font = roblox.Font,
+		RaycastParams = RaycastParams,
+		os = {
+			clock = function()
+				return now
+			end,
+			time = function()
+				return 1700000000 + math.floor(now)
+			end,
+			date = os.date,
+		},
+		tick = function()
+			return now
+		end,
+		time = function()
+			return now
+		end,
+		print = function(...)
+			local parts = table.pack(...)
+			for i = 1, parts.n do
+				parts[i] = tostring(parts[i])
+			end
+			log(string.format("[%s %6.1fs] %s", m.name, now, table.concat(parts, " ")))
+		end,
+		warn = function(...)
+			local parts = table.pack(...)
+			for i = 1, parts.n do
+				parts[i] = tostring(parts[i])
+			end
+			local msg = string.format("[%s %6.1fs] WARN %s", m.name, now, table.concat(parts, " "))
+			table.insert(warnings, msg)
+			log(msg)
+		end,
+	}
+	return env
+end
+
+local function runScript(m: Machine, scriptInst)
+	local chunk = luau.load(scriptInst.Source, { debugName = scriptInst:GetFullName(), environment = makeEnv(m, scriptInst) })
+	local co = coroutine.create(chunk)
+	threadMachine[co] = m
+	resume(co)
+end
+
+local function newMachine(name: string, dm, isServer: boolean): Machine
+	local m: Machine = {
+		name = name,
+		dm = dm,
+		isServer = isServer,
+		modules = {},
+		loading = {},
+		renderSteps = {},
+		viewport = roblox.Vector2.new(844, 390), -- a phone in landscape
+		camera = nil,
+		localPlayer = nil,
+		serverPlayer = nil,
+	}
+	machineOfDm[dm] = m
+	table.insert(machines, m)
+	return m
+end
+
+---------------------------------------------------------------------------------------------- public API
+
+function Emulator.boot(placeBytes: string)
+	Emulator.placeBytes = placeBytes
+	local dm = roblox.deserializePlace(placeBytes)
+	local server = newMachine("server", dm, true)
+	Emulator.server = server
+	for _, s in dm:GetService("ServerScriptService"):GetDescendants() do
+		if s.ClassName == "Script" then
+			runScript(server, s)
+		end
+	end
+	return server
+end
+
+local nextUserId = 1000
+
+function Emulator.addClient(name: string, viewport: any?): Machine
+	local dm = roblox.deserializePlace(Emulator.placeBytes)
+	-- clients never see server scripts
+	for _, child in dm:GetService("ServerScriptService"):GetChildren() do
+		child:Destroy()
+	end
+	local client = newMachine(name, dm, false)
+	if viewport then
+		client.viewport = viewport
+	end
+	-- replicate what the server created in ReplicatedStorage (the Remotes folder)
+	local serverRs = Emulator.server.dm:GetService("ReplicatedStorage")
+	local clientRs = dm:GetService("ReplicatedStorage")
+	for _, child in serverRs:GetChildren() do
+		if clientRs:FindFirstChild(child.Name) == nil then
+			child:Clone().Parent = clientRs
+		end
+	end
+	local cam = Instance.new("Camera")
+	cam.FieldOfView = 70
+	cam.ViewportSize = client.viewport
+	cam.Parent = dm:GetService("Workspace")
+	dm:GetService("Workspace").CurrentCamera = cam
+	client.camera = cam
+
+	nextUserId += 1
+	local serverPlayer = Instance.new("Player")
+	serverPlayer.Name = name
+	serverPlayer.UserId = nextUserId
+	local localPlayer = Instance.new("Player")
+	localPlayer.Name = name
+	localPlayer.UserId = nextUserId
+	Instance.new("PlayerGui").Parent = localPlayer
+	local playerScripts = Instance.new("PlayerScripts")
+	playerScripts.Parent = localPlayer
+	localPlayer.Parent = dm:GetService("Players")
+	dm:GetService("Players").LocalPlayer = localPlayer
+	client.localPlayer = localPlayer
+	client.serverPlayer = serverPlayer
+	clientOfServerPlayer[serverPlayer] = client
+
+	serverPlayer.Parent = Emulator.server.dm:GetService("Players")
+	eventOf(Emulator.server.dm:GetService("Players"), "PlayerAdded"):Fire(serverPlayer)
+
+	-- StarterPlayerScripts are copied into PlayerScripts and run there
+	for _, child in dm:GetService("StarterPlayer"):FindFirstChildOfClass("StarterPlayerScripts"):GetChildren() do
+		child:Clone().Parent = playerScripts
+	end
+	for _, s in playerScripts:GetDescendants() do
+		if s.ClassName == "LocalScript" then
+			runScript(client, s)
+		end
+	end
+	return client
+end
+
+function Emulator.removeClient(client: Machine)
+	local players = Emulator.server.dm:GetService("Players")
+	eventOf(players, "PlayerRemoving"):Fire(client.serverPlayer)
+	task.defer(function()
+		client.serverPlayer.Parent = nil
+	end)
+end
+
+local FRAME = 0.1
+
+-- Advance virtual time, running scripts, frames and render steps.
+function Emulator.run(seconds: number)
+	local target = now + seconds
+	while now < target - 1e-9 do
+		local frameEnd = math.min(now + FRAME, target)
+		runDue(frameEnd)
+		now = frameEnd
+		for _, m in machines do
+			local rs = m.dm:GetService("RunService")
+			local steps = {}
+			for _, s in m.renderSteps do
+				table.insert(steps, s)
+			end
+			table.sort(steps, function(a, b)
+				return a.priority < b.priority
+			end)
+			for _, s in steps do
+				local co = newThread(s.fn, m)
+				resume(co, FRAME)
+			end
+			eventOf(rs, "RenderStepped"):Fire(FRAME)
+			eventOf(rs, "Heartbeat"):Fire(FRAME)
+		end
+	end
+end
+
+---------------------------------------------------------------------------------------------- input helpers
+
+function Emulator.tapScreen(client: Machine, x: number, y: number)
+	local uis = client.dm:GetService("UserInputService")
+	eventOf(uis, "TouchTap"):Fire({ roblox.Vector2.new(x, y) }, false)
+end
+
+function Emulator.tapWorld(client: Machine, worldPos)
+	local x, y, visible = Emulator.worldToScreen(client, worldPos)
+	assert(visible, "point is behind the camera")
+	Emulator.tapScreen(client, x, y)
+	return x, y
+end
+
+function Emulator.pan(client: Machine, dx: number, dy: number)
+	local uis = client.dm:GetService("UserInputService")
+	local sig = eventOf(uis, "TouchPan")
+	sig:Fire({}, roblox.Vector2.new(0, 0), roblox.Vector2.zero, roblox.Enum.UserInputState.Begin, false)
+	sig:Fire({}, roblox.Vector2.new(dx, dy), roblox.Vector2.zero, roblox.Enum.UserInputState.Change, false)
+	sig:Fire({}, roblox.Vector2.new(dx, dy), roblox.Vector2.zero, roblox.Enum.UserInputState.End, false)
+end
+
+function Emulator.pinch(client: Machine, scale: number)
+	local uis = client.dm:GetService("UserInputService")
+	local sig = eventOf(uis, "TouchPinch")
+	sig:Fire({}, 1, 0, roblox.Enum.UserInputState.Begin, false)
+	sig:Fire({}, scale, 0, roblox.Enum.UserInputState.Change, false)
+	sig:Fire({}, scale, 0, roblox.Enum.UserInputState.End, false)
+end
+
+local function visibleInTree(inst): boolean
+	local node = inst
+	while node do
+		if node:IsA("GuiObject") and not node.Visible then
+			return false
+		end
+		if node:IsA("ScreenGui") and not node.Enabled then
+			return false
+		end
+		node = node.Parent
+	end
+	return true
+end
+
+-- Every visible button in the client's PlayerGui, as { button, text }.
+function Emulator.buttons(client: Machine)
+	local out = {}
+	for _, d in client.localPlayer.PlayerGui:GetDescendants() do
+		if d:IsA("GuiButton") and visibleInTree(d) then
+			table.insert(out, { button = d, text = if d:IsA("TextButton") then d.Text else d.Name })
+		end
+	end
+	return out
+end
+
+-- Press the first visible button whose text contains `needle` (plain match). Errors if there is none.
+function Emulator.press(client: Machine, needle: string)
+	for _, b in Emulator.buttons(client) do
+		if string.find(b.text, needle, 1, true) then
+			eventOf(b.button, "Activated"):Fire(nil, 1)
+			return b.button
+		end
+	end
+	local names = {}
+	for _, b in Emulator.buttons(client) do
+		table.insert(names, (string.gsub(b.text, "\n", " ")))
+	end
+	error(string.format("%s: no visible button with %q (have: %s)", client.name, needle, table.concat(names, " | ")), 2)
+end
+
+function Emulator.findText(client: Machine, needle: string): string?
+	for _, d in client.localPlayer.PlayerGui:GetDescendants() do
+		if (d:IsA("TextLabel") or d:IsA("TextButton")) and visibleInTree(d) and string.find(d.Text, needle, 1, true) then
+			return d.Text
+		end
+	end
+	return nil
+end
+
+-- Fail loudly with everything that went wrong so far.
+function Emulator.assertClean(label: string)
+	if #errors > 0 or #warnings > 0 then
+		stdio.ewrite(string.format("\n%s: %d errors, %d warnings\n", label, #errors, #warnings))
+		for _, e in errors do
+			stdio.ewrite(e .. "\n")
+		end
+		for _, w in warnings do
+			stdio.ewrite(w .. "\n")
+		end
+		error(label .. " failed")
+	end
+end
+
+Emulator.machines = machines
+Emulator.task = task
+Emulator.roblox = roblox
+
+return Emulator

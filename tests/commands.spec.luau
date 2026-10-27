@@ -91,10 +91,11 @@ T.test("recruit spends gold and manpower and merges into one army", function()
 	T.equal(nation.manpower, 10000 - 5000)
 	local armies = 0
 	for _, a in state.armies do
-		armies += 1
-		T.equal(a.owner, 1)
-		T.equal(a.location, capital.id)
-		T.equal(a.men, 5000)
+		if a.owner == 1 then
+			armies += 1
+			T.equal(a.location, capital.id)
+			T.equal(a.men, 5000)
+		end
 	end
 	T.equal(armies, 1)
 end)

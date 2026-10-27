@@ -48,7 +48,13 @@ T.test("a delta carries only changed records, and applying it catches the client
 	T.equal(client.provinces[3].owner, 2)
 	T.equal(client.provinces[3].development, 4)
 	T.equal(client.nations[2].gold, state.nations[2].gold)
-	T.equal(client.armies[1].men, 2000)
+	local mirrored
+	for _, a in client.armies do
+		if a.id == army.id then
+			mirrored = a
+		end
+	end
+	T.equal(mirrored and mirrored.men, 2000)
 
 	-- the army disappears
 	local before = Snapshot.full(state)
@@ -57,7 +63,9 @@ T.test("a delta carries only changed records, and applying it catches the client
 	assert(delta2, "expected a delta")
 	T.equal(delta2.removedArmies[1], army.id)
 	Snapshot.apply(client, delta2)
-	T.equal(#client.armies, 0)
+	for _, a in client.armies do
+		T.expect(a.id ~= army.id, "the removed army is gone on the client")
+	end
 end)
 
 T.test("a phase change alone is a delta", function()

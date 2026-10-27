@@ -1,6 +1,7 @@
 --!strict
 -- Match setup, phases and seats (which player controls which nation).
 
+local Army = require("./Army")
 local Config = require("../Config")
 local Types = require("../Types")
 
@@ -43,9 +44,10 @@ function Match.new(map: MapDef): MatchState
 			allianceId = nil,
 			powerImmuneUntil = 0,
 			eliminated = false,
+			battlesWon = 0,
 		}
 	end
-	return {
+	local state: MatchState = {
 		mapId = map.id,
 		tick = 0,
 		phase = "Peace",
@@ -56,7 +58,18 @@ function Match.new(map: MapDef): MatchState
 		alliances = {},
 		truces = {},
 		primordials = {},
+		battles = {},
+		offers = {},
+		events = {},
+		result = nil,
 	}
+	-- neutral land starts with a garrison, so expanding means a small fight first
+	for _, def in map.provinces do
+		if def.startOwner == nil and def.terrain ~= "Mountain" then
+			Army.spawn(state, 0, def.id, def.garrison or Config.NeutralGarrison)
+		end
+	end
+	return state
 end
 
 -- Phase for a match tick. Lobby and Pick are not used until the map vote and draft exist.
@@ -73,8 +86,9 @@ function Match.phaseAt(tick: number): Phase
 end
 
 -- True once Results has been shown long enough to start the next match.
-function Match.isOver(tick: number): boolean
-	return tick >= Config.Phases.MatchEndTick + Config.Phases.ResultsTicks
+function Match.isOver(state: MatchState): boolean
+	local result = state.result
+	return result ~= nil and state.tick >= result.endedAt + Config.Phases.ResultsTicks
 end
 
 -- Give a joining player the lowest-numbered nation a bot is playing. Returns nil if every seat is taken.

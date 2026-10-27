@@ -76,6 +76,8 @@ Config.Diplomacy = {
 	MaxAllianceSize = 3,
 	TruceTicks = 3 * 60,
 	CoalitionThreshold = 0.25, -- share of all provinces that puts a crown on a nation
+	OfferTicks = 30, -- alliance and peace offers expire after this
+	PeaceTributes = { 0, 50, 100 }, -- gold a peace offer can include (the buttons in the province sheet)
 }
 
 -- Primordial powers ------------------------------------------------------------------------------

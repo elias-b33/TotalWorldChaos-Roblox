@@ -5,7 +5,9 @@
 
 local Army = require("./Army")
 local Config = require("../Config")
+local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
+local Movement = require("./Movement")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -106,6 +108,21 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 		return build(state, nationId, command.province, command.building)
 	elseif command.kind == "Recruit" then
 		return recruit(state, nationId, command.province, command.regiments)
+	elseif command.kind == "Move" then
+		return Movement.order(state, nationId, command.army, command.to)
+	elseif command.kind == "Diplomacy" then
+		local action = command.action
+		if action == "War" then
+			return Diplomacy.declareWar(state, nationId, command.target)
+		elseif action == "Ally" then
+			return Diplomacy.propose(state, "Ally", nationId, command.target, 0)
+		elseif action == "Peace" then
+			return Diplomacy.propose(state, "Peace", nationId, command.target, command.gold)
+		elseif action == "AcceptAlly" then
+			return Diplomacy.accept(state, "Ally", nationId, command.target)
+		elseif action == "AcceptPeace" then
+			return Diplomacy.accept(state, "Peace", nationId, command.target)
+		end
 	end
 	return false, "UnknownCommand"
 end

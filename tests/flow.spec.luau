@@ -6,8 +6,10 @@ local Config = require("../src/shared/Config")
 local Economy = require("../src/shared/Sim/Economy")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
+local Rng = require("../src/shared/Sim/Rng")
 local Snapshot = require("../src/shared/Snapshot")
 local T = require("./TestKit")
+local Tick = require("../src/shared/Sim/Tick")
 
 -- What a keen player might tap every few seconds: develop the poorest province, then build, then recruit.
 local function greedyIntent(state, nationId: number)
@@ -45,7 +47,8 @@ for _, mapId in Maps.ids do
 		local accepted, refused = 0, 0
 		local phasesSeen: { [string]: boolean } = {}
 
-		while not Match.isOver(state.tick) do
+		local rng = Rng.new(7)
+		while not Match.isOver(state) do
 			-- 1. apply queued commands (one intent per tick from the player)
 			local ok = Commands.apply(state, me, greedyIntent(state, me))
 			if ok then
@@ -53,21 +56,16 @@ for _, mapId in Maps.ids do
 			else
 				refused += 1
 			end
-			-- advance the clock and phase
-			state.tick += 1
-			state.phase = Match.phaseAt(state.tick)
+			Tick.advance(state, rng) -- 2-8
 			phasesSeen[state.phase] = true
-			-- 5. income and upkeep
-			if state.tick % Config.MonthTicks == 0 then
-				Economy.payMonth(state)
-			end
-			-- 9. one delta to the client
+			-- 9. one delta to the client, then the events are spent
 			local current = Snapshot.full(state)
-			local delta = Snapshot.diff(lastSent, current)
+			local delta = Snapshot.diff(lastSent, current, state.events)
 			if delta then
 				Snapshot.apply(client, delta)
 			end
 			lastSent = current
+			table.clear(state.events)
 		end
 
 		T.expect(phasesSeen.Peace and phasesSeen.War and phasesSeen.Cataclysm and phasesSeen.Results, "missed a phase")
@@ -82,6 +80,8 @@ for _, mapId in Maps.ids do
 		T.expect(refused > 0, "the player should run out of money sometimes")
 		T.expect(Economy.monthlyIncome(state, me).gold > startIncome, "income did not grow")
 		T.expect(sameView(client, Snapshot.full(state)), "client mirror drifted from the server")
+		T.expect(state.result and state.result.kind == "Score", "the match ended on score")
+		T.expect(client.result and client.result.kind == "Score", "the client heard the result")
 		-- nobody else did anything, so bots kept their starting land
 		for id in state.nations do
 			T.equal(Match.provinceCount(state, id), 8)
