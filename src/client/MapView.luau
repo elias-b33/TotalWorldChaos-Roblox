@@ -12,6 +12,7 @@ local TAP_SLOP = 8 -- pixels a press may move and still count as a tap
 local MAX_ZOOM = 10 -- screen pixels per map pixel at the closest zoom
 local ZOOM_LEVELS = 3 -- whole map, region, close-up (mouse wheel steps between them)
 local SMOOTHING = 12 -- higher = snappier
+local TOP_BAR = 44 -- the HUD's top bar (UI/Hud BAR_HEIGHT): the map is framed below it
 
 local MapView = {}
 
@@ -37,9 +38,20 @@ local function viewport(): Vector2
 	return if camera then camera.ViewportSize else Vector2.new(800, 600)
 end
 
-local function fitZoom(): number
+-- The part of the screen the map is framed in (below the top bar), and its centre.
+local function viewArea(): Vector2
 	local vp = viewport()
-	return math.min(vp.X / mapSize.X, vp.Y / mapSize.Y)
+	return Vector2.new(vp.X, math.max(vp.Y - TOP_BAR, 1))
+end
+
+local function viewCentre(): Vector2
+	local vp = viewport()
+	return Vector2.new(vp.X / 2, TOP_BAR + (vp.Y - TOP_BAR) / 2)
+end
+
+local function fitZoom(): number
+	local area = viewArea()
+	return math.min(area.X / mapSize.X, area.Y / mapSize.Y)
 end
 
 local function clampZoom(z: number): number
@@ -48,7 +60,7 @@ end
 
 -- Keep the map's edges on screen: centred on an axis where the map is smaller than the screen.
 local function clampFocus(p: Vector2, z: number): Vector2
-	local half = viewport() / 2 / z
+	local half = viewArea() / 2 / z
 	local x = if mapSize.X <= half.X * 2 then mapSize.X / 2 else math.clamp(p.X, half.X, mapSize.X - half.X)
 	local y = if mapSize.Y <= half.Y * 2 then mapSize.Y / 2 else math.clamp(p.Y, half.Y, mapSize.Y - half.Y)
 	return Vector2.new(x, y)
@@ -129,11 +141,11 @@ function MapView.onZoom(fn: (number) -> ())
 end
 
 function MapView.toScreen(p: Vector2): Vector2
-	return viewport() / 2 + (p - focus) * zoom
+	return viewCentre() + (p - focus) * zoom
 end
 
 function MapView.toMap(screenPos: Vector2): Vector2
-	return focus + (screenPos - viewport() / 2) / zoom
+	return focus + (screenPos - viewCentre()) / zoom
 end
 
 -- The region zoom (the middle wheel step), for things that should show from there on.
@@ -162,10 +174,10 @@ local function apply()
 	if frame == nil then
 		return
 	end
-	local vp = viewport()
+	local centre = viewCentre()
 	-- whole pixels, so the pixel art doesn't shimmer while panning
-	local x = math.floor(vp.X / 2 - focus.X * zoom + 0.5)
-	local y = math.floor(vp.Y / 2 - focus.Y * zoom + 0.5)
+	local x = math.floor(centre.X - focus.X * zoom + 0.5)
+	local y = math.floor(centre.Y - focus.Y * zoom + 0.5)
 	local w = math.floor(mapSize.X * zoom + 0.5)
 	local h = math.floor(mapSize.Y * zoom + 0.5)
 	if x ~= applied.x or y ~= applied.y then
@@ -264,7 +276,7 @@ function MapView.init(onTap: TapHandler)
 			for _, p in positions do
 				sum += p
 			end
-			pinchCentre = if #positions > 0 then fromInput(sum / #positions) else viewport() / 2
+			pinchCentre = if #positions > 0 then fromInput(sum / #positions) else viewCentre()
 		end
 		zoomAround(pinchCentre, pinchStartZoom * scale, true)
 	end)
@@ -279,7 +291,7 @@ function MapView.init(onTap: TapHandler)
 		local hold = anchor
 		if hold then
 			-- the anchored map point stays under its screen point while the zoom changes
-			focus = clampFocus(hold.map - (hold.screen - viewport() / 2) / zoom, zoom)
+			focus = clampFocus(hold.map - (hold.screen - viewCentre()) / zoom, zoom)
 			targetFocus = focus
 			if zoom == targetZoom then
 				anchor = nil
