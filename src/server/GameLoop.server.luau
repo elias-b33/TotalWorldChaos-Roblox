@@ -1,6 +1,7 @@
 --!strict
 -- Boots the server and runs the 1-second tick (docs/DESIGN.md "Tick order").
--- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 9 is Replicator.
+-- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 7 (bots) is AIService, step 9 is
+-- Replicator.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +15,7 @@ Remotes.create()
 Players.CharacterAutoLoads = false -- the game is the map; nobody needs an avatar walking around
 
 local Server = script.Parent
+local AIService = require(Server.Services.AIService)
 local CommandRouter = require(Server.CommandRouter)
 local MatchService = require(Server.Services.MatchService)
 local Replicator = require(Server.Replicator)
@@ -27,6 +29,7 @@ local PHASE_TOASTS = {
 local function startMatch()
 	local state = MatchService.start(MatchService.chooseMap())
 	CommandRouter.clear()
+	AIService.reset()
 	Replicator.reset(state)
 	-- seat everyone who is already here, in join order
 	for _, player in Players:GetPlayers() do
@@ -52,6 +55,9 @@ local function tick()
 	local state = MatchService.state()
 	CommandRouter.applyQueued(state) -- 1. apply queued commands
 	local newPhase = MatchService.advance() -- 2-8. armies, battles, sieges, income, win checks
+	-- 7. bots plan. Sim.Tick runs steps 2-8 in one call, so bots plan right after it; their commands wait in the
+	-- queue for step 1 of the next tick either way, so nothing changes in between.
+	AIService.step(state)
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end
