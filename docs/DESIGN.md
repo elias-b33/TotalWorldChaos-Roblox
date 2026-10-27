@@ -153,6 +153,7 @@ src/
     MapRenderer.luau           -- colours provinces, draws armies, labels and markers
     MapSurface.luau            -- builds the land from MapData shapes: wedges, relief, water, borders
     MapStyle.luau              -- biome look: material, colour, height
+    MaterialPack.luau          -- custom material variants (texture pack), when imported
     CameraController.luau      -- pan, pinch zoom, tap selection
     UI/                        -- HUD, province sheet, diplomacy, powers
   shared/
@@ -164,6 +165,7 @@ tests/                         -- Lune test files for shared/Sim
 assets/
   maps/<map>/                  -- layout.json, province_ids.png, previews, vote card
   textures/<theme>/            -- 512 px seamless terrain tiles (+ detail/ for tinting)
+  textures/hd/<Name>/          -- 1024 px texture pack: colour, normal, roughness per material variant
 tools/mapgen/                  -- Python generator for everything in assets/
 ```
 
@@ -198,6 +200,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 - **Look:** each biome has a built-in Roblox material and colour (`MapStyle`). In the political view the part colour is the owner's nation colour with a touch of the terrain colour, so the material still shows. Hills and mountains stand higher than plains; mountains get rock ridges with snow caps and are never painted. Seas are Roblox `Terrain` water; Skyshards floats over a deep sky.
 - **Borders:** thin lines between provinces of one owner, bold where two owners meet; redrawn when ownership changes.
 - **Labels:** a province's name and development pips show once the camera is within about four province widths, so big provinces are named from far away and small ones only up close.
+- **Texture pack:** if `MaterialService` holds the `TWC_*` material variants from `assets/textures/hd/` (or their image ids are filled in `MaterialPack`), provinces use them instead of the built-in materials (see `docs/MAPS.md` "Custom texture pack").
 - Colour changes only when ownership changes; nothing updates per frame except army tokens.
 
 ### Performance budget
@@ -441,7 +444,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 ### Phase 4: Polish and shop
 
 - [x] Province shapes for Earth, Eldmoor and Skyshards (built from `MapData` triangles, materials by biome)
-- [ ] Custom terrain texture pack as material variants
+- [x] Custom terrain texture pack as material variants (the owner imports it once in Studio)
 - [ ] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
 - [ ] `PlayerDataService`: XP, ranks, daily quests

@@ -736,6 +736,9 @@ end
 
 local nextUserId = 1000
 
+-- MaterialVariants every new client starts with (play.luau fills this when TEXTURES=1).
+Emulator.materialVariants = {} :: { any }
+
 function Emulator.addClient(name: string, viewport: any?): Machine
 	local dm = roblox.deserializePlace(Emulator.placeBytes)
 	-- clients never see server scripts
@@ -759,6 +762,10 @@ function Emulator.addClient(name: string, viewport: any?): Machine
 	pcall(function()
 		dm:GetService("Workspace").Terrain = terrain
 	end)
+	-- the owner's custom texture pack, as if imported in Studio (TEXTURES=1; see docs/MAPS.md)
+	for _, variant in Emulator.materialVariants do
+		variant:Clone().Parent = dm:GetService("MaterialService")
+	end
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 70
 	cam.ViewportSize = client.viewport

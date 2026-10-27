@@ -5,6 +5,7 @@
 --   lune run tools/harness/play smoke          # one scenario
 --   lune run tools/harness/play all            # every scenario
 --   MAP=earth lune run tools/harness/play smoke  # on another map (default: Config.DefaultMap)
+--   TEXTURES=1 lune run tools/harness/play look   # with the custom texture pack (assets/textures/hd) imported
 --
 -- Screenshots go to tools/harness/out/<scenario>/NN_name.png (rendered by render_scene.py).
 -- A scenario fails on any script error, any warn(), any table Roblox would mangle over the network,
@@ -324,6 +325,28 @@ local function runScenario(name: string)
 	end
 	fs.writeDir(shotDir)
 	Emulator.boot(fs.readFile("build/game.rbxlx"), process.env.MAP)
+	if process.env.TEXTURES then
+		-- one variant per pack folder, the way the owner names them in Studio's Material Manager
+		local bases = {
+			Grass = "Grass",
+			Forest = "LeafyGrass",
+			Sand = "Sand",
+			Ground = "Ground",
+			Sandstone = "Sandstone",
+			Rock = "Rock",
+			Snow = "Snow",
+			Ash = "CrackedLava",
+			Marble = "Marble",
+			Slate = "Slate",
+			Basalt = "Basalt",
+		}
+		for name, base in bases do
+			local v = Emulator.roblox.Instance.new("MaterialVariant")
+			v.Name = "TWC_" .. name
+			v.BaseMaterial = (Emulator.roblox.Enum.Material :: any)[base]
+			table.insert(Emulator.materialVariants, v)
+		end
+	end
 	scenarios[name]()
 	Emulator.assertClean(name)
 	print(string.format("== %s passed (%.0f s of game time) ==", name, Emulator.now()))

@@ -95,6 +95,7 @@ function Scene.capture(client)
 				color = c3(d.Color),
 				transparency = d.Transparency,
 				material = enumName(d.Material),
+				variant = d.MaterialVariant,
 			})
 		elseif d:IsA("BillboardGui") and d.Enabled then
 			local adornee = d.Adornee or d.Parent

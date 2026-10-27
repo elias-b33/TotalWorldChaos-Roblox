@@ -2,6 +2,7 @@
 
     python3 tools/mapgen/generate.py                 # everything (about 2 minutes)
     python3 tools/mapgen/generate.py --only tiles    # just the terrain tiles
+    python3 tools/mapgen/generate.py --only materials  # the 1024 px texture pack (material variants)
     python3 tools/mapgen/generate.py --only earth    # one map: earth | eldmoor | skyshards
 
 Output is deterministic: the same code always produces the same files.
@@ -21,6 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import export_luau  # noqa: E402
+import materials  # noqa: E402
 import render  # noqa: E402
 import shapes  # noqa: E402
 from layout import to_json, validate, write_json  # noqa: E402
@@ -103,10 +105,12 @@ def make_map(key: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["tiles", *MAPS.keys()])
+    ap.add_argument("--only", choices=["tiles", "materials", *MAPS.keys()])
     args = ap.parse_args()
     if args.only in (None, "tiles"):
         make_tiles()
+    if args.only in (None, "materials"):
+        materials.build(os.path.join(ASSETS, "textures", "hd"), os.path.join(SHEETS, "materials.jpg"), render.font(15))
     for key in MAPS:
         if args.only in (None, key):
             make_map(key)

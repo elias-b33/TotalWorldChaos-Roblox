@@ -141,15 +141,35 @@ Every tile is 512×512 and seamless. `detail/` holds the greyscale version for t
 ![Fantasy tiles](images/tiles_fantasy.jpg)
 ![Sky tiles](images/tiles_sky.jpg)
 
-### Using the textures in Roblox
+### Custom texture pack
 
-1. Upload `assets/textures/<theme>/*.png` and `detail/*.png` with Studio's Asset Manager (Bulk Import). Tiles are 512×512, under Roblox's 1024×1024 image limit.
-2. Put the asset ids in one client module, `src/client/MapArt.luau` (biome key → colour id, detail id).
-3. On each province's top face, add a `Texture` with `StudsPerTileU = StudsPerTileV = 128`, so every province shares one grid and textures line up across borders.
-   - **Terrain view:** colour tile, `Color3` white.
-   - **Political view:** detail tile, `Color3` = the owner's palette colour. Neutral: colour tile at `Transparency 0.45` over a light grey part.
-4. Water and void: one large part under the map with the `sea` or `void` tile. Bridges: a thin part per strait with the `bridge` tile.
-5. Lobby: upload `assets/maps/<map>/vote_card.jpg` (1024×512) for the three map-vote buttons.
+The 512 px tiles above are for previews and the vote cards. In the game, provinces use Roblox materials: the built-in ones by default, or our own **texture pack** once it is imported. The pack has 11 material variants, each a seamless 1024 px colour map (greyscale, so the part colour tints it), normal map and roughness map, made by `python3 tools/mapgen/generate.py --only materials` into `assets/textures/hd/<Name>/`:
+
+| Variant | Replaces | Used for | Studs per tile |
+| --- | --- | --- | --- |
+| `TWC_Grass` | Grass | grassland, steppe, savanna, meadow, skymeadow | 64 |
+| `TWC_Forest` | LeafyGrass | forest, taiga, jungle, wildwood, crystalgrove | 40 |
+| `TWC_Sand` | Sand | desert, dunes | 64 |
+| `TWC_Ground` | Ground | hills, tundra, highlands | 48 |
+| `TWC_Sandstone` | Sandstone | drylands | 64 |
+| `TWC_Rock` | Rock | mountains, peaks, mountain ridges | 48 |
+| `TWC_Snow` | Snow | ice, frostfields, snow caps | 64 |
+| `TWC_Ash` | CrackedLava | ashlands | 48 |
+| `TWC_Marble` | Marble | heartruins | 48 |
+| `TWC_Slate` | Slate | crags | 48 |
+| `TWC_Basalt` | Basalt | stormspire | 40 |
+
+![Texture pack](images/materials.jpg)
+
+`src/client/MaterialPack.luau` puts a variant on every part of its base material when the variant exists; until then the built-in material shows, so the game always works. Import the pack one of two ways:
+
+**A. In Studio, no code (about 15 minutes).** Open the place, then **Model tab → Material Manager**. For each row of the table: pick the base material in the list, press **+** (Create Material Variant), name it exactly as in the table, import `<Name>_color.png`, `<Name>_normal.png` and `<Name>_roughness.png` from `assets/textures/hd/<Name>/` into Color, Normal and Roughness, and set **Studs Per Tile**. Studio uploads the images and keeps the variants in `MaterialService`. Rojo doesn't manage `MaterialService`, so syncing never removes them. Publish the place.
+
+**B. By asset id.** Upload all 33 PNGs at once with **View → Asset Manager → Bulk Import**, right-click each image → **Copy ID**, and paste the ids (`rbxassetid://…`) into the `color`, `normal` and `roughness` fields of `src/client/MaterialPack.luau`. The client then creates the variants itself, so every build has them.
+
+Roblox lays a material's texture out in each part's own space, and every province is many triangles, so strongly patterned materials (Marble, Basalt, Sandstone) can show faint seams between triangles. The pack keeps patterns irregular to hide this.
+
+To preview the pack without Studio, run the harness with it imported: `TEXTURES=1 MAP=earth lune run tools/harness/play look`.
 
 ## Map data pipeline
 
@@ -162,7 +182,8 @@ Everything here comes from `python3 tools/mapgen/generate.py` (about 1–2 minut
 | `assets/maps/<map>/terrain.jpg`, `political.jpg` | Full-size previews | Reviews and Studio reference |
 | `assets/maps/<map>/atlas.jpg` | Terrain view with province ids printed | Debugging, bug reports ("army stuck in 57") |
 | `assets/maps/<map>/vote_card.jpg` | 1024×512 lobby card | Map vote |
-| `assets/textures/<theme>/…` | Terrain tiles | `MapArt` |
+| `assets/textures/<theme>/…` | 512 px terrain tiles | Previews, vote cards, harness stand-ins for built-in materials |
+| `assets/textures/hd/<Name>/…` | 1024 px texture pack (colour, normal, roughness) | `MaterialPack` (material variants) |
 
 **Scale:** 1 image pixel = 0.5 stud, so Earth and Eldmoor are 1024×512 studs and Skyshards is 1024×768. `center` in `layout.json` is where the province label and garrison token sit.
 

@@ -181,25 +181,40 @@ TEXTURE_PERIOD = 18.0  # studs per texture repeat
 SUN = np.array([-0.35, 1.0, 0.45]) / np.linalg.norm([-0.35, 1.0, 0.45])
 AMBIENT = 0.58
 _details: dict = {}
+sys.path.insert(0, os.path.join(ROOT, "tools", "mapgen"))
+from materials import MATERIALS  # noqa: E402
+
+HD_STUDS = {m.name: m.studs for m in MATERIALS}
 
 
-def detail(material: str):
-    """Mip chain of a grey detail map (mean 1) for a material, or None for flat materials."""
-    if material not in MATERIAL_TEXTURES:
-        return None
-    if material not in _details:
-        path = os.path.join(TEX, MATERIAL_TEXTURES[material] + ".png")
-        if not os.path.exists(path):
-            _details[material] = None
-        else:
+def mips(a):
+    chain = [a]
+    while chain[-1].shape[0] > 4:
+        x = chain[-1]
+        chain.append((x[0::2, 0::2] + x[1::2, 0::2] + x[0::2, 1::2] + x[1::2, 1::2]) / 4)
+    return chain
+
+
+def texture_of(key: str):
+    """Colour detail (mean ~1) and optional normal-map mip chains for a material or a TWC_ variant, or None."""
+    if key in _details:
+        return _details[key]
+    tex = None
+    if key.startswith("TWC_") and key[4:] in HD_STUDS:
+        name = key[4:]
+        folder = os.path.join(TEX, "hd", name)
+        color = np.asarray(Image.open(os.path.join(folder, f"{name}_color.png")).convert("L"), dtype=np.float64) / 255
+        normal = np.asarray(Image.open(os.path.join(folder, f"{name}_normal.png")).convert("RGB"), dtype=np.float64)
+        normal /= 255
+        tex = {"color": mips(color * 1.15), "normal": mips(normal * 2 - 1), "studs": HD_STUDS[key[4:]]}
+    elif key in MATERIAL_TEXTURES:
+        path = os.path.join(TEX, MATERIAL_TEXTURES[key] + ".png")
+        if os.path.exists(path):
             lum = np.asarray(Image.open(path).convert("L"), dtype=np.float64)
             lum = np.clip(1 + (lum / max(lum.mean(), 1) - 1) * 0.9, 0.45, 1.6)
-            chain = [lum]
-            while chain[-1].shape[0] > 4:
-                a = chain[-1]
-                chain.append((a[0::2, 0::2] + a[1::2, 0::2] + a[0::2, 1::2] + a[1::2, 1::2]) / 4)
-            _details[material] = chain
-    return _details[material]
+            tex = {"color": mips(lum), "normal": None, "studs": TEXTURE_PERIOD}
+    _details[key] = tex
+    return tex
 
 
 def part_faces(part):
@@ -241,8 +256,15 @@ def part_faces(part):
         fc = sum(f) / len(f)
         if np.dot(n, fc - centre) < 0:
             n = -n  # outward
-        out.append((f, n))
+        out.append((f, n, local_axis(cf, n)))
     return out
+
+
+def local_axis(cf, n):
+    """The part-local axis (0 = X, 1 = Y, 2 = Z) closest to a world-space face normal."""
+    r = cf[3:]
+    cols = [np.array([r[a], r[3 + a], r[6 + a]]) for a in range(3)]
+    return int(np.argmax([abs(float(np.dot(c, n))) for c in cols]))
 
 
 NEAR = 0.5
@@ -316,7 +338,7 @@ def render_world(img, scene, cam):
     for part in parts:
         if part["transparency"] >= 0.95:
             continue
-        for f, n in part_faces(part):
+        for f, n, axis in part_faces(part):
             fc = sum(f) / len(f)
             if np.dot(n, campos - fc) <= 0:
                 continue  # facing away
@@ -326,7 +348,8 @@ def render_world(img, scene, cam):
             shade = AMBIENT + (1 - AMBIENT) * max(0.0, float(np.dot(n, SUN)))
             if part["material"] == "Neon":
                 shade = 1.25
-            item = (proj, part["color"], shade, part["material"], 1 - part["transparency"])
+            texture = part.get("variant") or part["material"]
+            item = (proj, part["color"], shade, texture, 1 - part["transparency"], part["cf"], axis, n)
             (opaque if part["transparency"] < 0.001 else translucent).append(item)
 
     ids, zbuf = rasterize([it[0] for it in opaque], w, h)
@@ -334,47 +357,76 @@ def render_world(img, scene, cam):
     shades = np.array([1.0] + [it[2] for it in opaque])
     out = colors[ids] * shades[ids][..., None]
 
-    # world position under every pixel, from its depth, for material texture lookups (planar, from above)
+    # world position under every pixel, from its depth
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
     nx = (2 * (xs + 0.5) / w - 1) * cam.tan * (w / h)
     ny = (1 - 2 * (ys + 0.5) / h) * cam.tan
     right, up, look = (np.array(v) for v in (cam.right, cam.up, cam.look))
     depth = np.where(np.isfinite(zbuf), zbuf, 0)
-    wx = campos[0] + (right[0] * nx + up[0] * ny + look[0]) * depth
-    wz = campos[2] + (right[2] * nx + up[2] * ny + look[2]) * depth
-    mats = [""] + [it[3] for it in opaque]
-    for material in set(mats):
-        tex = detail(material)
+    world = [campos[i] + (right[i] * nx + up[i] * ny + look[i]) * depth for i in range(3)]
+
+    # materials: Roblox maps a material's texture in each part's own space (it turns with the part), so do the same
+    rots = np.array([[0.0] * 9] + [it[5][3:] for it in opaque])
+    poss = np.array([[0.0] * 3] + [it[5][:3] for it in opaque])
+    axes = np.array([0] + [it[6] for it in opaque])
+    normals = np.array([[0.0, 1.0, 0.0]] + [list(it[7]) for it in opaque])
+    keys = [""] + [it[3] for it in opaque]
+    for key in set(keys):
+        tex = texture_of(key)
         if tex is None:
             continue
-        mask = np.isin(ids, [i for i, m in enumerate(mats) if m == material])
+        mask = np.isin(ids, [i for i, k in enumerate(keys) if k == key])
         if not mask.any():
             continue
-        # pick the mip level whose texels match the pixel's footprint on the ground, like a GPU would
-        footprint = depth[mask] * 2 * cam.tan / h * tex[0].shape[0] / TEXTURE_PERIOD
-        level = np.clip(np.floor(np.log2(np.maximum(footprint, 1e-6))), 0, len(tex) - 1).astype(int)
-        vals = np.empty(level.shape)
-        for k, lvl in enumerate(tex):
-            sel = level == k
-            if sel.any():
-                tn = lvl.shape[0]
-                u = ((wx[mask][sel] / TEXTURE_PERIOD) % 1.0 * tn).astype(int) % tn
-                v = ((wz[mask][sel] / TEXTURE_PERIOD) % 1.0 * tn).astype(int) % tn
-                vals[sel] = lvl[v, u]
-        out[mask] *= vals[:, None]
+        k = ids[mask]
+        rel = [world[i][mask] - poss[k, i] for i in range(3)]
+        rot = rots[k]
+        local = [rot[:, a] * rel[0] + rot[:, 3 + a] * rel[1] + rot[:, 6 + a] * rel[2] for a in range(3)]
+        ua = np.where(axes[k] == 0, 1, 0)  # the two axes across the face
+        va = np.where(axes[k] == 2, 1, 2)
+        local = np.stack(local, axis=-1)
+        lu = np.take_along_axis(local, ua[:, None], axis=1)[:, 0]
+        lv = np.take_along_axis(local, va[:, None], axis=1)[:, 0]
+        period = tex["studs"]
+        # pick the mip level whose texels match the pixel's footprint, like a GPU would
+        footprint = depth[mask] * 2 * cam.tan / h * tex["color"][0].shape[0] / period
+        level = np.clip(np.floor(np.log2(np.maximum(footprint, 1e-6))), 0, len(tex["color"]) - 1).astype(int)
+        albedo = np.ones(level.shape)
+        bump = np.zeros(level.shape + (3,))
+        bump[:, 2] = 1
+        for lv_i in range(len(tex["color"])):
+            sel = level == lv_i
+            if not sel.any():
+                continue
+            tn = tex["color"][lv_i].shape[0]
+            u = ((lu[sel] / period) % 1.0 * tn).astype(int) % tn
+            v = ((lv[sel] / period) % 1.0 * tn).astype(int) % tn
+            albedo[sel] = tex["color"][lv_i][v, u]
+            if tex["normal"] is not None:
+                bump[sel] = tex["normal"][lv_i][v, u]
+        if tex["normal"] is not None:
+            # tangent space -> world: u along the part's ua axis, image-up along -va, out along the face normal
+            tu = np.stack([rot[np.arange(len(k)), ua + 3 * j] for j in range(3)], axis=-1)
+            tv = -np.stack([rot[np.arange(len(k)), va + 3 * j] for j in range(3)], axis=-1)
+            nw = tu * bump[:, :1] + tv * bump[:, 1:2] + normals[k] * bump[:, 2:3]
+            nw /= np.linalg.norm(nw, axis=-1, keepdims=True)
+            lam = np.clip(nw @ SUN, 0, 1)
+            flat = np.clip(normals[k] @ SUN, 0, 1)
+            out[mask] *= ((AMBIENT + (1 - AMBIENT) * lam) / (AMBIENT + (1 - AMBIENT) * flat))[:, None]
+        out[mask] *= albedo[:, None]
     rgb = Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8), "RGB").convert("RGBA")
     img.alpha_composite(rgb)
 
     # translucent faces (inner borders) and highlights on top, only where they are in front of the solid world
     layer = np.zeros((h, w, 4))
-    for proj, color, shade, _, alpha in translucent:
+    for proj, color, shade, _, alpha, *_ in translucent:
         lid, lz = rasterize([proj], w, h)
         m = (lid > 0) & (lz <= zbuf + 0.05)
         c = np.clip(np.array(color) * shade, 0, 1)
         layer[m, :3] = layer[m, :3] * (1 - alpha) + c * alpha
         layer[m, 3] = layer[m, 3] * (1 - alpha) + alpha
     for hl in scene.get("highlights", []):
-        for f, n in part_faces({**hl, "transparency": 0}):
+        for f, n, _ in part_faces({**hl, "transparency": 0}):
             if n[1] > 0.5:
                 proj = project_face(cam, f)
                 if proj is not None:
@@ -394,7 +446,7 @@ def render_world(img, scene, cam):
     sel_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     sd = ImageDraw.Draw(sel_layer)
     for sel in scene["selections"]:
-        for f, n in part_faces({**sel, "transparency": 0}):
+        for f, n, _ in part_faces({**sel, "transparency": 0}):
             if n[1] > 0.5:
                 proj = [cam.project(tuple(p)) for p in f]
                 if all(p is not None for p in proj):

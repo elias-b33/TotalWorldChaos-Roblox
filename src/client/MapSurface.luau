@@ -11,6 +11,7 @@ local Shared = ReplicatedStorage.Shared
 local Types = require(Shared.Types)
 
 local MapStyle = require(script.Parent.MapStyle)
+local MaterialPack = require(script.Parent.MaterialPack)
 
 local MapSurface = {}
 
@@ -19,6 +20,8 @@ export type Province = {
 	parts: { BasePart },
 	top: number, -- surface height
 }
+
+local MAX_RIDGES = 6 -- per mountain province, on its biggest triangles
 
 local provinces: { [number]: Province } = {}
 local borders: { { a: number, b: number, parts: { BasePart } } } = {}
@@ -29,6 +32,10 @@ local function newPart(class: string, parent: Instance, material: Enum.Material,
 	part.CanCollide = false
 	part.CastShadow = false
 	part.Material = material
+	local variant = MaterialPack.variantFor(material)
+	if variant then
+		part.MaterialVariant = variant
+	end
 	part.Color = color
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
@@ -67,8 +74,8 @@ end
 
 -- A rocky ridge (Λ in cross-section) with a snow cap, for mountain provinces.
 local function ridge(at: Vector3, length: number, yaw: number, parent: Instance, rock: Color3, out: { BasePart })
-	local width = length * 0.55
-	local tall = 2.5 + length * 0.25
+	local width = length * 0.7
+	local tall = 3 + length * 0.35
 	local function half(scale: number, base: number, material: Enum.Material, color: Color3)
 		local w, hgt = width * scale, tall * scale
 		for _, flip in { 0, math.pi } do
@@ -114,6 +121,7 @@ end
 function MapSurface.build(map: Types.MapDef, size: Vector2, parent: Instance, toWorld: (number, number) -> Vector3)
 	provinces = {}
 	borders = {}
+	MaterialPack.setup()
 	setupWorld(map, size, parent)
 
 	local land = Instance.new("Folder")
@@ -149,9 +157,9 @@ function MapSurface.build(map: Types.MapDef, size: Vector2, parent: Instance, to
 			table.sort(spots, function(p, q)
 				return p.area > q.area
 			end)
-			for k = 1, math.min(4, #spots) do
+			for k = 1, math.min(MAX_RIDGES, #spots) do
 				local spot = spots[k]
-				local length = math.clamp(math.sqrt(spot.area) * 0.5, 3, 16)
+				local length = math.clamp(math.sqrt(spot.area) * 0.8, 4, 24)
 				local yaw = ((def.id * 37 + k * 71) % 360) * math.pi / 180
 				ridge(toWorld(spot.x, spot.y) + Vector3.new(0, top, 0), length, yaw, model, style.color, parts)
 			end
