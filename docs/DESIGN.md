@@ -1,0 +1,410 @@
+# Roblox Grand Strategy — Design Doc
+
+Source of truth for the game design. Mirrors the design doc in Claude (claude.ai). If they disagree, ask the owner which one wins.
+
+## Overview
+
+A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and players who get knocked out come back as gods with disaster powers. Built for Roblox players aged 13–18+, most of them on phones.
+
+**Design pillars**
+
+1. **Readable at a glance.** Map colour is power; a new player understands the state of the match in 5 seconds.
+2. **Two taps per decision.** Every action is reachable in two taps on a phone.
+3. **Chaos is fun.** God powers and disasters shake up every match so the leader is never safe.
+4. **Short matches, long progression.** A match ends in 25 minutes; account XP and cosmetics carry over.
+
+| Source | Keep | Cut |
+| --- | --- | --- |
+| EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
+| WorldBox | God powers, disasters, watching borders spread across the map | Pixel terrain, individual units, creatures, sandbox world editing |
+
+## Match structure
+
+A match runs 25 minutes in six phases and always ends with a winner: a nation holding 40% of provinces wins on the spot, otherwise the top score at 25:00 wins.
+
+| Setting | Value |
+| --- | --- |
+| Server size | 12 players max |
+| Nations per match | 10 (bots fill empty slots) |
+| Map | ~150 provinces, ~15 per nation |
+| Match length | 25 min |
+| Tick | 1 s = 1 game day |
+| Economy payout | every 10 ticks (1 "month") |
+
+**Phases**
+
+1. **Lobby (60 s):** players join and vote on the map.
+2. **Pick (30 s):** players pick a start nation in random draft order; bots take the rest.
+3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
+4. **Open war (3–20 min):** everything unlocked.
+5. **Cataclysm (20–25 min):** god powers recharge twice as fast and a random disaster hits every 60 s.
+6. **Results (30 s):** winner, stats and XP; the server votes on the next map.
+
+**Win conditions**
+
+- **Domination:** own 40% of all provinces → instant win.
+- **Alliance victory:** an alliance (max 3 nations) jointly holds 55% → all members win.
+- **Score:** at 25:00 the highest score wins. Score = provinces × 10 + total development × 5 + battles won × 2.
+
+**Elimination and leavers**
+
+- A nation is eliminated when it has lost its capital and holds fewer than 3 provinces.
+- Eliminated players become **gods**: they stay in the server, see the whole map and use god powers. Nobody sits out a match.
+- A player who leaves is replaced by a bot instantly, so the map never has dead nations.
+
+## Core systems
+
+Two resources (gold and manpower), one unit type and one siege rule carry the whole game. Every number below is a starting value for playtests and lives in one `Config` module.
+
+### Map and provinces
+
+- ~150 land provinces, each with terrain, development (1–5) and at most one building.
+- Terrain: plains (normal), forest and hills (+25% defence, slower movement), mountains (impassable, used to make chokepoints).
+- About 40% of provinces start **neutral** with a small garrison, so the first minutes are about expansion, not PvP.
+- No sea in v1. Islands connect through "straits": extra neighbour links drawn as bridges.
+
+### Economy
+
+Income is paid every month (10 s).
+
+| Item | Cost | Effect |
+| --- | --- | --- |
+| Province income | — | +1 gold and +100 manpower per development level |
+| Capital | — | +5 gold per month |
+| Regiment (1,000 men) | 10 gold + 1,000 manpower | Upkeep 0.5 gold per month |
+| Develop province | 30 gold × current level | +1 development (max 5) |
+| Farm | 50 gold | +50% gold from this province |
+| Barracks | 40 gold | +50% manpower from this province |
+| Fort | 60 gold | +50% defence, siege time ×2 |
+
+### Armies and combat
+
+- One unit type, the regiment. An army is a stack of regiments shown as one token on the map.
+- Movement: one province per 5 s on plains, 8 s on forest and hills. Paths follow province neighbours (BFS).
+- A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers.
+- Modifiers: defender in forest or hills +25%, fort +50%, underdog +20%, coalition +10%, random ±10% per battle.
+- After round 3 the side with fewer men retreats to its nearest owned province. Armies under 500 men are destroyed.
+
+### Sieges
+
+- An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital.
+- When the siege completes, the province flips to the attacker immediately. No war score and no haggling over provinces in peace deals.
+
+### Diplomacy
+
+- **War:** declare on any nation you border. Your allies join automatically.
+- **Alliance:** request and accept; max 3 nations per alliance.
+- **Peace:** white peace, or peace plus a gold tribute. A 3-minute truce follows.
+- **Coalition:** a nation holding 25%+ of provinces gets a crown on the map, and every other nation gets +10% combat strength against it.
+
+### God powers
+
+Living nations earn 1 charge every 4 minutes; gods earn 1 charge every 60 s. A nation can be hit by a god power at most once per 30 s.
+
+| Power | Effect | Charges |
+| --- | --- | --- |
+| Meteor | Kills 50% of one army; −1 development in that province | 2 |
+| Plague | −50% manpower income for one nation for 60 s | 2 |
+| Rebels | Spawns a 3,000-man neutral army in one province | 2 |
+| Earthquake | Destroys the building in one province | 1 |
+| Blessing | +100% gold from one province for 60 s | 1 |
+| Divine shield | One province can't be sieged for 30 s | 1 |
+
+### Catch-up
+
+- **Overextension:** above 20 provinces, every 5 extra provinces cut gold income by 5%.
+- **Underdog:** the 3 nations with the fewest provinces get +20% defence.
+- **Coalition** against the leader (see Diplomacy).
+
+## Technical architecture
+
+The server owns all game state and runs one 1-second tick. Clients only send intents and draw what the server tells them, and bots send the same intents players do.
+
+Flow: client `Input + UI` → `Request…` remotes → `CommandRouter` (validates owner, cost, neighbours, cooldown, phase, rate limit) → services change `MatchState` → `Replicator` sends a snapshot on join and a delta every tick → client `MapRenderer + HUD`. `AIService` (bots) sends intents into the same `CommandRouter`. `GameLoop` drives the services every tick.
+
+### Tooling
+
+- **Rojo + Git/GitHub.** Code lives in files and Studio syncs from them.
+- **Luau `--!strict`** in every module, with shared types in one `Types.luau`.
+- **StyLua** (formatting) and **Selene** (linting) before each commit.
+- **Lune** runs the pure game-logic tests outside Roblox.
+- **ProfileStore** for player saves (XP, cosmetics), added in Phase 4. Match state is never saved.
+- **Studio** for building the final map and UI layouts, and for playtests.
+
+### Folder structure
+
+```text
+src/
+  server/
+    GameLoop.server.luau       -- match phases + 1 s tick
+    CommandRouter.luau         -- validates every intent from players and bots
+    Replicator.luau            -- snapshot on join, deltas each tick
+    Services/                  -- thin Roblox wrappers around shared/Sim
+      MapService.luau          -- provinces, ownership, neighbours, pathfinding
+      EconomyService.luau      -- income, upkeep, buildings, development
+      ArmyService.luau         -- movement, battles, sieges
+      DiplomacyService.luau    -- war, alliances, peace, truces
+      GodService.luau          -- charges, powers, cooldowns
+      AIService.luau           -- bot nations
+      MatchService.luau        -- phases, win checks, scoring
+      PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
+  client/
+    MapRenderer.luau           -- colours provinces, draws armies and borders
+    CameraController.luau      -- pan, pinch zoom, tap selection
+    UI/                        -- HUD, province sheet, diplomacy, powers
+  shared/
+    Types.luau
+    Config.luau                -- every balance number
+    MapData/                   -- province ids, terrain, neighbours
+    Sim/                       -- pure game rules, no Roblox APIs (tested with Lune)
+tests/                         -- Lune test files for shared/Sim
+```
+
+### Tick order
+
+1. Apply queued commands.
+2. Move armies.
+3. Resolve battles.
+4. Advance sieges and flip provinces.
+5. Every 10th tick: pay income and upkeep.
+6. Update god-power charges and timers.
+7. Bots plan (staggered: 1–2 bots per tick).
+8. Check win conditions and phase changes.
+9. Send one delta to every client.
+
+### Networking
+
+- **On join:** one full snapshot of provinces, nations and armies.
+- **Every tick:** one batched delta with only what changed (owners, development, armies, battle events).
+- **Army movement:** an `UnreliableRemoteEvent` with progress between province centres; the client interpolates the token.
+- **Intents:** the client fires `Request…` remotes; the server answers with `CommandResult` (ok or reason).
+
+### Security
+
+- `CommandRouter` checks ownership, neighbours, cost, cooldown and match phase on every intent. The client is never trusted.
+- Max 10 intents per second per player.
+- Bots go through `CommandRouter` too, so an AI bug can't make illegal moves.
+
+### Map rendering
+
+- **Prototype:** a hex grid generated in code. Neighbours come for free.
+- **Final map:** hand-made province MeshParts in Studio, each tagged with its province id from `MapData`.
+- Colour changes only when ownership changes; nothing updates per frame except army tokens.
+
+### Performance budget
+
+| Budget | Target |
+| --- | --- |
+| Provinces | ≤ 150 |
+| Armies on the map | ≤ 60 |
+| Server work per tick | < 5 ms |
+| Network per client | < 10 KB/s |
+
+## Data model
+
+All match state is a handful of tables keyed by id inside one `MatchState`. This is the contract every module builds against.
+
+```lua
+--!strict
+export type ProvinceId = number
+export type NationId = number
+export type ArmyId = number
+
+export type Terrain = "Plains" | "Forest" | "Hills" | "Mountain"
+export type Building = "None" | "Farm" | "Barracks" | "Fort"
+export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
+export type GodPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
+
+export type Province = {
+    id: ProvinceId,
+    name: string,
+    terrain: Terrain,
+    neighbors: { ProvinceId },
+    owner: NationId?,          -- nil = neutral
+    development: number,       -- 1..5
+    building: Building,
+    isCapital: boolean,
+    siege: { by: NationId, progress: number, required: number }?,
+    shieldUntil: number?,      -- tick when Divine Shield ends
+    buffs: { [string]: number }, -- buff name -> tick it ends
+}
+
+export type Nation = {
+    id: NationId,
+    name: string,
+    colorIndex: number,        -- palette index, so game logic stays Roblox-free and testable
+    controller: "Player" | "Bot",
+    userId: number?,           -- nil for bots
+    capital: ProvinceId,
+    gold: number,
+    manpower: number,
+    charges: number,
+    allianceId: number?,
+    powerImmuneUntil: number,  -- 30 s god-power protection
+    eliminated: boolean,
+}
+
+export type Army = {
+    id: ArmyId,
+    owner: NationId,           -- 0 = neutral (garrisons, Rebels)
+    location: ProvinceId,
+    men: number,
+    path: { ProvinceId },      -- remaining route
+    moveProgress: number,      -- ticks spent toward next province
+    inBattle: boolean,
+}
+
+export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
+export type Alliance = { id: number, members: { NationId } }
+export type Truce = { a: NationId, b: NationId, untilTick: number }
+export type God = { userId: number, charges: number }
+
+export type MatchState = {
+    tick: number,
+    phase: Phase,
+    provinces: { [ProvinceId]: Province },
+    nations: { [NationId]: Nation },
+    armies: { [ArmyId]: Army },
+    wars: { [number]: War },
+    alliances: { [number]: Alliance },
+    truces: { Truce },
+    gods: { [number]: God },   -- keyed by userId
+}
+```
+
+### Remotes
+
+| Remote | Direction | Payload |
+| --- | --- | --- |
+| `RequestMove` | client → server | armyId, targetProvince |
+| `RequestRecruit` | client → server | provinceId, regiments |
+| `RequestBuild` | client → server | provinceId, building |
+| `RequestDevelop` | client → server | provinceId |
+| `RequestDiplomacy` | client → server | action (War, Ally, AcceptAlly, Peace, AcceptPeace), targetNation, gold? |
+| `RequestGodPower` | client → server | power, target province or nation |
+| `CommandResult` | server → client | requestId, ok, reason |
+| `Snapshot` | server → client | full match state, sent on join |
+| `Delta` | server → client | changed provinces, nations, armies, events |
+| `ArmyPositions` (unreliable) | server → client | armyId, from, to, progress |
+| `Notify` | server → client | toast type and text |
+
+## UI and controls
+
+Phone first: the map fills the screen, the HUD stays on the edges, and every action is a tap on the map followed by a tap in a bottom sheet.
+
+- **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
+- **Top bar:** gold, manpower, god-power charges, match timer, your rank.
+- **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce).
+- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit, or Declare war and Ally on foreign provinces.
+- **Moving armies:** tap the army, tap the destination, see the path with arrival time, tap Confirm.
+- **God powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
+- **Map modes:** Political (default), Diplomacy (allies green, enemies red), Terrain.
+- **Feedback:** toasts for war declared, province lost and battle won; a short screen shake for a meteor.
+
+**Rules for every screen**
+
+- Buttons at least 44 px and text at least 14 px on phone.
+- Icons and numbers over words; no paragraphs anywhere in the HUD.
+- Every UI change is checked in Studio's phone emulator before it's merged.
+
+**Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit, siege, make an ally, declare war, use a god power.
+
+## Bot AI
+
+Each bot checks a short priority list every few seconds and does the first action that applies, using the same commands as players.
+
+**Priority list** (bots are staggered so 1–2 plan per tick)
+
+1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there.
+2. **Recruit:** total army is below provinces × 800 men and manpower is available.
+3. **Expand:** a neutral neighbour whose garrison I can beat → attack it.
+4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
+5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders, then develop.
+6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
+7. **God power:** spend a charge on the biggest enemy army in a war I'm in.
+
+| Difficulty | Plans every | Attack ratio | Behaviour |
+| --- | --- | --- | --- |
+| Easy | 6 s | 1.6× | Won't declare war on a player in the first 8 min |
+| Normal | 3 s | 1.3× | Default |
+| Hard | 2 s | 1.1× | Targets the leading player |
+
+No cheating: harder bots think faster and take more risks, but they never get free gold or manpower.
+
+## Monetization and retention
+
+Sell looks, convenience and private play, never strength.
+
+| Product | Type | Starting price (Robux) |
+| --- | --- | --- |
+| Nation skins: flag, colour palette, army token | Shop item | 49–149 |
+| Map themes: snow, desert, fantasy | Shop item | 99 |
+| God-power effects: meteor style, plague colour | Shop item | 49–99 |
+| Map emotes shown over your capital | Shop item | 25–49 |
+| VIP: exclusive colours, +25% XP, chat tag | Game pass | 199 |
+| Private servers: pick map, timer, bot count | Private server | 100 per month |
+| Seasonal pass with cosmetic tiers | Pass | 299 |
+
+**Never sell:** gold, regiments, manpower, god-power charges, combat bonuses or anything else that changes a match. No paid random items (loot boxes).
+
+**Retention:** account XP and ranks; 3 daily quests; the same server votes on the next map after Results; global leaderboard and weekly ranks; parties start next to each other.
+
+## Build roadmap
+
+Five phases, each ending in a playtest gate the owner runs in Studio.
+
+### Phase 1: Foundation
+
+- [ ] Rojo project, StyLua, Selene, strict mode, Lune test runner
+- [ ] `Types.luau` and `Config.luau` from this doc
+- [ ] Generated hex map: 150 tiles with terrain and neighbours
+- [ ] `MapRenderer` colours provinces by owner; camera pan and zoom on phone
+- [ ] `GameLoop` with a 1 s tick; economy pays income
+- [ ] Recruit, develop and build through `CommandRouter`
+
+**Gate 1:** one player can grow a nation for 25 minutes on a phone with no errors.
+
+### Phase 2: War
+
+- [ ] Army movement with BFS paths and client interpolation
+- [ ] Battles, retreats, sieges, provinces flipping
+- [ ] War, alliance, peace and truce
+- [ ] Neutral provinces with garrisons
+- [ ] Win conditions and the Results screen
+
+**Gate 2:** 4 friends play 3 matches and ask for a 4th.
+
+### Phase 3: Bots and gods
+
+- [ ] `AIService` on Normal; bots fill empty slots and replace leavers
+- [ ] Elimination and the god role
+- [ ] 6 god powers with charges and cooldowns
+- [ ] Catch-up rules: overextension, underdog, coalition
+- [ ] Cataclysm phase
+
+**Gate 3:** 1 player against 9 bots is fun for 25 minutes, and no single bot wins most matches.
+
+### Phase 4: Polish and shop
+
+- [ ] Hand-made final map
+- [ ] Tutorial match
+- [ ] `PlayerDataService`: XP, ranks, daily quests
+- [ ] Shop: nation skins, map themes, VIP pass
+- [ ] Sound and effects for battles and god powers
+
+**Gate 4:** 10 testers who have never played finish the tutorial without help.
+
+### Phase 5: Soft launch
+
+- [ ] Analytics events: match length, quit time, phase reached, win rate by start position
+- [ ] Weekly balance patch from the data
+- [ ] Easy and Hard bots, a second map
+
+## Open questions
+
+- Working title and style: historical, fantasy or meme?
+- Real-world map or fictional continents? (Default: fictional.)
+- Can a god target the nation that eliminated them?
+- Keep the hex grid for the final map, or switch to hand-made provinces?
+- Casual only, or a ranked mode after launch?
+- Provinces flip when a siege ends (current rule) or only through peace deals?

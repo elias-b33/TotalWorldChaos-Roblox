@@ -1,0 +1,62 @@
+# CLAUDE.md
+
+Roblox map PvP strategy game: EU4 + WorldBox, simplified, for players aged 13–18+, mostly on phones.
+The full spec is `docs/DESIGN.md`. Read the sections your task touches before writing code.
+
+## Golden rules
+
+- `docs/DESIGN.md` is the spec. Don't add features it doesn't list. If something is missing or contradictory, pick the simplest option, write it under "Decisions" in your final message, and keep going.
+- The server is authoritative. Every state change goes through `CommandRouter` and then the services. Never trust the client.
+- Bots send the same commands as players, through the same `CommandRouter`.
+- Every balance number lives in `src/shared/Config.luau`. No magic numbers anywhere else.
+- Game rules live in `src/shared/Sim/` as pure Luau. Sim code must not touch `game`, `workspace`, `Instance`, `Color3`, `Vector3`, `task`, `RemoteEvent` or any other Roblox global, so it runs under Lune. Sim functions take `MatchState` plus inputs and change state or return results.
+- Randomness in Sim comes from a seeded RNG module (`src/shared/Sim/Rng.luau`) passed in as an argument, so tests are deterministic. Never use `math.random` or `Random.new` inside Sim.
+- `src/server/Services/` are thin Roblox wrappers: they call Sim, handle remotes and timing, and nothing else.
+- `--!strict` at the top of every Luau file. Types come from `src/shared/Types.luau`. If you need to change a type, say so in your final message.
+- Inside `src/shared/`, use string requires (`require("./Rng")`) so the same files load in Roblox and Lune. If a require pattern fails in either runtime, fix it consistently and note it under "Decisions".
+
+## Commands
+
+| What | Command |
+| --- | --- |
+| Build the place file | `mkdir -p build && rojo build -o build/game.rbxlx` |
+| Format | `stylua src tests` |
+| Check formatting | `stylua --check src tests` |
+| Lint | `selene src` |
+| Run Sim tests | `lune run tests/run` |
+| Install missing tools | `bash scripts/cloud-setup.sh` |
+
+The cloud environment's setup script normally installs the tools. If one is missing when a session starts, the SessionStart hook is already installing it in the background: wait until `/tmp/cloud-setup.log` says `cloud-setup: done` instead of starting a second install.
+
+The first task creates `tests/run.luau` (a small runner that executes every `tests/*.spec.luau` and exits non-zero on failure). Lune supports string requires such as `require("../src/shared/Sim/Economy")` from a test file.
+
+`roblox.yml` is the Roblox API list Selene lints against. It is committed on purpose because Selene can't download it through the cloud proxy. Don't delete or regenerate it in a cloud session; the owner refreshes it on their own computer with `selene generate-roblox-std` if a newer Roblox API is flagged as unknown.
+
+## Definition of done (every task)
+
+1. `stylua --check`, `selene`, the Lune tests and `rojo build` all pass. Fix failures before you stop.
+2. Every new Sim rule has a Lune test.
+3. Tick the matching checkbox in the roadmap in `docs/DESIGN.md`.
+4. Commit with a clear message and push the branch.
+5. Your final message has three parts: **What changed**, **How to test in Studio** (exact steps the owner can follow, for example "Test tab → Clients and Servers → 2 players, tap a province, press Recruit"), and **Decisions** (anything you chose that the spec didn't say).
+
+## Limits of this environment
+
+- Roblox Studio can't run here. Code that needs the Roblox runtime (rendering, remotes, input, camera, UI) can only be built, not run. Keep that code simple, reuse the same patterns across files, and give precise manual test steps.
+- No third-party Roblox packages in Phases 1–3. ProfileStore arrives in Phase 4.
+- Work on one roadmap phase (or part of one) per session. Small, finished and tested beats big and half-done.
+
+## Layout
+
+```text
+default.project.json   Rojo project: shared → ReplicatedStorage.Shared, server → ServerScriptService.Server, client → StarterPlayerScripts.Client
+src/shared/            Types, Config, MapData, Sim (pure rules)
+src/server/            GameLoop, CommandRouter, Replicator, Services
+src/client/            MapRenderer, CameraController, UI
+tests/                 Lune tests for src/shared/Sim
+docs/DESIGN.md         The spec and the roadmap checkboxes
+roblox.yml             Roblox API list for Selene (committed; see Commands)
+scripts/cloud-setup.sh Installs rojo, stylua, selene, lune
+scripts/session-start.sh  SessionStart hook: installs missing tools in the background (cloud only)
+.claude/settings.json  Registers the SessionStart hook
+```
