@@ -670,6 +670,11 @@ makeEnv = function(m: Machine, scriptInst)
 			new = function(className, parent)
 				local inst = Instance.new(className)
 				machineOfInst[inst] = m
+				if inst:IsA("GuiObject") then
+					-- no layout engine here: GUI sits at the screen origin (Lune has no default for these)
+					inst.AbsolutePosition = roblox.Vector2.zero
+					inst.AbsoluteSize = roblox.Vector2.zero
+				end
 				if parent then
 					inst.Parent = parent
 				end

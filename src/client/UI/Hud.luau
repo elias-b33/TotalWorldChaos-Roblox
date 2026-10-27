@@ -164,6 +164,7 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
 
 	local bar = Instance.new("Frame")
 	bar.Name = "TopBar"
+	bar.Active = true -- swallow taps so they don't reach the map
 	bar.Size = UDim2.new(1, 0, 0, BAR_HEIGHT)
 	bar.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
 	bar.BackgroundTransparency = 0.25

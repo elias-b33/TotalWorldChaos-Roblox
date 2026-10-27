@@ -43,9 +43,11 @@ function Widgets.screen(name: string, order: number?): ScreenGui
 	return gui
 end
 
--- A dark rounded panel that grows to fit its content vertically.
+-- A dark rounded panel that grows to fit its content vertically. Active, so taps and drags on it never reach
+-- the map underneath.
 function Widgets.panel(parent: Instance, width: number): Frame
 	local f = Instance.new("Frame")
+	f.Active = true
 	f.Size = UDim2.fromOffset(width, 0)
 	f.AutomaticSize = Enum.AutomaticSize.Y
 	f.BackgroundColor3 = Widgets.PANEL

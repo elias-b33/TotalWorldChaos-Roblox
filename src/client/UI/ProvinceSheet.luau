@@ -227,6 +227,7 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 
 	sheet = Instance.new("Frame")
 	sheet.Name = "Sheet"
+	sheet.Active = true -- swallow taps so they don't reach the map
 	sheet.AnchorPoint = Vector2.new(0.5, 1)
 	sheet.Position = UDim2.new(0.5, 0, 1, -8)
 	sheet.Size = UDim2.fromOffset(SHEET_WIDTH, 0)

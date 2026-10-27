@@ -24,7 +24,12 @@ export type Art = {
 	color: { [number]: number }, -- nation slot -> colour
 	capitals: { [number]: { x: number, y: number } },
 	selected: number,
+	near: buffer, -- per pixel: which border checks it needs (NEAR_* bits), worked out once per map
+	dirty: { number }?, -- x0, y0, x1, y1 of what changed since the last takeDirty
 }
+
+-- Called now and then while painting a whole map, so a client can spread the work over several frames.
+export type Yield = () -> ()
 
 -- Biome looks: base colour, light and dark specks, decoration.
 local function style(base: number, light: number, dark: number, deco: string): Style
@@ -159,11 +164,14 @@ local function setTerrain(art: Art, x: number, y: number, c: number)
 end
 
 -- Stamp a decoration on a jittered grid wherever the whole sprite fits inside land of the same biome.
-local function decorate(art: Art, biomeOf: { [number]: Style }, deco: string, salt: number)
+local function decorate(art: Art, biomeOf: { [number]: Style }, deco: string, salt: number, yield: Yield?)
 	local sprite = SPRITES[deco]
 	local spacing, jitter = SPACING[deco][1], SPACING[deco][2]
 	local h, w = #sprite, #sprite[1]
 	for gy = 0, art.height - h - 1, spacing do
+		if yield and gy % 64 < spacing then
+			yield()
+		end
 		for gx = 0, art.width - w - 1, spacing do
 			local x = gx + math.floor(noise(gx, gy, salt) * (2 * jitter + 1)) - jitter
 			local y = gy + math.floor(noise(gx, gy, salt + 1) * (2 * jitter + 1)) - jitter
@@ -210,7 +218,7 @@ local function decorate(art: Art, biomeOf: { [number]: Style }, deco: string, sa
 	end
 end
 
-local function paintTerrain(art: Art, biomeOf: { [number]: Style })
+local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield?)
 	local w, h = art.width, art.height
 	local ids = art.ids
 	local sky = art.theme == "sky"
@@ -222,6 +230,9 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style })
 		buffer.writeu8(dist, i, if buffer.readu8(ids, i) == 0 then 255 else 0)
 	end
 	for d = 1, if sky then 0 else SHALLOWS do
+		if yield then
+			yield()
+		end
 		for y = 0, h - 1 do
 			for x = 0, w - 1 do
 				local i = y * w + x
@@ -241,6 +252,9 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style })
 	end
 
 	for y = 0, h - 1 do
+		if yield and y % 64 == 63 then
+			yield()
+		end
 		for x = 0, w - 1 do
 			local i = y * w + x
 			local pid = buffer.readu8(ids, i)
@@ -305,19 +319,18 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style })
 	end
 
 	for k, deco in DECORATIONS do
-		decorate(art, biomeOf, deco, 10 + 7 * k)
+		decorate(art, biomeOf, deco, 10 + 7 * k, yield)
 	end
 end
 
 ------------------------------------------------------------------------------------------------- political layer
 
-local function ownerAt(art: Art, x: number, y: number): number
-	if x < 0 or y < 0 or x >= art.width or y >= art.height then
-		return 0
-	end
-	local pid = buffer.readu8(art.ids, y * art.width + x)
-	return if pid == 0 then 0 else art.owner[pid] or 0
-end
+local NEAR1 = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+local NEAR2 = { { 2, 0 }, { -2, 0 }, { 0, 2 }, { 0, -2 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }
+-- Art.near bits. A pixel with none set is inside its province, and its colour depends only on its terrain.
+local NEAR_EDGE = 1 -- a 4-neighbour is another province, sea or off the map (nation border candidate)
+local NEAR_RING = 2 -- a pixel two steps away is another province, sea or off the map (inner line candidate)
+local NEAR_PROVINCE = 4 -- a 4-neighbour is another province (dotted province border)
 
 local function idAt(art: Art, x: number, y: number): number
 	if x < 0 or y < 0 or x >= art.width or y >= art.height then
@@ -326,13 +339,28 @@ local function idAt(art: Art, x: number, y: number): number
 	return buffer.readu8(art.ids, y * art.width + x)
 end
 
-local function setPixel(art: Art, x: number, y: number, c: number)
-	local r, g, b = rgb(c)
-	buffer.writeu32(art.pixels, (y * art.width + x) * 4, 0xff000000 + b * 65536 + g * 256 + r)
+local function ownerAt(art: Art, x: number, y: number): number
+	local pid = idAt(art, x, y)
+	return if pid == 0 then 0 else art.owner[pid] or 0
 end
 
-local NEAR1 = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
-local NEAR2 = { { 2, 0 }, { -2, 0 }, { 0, 2 }, { 0, -2 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }
+-- 0xRRGGBB -> the RGBA bytes EditableImage expects (buffers are little-endian).
+local function rgba(c: number): number
+	local r, g, b = rgb(c)
+	return 0xff000000 + b * 65536 + g * 256 + r
+end
+
+local function markDirty(art: Art, x0: number, y0: number, x1: number, y1: number)
+	local d = art.dirty
+	if d == nil then
+		art.dirty = { x0, y0, x1, y1 }
+	else
+		d[1] = math.min(d[1], x0)
+		d[2] = math.min(d[2], y0)
+		d[3] = math.max(d[3], x1)
+		d[4] = math.max(d[4], y1)
+	end
+end
 
 local function paintProvince(art: Art, pid: number)
 	local box = art.boxes[pid]
@@ -344,71 +372,103 @@ local function paintProvince(art: Art, pid: number)
 	local selected = art.selected == pid
 	local base = art.baseLum[pid]
 	local w = art.width
-	for y = box[2], box[4] do
-		for x = box[1], box[3] do
-			local i = y * w + x
-			if buffer.readu8(art.ids, i) ~= pid then
-				continue
-			end
-			local c = buffer.readu32(art.terrain, i * 4)
+	local ids, terrain, near, pixels = art.ids, art.terrain, art.near, art.pixels
+
+	-- most pixels' colours depend only on their terrain colour: work each one out once per repaint
+	local tinted: { [number]: number } = {}
+	local function tint(c: number): number
+		local t = tinted[c]
+		if t == nil then
+			t = c
 			if o ~= 0 then
 				-- the nation's colour, shaded by the terrain underneath so trees and peaks still show
-				local k = math.clamp(lum(c) / base, 0.55, 1.5)
-				c = mix(c, scale(nation, k), 0.7)
+				t = mix(c, scale(nation, math.clamp(lum(c) / base, 0.55, 1.5)), 0.7)
 			end
+			tinted[c] = t
+		end
+		return t
+	end
+	local inside: { [number]: number } = {}
+	local edgeColor = if selected then 0xffffff else scale(nation, 0.55)
+	local innerColor = mix(nation, 0xffffff, 0.25)
+
+	for y = box[2], box[4] do
+		local row = y * w
+		for x = box[1], box[3] do
+			local i = row + x
+			if buffer.readu8(ids, i) ~= pid then
+				continue
+			end
+			local c = buffer.readu32(terrain, i * 4)
+			local flags = buffer.readu8(near, i)
+			if flags == 0 then
+				local f = inside[c]
+				if f == nil then
+					f = rgba(if selected then mix(tint(c), 0xffffff, 0.35) else tint(c))
+					inside[c] = f
+				end
+				buffer.writeu32(pixels, i * 4, f)
+				continue
+			end
+			local v = tint(c)
 			local edge = false
-			local provinceEdge = false
-			for _, d in NEAR1 do
-				local nx, ny = x + d[1], y + d[2]
-				if o ~= 0 and ownerAt(art, nx, ny) ~= o then
-					edge = true
-				end
-				local other = idAt(art, nx, ny)
-				if other ~= pid and other ~= 0 then
-					provinceEdge = true
-				end
-			end
-			if edge then
-				c = scale(nation, 0.55)
-			elseif o ~= 0 then
-				for _, d in NEAR2 do
+			if o ~= 0 and bit32.btest(flags, NEAR_EDGE) then
+				for _, d in NEAR1 do
 					if ownerAt(art, x + d[1], y + d[2]) ~= o then
-						c = mix(nation, 0xffffff, 0.25) -- a light inner line along the nation border
+						edge = true
 						break
 					end
 				end
-				if provinceEdge and (x + y) % 2 == 0 then
-					c = scale(c, 0.7)
+			end
+			local provinceEdge = bit32.btest(flags, NEAR_PROVINCE)
+			if edge then
+				v = edgeColor
+			else
+				if o ~= 0 and bit32.btest(flags, NEAR_RING) then
+					for _, d in NEAR2 do
+						if ownerAt(art, x + d[1], y + d[2]) ~= o then
+							v = innerColor -- a light inner line along the nation border
+							break
+						end
+					end
 				end
-			elseif provinceEdge and (x + y) % 2 == 0 then
-				c = scale(c, 0.7)
+				if provinceEdge and (x + y) % 2 == 0 then
+					v = scale(v, 0.7)
+				end
+				if selected then
+					v = if provinceEdge then 0xffffff else mix(v, 0xffffff, 0.35)
+				end
 			end
-			if selected then
-				c = if edge or provinceEdge then 0xffffff else mix(c, 0xffffff, 0.35)
-			end
-			setPixel(art, x, y, c)
+			buffer.writeu32(pixels, i * 4, rgba(v))
 		end
 	end
-	local capital = art.capitals[pid]
-	if capital then
-		local sprite = SPRITES[if art.theme == "sky" then "dome" else "castle"]
+	markDirty(art, box[1], box[2], box[3], box[4])
+end
+
+-- Castles (domes on Skyshards) go on top of everything, after any repaint, since they overlap neighbours.
+local function drawCapitals(art: Art)
+	local sprite = SPRITES[if art.theme == "sky" then "dome" else "castle"]
+	local h, w = #sprite, #sprite[1]
+	for pid, capital in art.capitals do
+		local o = art.owner[pid] or 0
 		local palette: { [string]: number } = {
-			F = if o ~= 0 then nation else 0xb0b0b0,
+			F = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0,
 			M = 0xe4ded2,
 			D = 0x5b544a,
 			W = 0xffe9a0,
 			C = 0x3ff0ff,
 		}
 		local x0, y0 = capital.x - 2, capital.y - 3
-		for j = 1, #sprite do
-			for i = 1, #sprite[j] do
+		for j = 1, h do
+			for i = 1, w do
 				local ch = string.sub(sprite[j], i, i)
 				local x, y = x0 + i - 1, y0 + j - 1
-				if ch ~= "." and x >= 0 and y >= 0 and x < w and y < art.height then
-					setPixel(art, x, y, palette[ch])
+				if ch ~= "." and x >= 0 and y >= 0 and x < art.width and y < art.height then
+					buffer.writeu32(art.pixels, (y * art.width + x) * 4, rgba(palette[ch]))
 				end
 			end
 		end
+		markDirty(art, x0, y0, x0 + w - 1, y0 + h - 1)
 	end
 end
 
@@ -419,8 +479,9 @@ type MapLike = {
 	provinces: { { id: number, biome: string, isCapital: boolean, center: { x: number, y: number } } },
 }
 
--- Paint the terrain and a neutral political layer. Owners come later through setOwners.
-function PixelArt.new(map: MapLike, grid: Grid): Art
+-- Paint the terrain and a neutral political layer. Owners come later through setOwners. Pass `yield` to have it
+-- called every few dozen rows (a client spreads the work over frames this way); tests leave it out.
+function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?): Art
 	local w, h = grid.width, grid.height
 	local art: Art = {
 		width = w,
@@ -436,6 +497,8 @@ function PixelArt.new(map: MapLike, grid: Grid): Art
 		color = {},
 		capitals = {},
 		selected = 0,
+		near = buffer.create(w * h),
+		dirty = nil,
 	}
 	local biomeOf: { [number]: Style } = {}
 	for _, p in map.provinces do
@@ -447,40 +510,47 @@ function PixelArt.new(map: MapLike, grid: Grid): Art
 		end
 	end
 
-	-- bounding boxes and which provinces touch
+	-- bounding boxes, which provinces touch, and each pixel's border checks
 	local touch: { [number]: { [number]: boolean } } = {}
 	for y = 0, h - 1 do
+		if yield and y % 64 == 63 then
+			yield()
+		end
 		for x = 0, w - 1 do
 			local i = y * w + x
 			local pid = buffer.readu8(grid.ids, i)
-			if pid ~= 0 then
-				local box = art.boxes[pid]
-				if box == nil then
-					art.boxes[pid] = { x, y, x, y }
-				else
-					box[1] = math.min(box[1], x)
-					box[3] = math.max(box[3], x)
-					box[4] = y
-				end
-				if x < w - 1 then
-					local right = buffer.readu8(grid.ids, i + 1)
-					if right ~= 0 and right ~= pid then
+			if pid == 0 then
+				continue
+			end
+			local box = art.boxes[pid]
+			if box == nil then
+				art.boxes[pid] = { x, y, x, y }
+			else
+				box[1] = math.min(box[1], x)
+				box[3] = math.max(box[3], x)
+				box[4] = y
+			end
+			local flags = 0
+			for _, d in NEAR1 do
+				local other = idAt(art, x + d[1], y + d[2])
+				if other ~= pid then
+					flags = bit32.bor(flags, NEAR_EDGE)
+					if other ~= 0 then
+						flags = bit32.bor(flags, NEAR_PROVINCE)
 						touch[pid] = touch[pid] or {}
-						touch[right] = touch[right] or {}
-						touch[pid][right] = true
-						touch[right][pid] = true
-					end
-				end
-				if y < h - 1 then
-					local below = buffer.readu8(grid.ids, i + w)
-					if below ~= 0 and below ~= pid then
-						touch[pid] = touch[pid] or {}
-						touch[below] = touch[below] or {}
-						touch[pid][below] = true
-						touch[below][pid] = true
+						touch[other] = touch[other] or {}
+						touch[pid][other] = true
+						touch[other][pid] = true
 					end
 				end
 			end
+			for _, d in NEAR2 do
+				if idAt(art, x + d[1], y + d[2]) ~= pid then
+					flags = bit32.bor(flags, NEAR_RING)
+					break
+				end
+			end
+			buffer.writeu8(art.near, i, flags)
 		end
 	end
 	for pid, set in touch do
@@ -491,15 +561,20 @@ function PixelArt.new(map: MapLike, grid: Grid): Art
 		art.touching[pid] = list
 	end
 
-	paintTerrain(art, biomeOf)
+	paintTerrain(art, biomeOf, yield)
 	for i = 0, w * h - 1 do
-		local c = buffer.readu32(art.terrain, i * 4)
-		local r, g, b = rgb(c)
-		buffer.writeu32(art.pixels, i * 4, 0xff000000 + b * 65536 + g * 256 + r)
+		buffer.writeu32(art.pixels, i * 4, rgba(buffer.readu32(art.terrain, i * 4)))
 	end
+	local painted = 0
 	for pid in art.boxes do
 		paintProvince(art, pid)
+		painted += 1
+		if yield and painted % 16 == 0 then
+			yield()
+		end
 	end
+	drawCapitals(art)
+	art.dirty = { 0, 0, w - 1, h - 1 }
 	return art
 end
 
@@ -536,6 +611,9 @@ function PixelArt.setOwners(art: Art, owners: { [number]: number }, colors: { [n
 		paintProvince(art, pid)
 		any = true
 	end
+	if any then
+		drawCapitals(art)
+	end
 	return any
 end
 
@@ -553,7 +631,28 @@ function PixelArt.select(art: Art, pid: number?): boolean
 	if new ~= 0 then
 		paintProvince(art, new)
 	end
+	drawCapitals(art)
 	return true
+end
+
+-- Mark the whole image as changed (e.g. a cached painting shown through a new EditableImage).
+function PixelArt.invalidate(art: Art)
+	art.dirty = { 0, 0, art.width - 1, art.height - 1 }
+end
+
+-- The rectangle (x0, y0, x1, y1, inclusive, inside the image) changed since the last call, or nil.
+function PixelArt.takeDirty(art: Art): { number }?
+	local d = art.dirty
+	art.dirty = nil
+	if d == nil then
+		return nil
+	end
+	local x0, y0 = math.max(d[1], 0), math.max(d[2], 0)
+	local x1, y1 = math.min(d[3], art.width - 1), math.min(d[4], art.height - 1)
+	if x1 < x0 or y1 < y0 then
+		return nil
+	end
+	return { x0, y0, x1, y1 }
 end
 
 -- The colour of one pixel, 0xRRGGBB (for tests and debugging).

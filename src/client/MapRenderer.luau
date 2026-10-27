@@ -19,24 +19,40 @@ local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
 
 local NAME_MIN_PIXELS = 70 -- a province's name shows once the province is this wide on screen
-local GARRISON_MIN_ZOOM = 3 -- neutral garrisons show from this zoom (screen pixels per map pixel)
+local DETAIL_ZOOM = 0.9 -- garrisons and development pips show from this share of the region zoom inwards
+local TEXT_SIZE = 14 -- the smallest text on the map (docs/DESIGN.md "UI and controls")
 local TOKEN_SIZE = 14 -- army token, screen pixels
 local TOKEN_PICK = 20 -- a tap this close to a token's centre (screen pixels) picks the army
 local TOKEN_SPACING = 4 -- map pixels between tokens standing in one province
 local TOKEN_SMOOTHING = 6 -- higher = tokens catch up with their target faster
 local DOT_SPACING = 4 -- map pixels between the dots of a route or strait
+local PIXELATED_FROM = 1.5 -- zoom from which map pixels are drawn hard-edged (smooth below, so thin lines don't flicker)
+local PAINT_SLICE = 0.008 -- seconds of painting per frame while a map is painted for the first time
 
 local MapRenderer = {}
 
-type Token = { frame: Frame, stroke: UIStroke, label: TextLabel, pos: Vector2, target: Vector2, neutral: boolean }
+type Token = {
+	frame: Frame,
+	stroke: UIStroke,
+	label: TextLabel,
+	pos: Vector2,
+	target: Vector2,
+	neutral: boolean,
+	province: number,
+}
 
 local grid: MapGrid.Grid? = nil
 local art: PixelArt.Art? = nil
 local image: EditableImage? = nil
-local dirty = false
+local imageLabel: ImageLabel? = nil
 local size = Vector2.new(1024, 512)
+local generation = 0 -- bumps with every new map, so a painting finished for an old one is ignored
+local grids: { [string]: MapGrid.Grid } = {} -- decoded grids by map id
+local arts: { [string]: PixelArt.Art } = {} -- painted maps by map id and resolution, reused across matches
+local warned = false
 local layers: { [string]: Frame } = {}
-local labels: { [number]: { frame: Frame, pips: TextLabel, width: number } } = {}
+local widths: { [number]: number } = {} -- each province's width in map pixels
+local labels: { [number]: { frame: Frame, pips: TextLabel } } = {}
 local markers: { [number]: TextLabel } = {}
 local tokens: { [number]: Token } = {}
 local selectedArmy: number? = nil
@@ -66,11 +82,11 @@ local function layer(name: string, parent: Frame): Frame
 	return frame
 end
 
-local function textLabel(parent: Instance, value: string, textSize: number): TextLabel
+local function textLabel(parent: Instance, value: string): TextLabel
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamBold
-	label.TextSize = textSize
+	label.TextSize = TEXT_SIZE
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.2
 	label.Text = value
@@ -105,46 +121,138 @@ local function dots(parent: Frame, a: Vector2, b: Vector2, color: Color3, dotSiz
 	end
 end
 
-local function showLabels(z: number)
-	for _, label in labels do
-		label.frame.Visible = label.width * z >= NAME_MIN_PIXELS
+-- Neutral garrisons and development pips show from the region zoom inwards (it depends on the screen size).
+local function detailVisible(z: number): boolean
+	return z >= MapView.regionZoom() * DETAIL_ZOOM
+end
+
+-- Everything that depends on the zoom: names, garrisons, and how the pixels are sampled.
+local function onZoom(z: number)
+	local detail = detailVisible(z)
+	for id, label in labels do
+		label.frame.Visible = (widths[id] or 0) * z >= NAME_MIN_PIXELS
+		label.pips.Visible = detail
 	end
 	for _, token in tokens do
 		if token.neutral then
-			token.frame.Visible = z >= GARRISON_MIN_ZOOM
+			token.frame.Visible = detail
+		end
+	end
+	local label = imageLabel
+	if label then
+		local mode = if z >= PIXELATED_FROM then Enum.ResamplerMode.Pixelated else Enum.ResamplerMode.Default
+		if label.ResampleMode ~= mode then
+			label.ResampleMode = mode
 		end
 	end
 end
 
+-- An EditableImage of this size: the current one if it fits, else a new one (the old one is destroyed, freeing
+-- its memory right away). nil when the device or the game settings don't allow it.
+local function imageFor(w: number, h: number): EditableImage?
+	local current = image
+	if current and current.Size.X == w and current.Size.Y == h then
+		return current
+	end
+	if current then
+		current:Destroy()
+		image = nil
+	end
+	local ok, result = pcall(function()
+		return AssetService:CreateEditableImage({ Size = Vector2.new(w, h) })
+	end)
+	if ok and result then
+		image = result
+		return result
+	end
+	return nil
+end
+
+-- Owners and nation colours from the snapshot into the pixel art.
+local function paintOwners()
+	local a = art
+	local snapshot = ClientState.snapshot()
+	if a == nil or snapshot == nil then
+		return
+	end
+	local owners: { [number]: number } = {}
+	for _, record in snapshot.provinces do
+		owners[record.id] = record.owner
+	end
+	local colors: { [number]: number } = {}
+	for _, nation in snapshot.nations do
+		colors[nation.id] = packed(Palette.nation(nation.colorIndex))
+	end
+	PixelArt.setOwners(a, owners, colors)
+end
+
 local function build(map: Types.MapDef)
+	generation += 1
+	local myGeneration = generation
 	labels = {}
 	markers = {}
 	tokens = {}
 	layers = {}
+	widths = {}
 	selectedArmy = nil
-	local g = MapGrid.decode(map)
+
+	-- full resolution if the device allows it, else half
+	local full = grids[map.id] or MapGrid.decode(map)
+	grids[map.id] = full
+	local g = full
+	local editable = imageFor(g.width, g.height)
+	if editable == nil then
+		g = MapGrid.downsample(full, 2)
+		editable = imageFor(g.width, g.height)
+	end
 	grid = g
 	size = Vector2.new(g.width, g.height)
-	art = PixelArt.new(map, g)
 	local canvas = MapView.create(size, Palette.background[map.theme] or Palette.background.earth)
 
 	local imageLayer = layer("Image", canvas)
-	local ok, result = pcall(function()
-		return AssetService:CreateEditableImage({ Size = size })
-	end)
-	if ok and result then
-		image = result
+	imageLabel = nil
+	if editable then
 		local label = Instance.new("ImageLabel")
 		label.Name = "Pixels"
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
-		label.ResampleMode = Enum.ResamplerMode.Pixelated
-		label.ImageContent = Content.fromObject(result)
+		label.ImageContent = Content.fromObject(editable)
 		label.Parent = imageLayer
-		dirty = true
+		imageLabel = label
 	else
-		image = nil
-		warn("[map] no EditableImage (enable it in Game Settings, see docs/MAPS.md):", result)
+		local notice = textLabel(canvas.Parent or canvas, "🗺️ Map art is off: turn on Allow Mesh / Image APIs")
+		notice.AnchorPoint = Vector2.new(0.5, 0)
+		notice.Position = UDim2.new(0.5, 0, 0, 56)
+		notice.Size = UDim2.fromOffset(420, 24)
+		if not warned then
+			warned = true
+			warn("[map] no EditableImage: turn on Game Settings > Security > Allow Mesh / Image APIs (docs/MAPS.md)")
+		end
+	end
+
+	-- the painted map: reused from an earlier match on this map, or painted now, a few milliseconds per frame
+	local key = map.id .. ":" .. g.width
+	local cached = arts[key]
+	if cached then
+		art = cached
+		PixelArt.select(cached, nil)
+		PixelArt.invalidate(cached)
+	else
+		art = nil
+		task.spawn(function()
+			local last = os.clock()
+			local painted = PixelArt.new(map, g, function()
+				if os.clock() - last > PAINT_SLICE then
+					task.wait()
+					last = os.clock()
+				end
+			end)
+			arts[key] = painted
+			if generation == myGeneration then
+				art = painted
+				paintOwners()
+			end
+		end)
 	end
 
 	local straits = layer("Straits", canvas)
@@ -164,47 +272,27 @@ local function build(map: Types.MapDef)
 
 	local labelLayer = layer("Labels", canvas)
 	for _, def in map.provinces do
+		widths[def.id] = 2 * math.sqrt(def.area / (g.scale * g.scale) / math.pi)
 		if def.terrain ~= "Mountain" then
 			local record = ClientState.province(def.id)
 			local frame = Instance.new("Frame")
 			frame.Name = "P" .. def.id
 			frame.AnchorPoint = Vector2.new(0.5, 0)
 			frame.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, 6)
-			frame.Size = UDim2.fromOffset(140, 30)
+			frame.Size = UDim2.fromOffset(150, 36)
 			frame.BackgroundTransparency = 1
 			frame.Parent = labelLayer
-			local name = textLabel(frame, def.name, 13)
-			name.Size = UDim2.new(1, 0, 0, 16)
-			local dev = textLabel(frame, pips(if record then record.development else def.development), 9)
-			dev.Position = UDim2.fromOffset(0, 16)
-			dev.Size = UDim2.new(1, 0, 0, 12)
-			local areaPixels = def.area / (g.scale * g.scale)
-			labels[def.id] = { frame = frame, pips = dev, width = 2 * math.sqrt(areaPixels / math.pi) }
+			local name = textLabel(frame, def.name)
+			name.Size = UDim2.new(1, 0, 0, 18)
+			local dev = textLabel(frame, pips(if record then record.development else def.development))
+			dev.Position = UDim2.fromOffset(0, 18)
+			dev.Size = UDim2.new(1, 0, 0, 16)
+			labels[def.id] = { frame = frame, pips = dev }
 		end
 	end
 	layer("Tokens", canvas)
 	layer("Markers", canvas)
-	showLabels(MapView.zoom())
-end
-
--- Owners and nation colours from the snapshot into the pixel art.
-local function paintOwners()
-	local a = art
-	local snapshot = ClientState.snapshot()
-	if a == nil or snapshot == nil then
-		return
-	end
-	local owners: { [number]: number } = {}
-	for _, record in snapshot.provinces do
-		owners[record.id] = record.owner
-	end
-	local colors: { [number]: number } = {}
-	for _, nation in snapshot.nations do
-		colors[nation.id] = packed(Palette.nation(nation.colorIndex))
-	end
-	if PixelArt.setOwners(a, owners, colors) then
-		dirty = true
-	end
+	onZoom(MapView.zoom())
 end
 
 -- Battle and siege badges, made on demand.
@@ -217,10 +305,10 @@ local function setMarker(provinceId: number, value: string?)
 		return
 	end
 	if marker == nil then
-		local label = textLabel(layers.Markers, "", 13)
+		local label = textLabel(layers.Markers, "")
 		label.AnchorPoint = Vector2.new(0.5, 1)
-		label.Position = at(MapRenderer.centerOf(provinceId)) + UDim2.fromOffset(0, -10)
-		label.Size = UDim2.fromOffset(64, 22)
+		label.Position = at(MapRenderer.centerOf(provinceId)) + UDim2.fromOffset(0, -12)
+		label.Size = UDim2.fromOffset(70, 24)
 		label.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
 		label.BackgroundTransparency = 0.2
 		local corner = Instance.new("UICorner")
@@ -274,17 +362,26 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	frame.Size = UDim2.fromOffset(px, px)
 	frame.BackgroundColor3 = nationColor(army.owner)
 	frame.BorderSizePixel = 0
-	frame.Visible = not neutral or MapView.zoom() >= GARRISON_MIN_ZOOM
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = Color3.fromRGB(20, 20, 28)
 	stroke.Thickness = 2
 	stroke.Parent = frame
-	local label = textLabel(frame, "", if neutral then 10 else 12)
+	local label = textLabel(frame, "")
 	label.AnchorPoint = Vector2.new(0.5, 1)
 	label.Position = UDim2.new(0.5, 0, 0, -2)
-	label.Size = UDim2.fromOffset(70, 16)
+	label.Size = UDim2.fromOffset(76, 18)
 	frame.Parent = layers.Tokens
-	return { frame = frame, stroke = stroke, label = label, pos = target, target = target, neutral = neutral }
+	local token: Token = {
+		frame = frame,
+		stroke = stroke,
+		label = label,
+		pos = target,
+		target = target,
+		neutral = neutral,
+		province = army.location,
+	}
+	frame.Visible = not neutral or detailVisible(MapView.zoom())
+	return token
 end
 
 local function refreshArmies()
@@ -307,6 +404,7 @@ local function refreshArmies()
 		local t = assert(token, "token")
 		t.label.Text = (if t.neutral then "🛡 " elseif army.inBattle then "💥 " else "⚔ ") .. shortMen(army.men)
 		t.target = target
+		t.province = army.location
 	end
 	for id, token in tokens do
 		if not alive[id] then
@@ -318,7 +416,8 @@ end
 
 -- What is under a screen point: an army token (they sit on top) or a province.
 function MapRenderer.pick(screenPos: Vector2): ("Army" | "Province" | nil, number?)
-	local best, bestDistance = nil, TOKEN_PICK
+	local best: number? = nil
+	local bestDistance = TOKEN_PICK
 	for id, token in tokens do
 		if token.frame.Visible then
 			local d = (MapView.toScreen(token.pos) - screenPos).Magnitude
@@ -362,8 +461,8 @@ end
 
 function MapRenderer.select(provinceId: number?)
 	local a = art
-	if a and PixelArt.select(a, provinceId) then
-		dirty = true
+	if a then
+		PixelArt.select(a, provinceId)
 	end
 end
 
@@ -381,8 +480,23 @@ function MapRenderer.selectArmy(armyId: number?)
 	end
 end
 
+-- Send what changed in the pixel art to the image: only the changed rectangle, unless most of it changed.
+local function upload(editable: EditableImage, a: PixelArt.Art, d: { number })
+	local x0, y0, x1, y1 = d[1], d[2], d[3], d[4]
+	local w, h = x1 - x0 + 1, y1 - y0 + 1
+	if w * h * 2 >= a.width * a.height then
+		editable:WritePixelsBuffer(Vector2.zero, Vector2.new(a.width, a.height), a.pixels)
+		return
+	end
+	local rect = buffer.create(w * h * 4)
+	for row = 0, h - 1 do
+		buffer.copy(rect, row * w * 4, a.pixels, ((y0 + row) * a.width + x0) * 4, w * 4)
+	end
+	editable:WritePixelsBuffer(Vector2.new(x0, y0), Vector2.new(w, h), rect)
+end
+
 function MapRenderer.init()
-	MapView.onZoom(showLabels)
+	MapView.onZoom(onZoom)
 	ClientState.onReset(function()
 		local map = ClientState.map()
 		if map then
@@ -421,11 +535,12 @@ function MapRenderer.init()
 			end
 		end
 		-- the pixel art goes to the screen at most once a frame
-		local editable = image
-		local pixels = art
-		if dirty and editable and pixels then
-			dirty = false
-			editable:WritePixelsBuffer(Vector2.zero, size, pixels.pixels)
+		local editable, painted = image, art
+		if editable and painted and imageLabel then
+			local d = PixelArt.takeDirty(painted)
+			if d then
+				upload(editable, painted, d)
+			end
 		end
 	end)
 end

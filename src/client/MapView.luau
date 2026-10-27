@@ -1,10 +1,9 @@
 --!strict
 -- The 2D map on screen (docs/DESIGN.md "UI and controls"): a full-screen GUI with the pixel-art map on a canvas
--- that pans and zooms. One finger or mouse drag pans, pinch or wheel zooms between the whole map and a close-up,
--- a tap (or click) is handed to the tap handler. Map positions are in map-art pixels (1 pixel = 1 stud);
+-- that pans and zooms. One finger or mouse drag pans, pinch zooms around the fingers, the wheel zooms around the
+-- pointer, a tap (or click) is handed to the tap handler. Map positions are in map-art pixels (1 pixel = 1 stud);
 -- things drawn on the map are children of the canvas, placed by scale so they follow every pan and zoom.
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -18,13 +17,18 @@ local MapView = {}
 
 export type TapHandler = (screenPos: Vector2) -> ()
 
+type Anchor = { screen: Vector2, map: Vector2 } -- keep this map point under this screen point while zooming
+
 local gui: ScreenGui? = nil
+local root: Frame? = nil -- full-screen background; its corner is the origin of map-screen coordinates
 local canvas: Frame? = nil
 local mapSize = Vector2.new(1024, 512)
 local zoom = 1
 local targetZoom = 1
 local focus = Vector2.zero -- map pixel at the centre of the screen
 local targetFocus = Vector2.zero
+local anchor: Anchor? = nil
+local applied = { x = math.huge, y = math.huge, w = -1, h = -1 }
 local lastZoom = -1
 local zoomListeners: { (number) -> () } = {}
 
@@ -42,8 +46,12 @@ local function clampZoom(z: number): number
 	return math.clamp(z, fitZoom(), MAX_ZOOM)
 end
 
-local function clampFocus(p: Vector2): Vector2
-	return Vector2.new(math.clamp(p.X, 0, mapSize.X), math.clamp(p.Y, 0, mapSize.Y))
+-- Keep the map's edges on screen: centred on an axis where the map is smaller than the screen.
+local function clampFocus(p: Vector2, z: number): Vector2
+	local half = viewport() / 2 / z
+	local x = if mapSize.X <= half.X * 2 then mapSize.X / 2 else math.clamp(p.X, half.X, mapSize.X - half.X)
+	local y = if mapSize.Y <= half.Y * 2 then mapSize.Y / 2 else math.clamp(p.Y, half.Y, mapSize.Y - half.Y)
+	return Vector2.new(x, y)
 end
 
 -- Zoom of each wheel step: whole map, region, close-up (evenly spaced on a log scale).
@@ -63,9 +71,17 @@ local function nearestLevel(): number
 	return best
 end
 
+-- Input positions -> map-screen coordinates (relative to the full-screen map GUI). Both input positions and
+-- AbsolutePosition leave out the same top-bar and notch insets, so the difference is exact on every device.
+local function fromInput(p: Vector2): Vector2
+	local frame = root
+	return if frame then p - frame.AbsolutePosition else p
+end
+
 local function pan(deltaPixels: Vector2)
-	targetFocus = clampFocus(targetFocus - deltaPixels / zoom)
-	focus = clampFocus(focus - deltaPixels / zoom)
+	anchor = nil
+	targetFocus = clampFocus(targetFocus - deltaPixels / zoom, targetZoom)
+	focus = clampFocus(focus - deltaPixels / zoom, zoom)
 end
 
 -- Build the map GUI for a new map (replacing any old one). Returns the canvas to draw on.
@@ -91,7 +107,9 @@ function MapView.create(size: Vector2, background: Color3): Frame
 	frame.Parent = back
 	screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	gui = screen
+	root = back
 	canvas = frame
+	applied = { x = math.huge, y = math.huge, w = -1, h = -1 }
 	MapView.showWholeMap()
 	return frame
 end
@@ -118,17 +136,24 @@ function MapView.toMap(screenPos: Vector2): Vector2
 	return focus + (screenPos - viewport() / 2) / zoom
 end
 
+-- The region zoom (the middle wheel step), for things that should show from there on.
+function MapView.regionZoom(): number
+	return levelZoom(2)
+end
+
 function MapView.centreOn(p: Vector2, closeUp: boolean?)
-	targetFocus = clampFocus(p)
+	anchor = nil
 	if closeUp then
 		targetZoom = levelZoom(2)
 	end
+	targetFocus = clampFocus(p, targetZoom)
 end
 
 function MapView.showWholeMap()
+	anchor = nil
 	targetZoom = fitZoom()
 	zoom = targetZoom
-	targetFocus = mapSize / 2
+	targetFocus = clampFocus(mapSize / 2, zoom)
 	focus = targetFocus
 end
 
@@ -138,9 +163,19 @@ local function apply()
 		return
 	end
 	local vp = viewport()
-	local topLeft = vp / 2 - focus * zoom
-	frame.Position = UDim2.fromOffset(topLeft.X, topLeft.Y)
-	frame.Size = UDim2.fromOffset(mapSize.X * zoom, mapSize.Y * zoom)
+	-- whole pixels, so the pixel art doesn't shimmer while panning
+	local x = math.floor(vp.X / 2 - focus.X * zoom + 0.5)
+	local y = math.floor(vp.Y / 2 - focus.Y * zoom + 0.5)
+	local w = math.floor(mapSize.X * zoom + 0.5)
+	local h = math.floor(mapSize.Y * zoom + 0.5)
+	if x ~= applied.x or y ~= applied.y then
+		frame.Position = UDim2.fromOffset(x, y)
+		applied.x, applied.y = x, y
+	end
+	if w ~= applied.w or h ~= applied.h then
+		frame.Size = UDim2.fromOffset(w, h)
+		applied.w, applied.h = w, h
+	end
 	if math.abs(zoom - lastZoom) > 1e-3 then
 		lastZoom = zoom
 		for _, fn in zoomListeners do
@@ -149,14 +184,21 @@ local function apply()
 	end
 end
 
+-- Zoom to z keeping the map point under screenPos where it is (pinch midpoint, mouse pointer).
+local function zoomAround(screenPos: Vector2, z: number, immediate: boolean)
+	anchor = { screen = screenPos, map = MapView.toMap(screenPos) }
+	targetZoom = clampZoom(z)
+	if immediate then
+		zoom = targetZoom
+	end
+end
+
 function MapView.init(onTap: TapHandler)
 	local function tap(inputPos: Vector2)
-		-- input positions leave out the top bar inset; the map GUI covers the whole screen
-		local inset = GuiService:GetGuiInset()
-		onTap(inputPos + inset)
+		onTap(fromInput(inputPos))
 	end
 
-	-- Mouse: drag to pan, click to select, wheel to step zoom levels.
+	-- Mouse: drag to pan, click to select, wheel to step zoom levels around the pointer.
 	local mouseDown: Vector2? = nil
 	local mouseLast = Vector2.zero
 	local mouseMoved = false
@@ -181,7 +223,7 @@ function MapView.init(onTap: TapHandler)
 		elseif input.UserInputType == Enum.UserInputType.MouseWheel and not processed then
 			-- wheel forward (+Z) zooms in, towards the close-up
 			local level = math.clamp(nearestLevel() + math.sign(input.Position.Z), 1, ZOOM_LEVELS)
-			targetZoom = levelZoom(level)
+			zoomAround(fromInput(Vector2.new(input.Position.X, input.Position.Y)), levelZoom(level), false)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
@@ -193,7 +235,7 @@ function MapView.init(onTap: TapHandler)
 		end
 	end)
 
-	-- Touch: tap to select, one-finger pan, pinch to zoom.
+	-- Touch: tap to select, one-finger pan, pinch to zoom around the fingers.
 	UserInputService.TouchTap:Connect(function(positions, processed)
 		if not processed and positions[1] then
 			tap(positions[1])
@@ -211,21 +253,44 @@ function MapView.init(onTap: TapHandler)
 		lastTranslation = totalTranslation
 	end)
 	local pinchStartZoom = zoom
-	UserInputService.TouchPinch:Connect(function(_positions, scale, _velocity, state, processed)
+	local pinchCentre = Vector2.zero
+	UserInputService.TouchPinch:Connect(function(positions, scale, _velocity, state, processed)
 		if processed then
 			return
 		end
 		if state == Enum.UserInputState.Begin then
 			pinchStartZoom = targetZoom
+			local sum = Vector2.zero
+			for _, p in positions do
+				sum += p
+			end
+			pinchCentre = if #positions > 0 then fromInput(sum / #positions) else viewport() / 2
 		end
-		targetZoom = clampZoom(pinchStartZoom * scale)
+		zoomAround(pinchCentre, pinchStartZoom * scale, true)
 	end)
 
 	RunService.RenderStepped:Connect(function(dt: number)
 		local a = 1 - math.exp(-SMOOTHING * dt)
 		targetZoom = clampZoom(targetZoom)
 		zoom += (targetZoom - zoom) * a
-		focus = focus:Lerp(targetFocus, a)
+		if math.abs(targetZoom - zoom) < 1e-3 then
+			zoom = targetZoom
+		end
+		local hold = anchor
+		if hold then
+			-- the anchored map point stays under its screen point while the zoom changes
+			focus = clampFocus(hold.map - (hold.screen - viewport() / 2) / zoom, zoom)
+			targetFocus = focus
+			if zoom == targetZoom then
+				anchor = nil
+			end
+		else
+			targetFocus = clampFocus(targetFocus, targetZoom)
+			focus = clampFocus(focus:Lerp(targetFocus, a), zoom)
+			if (targetFocus - focus).Magnitude < 0.01 then
+				focus = targetFocus
+			end
+		end
 		apply()
 	end)
 end

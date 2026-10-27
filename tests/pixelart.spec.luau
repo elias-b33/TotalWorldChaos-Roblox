@@ -64,3 +64,43 @@ T.test("a repaint leaves provinces far away untouched", function()
 	)
 	T.equal(PixelArt.pixel(art, x, y), before)
 end)
+
+T.test("a repaint reports the rectangle it changed", function()
+	PixelArt.takeDirty(art)
+	local id = map.nations[3].capital
+	PixelArt.setOwners(art, { [id] = 3 }, { [3] = 0x00ff00 })
+	local d = PixelArt.takeDirty(art)
+	T.expect(d ~= nil, "a dirty rectangle")
+	local box = art.boxes[id]
+	local r = assert(d, "rect")
+	T.expect(r[1] <= box[1] and r[2] <= box[2] and r[3] >= box[3] and r[4] >= box[4], "it covers the province")
+	T.expect(PixelArt.takeDirty(art) == nil, "and is cleared once taken")
+end)
+
+T.test("capitals keep their castle when a neighbour is repainted", function()
+	local id = map.nations[4].capital
+	local cx, cy = centre(id)
+	local before = PixelArt.pixel(art, cx, cy - 1)
+	for _, other in art.touching[id] do
+		PixelArt.setOwners(art, { [other] = 5 }, { [5] = 0x123456 })
+		PixelArt.setOwners(art, { [other] = 0 }, { [5] = 0x123456 })
+	end
+	T.equal(PixelArt.pixel(art, cx, cy - 1), before)
+end)
+
+T.test("a half-resolution grid keeps nearly every province", function()
+	local half = MapGrid.downsample(grid, 2)
+	T.equal(half.width, grid.width // 2)
+	T.equal(half.scale, grid.scale * 2)
+	local seen: { [number]: boolean } = {}
+	for i = 0, buffer.len(half.ids) - 1 do
+		seen[buffer.readu8(half.ids, i)] = true
+	end
+	local kept = 0
+	for _, p in map.provinces do
+		if seen[p.id] then
+			kept += 1
+		end
+	end
+	T.expect(kept >= #map.provinces * 0.95, "kept " .. kept .. " of " .. #map.provinces)
+end)

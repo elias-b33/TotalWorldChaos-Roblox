@@ -72,6 +72,7 @@ function Results.init(showHandler: () -> ())
 	-- dim the whole screen behind the results
 	dim = Instance.new("Frame")
 	dim.Name = "Dim"
+	dim.Active = true -- the map can't be tapped behind the results
 	dim.Size = UDim2.fromScale(1, 1)
 	dim.BackgroundColor3 = Color3.new(0, 0, 0)
 	dim.BackgroundTransparency = 0.45
