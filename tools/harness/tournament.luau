@@ -8,6 +8,7 @@
 --   lune run tools/harness/tournament 20 all Hard/Normal   # mixed: half the nations on each, swapped every seed
 --   lune run tools/harness/tournament 20 all Easy/Player   # Easy bots against Normal-bot stand-ins for players
 --   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
+--   SET="Features.Diplomacy=false" lune run tools/harness/tournament 200 earth   # a match feature off (true/false)
 --   lune run tools/harness/tournament 200 eldmoor     # start-position balance (docs/BALANCE.md section 16)
 --   RACES=shuffle lune run tools/harness/tournament 100   # races dealt out at random each match (the map's mix):
 --                                                         # race strength without the start positions in it
@@ -24,6 +25,7 @@ local process = require("@lune/process")
 local Bot = require("../../src/shared/Sim/Bot")
 local Commands = require("../../src/shared/Sim/Commands")
 local Config = require("../../src/shared/Config")
+local Diplomacy = require("../../src/shared/Sim/Diplomacy")
 local Maps = require("../../src/shared/Maps")
 local Match = require("../../src/shared/Sim/Match")
 local Races = require("../../src/shared/Sim/Races")
@@ -49,15 +51,17 @@ end
 local overrides = process.env.SET
 if overrides and overrides ~= "" then
 	for _, pair in string.split(overrides, ",") do
-		local path, value = string.match(pair, "^%s*([%w%.]+)%s*=%s*([%d%.]+)%s*$")
+		local path, value = string.match(pair, "^%s*([%w%.]+)%s*=%s*([%w%.]+)%s*$")
 		assert(path and value, "bad SET entry: " .. pair)
+		local parsed: any = if value == "true" then true elseif value == "false" then false else tonumber(value)
+		assert(parsed ~= nil, "bad SET value: " .. pair)
 		local node: any = Config
 		local keys = string.split(path, ".")
 		for i = 1, #keys - 1 do
 			node = node[keys[i]]
 		end
 		assert(node[keys[#keys]] ~= nil, "unknown Config value: " .. path)
-		node[keys[#keys]] = tonumber(value)
+		node[keys[#keys]] = parsed
 		print(string.format("what-if: Config.%s = %s", path, value))
 	end
 end
@@ -89,6 +93,9 @@ type MatchStats = {
 	wars: number,
 	conquests: number, -- provinces taken from another nation (not neutral land)
 	powers: number, -- Primordial powers bots used
+	insults: number, -- the EU4 pack: insults and insults back bots sent, wars declared on a nation the declarer holds a
+	insultsBack: number, -- grudge against (it insulted them)
+	grudgeWars: number,
 	leaderChanges: number, -- minutes (from 3:00) that ended with a different nation holding the most provinces
 	armyStats: { [number]: ArmyStats }, -- at the end of minutes 15 and 25 (or the end of the match)
 	group: { [number]: string }, -- mixed mode: nation -> "A" or "B"
@@ -209,6 +216,9 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		wars = 0,
 		conquests = 0,
 		powers = 0,
+		insults = 0,
+		insultsBack = 0,
+		grudgeWars = 0,
 		leaderChanges = 0,
 		armyStats = {},
 	}
@@ -241,8 +251,16 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		end
 		local early = state.tick < Config.Bots.Easy.noPlayerWarTicks
 		for _, e in state.events do
+			if e.kind == "Insult" then
+				stats.insults += 1
+			elseif e.kind == "InsultBack" then
+				stats.insultsBack += 1
+			end
 			if e.kind == "WarDeclared" then
 				stats.wars += 1
+				if Diplomacy.grudge(state, e.a, e.b) then
+					stats.grudgeWars += 1
+				end
 				if mixed and early then
 					local key = group[e.a] .. group[e.b]
 					earlyWars[key] = (earlyWars[key] or 0) + 1
@@ -296,6 +314,9 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		wars = stats.wars,
 		conquests = stats.conquests,
 		powers = stats.powers,
+		insults = stats.insults,
+		insultsBack = stats.insultsBack,
+		grudgeWars = stats.grudgeWars,
 		leaderChanges = stats.leaderChanges,
 		armyStats = stats.armyStats,
 		group = group,
@@ -355,6 +376,7 @@ for _, mapId in mapIds do
 	local lengths = {}
 	local perMinute: { { number } } = {}
 	local rejected, commands, wars, conquests, leaderChanges, powers = 0, 0, 0, 0, 0, 0
+	local insults, insultsBack, grudgeWars = 0, 0, 0
 	local atMinute: { [number]: { [string]: { number } } } = {}
 	for _, m in { 15, 25 } do
 		atMinute[m] = { armies = {}, men = {}, maxMen = {}, stacked = {}, gold = {}, manpower = {} }
@@ -431,6 +453,9 @@ for _, mapId in mapIds do
 		wars += s.wars
 		conquests += s.conquests
 		powers += s.powers
+		insults += s.insults
+		insultsBack += s.insultsBack
+		grudgeWars += s.grudgeWars
 		leaderChanges += s.leaderChanges
 		for k, v in s.rejectReasons do
 			reasons[k] = (reasons[k] or 0) + v
@@ -514,6 +539,14 @@ for _, mapId in mapIds do
 		table.insert(ends, clock(l))
 	end
 	print("match ends: " .. table.concat(ends, " "))
+	print(
+		string.format(
+			"insults per match %.1f, insults back %.1f  |  wars declared on an insulter per match %.1f",
+			insults / seeds,
+			insultsBack / seeds,
+			grudgeWars / seeds
+		)
+	)
 	print(
 		string.format(
 			"provinces taken from nations per match %.1f  |  leader changes per match (minute checks after 3:00) %.1f  |  powers used by bots per match %.1f",

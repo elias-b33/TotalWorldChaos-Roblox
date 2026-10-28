@@ -1648,6 +1648,43 @@ IconArt.ICONS = {
 		"................",
 		"................",
 	},
+	-- the EU4 pack: an insult (an anger mark: the insult marker, the Insult buttons) and military access (a signpost)
+	grudge = {
+		"................",
+		"....KK....KK....",
+		"...KRRK..KRRK...",
+		"...KRRK..KRRK...",
+		".KKKRRK..KRRKKK.",
+		"KRRRRrK..KrRRRRK",
+		".KKKKK....KKKKK.",
+		"................",
+		"................",
+		".KKKKK....KKKKK.",
+		"KRRRRrK..KrRRRRK",
+		".KKKRRK..KRRKKK.",
+		"...KRRK..KRRK...",
+		"...KRRK..KRRK...",
+		"....KK....KK....",
+		"................",
+	},
+	access = {
+		"................",
+		"......KKKK......",
+		"..KKKKKKKKKKK...",
+		"..KSSSSSSSoSSK..",
+		"..KSooooooooSSK.",
+		"..KSSSSSSSoSSK..",
+		"..KKKKKKKKKKK...",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"....KKKttKKK....",
+		"....KnnnnnnK....",
+		"....KKKKKKKK....",
+		"................",
+	},
 } :: { [string]: { string } }
 
 -- Icons made by recolouring another one: { base, { [from code] = to code } }.
@@ -1758,6 +1795,9 @@ IconArt.FALLBACK = {
 	troopers = "🔫",
 	gunners = "💥",
 	hoverbikes = "🏍",
+	-- the EU4 pack
+	grudge = "💢",
+	access = "🚶",
 } :: { [string]: string }
 
 -- Old emoji in text (toasts from the server, power names, relation marks) and the icon that replaces each.
@@ -1827,6 +1867,10 @@ IconArt.EMOJI = {
 	["📺"] = "video",
 	["🧱"] = "border",
 	["🖼"] = "frame",
+	-- the EU4 pack (toasts: "💢 Rhine insulted you!", "😀 Your jesters…", "🚶 Rhine lets your armies through")
+	["💢"] = "grudge",
+	["😀"] = "smile",
+	["🚶"] = "access",
 } :: { [string]: string }
 
 local function rgba(c: number): number

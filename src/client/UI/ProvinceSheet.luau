@@ -2,7 +2,8 @@
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
 -- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each troop
 -- your race can raise, under the names and icons the map gives them, move an army) and diplomacy on foreign ones
--- (war, ally, peace). Every button shows its price; the server decides.
+-- (war, ally, peace, and the EU4 pack's insult, gift and military access). Every button shows its price; the server
+-- decides.
 -- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
 
 local Players = game:GetService("Players")
@@ -238,7 +239,8 @@ local function render()
 	-- diplomacy with the owner of a foreign province
 	if owner and me and owner.id ~= me.id and snap then
 		local target = owner.id
-		if Relations.atWar(me.id, target) then
+		local atWar, allied = Relations.atWar(me.id, target), Relations.allied(me.id, target)
+		if atWar then
 			for _, tribute in Config.Diplomacy.PeaceTributes do
 				local costs = if tribute == 0 then {} else { { "gold", "+" .. tribute } }
 				action("peace", "Peace", costs, Widgets.BUTTON, me.gold >= tribute, function()
@@ -247,16 +249,41 @@ local function render()
 			end
 		else
 			local canWar = snap.phase ~= "Peace"
-				and not Relations.allied(me.id, target)
+				and not allied
 				and not Relations.truce(me.id, target)
 				and Relations.borders(me.id, target)
 			action("war", "Declare war", {}, Widgets.DANGER, canWar, function()
 				Intents.diplomacy("War", target)
 			end)
-			if not Relations.allied(me.id, target) then
+			if not allied then
 				action("handshake", "Ally", {}, Widgets.BUTTON, true, function()
 					Intents.diplomacy("Ally", target)
 				end, "🤝 Ally")
+			end
+		end
+		-- the EU4 pack (a match setting): insult (an action with no message; never an ally), a gift, ask for military
+		-- access
+		if snap.setup.settings.diplomacy then
+			if not allied then
+				local wait = Relations.cooldown("Insult", me.id, target)
+				local costs = if wait > 0 then { { "hourglass", wait .. " s" } } else {}
+				action("grudge", "Insult", costs, Widgets.BUTTON, wait == 0, function()
+					Intents.diplomacy("Insult", target)
+				end, "Insult")
+			end
+			if not atWar then
+				local gift = Config.Diplomacy.GiftGold
+				local wait = Relations.cooldown("Gift", me.id, 0) -- one gift a minute, whoever it goes to
+				local costs =
+					{ { if wait > 0 then "hourglass" else "gold", if wait > 0 then wait .. " s" else tostring(gift) } }
+				action("gift", "Gift", costs, Widgets.GOOD, wait == 0 and me.gold >= gift, function()
+					Intents.diplomacy("Gift", target)
+				end, "Gift")
+				if not allied and not Relations.hasAccess(me.id, target) then
+					action("access", "Ask access", {}, Widgets.BUTTON, true, function()
+						Intents.diplomacy("Access", target)
+					end, "Access")
+				end
 			end
 		end
 	end
@@ -326,8 +353,9 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 		if selected == nil then
 			return
 		end
-		-- the sheet shows prices and enabled buttons, so refresh when this province or any nation changes
-		local relevant = #delta.nations > 0
+		-- the sheet shows prices and enabled buttons, so refresh when this province, any nation or the diplomacy (a
+		-- war, an insult's wait) changes
+		local relevant = #delta.nations > 0 or delta.diplomacy ~= nil
 		for _, r in delta.provinces do
 			relevant = relevant or r.id == selected
 		end

@@ -68,6 +68,9 @@ function PrivateSettings.summary(s: Types.MatchSettings): string
 	if not s.disasters then
 		table.insert(parts, "no disasters")
 	end
+	if not s.diplomacy then
+		table.insert(parts, "no insults, gifts or access")
+	end
 	if #s.teams > 0 then
 		table.insert(parts, "teams set")
 	end
@@ -249,14 +252,17 @@ local function buildPanel()
 	local disasters = row(right, 2, "meteor", "Disasters")
 	option(disasters, "disasters", true, "On")
 	option(disasters, "disasters", false, "Off")
+	local insults = row(right, 3, "grudge", "Insults") -- the EU4 pack: insults, gifts and military access
+	option(insults, "diplomacy", true, "On")
+	option(insults, "diplomacy", false, "Off")
 	local teamsTitle = Widgets.label(right, "Teams: tap a player (same team = allies)", TEXT_SIZE, 22)
-	teamsTitle.LayoutOrder = 3
+	teamsTitle.LayoutOrder = 4
 	Widgets.leadIcon(teamsTitle, "teams", Theme.size.icon)
 	teamGrid = Instance.new("Frame")
 	teamGrid.Name = "Teams"
 	teamGrid.BackgroundTransparency = 1
 	teamGrid.Size = UDim2.new(1, 0, 0, 4 * TEAM_CELL.Y + 3 * 4)
-	teamGrid.LayoutOrder = 4
+	teamGrid.LayoutOrder = 5
 	teamGrid.Parent = right
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(TEAM_CELL.X, TEAM_CELL.Y)

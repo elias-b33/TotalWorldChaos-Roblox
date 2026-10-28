@@ -224,8 +224,21 @@ Config.Diplomacy = {
 	MaxAllianceSize = 3,
 	TruceTicks = 3 * 60,
 	CoalitionThreshold = 0.2, -- share of the ownable provinces (not mountains) that puts a crown on a nation
-	OfferTicks = 30, -- alliance and peace offers expire after this
+	OfferTicks = 30, -- alliance, peace and military access offers expire after this
 	PeaceTributes = { 0, 50, 100 }, -- gold a peace offer can include (the buttons in the province sheet)
+	-- Insults (a diplomatic action with no message, docs/DESIGN.md "Diplomacy"): one nation insults another at most
+	-- this often (each way)
+	InsultCooldownTicks = 90,
+	AnswerTicks = 30, -- the insulted nation may answer (insult back or laugh it off) this long
+	GrudgeTicks = 3 * 60, -- an insult gives the insulted nation a grudge against the insulter for this long...
+	GrudgeBonus = 0.1, -- ...worth this much combat strength in battles against the insulter (whole side, like races)
+	LaughTicks = 60, -- laughing an insult off trades the grudge for high spirits this long...
+	LaughBonus = 0.05, -- ...worth this much combat strength in every battle (doesn't stack with a grudge: the best counts)
+	MarkerSeconds = 5, -- how long the insult marker stays over the insulted nation's capital (client)
+	GiftGold = 25, -- a gift: a little gold to another nation
+	GiftCooldownTicks = 60, -- a nation sends one gift (to anyone) at most this often
+	AccessTicks = 3 * 60, -- military access: the guest's armies may enter the owner's land this long (a war between
+	-- them ends it); when it ends, the guest's armies there walk home under the white flag
 }
 
 -- Primordial powers ------------------------------------------------------------------------------
@@ -613,6 +626,12 @@ Config.Season.Rewards = {
 	},
 }
 
+-- Match features (the "EU4 pack", docs/DESIGN.md): each is a match setting (Sim.Settings) with this default, so a
+-- private server, and later a sandbox mode, can turn it off. false here turns it off on every server.
+Config.Features = {
+	Diplomacy = true, -- insults and their answers, gifts, military access (war, alliances and peace are always on)
+}
+
 -- Network and security ---------------------------------------------------------------------------
 
 Config.Net = {
@@ -642,6 +661,12 @@ Config.Bots = {
 	AttackShare = 0.3,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
+	-- insults (docs/DESIGN.md "Bot AI"): now and then a bot insults a rival, and an insulted bot answers back and leans
+	-- towards war with its insulter
+	InsultChance = 0.002, -- per plan (Normal bots plan every 3 s: about one insult per bot in a 25-minute match)
+	InsultBackChance = 0.5, -- an insulted bot insults back (it decides once per insult; else it keeps its grudge)
+	GrudgeAttackRatio = 0.85, -- against a nation it holds a grudge against, a bot needs this share of its attack ratio
+	GrudgeMinRatio = 1, -- ...but never less than this much of the enemy's strength (Hard's 1.1 × 0.85 would be 0.94)
 }
 
 -- Private servers (docs/MONETIZATION.md 3.4): what the owner may pick in the Lobby's settings sheet. The defaults

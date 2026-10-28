@@ -480,6 +480,10 @@ function TelemetryService.init()
 		if ok and command.kind == "Power" then
 			TelemetryService.send(Telemetry.powerUsed(state, player.UserId, command.power), player)
 		end
+		local diplomacy = if ok then Telemetry.diplomacy(state, player.UserId, command) else nil
+		if diplomacy then
+			TelemetryService.send(diplomacy, player) -- the EU4 pack: insults and answers, gifts, military access
+		end
 	end)
 	PlayerDataService.onLoaded(function(player: Player, data: Types.PlayerProfile)
 		onboard(player, "joined")

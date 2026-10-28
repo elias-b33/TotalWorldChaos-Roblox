@@ -444,6 +444,27 @@ T.test("hostile fleets fight three rounds; the loser retreats to the nearest zon
 	T.equal(weak.retreating, nil)
 end)
 
+T.test("an insult's grudge and high spirits count at sea too", function()
+	local state = fresh()
+	warPhase(state)
+	state.provinces[id("Cinder Reach")].owner = ZEPHYR
+	state.provinces[id("Cinder Rock")].owner = AURORA
+	T.expect((Diplomacy.declareWar(state, AURORA, ZEPHYR)))
+	local mine = Navy.spawn(state, AURORA, LYRA, 2)
+	local theirs = Navy.spawn(state, ZEPHYR, LYRA, 2)
+	local sides = assert(Navy.sides(state, { mine, theirs }))
+	T.equal(sides.defenderOwner, AURORA)
+	local before = Navy.modifier(state, sides, true, 0)
+	local attackBefore = Navy.modifier(state, sides, false, 0)
+	local insult = { kind = "Diplomacy", action = "Insult", target = AURORA, gold = 0 } :: Types.Command
+	T.expect((Commands.apply(state, ZEPHYR, insult)))
+	T.near(Navy.modifier(state, sides, true, 0), before + Config.Diplomacy.GrudgeBonus, 1e-9, "the insulted fleet")
+	T.near(Navy.modifier(state, sides, false, 0), attackBefore, 1e-9, "the insulter's gets nothing")
+	local laugh = { kind = "Diplomacy", action = "LaughOff", target = ZEPHYR, gold = 0 } :: Types.Command
+	T.expect((Commands.apply(state, AURORA, laugh)))
+	T.near(Navy.modifier(state, sides, true, 0), before + Config.Diplomacy.LaughBonus, 1e-9, "high spirits")
+end)
+
 T.test("a beaten fleet with no friendly coast to reach sinks, and everyone aboard with it", function()
 	local state, rng = fresh()
 	warPhase(state)
