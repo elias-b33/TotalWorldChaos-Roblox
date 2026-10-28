@@ -8,6 +8,7 @@ local Emulator = require("../Emulator")
 local H = require("../H")
 local MapGrid = require("../../../src/shared/MapGrid")
 local Navy = require("../../../src/shared/Sim/Navy")
+local Troops = require("../../../src/shared/Sim/Troops")
 local provinceByName = H.provinceByName
 
 local GUI_BUDGET = 2000
@@ -122,9 +123,10 @@ local function run()
 	H.expect(H.mapObject(alice, "Fleet" .. fleet.id) ~= nil, "a fleet token is on Alice's map")
 	H.expect(H.client(bob, "ClientState").fleet(fleet.id) ~= nil, "Bob sees the fleet too")
 
-	-- recruit 3 regiments, pick the army up from the sheet, tap the fleet, Board
+	-- recruit 3 regiments of her race's line troop, pick the army up from the sheet, tap the fleet, Board
+	local line = Troops.ofRole(state.nations[A].race, "line")
 	for _ = 1, 3 do
-		Emulator.press(alice, "Regiment")
+		Emulator.press(alice, "Recruit_" .. line)
 		Emulator.run(1.2)
 	end
 	local army

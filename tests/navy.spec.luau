@@ -361,7 +361,7 @@ T.test("an army on the coast boards its fleet: what fits goes aboard, the rest s
 	local state, rng = fresh()
 	local landing = id("Aurora Landing")
 	local fleet = Navy.spawn(state, AURORA, VEGA, 2)
-	local army = Army.spawn(state, AURORA, landing, 2000)
+	local army = Army.spawn(state, AURORA, landing, 2000, "Infantry") -- (without a troop: the race's line troop)
 	Army.add(army, { Archers = 1000 })
 	T.expect((Commands.apply(state, AURORA, { kind = "Embark", army = army.id, fleet = fleet.id })))
 	run(state, rng, 1)
