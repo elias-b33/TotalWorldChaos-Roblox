@@ -1,4 +1,5 @@
-"""Redraw every mockup in docs/images/ui/ (docs/UI_DIRECTION.md) from the backdrops in tools/uimock/backdrops/.
+"""Redraw every mockup in docs/images/ui/ (docs/UI_DIRECTION.md) and docs/images/next/ (docs/NEXT_FEATURES.md) from
+the backdrops in tools/uimock/backdrops/.
 
     python3 tools/uimock/render_all.py
 
@@ -6,7 +7,8 @@ Needs Python 3 with Pillow, Fredoka One (tools/harness/fonts) and Inter (/usr/sh
 harness renderer's stand-in for Builder Sans). The backdrops are harness renders with only the map kept: run a scenario
 with KEEP_SCENE=1, then map_only.py (or map_shift.py to pan the map) on the scene it saved. now_capital.png is the
 current build's own render, for the before/after. font_test.png is not redrawn here (it needs Luckiest Guy, which
-the repo does not ship).
+the repo does not ship). The next_*.png/jpg backdrops and the replay strip are described in docs/NEXT_FEATURES.md
+"Mockups".
 """
 import os
 import subprocess
@@ -44,3 +46,15 @@ with tempfile.TemporaryDirectory() as tmp:
         env=dict(os.environ, UIMOCK_BAND="brass"))
     run("before_after.py", brass, os.path.join(OUT, "01_hud_province.png"), os.path.join(OUT, "material_ab.png"),
         "A: brass band", "B: iron band, brass title plate (chosen for in-match sheets)")
+
+# docs/NEXT_FEATURES.md: the planned features, on the same kit
+NEXT = os.path.join(REPO, "docs", "images", "next")
+os.makedirs(NEXT, exist_ok=True)
+strip = os.path.join(BACK, "next_replay_eldmoor_strip.jpg")
+run("mock_next.py", "pings", os.path.join(BACK, "next_ping_earth.png"), os.path.join(NEXT, "01_pings.png"))
+run("mock_next.py", "results", strip, os.path.join(BACK, "next_replay_eldmoor_0900.jpg"),
+    os.path.join(NEXT, "02_results_replay_awards.png"))
+run("mock_next.py", "frames", strip, os.path.join(NEXT, "02b_replay_frames.jpg"))
+run("mock_next.py", "empire", os.path.join(BACK, "next_empire_eldmoor.png"), os.path.join(NEXT, "03_empire.png"))
+run("mock_next.py", "menu", os.path.join(BACK, "next_menu_earth.jpg"), os.path.join(NEXT, "04_party_menu.png"))
+run("mock_next.py", "draft", os.path.join(BACK, "next_menu_earth.jpg"), os.path.join(NEXT, "05_party_draft.png"))
