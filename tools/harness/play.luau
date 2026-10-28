@@ -2866,9 +2866,7 @@ function scenarios.ads()
 	H.expect(#data.purchaseHistory == 1 and data.purchaseHistory[1].robux == 10, "and listed in the purchase history")
 	Emulator.press(alice, "✕")
 	Emulator.run(0.3)
-	H.server("Services.ShopService").refresh(player) -- the reroll's receipt doesn't resend the shop view
-	Emulator.run(0.5)
-	H.client(alice, "UI.Shop").open("History")
+	H.client(alice, "UI.Shop").open("History") -- the receipt resent the shop view: the history is up to date
 	Emulator.run(0.5)
 	H.expect(
 		Emulator.findText(alice, "Quest reroll") ~= nil and Emulator.findText(alice, "quest_reroll") == nil,

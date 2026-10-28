@@ -59,6 +59,7 @@ local function onReceipt(receipt: any): Enum.ProductPurchaseDecision
 	if player and decision == Enum.ProductPurchaseDecision.PurchaseGranted then
 		if fresh and not fromAd then
 			TelemetryService.purchased(player, Ads.PRODUCT, receipt.CurrencySpent) -- analytics: a Robux purchase
+			ShopService.refresh(player) -- the shop's purchase history lists it
 		end
 		QuestService.sendView(player)
 	end
