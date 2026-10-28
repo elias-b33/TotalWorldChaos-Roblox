@@ -1,5 +1,6 @@
 --!strict
--- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its colour, province count and your relation.
+-- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its colour, province count and your relation,
+-- and at the bottom the way to your quests during a match (the top bar has no room for another button).
 
 local Players = game:GetService("Players")
 
@@ -11,12 +12,22 @@ local Widgets = require(script.Parent.Widgets)
 
 local Nations = {}
 
+-- The play-streak flame after a player's nation name, by tier (Sim.Login.flameTier): 3, 7, 14 and 30 days.
+local FLAMES = { " 🔥", " 🔥🔥", " 💙", " 💙👑" }
+
 local drawer: Frame
 local rows: Frame
+local questsButton: TextButton? = nil
+local questsText: () -> string = function()
+	return "📜 Quests"
+end
 
 local function render()
 	if not drawer.Visible then
 		return
+	end
+	if questsButton then
+		questsButton.Text = questsText()
 	end
 	local snap = ClientState.snapshot()
 	Widgets.clear(rows)
@@ -42,9 +53,10 @@ local function render()
 		local who = if n.id == me then "⭐ " elseif n.controller == "Player" then "👤 " else ""
 		local status = if n.eliminated then "☠ " else Relations.icon(me, n.id)
 		local vip = if looks.vip then " [VIP]" else ""
+		local flame = FLAMES[looks.flame or 0] or "" -- play-streak reward (MONETIZATION 5.6)
 		local label = Widgets.label(
 			row,
-			string.format("%s%s%s  🏴%d %s", who, n.name, vip, Relations.provinceCount(n.id), status),
+			string.format("%s%s%s%s  🏴%d %s", who, n.name, flame, vip, Relations.provinceCount(n.id), status),
 			14,
 			24
 		)
@@ -69,14 +81,31 @@ function Nations.toggle()
 	render()
 end
 
-function Nations.init()
+-- onQuests: opens the Quests screen; buttonText: its button's text (with the number of quests to claim).
+function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?)
 	local gui = Widgets.screen("Nations", 4)
 	drawer = Widgets.panel(gui, 230)
 	drawer.Name = "Drawer"
 	drawer.Position = UDim2.fromOffset(8, 52)
 	drawer.Visible = false
 	Widgets.list(drawer, false, 4)
-	Widgets.label(drawer, "🌍 Nations", 16, 24).LayoutOrder = 0
+	-- the title, and beside it the way to the quests (in the header: a row under ten nations runs off a phone)
+	local header = Instance.new("Frame")
+	header.Name = "Header"
+	header.BackgroundTransparency = 1
+	header.Size = UDim2.new(1, 0, 0, if onQuests then Widgets.BUTTON_HEIGHT else 24)
+	header.LayoutOrder = 0
+	header.Parent = drawer
+	Widgets.label(header, "🌍 Nations", 16, if onQuests then Widgets.BUTTON_HEIGHT else 24)
+	if onQuests then
+		questsText = buttonText or questsText
+		local b = Widgets.button(header, questsText(), 116, Color3.fromRGB(120, 90, 40), onQuests)
+		b.Name = "QuestsButton"
+		b.TextSize = 14
+		b.AnchorPoint = Vector2.new(1, 0)
+		b.Position = UDim2.fromScale(1, 0)
+		questsButton = b
+	end
 	rows = Instance.new("Frame")
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1

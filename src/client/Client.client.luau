@@ -29,6 +29,8 @@ local Cosmetics = require(Client.Cosmetics)
 local Emotes = require(Client.UI.Emotes)
 local Shop = require(Client.UI.Shop)
 local ShopState = require(Client.ShopState)
+local Quests = require(Client.UI.Quests)
+local QuestState = require(Client.QuestState)
 
 local selectedArmy: number? = nil
 
@@ -135,7 +137,7 @@ Offers.init()
 Powers.init(Hud.toast, function()
 	selectProvince(nil) -- the power picker replaces any open sheet
 end)
-Nations.init()
+Nations.init(Quests.open, Quests.shortButtonText)
 Tutorial.init(function()
 	return selectedArmy
 end)
@@ -153,10 +155,12 @@ ClientState.onReset(function()
 end)
 Cosmetics.init()
 Shop.init(Hud.toast)
+Quests.init()
 Emotes.init()
 Effects.init() -- after MapRenderer: draws on the canvas it builds
 Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
 ProfileState.init()
 ShopState.init()
+QuestState.init()
 LobbyState.init()
 ClientState.init()

@@ -349,27 +349,30 @@ Three a day at 00:00 UTC: one easy, one medium and one hard, picked from a pool 
 | --- | --- | --- |
 | Easy | 100 XP, 30 Glory | Play 1 match. Capture 3 neutral provinces. Recruit 5 regiments. Build 2 buildings. |
 | Medium | 150 XP, 40 Glory | Win 3 battles. Develop a province to level 4. Form an alliance. Finish in the top 5. Use 2 Primordial powers. |
-| Hard | 200 XP, 50 Glory | Capture an enemy capital. Hold 25 provinces at once. Finish in the top 3. Win a battle as an underdog. As a Primordial, use 4 powers. |
+| Hard | 200 XP, 50 Glory | Capture an enemy capital. Hold 25 provinces at once. Finish in the top 3. Win 6 battles. Capture 10 provinces. |
 
 Rules for the quest pool:
 
 - Every quest can be finished in normal play on every map.
 - No quest asks you to lose, betray an ally, quit, or do anything that ruins other players' match.
 - No quest needs a purchase or a specific cosmetic.
+- No quest needs being a Primordial: rising as one means losing your nation. "Use 2 Primordial powers" counts a nation's powers too.
+
+The pool is `Config.Progression.Quests.Pool`. Rerolls swap an unfinished daily quest for another of the same tier; weekly quests can't be rerolled. A finished quest waits until it is claimed (it never expires); progress counts at Results (or when you leave), and an AFK match counts nothing.
 
 ### 5.5 Weekly quests
 
-Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: play 10 matches; win 1 match; play on all three maps; capture 100 provinces in total; win 50 battles; use 15 Primordial powers.
+Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: play 10 matches; win 1 match; capture 100 provinces in total; win 50 battles; use 15 Primordial powers; finish in the top 3 three times. (No "play on all three maps": the map vote decides the map, so a player can't make it happen.)
 
 ### 5.6 Login calendar, streaks and achievements
 
-**Login calendar:** a 7-step cycle that moves one step on each **day you play**, not each calendar day. Missing days pauses it and never resets it.
+**Login calendar:** a 7-step cycle that moves one step on each **day you play** (a UTC day with a finished match: stayed to Results, not AFK), not each calendar day. Missing days pauses it and never resets it. The step's Glory is paid with that match and shows on the Results breakdown.
 
 | Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Glory | 25 | 25 | 50 | 50 | 75 | 75 | 200 |
 
-**Play streak:** consecutive days with a finished match. One missed day per week is covered automatically. Streak rewards are cosmetic only: a flame on your nameplate at 3 days, a bigger flame at 7, a blue flame at 14 and the title "the Unyielding" at 30. A broken streak keeps every earned reward.
+**Play streak:** consecutive days with a finished match. One missed day per week is covered automatically (the week of the missed day, Monday to Sunday). Streak rewards are cosmetic only: a flame on your nameplate at 3 days, a bigger flame at 7, a blue flame at 14 and the title "the Unyielding" at 30. A broken streak keeps every earned reward (they follow the best streak). The nameplate flame shows after your nation's name in the 🌍 nations list.
 
 **Achievements:** one-time, shown with progress bars. 30 at launch. Examples:
 

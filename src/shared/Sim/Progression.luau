@@ -22,7 +22,7 @@ local P = Config.Progression
 
 local Progression = {}
 
-Progression.PROFILE_VERSION = 2
+Progression.PROFILE_VERSION = 3
 
 -- Level curve and ranks ---------------------------------------------------------------------------------
 
@@ -83,6 +83,15 @@ function Progression.newStats(userId: number, tick: number): Stats
 		powersUsed = 0,
 		paidXp = 0,
 		paidGlory = 0,
+		neutralTaken = 0,
+		capitalsTaken = 0,
+		regiments = 0,
+		buildings = 0,
+		developed = 0,
+		bestDevelopment = 0,
+		alliances = 0,
+		mostProvinces = 0,
+		questCounted = {},
 	}
 end
 
@@ -90,12 +99,26 @@ local function closeIdle(stats: Stats, tick: number)
 	stats.longestIdle = math.max(stats.longestIdle, tick - stats.lastCommandAt)
 end
 
--- The player sent a command (any command counts against AFK; only a successful power counts as used).
-function Progression.recordCommand(stats: Stats, tick: number, command: Types.Command, ok: boolean)
+-- The player sent a command (any command counts against AFK; only a successful power counts as used). With the
+-- match state (after the command), carried-out orders count for quests too.
+function Progression.recordCommand(stats: Stats, tick: number, command: Types.Command, ok: boolean, state: MatchState?)
 	closeIdle(stats, tick)
 	stats.lastCommandAt = tick
-	if ok and command.kind == "Power" then
+	if not ok then
+		return
+	end
+	if command.kind == "Power" then
 		stats.powersUsed += 1
+	elseif command.kind == "Recruit" then
+		stats.regiments += command.regiments
+	elseif command.kind == "Build" then
+		stats.buildings += 1
+	elseif command.kind == "Develop" then
+		stats.developed += 1
+		local province = if state then state.provinces[command.province] else nil
+		if province then
+			stats.bestDevelopment = math.max(stats.bestDevelopment, province.development)
+		end
 	end
 end
 
@@ -103,8 +126,14 @@ local function seatedNow(state: MatchState, userId: number): boolean
 	return Match.nationOf(state, userId) ~= nil or state.primordials[userId] ~= nil
 end
 
--- Count this tick's captures and battle wins for the players whose nations made them, and note who has a nation
--- or a Primordial. Call before the events are cleared.
+local function statsOfNation(state: MatchState, statsByUser: { [number]: Stats }, nationId: number): Stats?
+	local nation = state.nations[nationId]
+	local userId = if nation then nation.userId else nil
+	return if userId then statsByUser[userId] else nil
+end
+
+-- Count this tick's captures, battle wins and alliances for the players whose nations made them, the most
+-- provinces each has held, and note who has a nation or a Primordial. Call before the events are cleared.
 function Progression.observe(state: MatchState, statsByUser: { [number]: Stats })
 	for userId, stats in statsByUser do
 		if not stats.seated and stats.leftAt == nil and seatedNow(state, userId) then
@@ -112,15 +141,41 @@ function Progression.observe(state: MatchState, statsByUser: { [number]: Stats }
 		end
 	end
 	for _, e in state.events do
-		if e.kind == "ProvinceTaken" or e.kind == "BattleEnded" then
-			local nation = state.nations[e.a]
-			local userId = if nation then nation.userId else nil
-			local stats = if userId then statsByUser[userId] else nil
-			if stats and e.kind == "ProvinceTaken" then
-				stats.provincesTaken += 1
-			elseif stats then
-				stats.battlesWon += 1
+		local stats = if e.kind == "ProvinceTaken"
+				or e.kind == "BattleEnded"
+				or e.kind == "AllianceFormed"
+			then statsOfNation(state, statsByUser, e.a)
+			else nil
+		if stats and e.kind == "ProvinceTaken" then
+			stats.provincesTaken += 1
+			local province = state.provinces[e.province]
+			if e.b == 0 then
+				stats.neutralTaken += 1
+			elseif province and province.isCapital then
+				stats.capitalsTaken += 1
 			end
+		elseif stats and e.kind == "BattleEnded" then
+			stats.battlesWon += 1
+		elseif stats then
+			stats.alliances += 1
+		end
+		if e.kind == "AllianceFormed" then
+			local other = statsOfNation(state, statsByUser, e.b)
+			if other then
+				other.alliances += 1
+			end
+		end
+	end
+	local held: { [number]: number } = {}
+	for _, p in state.provinces do
+		if p.owner then
+			held[p.owner] = (held[p.owner] or 0) + 1
+		end
+	end
+	for nationId, count in held do
+		local stats = statsOfNation(state, statsByUser, nationId)
+		if stats and count > stats.mostProvinces then
+			stats.mostProvinces = count
 		end
 	end
 end
@@ -176,6 +231,9 @@ local function add(reward: MatchReward, kind: string, xp: number, glory: number)
 		reward.glory += glory
 	end
 end
+
+-- Add a row to a reward breakdown (and its totals). Nothing for a row of zeros.
+Progression.addLine = add
 
 -- What the match pays one player. Call at Results for everyone still here, or when a player leaves early.
 -- Whatever an earlier leave already paid this match comes off the total, so leaving and rejoining pays the
@@ -245,8 +303,8 @@ function Progression.newProfile(): Profile
 		lastMatchDay = -1,
 		owned = {},
 		equipped = {},
-		quests = { day = 0, week = 0, rerollsUsed = 0, daily = {}, weekly = {} },
-		login = { step = 0, lastPlayDay = 0, streak = 0 },
+		quests = { day = -1, week = -1, rerollsUsed = 0, videoRerolls = 0, daily = {}, weekly = {} },
+		login = { step = 0, lastPlayDay = -1, streak = 0, best = 0, coveredWeek = -1 },
 		achievements = {},
 		season = { id = "", xp = 0, premium = false, claimed = {} },
 		receipts = {},
@@ -262,6 +320,11 @@ local MIGRATIONS: { [number]: (Profile) -> () } = {
 	-- 2 adds tutorialDone: someone who has already played a match never gets sent to the tutorial
 	[1] = function(profile: Profile)
 		profile.tutorialDone = profile.tutorialDone == true or profile.stats.matches > 0
+	end,
+	-- 3 fills in the quest book and the login calendar (placeholders until then, never used)
+	[2] = function(profile: Profile)
+		profile.quests = { day = -1, week = -1, rerollsUsed = 0, videoRerolls = 0, daily = {}, weekly = {} }
+		profile.login = { step = 0, lastPlayDay = -1, streak = 0, best = 0, coveredWeek = -1 }
 	end,
 }
 
@@ -279,25 +342,35 @@ function Progression.isFirstMatchToday(profile: Profile, today: number): boolean
 	return profile.lastMatchDay ~= today
 end
 
+-- Add XP and Glory to a profile, with the level-ups (50 Glory each) and rank-ups (+500 Glory each) they bring.
+-- Returns the level-up and rank-up Glory (already added).
+function Progression.addXp(profile: Profile, xp: number, glory: number): (number, number)
+	profile.xp += xp
+	profile.glory += glory
+	local newLevel = Progression.levelFor(profile.xp)
+	if newLevel <= profile.level then
+		return 0, 0
+	end
+	local rankBefore = Progression.rankFor(profile.level)
+	local rankAfter = Progression.rankFor(newLevel)
+	local levelGlory = (newLevel - profile.level) * P.LevelUpGlory
+	local rankGlory = (rankAfter - rankBefore) * P.RankUpGlory
+	profile.glory += levelGlory + rankGlory
+	profile.level = newLevel
+	return levelGlory, rankGlory
+end
+
 -- Apply a match reward to a profile: XP, Glory, levels (50 Glory each) and ranks (+500 Glory each), and the
 -- lifetime stats. Returns the report for the Results screen, with the level-up and rank-up lines added.
 function Progression.grant(profile: Profile, stats: Stats, reward: MatchReward, today: number): Types.RewardReport
 	local before = Progression.summary(profile)
 	local full: MatchReward = table.clone(reward)
 	full.lines = table.clone(reward.lines)
-	profile.xp += reward.xp
-	profile.glory += reward.glory
 	stats.paidXp += reward.xp
 	stats.paidGlory += reward.glory
-	local newLevel = Progression.levelFor(profile.xp)
-	if newLevel > profile.level then
-		local rankBefore = Progression.rankFor(profile.level)
-		local rankAfter = Progression.rankFor(newLevel)
-		add(full, "LevelUp", 0, (newLevel - profile.level) * P.LevelUpGlory)
-		add(full, "RankUp", 0, (rankAfter - rankBefore) * P.RankUpGlory)
-		profile.glory += full.glory - reward.glory
-		profile.level = newLevel
-	end
+	local levelGlory, rankGlory = Progression.addXp(profile, reward.xp, reward.glory)
+	add(full, "LevelUp", 0, levelGlory)
+	add(full, "RankUp", 0, rankGlory)
 	if reward.stayed and not reward.afk then
 		profile.lastMatchDay = today
 	end
