@@ -99,6 +99,44 @@ function H.iconShown(client, icon: string): boolean
 	return false
 end
 
+-- The visible text objects (in the ScreenGui named `screen`, or anywhere) whose text contains `text` and whose own
+-- pixel icon is `icon`: where an emoji used to lead the text ("🏴 3k" is now a Rebels flag icon and "3k").
+function H.iconTexts(client, icon: string, text: string, screen: string?)
+	local root = if screen then client.localPlayer.PlayerGui:FindFirstChild(screen) else client.localPlayer.PlayerGui
+	local out = {}
+	for _, d in if root then root:GetDescendants() else {} do
+		if (d:IsA("TextLabel") or d:IsA("TextButton")) and string.find(d.Text, text, 1, true) and shown(d) then
+			local mark = d:FindFirstChild("Icon")
+			if mark and mark:GetAttribute("Icon") == icon and shown(mark) then
+				table.insert(out, d)
+			end
+		end
+	end
+	return out
+end
+
+function H.iconText(client, icon: string, text: string, screen: string?): boolean
+	return #H.iconTexts(client, icon, text, screen) > 0
+end
+
+-- The map's overlay named `name` (e.g. "Crown1", "Status12") when it is on screen, or nil.
+function H.mapObject(client, name: string)
+	local map = client.localPlayer.PlayerGui:FindFirstChild("Map")
+	local obj = map and map:FindFirstChild(name, true)
+	return if obj and shown(obj) then obj else nil
+end
+
+-- An army's strength badge on the map, when it shows: its text and its pixel icon (nil, nil when hidden).
+function H.badge(client, armyId: number): (string?, string?)
+	local token = H.mapObject(client, "Army" .. armyId)
+	local badge = token and token:FindFirstChild("Strength")
+	local icon = badge and badge:FindFirstChild("Icon")
+	if badge == nil or icon == nil or not shown(badge) then
+		return nil, nil
+	end
+	return badge.Text, icon:GetAttribute("Icon")
+end
+
 -- A server-side module's table, e.g. H.server("Services.MatchService").
 function H.server(path: string)
 	local node = Emulator.server.dm:GetService("ServerScriptService").Server
@@ -258,6 +296,68 @@ function scenarios.look()
 	Emulator.pinch(alice, 3.5)
 	Emulator.run(2)
 	H.shot(alice, "region")
+	-- an idle neutral garrison's badge shows only where it covers no province name and no other garrison's badge;
+	-- the others keep their grey token. Checked from the objects on the map, each badge as wide as its padding plus
+	-- its text estimated the way the layout estimates it.
+	local Renderer = H.client(alice, "MapRenderer")
+	local LabelLayout = H.client(alice, "LabelLayout")
+	local Vector2 = Emulator.roblox.Vector2
+	local function canvasPoint(pos): any -- a position on the map's canvas, on screen
+		local m = Renderer.mapSize()
+		return MapView.toScreen(Vector2.new(pos.X.Scale * m.X, pos.Y.Scale * m.Y))
+			+ Vector2.new(pos.X.Offset, pos.Y.Offset)
+	end
+	local function garrisonBadges(): (number, number, string?)
+		local s = H.state()
+		local names, badges, waiting = {}, {}, 0
+		for id in s.provinces do
+			local name = H.mapObject(alice, "P" .. id)
+			if name then
+				local c = canvasPoint(name.Position)
+				local pips = name:FindFirstChild("Pips")
+				local h = name.Size.Y.Offset
+					+ (if pips and pips.Visible then pips.Position.Y.Offset + pips.Size.Y.Offset else 0)
+				table.insert(names, { x = c.X - name.Size.X.Offset / 2, y = c.Y, w = name.Size.X.Offset, h = h, what = name.Text })
+			end
+		end
+		local count = {}
+		for _, a in s.armies do
+			count[a.location] = (count[a.location] or 0) + 1
+		end
+		for id, a in s.armies do
+			local idle = a.owner == 0 and not a.rebel and not a.inBattle and count[a.location] == 1
+			local token = if idle then H.mapObject(alice, "Army" .. id) else nil
+			local badge = token and token:FindFirstChild("Strength")
+			if badge and badge.Visible then
+				local pad = badge:FindFirstChildOfClass("UIPadding")
+				local w = pad.PaddingLeft.Offset + pad.PaddingRight.Offset + LabelLayout.textWidth(badge.Text, badge.TextSize)
+				local t = canvasPoint(token.Position)
+				local bottom = t.Y - token.Size.Y.Offset / 2 + badge.Position.Y.Offset
+				local h = badge.Size.Y.Offset
+				table.insert(badges, { x = t.X + badge.Position.X.Offset - w / 2, y = bottom - h, w = w, h = h, what = "the garrison in " .. s.provinces[a.location].name })
+			elseif token then
+				waiting += 1
+			end
+		end
+		local function overlap(a, b): boolean
+			return a.x < b.x + b.w and b.x < a.x + a.w and a.y < b.y + b.h and b.y < a.y + a.h
+		end
+		for i, b in badges do
+			for _, n in names do
+				if overlap(b, n) then
+					return #badges, waiting, b.what .. "'s badge covers the name " .. n.what
+				end
+			end
+			for j = i + 1, #badges do
+				if overlap(b, badges[j]) then
+					return #badges, waiting, b.what .. "'s badge covers " .. badges[j].what .. "'s"
+				end
+			end
+		end
+		return #badges, waiting, nil
+	end
+	local shownBadges, waitingBadges, problem = garrisonBadges()
+	H.expect(problem == nil, string.format("at the region zoom, %d garrison badges show where there's room and %d wait (%s)", shownBadges, waitingBadges, problem or "none covers a name or another"))
 	-- the region zoom shows the whole-map painting; zoomed in, the close-up detail is laid over it
 	local function closeUp()
 		local canvas = MapView.canvas()
@@ -269,6 +369,8 @@ function scenarios.look()
 	Emulator.run(2)
 	H.expect(closeUp() ~= nil and closeUp().Visible, "the close-up detail shows at close zoom")
 	H.shot(alice, "close_up")
+	shownBadges, waitingBadges, problem = garrisonBadges()
+	H.expect(shownBadges > 0 and problem == nil, string.format("close up, %d garrison badges show and %d wait (%s)", shownBadges, waitingBadges, problem or "none covers a name or another"))
 
 	-- the nearest mountain, the nearest coast and the nearest forest, close up
 	local map = H.client(alice, "ClientState").map()
@@ -326,6 +428,68 @@ function scenarios.look()
 	MapView.showWholeMap()
 	Emulator.run(0.5)
 	H.expect(closeUp() == nil, "the close-up is freed when zoomed out")
+
+	-- the overlays at each zoom step: names with pip bars, army badges, a siege's pill and power badges, the
+	-- selected army and province in gold
+	local Army = require("../../src/shared/Sim/Army")
+	local Primordial = require("../../src/shared/Sim/Primordial")
+	local state = H.state()
+	local A = H.myNation(alice)
+	state.tick = 179 -- War (powers need it)
+	Emulator.run(1.5)
+	local siegeAt, siegeD = nil, math.huge
+	for id, p in state.provinces do
+		local d = (H.provinceMap(alice, id) - here).Magnitude
+		if p.owner == nil and p.terrain ~= "Mountain" and d < siegeD then
+			siegeAt, siegeD = id, d
+		end
+	end
+	for id, a in state.armies do
+		if a.location == siegeAt then
+			state.armies[id] = nil -- no garrison: the army goes straight to the siege
+		end
+	end
+	Army.spawn(state, A, siegeAt, 2000)
+	local guard = Army.spawn(state, A, capital, 3000)
+	state.nations[2].charges = 5
+	H.expect(Primordial.use(state, { nation = 2 }, "Shield", capital), "a shield on the capital")
+	H.expect(Primordial.use(state, { nation = 2 }, "Blessing", capital), "and a blessing")
+	Emulator.run(6) -- their toasts come and go
+	Renderer.select(capital)
+	Renderer.selectArmy(guard.id)
+	Emulator.run(0.5)
+	H.shot(alice, "overlays_whole")
+	MapView.centreOn(here, true)
+	Emulator.run(1.5)
+	H.shot(alice, "overlays_region")
+	Emulator.pinch(alice, 3)
+	MapView.centreOn(here, false) -- the pinch zooms round the middle of the screen: back to the capital
+	Emulator.run(2)
+	H.shot(alice, "overlays_close")
+	local Theme = H.client(alice, "UI.Theme")
+	local name = H.mapObject(alice, "P" .. capital)
+	H.expect(name ~= nil and name.TextColor3 == Theme.color.gold, "the selected province's name is gold")
+	local pips = name:FindFirstChild("Pips")
+	H.expect(pips ~= nil and pips.Visible, "with its development pips under it")
+	local text, icon = H.badge(alice, guard.id)
+	H.expect(text == "3k" and icon == "sword", "the army's badge: a sword and 3k")
+	local badge = H.mapObject(alice, "Army" .. guard.id):FindFirstChild("Strength")
+	H.expect(badge:FindFirstChildOfClass("UIStroke").Color == Theme.color.gold, "the selected army's badge is outlined in gold")
+	-- a province's status pills as "icon:text" words, sorted
+	local function pills(provinceId: number): string
+		local row = H.mapObject(alice, "Status" .. provinceId)
+		local out = {}
+		for _, pill in if row then row:GetChildren() else {} do
+			local mark = pill:FindFirstChild("Icon")
+			if pill:IsA("TextLabel") and pill.Visible and mark then
+				table.insert(out, mark:GetAttribute("Icon") .. ":" .. pill.Text)
+			end
+		end
+		table.sort(out)
+		return table.concat(out, " ")
+	end
+	H.expect(string.match(pills(capital), "^blessing:%d+ divineShield:%d+$") ~= nil, "the capital's status row: blessing and shield with their seconds (" .. pills(capital) .. ")")
+	H.expect(string.match(pills(siegeAt), "^hourglass:%d+%%$") ~= nil, "the siege shows its progress (" .. pills(siegeAt) .. ")")
 end
 
 local function provinceByName(name: string): number
@@ -453,7 +617,8 @@ function scenarios.war()
 		end
 	end
 	Emulator.run(1.5)
-	H.expect(Emulator.findText(alice, "👑") ~= nil, "the coalition leader wears a crown")
+	local crown = H.mapObject(alice, "Crown" .. A)
+	H.expect(crown ~= nil and crown:GetAttribute("Icon") == "crown", "the coalition leader wears a crown")
 	H.shot(alice, "crown")
 	need = math.ceil(Config.Win.DominationShare * 131)
 	for _, p in state.provinces do
@@ -578,9 +743,8 @@ function scenarios.primordial()
 	H.expect(rebels ~= nil and rebels.location == rebelTarget, "Rebels rose in " .. state.provinces[rebelTarget].name)
 	H.client(alice, "MapView").showWholeMap()
 	Emulator.run(1.5)
-	local token = Emulator.findText(alice, "🏴 3k")
-	H.expect(token ~= nil, "Alice sees the 🏴 Rebels token zoomed out")
-	H.expect(Emulator.findText(alice, "🛡 ") == nil, "while garrisons stay hidden at that zoom")
+	H.expect(H.badge(alice, rebels.id) == "3k" and select(2, H.badge(alice, rebels.id)) == "rebels", "Alice sees the Rebels token (flag, 3k) zoomed out")
+	H.expect(not H.iconText(alice, "shield", "", "Map"), "while garrisons stay hidden at that zoom")
 	H.shot(alice, "rebels")
 	H.client(alice, "MapView").centreOn(H.provinceMap(alice, rebelTarget), true)
 	Emulator.run(1.5)
@@ -1169,24 +1333,34 @@ function scenarios.tutorial()
 	H.expect(state.phase == "Peace" and state.tick <= 3, "the Lobby was skipped")
 	H.expect(Emulator.findText(alice, "1/6") ~= nil, "the first prompt shows")
 	local capital = state.nations[A].capital
+	-- the card's hint says what to tap next: the icon of the button to press, or the map arrow ("point")
+	local function hintIs(icon: string, text: string): boolean
+		local gui = alice.localPlayer.PlayerGui:FindFirstChild("Tutorial")
+		local label = gui and gui:FindFirstChild("Hint", true)
+		local mark = label and label:FindFirstChild("Icon")
+		if mark == nil or not string.find(label.Text, text, 1, true) or Emulator.findText(alice, label.Text) == nil then
+			return false
+		end
+		return (if mark:GetAttribute("Points") then "point" else mark:GetAttribute("Icon")) == icon
+	end
 
 	-- 1. take a neutral province: the arrow is on the army; tap it, Move, the grey province, Go
-	H.expect(Emulator.findText(alice, "Tap your army") ~= nil, "it asks for the army")
+	H.expect(hintIs("point", "Tap your army"), "it asks for the army, where the map arrow points")
 	H.shot(alice, "prompt1_army")
 	tapProvince(alice, capital)
-	H.expect(Emulator.findText(alice, "Tap ➜ Move") ~= nil, "then for Move")
+	H.expect(hintIs("arrow", "Tap Move"), "then for Move (its arrow icon)")
 	H.shot(alice, "prompt1_move")
 	Emulator.press(alice, "Move")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "Tap grey land") ~= nil, "then for the grey province")
+	H.expect(hintIs("point", "Tap grey land"), "then for the grey province")
 	local target = Tutorial.neutralTarget(state, A)
 	H.shot(alice, "prompt1_target")
 	tapProvince(alice, target)
-	H.expect(Emulator.findText(alice, "Tap ✅ Go") ~= nil, "then for Go")
+	H.expect(hintIs("check", "Tap Go"), "then for Go (its check icon)")
 	H.shot(alice, "prompt1_go")
 	Emulator.press(alice, "Go")
 	Emulator.run(8)
-	H.expect(Emulator.findText(alice, "⏳") ~= nil, "then it says to wait")
+	H.expect(hintIs("hourglass", ""), "then it says to wait (an hourglass)")
 	H.shot(alice, "prompt1_wait")
 	local deadline = Emulator.now() + 120
 	while tut.step == 1 and Emulator.now() < deadline do
@@ -1199,7 +1373,7 @@ function scenarios.tutorial()
 	H.expect(Emulator.findText(alice, "2/6") ~= nil and Emulator.findText(alice, "Tap your land") ~= nil, "prompt 2")
 	H.shot(alice, "prompt2_recruit")
 	tapProvince(alice, capital)
-	H.expect(Emulator.findText(alice, "Tap +1 Regiment") ~= nil, "it points at the Recruit button")
+	H.expect(hintIs("sword", "Tap +1 Regiment"), "it points at the Recruit button")
 	H.shot(alice, "prompt2_button")
 	Emulator.press(alice, "Regiment")
 	Emulator.run(2)
@@ -1228,7 +1402,7 @@ function scenarios.tutorial()
 	H.expect(Emulator.findText(alice, "Ally with " .. state.nations[friend].name) ~= nil, "prompt 4 names the friend")
 	H.shot(alice, "prompt4_ally")
 	tapProvince(alice, Tutorial.view(state, tut).province)
-	H.expect(Emulator.findText(alice, "Tap 🤝 Ally") ~= nil, "it points at the Ally button")
+	H.expect(hintIs("handshake", "Tap Ally"), "it points at the Ally button")
 	H.shot(alice, "prompt4_button")
 	Emulator.press(alice, "🤝 Ally")
 	Emulator.run(3)
@@ -1243,7 +1417,7 @@ function scenarios.tutorial()
 	H.expect(Emulator.findText(alice, "War on " .. state.nations[rival].name) ~= nil, "prompt 5 names the rival")
 	H.shot(alice, "prompt5_war")
 	tapProvince(alice, Tutorial.view(state, tut).province)
-	H.expect(Emulator.findText(alice, "Tap ⚔ Declare war") ~= nil, "it points at Declare war")
+	H.expect(hintIs("war", "Tap Declare war"), "it points at Declare war")
 	H.shot(alice, "prompt5_button")
 	Emulator.press(alice, "Declare")
 	Emulator.run(2)
@@ -1254,17 +1428,17 @@ function scenarios.tutorial()
 
 	-- 6. a power: the button, Blessing, her own land, Confirm
 	H.expect(state.nations[A].charges >= 1, "Alice has a charge")
-	H.expect(Emulator.findText(alice, "Tap the ✨ button") ~= nil, "prompt 6 points at the power button")
+	H.expect(hintIs("sparkles", "Tap the power button"), "prompt 6 points at the power button")
 	H.shot(alice, "prompt6_power")
 	Emulator.press(alice, "PowerButton")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "Pick 🌟 Blessing") ~= nil, "then at Blessing")
+	H.expect(hintIs("blessing", "Pick Blessing"), "then at Blessing")
 	H.shot(alice, "prompt6_blessing")
 	Emulator.press(alice, "Blessing")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Tap your land") ~= nil, "then at her land")
 	tapProvince(alice, capital)
-	H.expect(Emulator.findText(alice, "Tap ✅ Confirm") ~= nil, "then at Confirm")
+	H.expect(hintIs("check", "Tap Confirm"), "then at Confirm")
 	H.shot(alice, "prompt6_confirm")
 	Emulator.press(alice, "Confirm")
 	Emulator.run(2)
@@ -1638,7 +1812,7 @@ function scenarios.retreat()
 	end
 	H.expect(beaten.retreating == true and beaten.location == reach, "the beaten army is still on the field, retreating")
 	Emulator.run(2)
-	H.expect(Emulator.findText(alice, "🏳") ~= nil, "its token flies the retreat flag")
+	H.expect(select(2, H.badge(alice, beaten.id)) == "retreat", "its token flies the retreat flag")
 	H.client(alice, "UI.ArmySheet").show(beaten.id)
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Retreating to Cinder Rock") ~= nil, "the army sheet says where it is going")
@@ -1650,7 +1824,10 @@ function scenarios.retreat()
 	end
 	Emulator.run(1)
 	H.expect(beaten.location == rock and beaten.retreating == nil, "it walked home and is a normal army again")
-	H.expect(state.armies[beaten.id] ~= nil and Emulator.findText(alice, "🏳") == nil, "no flag once home")
+	H.expect(
+		state.armies[beaten.id] ~= nil and select(2, H.badge(alice, beaten.id)) == "sword" and not H.iconText(alice, "retreat", "", "Map"),
+		"no flag once home"
+	)
 	H.shot(alice, "home")
 end
 
@@ -3038,7 +3215,9 @@ function scenarios.season()
 	local earned = data.xp - xp0
 	H.expect(earned > 0 and data.season.xp - season0 == earned, string.format("the match's %d XP is season XP too", earned))
 	H.expect(SeasonState.view().xp == data.season.xp, "and her client knows")
-	H.expect(Emulator.findText(alice, "🎟 Season") ~= nil, "the Results screen has a season button")
+	local resultsGui = alice.localPlayer.PlayerGui:FindFirstChild("Results")
+	local seasonButton = resultsGui and resultsGui:FindFirstChild("SeasonButton", true)
+	H.expect(seasonButton ~= nil and Emulator.findText(alice, seasonButton.Text) ~= nil and string.find(seasonButton.Text, "Season", 1, true) ~= nil, "the Results screen has a season button")
 	H.shot(alice, "results")
 
 	-- more play (two weeks' worth of XP), then the free tiers from the Results screen
@@ -3261,7 +3440,7 @@ function scenarios.leaderboards()
 	H.expect(data.glory >= glory0 + 300, "into Alice's Glory")
 	H.expect(table.find(trophies.achievements().recent, "domination") ~= nil, "Alice's view lists it as just unlocked")
 	H.expect(Emulator.findText(alice, "Unlocked: ") ~= nil and Emulator.findText(alice, "Domination") ~= nil, "the Results screen says so")
-	H.expect(Emulator.findText(alice, "🏆 Achievement") ~= nil, "with an achievement line in the breakdown")
+	H.expect(H.iconText(alice, "trophy", "Achievements", "Results"), "with an achievement line in the breakdown")
 	H.shot(alice, "results")
 
 	-- the weekly board: one batch of writes at Results, then a fresh read

@@ -47,8 +47,8 @@ function LabelLayout.place(boxes: { Box }): { [number]: boolean }
 	return shown
 end
 
--- A text's width in screen pixels, estimated for GothamBold at this size (TextService isn't available everywhere
--- this runs, and an estimate a few pixels off is fine for spacing).
+-- A text's width in screen pixels, estimated for the map's bold font at this size (TextService isn't available
+-- everywhere this runs). It errs a little wide for Builder Sans Bold, so names and their outlines never touch.
 function LabelLayout.textWidth(text: string, textSize: number): number
 	return (utf8.len(text) or #text) * textSize * 0.6 + 4
 end

@@ -9,6 +9,7 @@
 -- It is a test tool, not a perfect Roblox: physics, rendering and replication of workspace are not emulated.
 
 local luau = require("@lune/luau")
+local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 local stdio = require("@lune/stdio")
 
@@ -428,6 +429,10 @@ end)
 local editables: { [number]: any } = {}
 
 roblox.implementMethod("AssetService", "CreateEditableImage", function(_service, options)
+	-- NO_EDITABLE_IMAGE=1: the game setting is off, as in a published game without it (the fallbacks show)
+	if process.env.NO_EDITABLE_IMAGE then
+		error("EditableImage is not allowed in this experience (NO_EDITABLE_IMAGE)")
+	end
 	local size = (options and options.Size) or roblox.Vector2.new(512, 512)
 	local image = {
 		id = #editables + 1,
@@ -1272,6 +1277,12 @@ local function runScript(m: Machine, scriptInst)
 	resume(co)
 end
 
+-- Clients' screen size: a phone in landscape (844×390), or VIEWPORT=WxH (e.g. VIEWPORT=667x375, a small phone).
+local function defaultViewport()
+	local w, h = string.match(process.env.VIEWPORT or "", "^(%d+)x(%d+)$")
+	return roblox.Vector2.new(tonumber(w) or 844, tonumber(h) or 390)
+end
+
 local function newMachine(name: string, dm, isServer: boolean): Machine
 	local m: Machine = {
 		name = name,
@@ -1280,7 +1291,7 @@ local function newMachine(name: string, dm, isServer: boolean): Machine
 		modules = {},
 		loading = {},
 		renderSteps = {},
-		viewport = roblox.Vector2.new(844, 390), -- a phone in landscape
+		viewport = defaultViewport(),
 		camera = nil,
 		localPlayer = nil,
 		serverPlayer = nil,

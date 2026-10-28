@@ -1,8 +1,14 @@
 --!strict
 -- What is drawn on the 2D map (docs/DESIGN.md "Map rendering"): the pixel-art image painted by PixelArt
--- (terrain, owners, the selected province), straits, province names, army tokens gliding between province
--- centres, battle and siege markers, the coalition leader's crown and route lines. Everything sits on MapView's
--- canvas, placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
+-- (terrain, owners, the selected province), straits, province names with their development pips, army tokens
+-- gliding from province to province with their strength badges, each province's status pills (battle, siege,
+-- Primordial powers), the coalition leader's crown and route lines. Everything sits on MapView's canvas, placed in
+-- map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
+--
+-- The overlays share the UI kit's look (UI/Theme, UI/Icons): names in Builder Sans with an ink outline, pips as a
+-- pixel bar, badges and pills as dark plates with a pixel icon and Fredoka One numbers. What they say and where they
+-- stack comes from MapBadges. Armies resting in one province stand side by side and their badges stack in a column
+-- above them, with the province's status row on top, so nothing covers anything at any zoom.
 
 local AssetService = game:GetService("AssetService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,25 +24,41 @@ local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
 
 local ClientState = require(script.Parent.ClientState)
-local LabelLayout = require(script.Parent.LabelLayout)
 local Cosmetics = require(script.Parent.Cosmetics)
+local Icons = require(script.Parent.UI.Icons)
+local LabelLayout = require(script.Parent.LabelLayout)
+local MapBadges = require(script.Parent.MapBadges)
 local MapView = require(script.Parent.MapView)
 local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
 local ShopState = require(script.Parent.ShopState)
+local Theme = require(script.Parent.UI.Theme)
+local Widgets = require(script.Parent.UI.Widgets)
 
 local NAME_MIN_PIXELS = 70 -- a province's name shows once the province is this wide on screen
 local NAME_RELAYOUT = 0.04 -- names are laid out again when the zoom changes by this share
 local NAME_OFFSET = 6 -- screen pixels between a province's centre and the top of its name
-local NAME_HEIGHT, PIPS_HEIGHT = 18, 16
+local NAME_HEIGHT = 18
+local PIPS_SCALE = 2 -- screen pixels per pixel of the development pip bar (MapBadges.pips)
+local PIPS_GAP = 1 -- screen pixels between a name and its pips
 local DETAIL_ZOOM = 0.9 -- garrisons and development pips show from this share of the region zoom inwards
-local TEXT_SIZE = 14 -- the smallest text on the map (docs/DESIGN.md "UI and controls")
+local TEXT_SIZE = Theme.text.small -- the smallest text on the map (docs/DESIGN.md "UI and controls")
 local TOKEN_SIZE = 14 -- army token, screen pixels
 local TOKEN_SKIN_SIZE = 18 -- a token skin's 12×12 sprite, screen pixels
 local TOKEN_PICK = 20 -- a tap this close to a token's centre (screen pixels) picks the army
-local TOKEN_SPACING = 4 -- map pixels between tokens standing in one province
+local TOKEN_LIFT = 4 -- map pixels: armies resting in a province stand this far above its centre (its name is below)
+local TOKEN_SLOT = 18 -- screen pixels between armies resting side by side in one province
 local TOKEN_SMOOTHING = 6 -- higher = tokens catch up with their target faster
-local TOKEN_EDGE = Color3.fromRGB(20, 20, 28) -- army token outline (selected: yellow; Rebels: Palette.rebelEdge)
+local BADGE_HEIGHT = 20 -- strength badges and status pills, screen pixels
+local BADGE_GAP = 2 -- between a token and its badge, and between stacked badges
+local BADGE_ICON = 16 -- the pixel icon in a badge or pill
+local BADGE_PAD = 4 -- inside a pill, left of its icon and right of its text
+local BADGE_TEXT_GAP = 2 -- between a pill's icon and its text
+local GARRISON_PRIORITY = -1e6 -- idle garrisons' badges claim room after every province name (LabelLayout)
+local STATUS_WIDTH = 240 -- a province's status row (its pills are centred in it)
+local CROWN_SIZE = Theme.size.icon -- the coalition leader's crown, on top of its flag pole
+local NOTICE_TOP = 60 -- the "map art is off" notice: screen pixels under the top bars, below the toasts' line
+local NOTICE_WIDTH = 420
 local DOT_SPACING = 4 -- map pixels between the dots of a route or strait
 local PIXELATED_FROM = 1.5 -- zoom from which map pixels are drawn hard-edged (smooth below, so thin lines don't flicker)
 local PAINT_SLICE = 0.008 -- seconds of painting per frame while a map is painted for the first time
@@ -48,24 +70,39 @@ local DETAIL_COVER = 0.8 -- the view fills at most this share of it, so a short 
 local DETAIL_SETTLE = 0.15 -- seconds the view keeps still before the close-up is repainted around it
 local DETAIL_SLICE = 0.006 -- seconds of close-up painting per frame
 local FLAG_WIDTH, FLAG_HEIGHT = 24, 18 -- a capital's 16×12 flag, screen pixels
+local FLAG_RIGHT, FLAG_BOTTOM = -10, 8 -- the flag's pole stands left of the capital's centre: its bottom right corner
+local POLE = 3 -- the pole's width plus the gap before the flag
 local EMOTE_SIZE = 26 -- capital emote icon, screen pixels
 local VICTORY_SIZE = 32 -- victory animation over a winner's capital
 local VICTORY_FRAME_SECONDS = 0.4
+local _, PIP_BAR_W, PIP_BAR_H = MapBadges.pips(0, Config.Economy.MaxDevelopment) -- the pip bar's size in pixels
 
 local MapRenderer = {}
+
+-- A pill: a dark plate with an outline, a pixel icon and Fredoka One text (or the icon alone), as wide as its content.
+type Pill = { label: TextLabel, stroke: UIStroke, pad: UIPadding, icon: GuiObject }
 
 type Token = {
 	frame: Frame,
 	stroke: UIStroke,
-	label: TextLabel,
+	badge: Pill, -- the army's strength: state icon and size, outlined in its nation's colour
 	pos: Vector2,
 	target: Vector2,
 	neutral: boolean, -- a neutral garrison: hidden below the region zoom
-	rebel: boolean, -- Rebels: owner 0 too, but always shown, with a 🏴
+	rebel: boolean, -- Rebels: owner 0 too, but always shown, with the Rebels' flag
 	owner: number,
 	province: number,
 	skinned: boolean, -- drawn with a token skin sprite (no square outline unless selected)
+	half: number, -- half the token's size on screen
+	resting: boolean, -- standing in its province (not marching between two)
+	slotX: number, -- screen pixels left or right of its province's anchor, beside the others resting there
+	row: number, -- its badge's row in the province's stack (-1 while hidden)
+	text: string, -- what its badge shows now
+	icon: string,
 }
+
+-- A province's status row: battle or siege, and Primordial-power effects (MapBadges.status).
+type Status = { row: Frame, pills: { Pill }, lift: number }
 
 local grid: MapGrid.Grid? = nil
 local art: PixelArt.Art? = nil
@@ -88,15 +125,25 @@ local viewStill = 0
 local layers: { [string]: Frame } = {}
 local widths: { [number]: number } = {} -- each province's width in map pixels
 local namesLaidOut = { zoom = -1, detail = false }
-local labels: { [number]: { frame: Frame, pips: TextLabel, width: number } } = {} -- width: of the name, on screen
-local markers: { [number]: TextLabel } = {}
-local effects: { [number]: TextLabel } = {}
-local crowns: { [number]: TextLabel } = {}
+local idleLaidOut: { [number]: boolean } = {} -- the idle garrisons the last layout placed (army ids)
+local roomy: { [number]: boolean } = {} -- those of them whose badge had room
+-- each province's name (its pips under it) and the name's width on screen
+local labels: { [number]: { name: TextLabel, pips: GuiObject, width: number, development: number } } = {}
+local pipImages: { [number]: EditableImage | false } = {} -- the pip bar for each development level (false: no image)
+local provinceStates: { [number]: { battle: boolean, siege: number?, siegeBy: number, owner: number } } = {}
+local effectTexts: { [number]: string } = {} -- Primordial-power badges from Powers (MapRenderer.setEffect)
+local statuses: { [number]: Status } = {}
+local crowns: { [number]: GuiObject } = {}
 local tokens: { [number]: Token } = {}
+local groups: { [number]: { number } } = {} -- each province's badge stack: armies resting there, then leaving it
+local stackShown: { [number]: number } = {} -- strength badges shown in each province's stack
+local stackHalf: { [number]: number } = {} -- half the biggest token in each province's stack
+local detailShown = false -- garrisons, pips and every army's size show (the region zoom inwards)
 local flags: { [number]: { frame: Frame, key: string } } = {}
 local victories: { { label: TextLabel, frames: { string } } } = {}
 local victoryClock = 0
 local selectedArmy: number? = nil
+local selectedProvince: number? = nil
 
 local function at(p: Vector2): UDim2
 	return UDim2.fromScale(p.X / size.X, p.Y / size.Y)
@@ -133,21 +180,127 @@ local function layer(name: string, parent: Frame): Frame
 	return frame
 end
 
+-- Map text: Builder Sans in warm white with a solid ink outline, so it reads on every terrain and on the close-up.
 local function textLabel(parent: Instance, value: string): TextLabel
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	label.FontFace = Theme.font.body
 	label.TextSize = TEXT_SIZE
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.2
+	label.TextColor3 = Theme.color.text
+	label.TextStrokeColor3 = Theme.color.ink
+	label.TextStrokeTransparency = 0
 	label.Text = value
 	label.Parent = parent
 	return label
 end
 
-local function pips(development: number): string
-	return string.rep("●", development) .. string.rep("○", 5 - development)
+local function newPill(parent: Instance, name: string, icon: string, edge: Color3): Pill
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.Size = UDim2.fromOffset(0, BADGE_HEIGHT)
+	label.AutomaticSize = Enum.AutomaticSize.X
+	label.BackgroundColor3 = Theme.color.navyDeep
+	label.BackgroundTransparency = 0.1
+	label.BorderSizePixel = 0
+	label.FontFace = Theme.font.display
+	label.TextSize = TEXT_SIZE
+	label.TextColor3 = Theme.color.text
+	label.Text = ""
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, Theme.radius.s)
+	corner.Parent = label
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = edge
+	stroke.Thickness = 1
+	stroke.Parent = label
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, BADGE_PAD + BADGE_ICON)
+	pad.PaddingRight = UDim.new(0, BADGE_PAD)
+	pad.Parent = label
+	local iconLabel = Icons.label(label, icon, BADGE_ICON)
+	iconLabel.AnchorPoint = Vector2.new(0, 0.5)
+	iconLabel.Position = UDim2.new(0, -BADGE_ICON, 0.5, 0)
+	label.Parent = parent
+	return { label = label, stroke = stroke, pad = pad, icon = iconLabel }
 end
+
+-- Change what a pill shows (only what differs).
+local function setPill(pill: Pill, icon: string, text: string, edge: Color3?)
+	if pill.label.Text ~= text then
+		pill.label.Text = text
+		local gap = if text == "" then 0 else BADGE_TEXT_GAP
+		pill.pad.PaddingLeft = UDim.new(0, BADGE_PAD + BADGE_ICON + gap)
+		pill.icon.Position = UDim2.new(0, -(BADGE_ICON + gap), 0.5, 0)
+	end
+	Icons.set(pill.icon, icon)
+	if edge and pill.stroke.Color ~= edge then
+		pill.stroke.Color = edge
+	end
+end
+
+-- The pip bar for a development level: one small EditableImage per level, shared by every province (nil when the
+-- device can't make one; the pips are text then).
+local function pipImage(level: number): EditableImage?
+	local cached = pipImages[level]
+	if cached ~= nil then
+		return if cached then cached else nil
+	end
+	local pixels, w, h = MapBadges.pips(level, Config.Economy.MaxDevelopment)
+	local ok, result = pcall(function()
+		return AssetService:CreateEditableImage({ Size = Vector2.new(w, h) })
+	end)
+	if not ok or result == nil then
+		pipImages[level] = false
+		return nil
+	end
+	local editable = result :: EditableImage
+	editable:WritePixelsBuffer(Vector2.zero, Vector2.new(w, h), pixels)
+	pipImages[level] = editable
+	return editable
+end
+
+local function pipText(development: number): string
+	return string.rep("●", development) .. string.rep("○", Config.Economy.MaxDevelopment - development)
+end
+
+-- A province's development under its name: the pixel pip bar, or text pips without EditableImage.
+local function pipsLabel(parent: Instance, development: number): GuiObject
+	local bar = pipImage(development)
+	local obj: GuiObject
+	if bar then
+		local l = Instance.new("ImageLabel")
+		l.BackgroundTransparency = 1
+		l.ResampleMode = Enum.ResamplerMode.Pixelated
+		l.ImageContent = Content.fromObject(bar)
+		l.Size = UDim2.fromOffset(PIP_BAR_W * PIPS_SCALE, PIP_BAR_H * PIPS_SCALE)
+		obj = l
+	else
+		local l = textLabel(parent, pipText(development))
+		l.TextColor3 = Theme.color.gold
+		l.Size = UDim2.fromOffset(100, 16)
+		obj = l
+	end
+	obj.Name = "Pips"
+	obj.AnchorPoint = Vector2.new(0.5, 0)
+	obj.Position = UDim2.new(0.5, 0, 1, PIPS_GAP)
+	obj.Parent = parent
+	return obj
+end
+
+local function setPips(obj: GuiObject, development: number)
+	if obj:IsA("ImageLabel") then
+		local bar = pipImage(development)
+		if bar then
+			obj.ImageContent = Content.fromObject(bar)
+		end
+	elseif obj:IsA("TextLabel") then
+		obj.Text = pipText(development)
+	end
+end
+
+-- The height the pips take under a name (the layout keeps names and pips clear of each other).
+local PIPS_HEIGHT = PIPS_GAP + PIP_BAR_H * PIPS_SCALE
 
 local function packed(c: Color3): number
 	return math.floor(c.R * 255 + 0.5) * 65536 + math.floor(c.G * 255 + 0.5) * 256 + math.floor(c.B * 255 + 0.5)
@@ -177,11 +330,41 @@ local function detailVisible(z: number): boolean
 	return z >= MapView.regionZoom() * DETAIL_ZOOM
 end
 
--- Names of provinces wide enough on screen, minus any that would overlap a bigger province's name.
-local function layoutNames(z: number, detail: boolean)
+-- Where armies resting in a province stand (map pixels): a little above its centre, clear of its name.
+local function anchorOf(provinceId: number): Vector2
+	return MapRenderer.centerOf(provinceId) - Vector2.new(0, TOKEN_LIFT)
+end
+
+-- A neutral garrison alone in its province and not fighting: its badge shows only where it has room.
+local function idleGarrison(token: Token): boolean
+	local group = groups[token.province]
+	return token.neutral and token.resting and token.icon ~= "battle" and group ~= nil and #group == 1
+end
+
+-- Whether the idle garrisons are no longer the ones the last layout placed.
+local function garrisonsChanged(): boolean
+	local n = 0
+	for id, token in tokens do
+		if idleGarrison(token) then
+			if not idleLaidOut[id] then
+				return true
+			end
+			n += 1
+		end
+	end
+	for _ in idleLaidOut do
+		n -= 1
+	end
+	return n ~= 0
+end
+
+-- Names of provinces wide enough on screen, minus any that would overlap a bigger province's name; then, from the
+-- region zoom inwards, each idle garrison's badge wherever it covers no name and no garrison badge placed before it
+-- (bigger provinces first; the others keep their grey token until there's room). True when it laid them out again.
+local function layoutNames(z: number, detail: boolean, force: boolean?): boolean
 	local last = namesLaidOut
-	if last.detail == detail and last.zoom > 0 and math.abs(z / last.zoom - 1) < NAME_RELAYOUT then
-		return
+	if not force and last.detail == detail and last.zoom > 0 and math.abs(z / last.zoom - 1) < NAME_RELAYOUT then
+		return false
 	end
 	namesLaidOut = { zoom = z, detail = detail }
 	local boxes: { LabelLayout.Box } = {}
@@ -199,29 +382,197 @@ local function layoutNames(z: number, detail: boolean)
 			})
 		end
 	end
+	idleLaidOut = {}
+	if detail then
+		for id, token in tokens do
+			if idleGarrison(token) then
+				idleLaidOut[id] = true
+				-- its badge, centred over its token: as wide as its padding, icon and text
+				local a = anchorOf(token.province) * z
+				local w = BADGE_PAD * 2 + BADGE_ICON + BADGE_TEXT_GAP + LabelLayout.textWidth(token.text, TEXT_SIZE)
+				table.insert(boxes, {
+					id = -id, -- (names use province ids)
+					x = a.X - w / 2,
+					y = a.Y - token.half - BADGE_GAP - BADGE_HEIGHT,
+					w = w,
+					h = BADGE_HEIGHT,
+					priority = GARRISON_PRIORITY + (widths[token.province] or 0),
+				})
+			end
+		end
+	end
 	local shown = LabelLayout.place(boxes)
 	for id, label in labels do
-		label.frame.Visible = shown[id] == true
+		label.name.Visible = shown[id] == true
 		label.pips.Visible = detail
+	end
+	roomy = {}
+	for id in idleLaidOut do
+		roomy[id] = shown[-id] == true
+	end
+	return true
+end
+
+-- An army's strength badge shows from the region zoom inwards (an idle garrison's only where it has room, see
+-- layoutNames); zoomed out, only on your own armies, Rebels and the selected army, so a busy map isn't a pile of
+-- numbers.
+local function badgeShown(id: number, token: Token): boolean
+	if id == selectedArmy then
+		return true
+	elseif idleGarrison(token) then
+		return detailShown and roomy[id] == true
+	end
+	local me = ClientState.myNation()
+	return detailShown or token.rebel or (me ~= 0 and token.owner == me)
+end
+
+-- A badge's place: `row` rows above its token, centred over the armies resting beside it.
+local function placeBadge(token: Token, row: number)
+	local label = token.badge.label
+	local visible = row >= 0
+	if label.Visible ~= visible then
+		label.Visible = visible
+	end
+	if visible and token.row ~= row then
+		label.Position = UDim2.new(0.5, -token.slotX, 0, -BADGE_GAP - row * (BADGE_HEIGHT + BADGE_GAP))
+	end
+	token.row = if visible then row else -1
+end
+
+local function placeStatus(provinceId: number, status: Status)
+	local lift = MapBadges.statusLift(
+		stackHalf[provinceId] or 0,
+		BADGE_GAP,
+		stackShown[provinceId] or 0,
+		BADGE_HEIGHT + BADGE_GAP
+	)
+	if status.lift ~= lift then
+		status.lift = lift
+		status.row.Position = at(anchorOf(provinceId)) + UDim2.fromOffset(0, -lift)
 	end
 end
 
--- Everything that depends on the zoom: names, garrisons, and how the pixels are sampled.
--- An army's size label shows from the region zoom inwards; zoomed out, only on your own armies, Rebels and the
--- selected army, so a busy map isn't a pile of numbers.
-local function sizeShown(id: number, token: Token, detail: boolean): boolean
-	local me = ClientState.myNation()
-	return detail or token.rebel or id == selectedArmy or (me ~= 0 and token.owner == me)
+-- Stack the strength badges of the armies in each province in a column above them (the first shown lowest) and
+-- stand each province's status row on top. Run when armies come, go or start marching, when the zoom detail flips
+-- and when the selection changes.
+local function stackBadges()
+	stackShown, stackHalf = {}, {}
+	for provinceId, ids in groups do
+		local shown, half = 0, 0
+		for _, id in ids do
+			local token = tokens[id]
+			if token then
+				half = math.max(half, token.half)
+				if token.frame.Visible and badgeShown(id, token) then
+					placeBadge(token, shown)
+					shown += 1
+				else
+					placeBadge(token, -1)
+				end
+			end
+		end
+		stackShown[provinceId], stackHalf[provinceId] = shown, half
+	end
+	for provinceId, status in statuses do
+		placeStatus(provinceId, status)
+	end
 end
 
+-- Is this province's status yours to follow closely (your land, or your siege)?
+local function involvesMe(provinceId: number): boolean
+	local me = ClientState.myNation()
+	local state = provinceStates[provinceId]
+	return me ~= 0 and state ~= nil and (state.owner == me or state.siegeBy == me)
+end
+
+local function statusEdge(icon: string): Color3
+	if icon == "battle" then
+		return Theme.color.danger
+	elseif icon == "hourglass" then
+		return Theme.color.gold
+	end
+	return Theme.color.special -- Primordial powers
+end
+
+-- A province's status row: its battle or siege, then Primordial-power effects, each a pill. Zoomed out, only the
+-- icons show unless it is your province or your siege. Made on demand and destroyed once empty, so the provinces
+-- that once had a battle or a siege don't keep hidden objects for the rest of the match.
+local function renderStatus(provinceId: number)
+	local state = provinceStates[provinceId]
+	local brief = not detailShown and not involvesMe(provinceId)
+	local pills = MapBadges.status(
+		state ~= nil and state.battle,
+		if state then state.siege else nil,
+		effectTexts[provinceId],
+		brief
+	)
+	local status = statuses[provinceId]
+	if #pills == 0 then
+		if status then
+			status.row:Destroy()
+			statuses[provinceId] = nil
+		end
+		return
+	end
+	if status == nil then
+		local parent = layers.Markers
+		if parent == nil then
+			return
+		end
+		local row = Instance.new("Frame")
+		row.Name = "Status" .. provinceId
+		row.AnchorPoint = Vector2.new(0.5, 1)
+		row.Size = UDim2.fromOffset(STATUS_WIDTH, BADGE_HEIGHT)
+		row.BackgroundTransparency = 1
+		local list = Instance.new("UIListLayout")
+		list.FillDirection = Enum.FillDirection.Horizontal
+		list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		list.VerticalAlignment = Enum.VerticalAlignment.Center
+		list.Padding = UDim.new(0, BADGE_GAP + 1)
+		list.SortOrder = Enum.SortOrder.LayoutOrder
+		list.Parent = row
+		row.Parent = parent
+		local made: Status = { row = row, pills = {}, lift = -1 }
+		statuses[provinceId] = made
+		status = made
+	end
+	local s = status :: Status
+	for i, p in pills do
+		local pill = s.pills[i]
+		if pill == nil then
+			pill = newPill(s.row, "Pill", p.icon, statusEdge(p.icon))
+			pill.label.LayoutOrder = i
+			s.pills[i] = pill
+		end
+		setPill(pill, p.icon, p.text, statusEdge(p.icon))
+	end
+	for i = #s.pills, #pills + 1, -1 do
+		s.pills[i].label:Destroy()
+		s.pills[i] = nil
+	end
+	s.row.Visible = true
+	placeStatus(provinceId, s)
+end
+
+-- Everything that depends on the zoom: names, garrisons, badges, how much the status pills say, and how the pixels
+-- are sampled.
 local function onZoom(z: number)
 	local detail = detailVisible(z)
-	layoutNames(z, detail)
-	for id, token in tokens do
-		if token.neutral then
-			token.frame.Visible = detail
+	local relaid = layoutNames(z, detail)
+	if relaid and detail == detailShown and detail then
+		stackBadges() -- garrison badges that found room, or lost it
+	end
+	if detail ~= detailShown then
+		detailShown = detail
+		for _, token in tokens do
+			if token.neutral then
+				token.frame.Visible = detail
+			end
 		end
-		token.label.Visible = sizeShown(id, token, detail)
+		stackBadges()
+		for provinceId in statuses do
+			renderStatus(provinceId)
+		end
 	end
 	local label = imageLabel
 	if label then
@@ -464,21 +815,21 @@ local function refreshFlags()
 			local holder = Instance.new("Frame")
 			holder.Name = "Flag" .. nation.id
 			holder.AnchorPoint = Vector2.new(1, 1)
-			holder.Position = at(MapRenderer.centerOf(nation.capital)) + UDim2.fromOffset(-10, 8)
-			holder.Size = UDim2.fromOffset(FLAG_WIDTH + 3, FLAG_HEIGHT + 8)
+			holder.Position = at(MapRenderer.centerOf(nation.capital)) + UDim2.fromOffset(FLAG_RIGHT, FLAG_BOTTOM)
+			holder.Size = UDim2.fromOffset(FLAG_WIDTH + POLE, FLAG_HEIGHT + 8)
 			holder.BackgroundTransparency = 1
 			holder.Parent = flagLayer
 			local pole = Instance.new("Frame")
 			pole.Name = "Pole"
-			pole.Size = UDim2.new(0, 2, 1, 0)
-			pole.BackgroundColor3 = Color3.fromRGB(40, 32, 26)
+			pole.Size = UDim2.new(0, POLE - 1, 1, 0)
+			pole.BackgroundColor3 = Theme.color.ink
 			pole.BorderSizePixel = 0
 			pole.Parent = holder
 			local flag =
 				Cosmetics.flagLabel(holder, flagId, nation.colorIndex, UDim2.fromOffset(FLAG_WIDTH, FLAG_HEIGHT))
-			flag.Position = UDim2.fromOffset(3, 0)
+			flag.Position = UDim2.fromOffset(POLE, 0)
 			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(20, 20, 28)
+			stroke.Color = Theme.color.ink
 			stroke.Thickness = 1
 			stroke.Parent = flag
 			flags[nation.id] = { frame = holder, key = key }
@@ -506,11 +857,16 @@ local function showEmote(e: Types.MatchEvent)
 	label.AnchorPoint = Vector2.new(0.5, 1)
 	label.Position = at(MapRenderer.centerOf(e.province)) + UDim2.fromOffset(0, -58)
 	label.Size = UDim2.fromOffset(EMOTE_SIZE + 12, EMOTE_SIZE + 8)
-	label.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-	label.BackgroundTransparency = 0.25
+	label.BackgroundColor3 = Theme.color.navyDeep
+	label.BackgroundTransparency = 0.15
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(1, 0)
 	corner.Parent = label
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Theme.color.ink
+	stroke.Thickness = Theme.stroke
+	stroke.Parent = label
 	local myGeneration = generation
 	task.delay(Config.Shop.EmoteShowSeconds, function()
 		if generation == myGeneration then
@@ -597,16 +953,22 @@ local function build(map: Types.MapDef)
 	generation += 1
 	freeDetail()
 	labels = {}
-	markers = {}
-	effects = {}
+	provinceStates = {}
+	effectTexts = {}
+	statuses = {}
 	crowns = {}
 	tokens = {}
+	groups = {}
+	stackShown, stackHalf = {}, {}
 	flags = {}
 	victories = {}
 	layers = {}
 	widths = {}
 	namesLaidOut = { zoom = -1, detail = false }
+	idleLaidOut, roomy = {}, {}
+	detailShown = false
 	selectedArmy = nil
+	selectedProvince = nil
 
 	-- full resolution if the device allows it, else half
 	local full = grids[map.id] or MapGrid.decode(map)
@@ -633,10 +995,11 @@ local function build(map: Types.MapDef)
 		label.Parent = imageLayer
 		imageLabel = label
 	else
-		local notice = textLabel(canvas.Parent or canvas, "🗺️ Map art is off: turn on Allow Mesh / Image APIs")
-		notice.AnchorPoint = Vector2.new(0.5, 0)
-		notice.Position = UDim2.new(0.5, 0, 0, MapView.topBand() + 8) -- just under the top bars (a full-screen GUI)
-		notice.Size = UDim2.fromOffset(420, 24)
+		-- the kit's toast look, standing for good under the line where toasts come and go (a full-screen GUI)
+		local notice = Widgets.toast(canvas.Parent or canvas, MapView.topBand() + NOTICE_TOP, NOTICE_WIDTH)
+		notice.Name = "MapArtOff"
+		Widgets.setIconText(notice, "🗺 Map art is off: turn on Allow Mesh / Image APIs", "map")
+		notice.Visible = true
 		if not warned then
 			warned = true
 			warn("[map] no EditableImage: turn on Game Settings > Security > Allow Mesh / Image APIs (docs/MAPS.md)")
@@ -662,26 +1025,21 @@ local function build(map: Types.MapDef)
 	end
 	layer("Route", canvas)
 
+	-- each province's name, its development pips hanging under it (two GUI objects a province)
 	local labelLayer = layer("Labels", canvas)
 	for _, def in map.provinces do
 		widths[def.id] = 2 * math.sqrt(def.area / (g.scale * g.scale) / math.pi)
 		if def.terrain ~= "Mountain" then
 			local record = ClientState.province(def.id)
-			local frame = Instance.new("Frame")
-			frame.Name = "P" .. def.id
-			frame.AnchorPoint = Vector2.new(0.5, 0)
-			frame.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, NAME_OFFSET)
-			frame.Size = UDim2.fromOffset(150, NAME_HEIGHT + PIPS_HEIGHT)
-			frame.BackgroundTransparency = 1
-			frame.Parent = labelLayer
-			local name = textLabel(frame, def.name)
-			name.Size = UDim2.new(1, 0, 0, NAME_HEIGHT)
-			local dev = textLabel(frame, pips(if record then record.development else def.development))
-			dev.Position = UDim2.fromOffset(0, NAME_HEIGHT)
-			dev.Size = UDim2.new(1, 0, 0, PIPS_HEIGHT)
-			local width =
-				math.max(LabelLayout.textWidth(def.name, TEXT_SIZE), LabelLayout.textWidth(dev.Text, TEXT_SIZE))
-			labels[def.id] = { frame = frame, pips = dev, width = width }
+			local development = if record then record.development else def.development
+			local width = math.max(LabelLayout.textWidth(def.name, TEXT_SIZE), PIP_BAR_W * PIPS_SCALE)
+			local name = textLabel(labelLayer, def.name)
+			name.Name = "P" .. def.id
+			name.AnchorPoint = Vector2.new(0.5, 0)
+			name.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, NAME_OFFSET)
+			name.Size = UDim2.fromOffset(width, NAME_HEIGHT)
+			local pips = pipsLabel(name, development)
+			labels[def.id] = { name = name, pips = pips, width = width, development = development }
 		end
 	end
 	layer("Flags", canvas)
@@ -707,52 +1065,35 @@ function MapRenderer.provinceWidth(provinceId: number): number
 	return widths[provinceId] or 0
 end
 
--- Badges above a province, made on demand: battle and siege (markers), Primordial-power effects (effects,
--- higher up).
-local function setBadge(store: { [number]: TextLabel }, provinceId: number, value: string?, lift: number, width: number)
-	local marker = store[provinceId]
-	if value == nil then
-		if marker then
-			marker.Visible = false
-		end
-		return
+-- How far above a province's centre its overlays reach on screen (its armies' badges and its status row), so the
+-- tutorial's arrow can stand clear of what it points at.
+function MapRenderer.overlayTop(provinceId: number): number
+	local lift = MapBadges.statusLift(
+		stackHalf[provinceId] or 0,
+		BADGE_GAP,
+		stackShown[provinceId] or 0,
+		BADGE_HEIGHT + BADGE_GAP
+	)
+	local status = statuses[provinceId]
+	if status and status.row.Visible then
+		lift += BADGE_HEIGHT
 	end
-	if marker == nil then
-		if layers.Markers == nil then
-			return
-		end
-		local label = textLabel(layers.Markers, "")
-		label.AnchorPoint = Vector2.new(0.5, 1)
-		label.Position = at(MapRenderer.centerOf(provinceId)) + UDim2.fromOffset(0, -lift)
-		label.Size = UDim2.fromOffset(width, 24)
-		label.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-		label.BackgroundTransparency = 0.2
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(1, 0)
-		corner.Parent = label
-		store[provinceId] = label
-		marker = label
-	end
-	local m = assert(marker, "marker")
-	m.Text = value
-	m.Visible = true
+	return TOKEN_LIFT * MapView.zoom() + lift
 end
 
-local function setMarker(provinceId: number, value: string?)
-	setBadge(markers, provinceId, value, 12, 70)
-end
-
--- A Primordial-power badge over a province (a strike, a shield, a blessing), above the battle/siege badge.
--- nil hides it.
+-- A Primordial-power badge over a province (a strike, a shield, a blessing, a plague: Powers' emoji and seconds left,
+-- e.g. "🛡️25 🌟30"), shown as pills in the province's status row after its battle or siege. nil clears it.
 function MapRenderer.setEffect(provinceId: number, value: string?)
-	setBadge(effects, provinceId, value, 38, 90)
+	effectTexts[provinceId] = value
+	renderStatus(provinceId)
 end
 
--- A crown over the capital of every coalition leader (CatchUp.leadersFrom); over its first province if the capital
--- is lost.
+-- A pixel crown on top of the flag pole of every coalition leader's capital (CatchUp.leadersFrom); where the pole
+-- would stand at its first province if the capital is lost.
 local function refreshCrowns()
 	local snapshot = ClientState.snapshot()
-	if snapshot == nil or layers.Crowns == nil then
+	local crownLayer = layers.Crowns
+	if snapshot == nil or crownLayer == nil then
 		return
 	end
 	local counts: { [number]: number } = {}
@@ -777,54 +1118,62 @@ local function refreshCrowns()
 		return
 	end
 	local leaders = CatchUp.leadersFrom(counts, CatchUp.ownableCount(map.provinces))
-	for nationId, label in crowns do
-		label.Visible = leaders[nationId] == true
+	for nationId, crown in crowns do
+		crown.Visible = leaders[nationId] == true
 	end
+	local poleX = FLAG_RIGHT - FLAG_WIDTH - POLE + (POLE - 1) / 2 -- the middle of the flag's pole
+	local poleTop = FLAG_BOTTOM - FLAG_HEIGHT - 8
 	for nationId in leaders do
 		local where = if owners[capitals[nationId]] == nationId then capitals[nationId] else firstOwned[nationId]
-		local label = crowns[nationId]
-		if label == nil then
-			label = textLabel(layers.Crowns, "👑")
-			label.Name = "Crown" .. nationId
-			label.TextSize = 20
-			label.AnchorPoint = Vector2.new(0.5, 1)
-			label.Size = UDim2.fromOffset(28, 26)
-			crowns[nationId] = label
+		local crown = crowns[nationId]
+		if crown == nil then
+			local made = Icons.label(crownLayer, "crown", CROWN_SIZE)
+			made.Name = "Crown" .. nationId
+			made.AnchorPoint = Vector2.new(0.5, 1)
+			crowns[nationId] = made
+			crown = made
 		end
-		local l = assert(label, "crown")
-		l.Position = at(MapRenderer.centerOf(where)) + UDim2.fromOffset(0, -30)
-		l.Visible = true
+		local c = crown :: GuiObject
+		c.Position = at(MapRenderer.centerOf(where)) + UDim2.fromOffset(poleX, poleTop)
+		c.Visible = true
 	end
 end
 
 local function refreshProvince(record: Snapshot.ProvinceRecord)
 	local label = labels[record.id]
-	if label then
-		label.pips.Text = pips(record.development)
+	if label and label.development ~= record.development then
+		label.development = record.development
+		setPips(label.pips, record.development)
 	end
-	if record.battle then
-		setMarker(record.id, "💥")
-	elseif record.siegeRequired > 0 then -- siegeBy is 0 for Rebels
-		setMarker(record.id, string.format("⏳ %d%%", math.floor(100 * record.siegeProgress / record.siegeRequired)))
-	else
-		setMarker(record.id, nil)
+	-- siegeBy is 0 for Rebels: a siege is on whenever it needs progress
+	local siege = if record.siegeRequired > 0
+		then math.floor(100 * record.siegeProgress / record.siegeRequired)
+		else nil
+	local old = provinceStates[record.id]
+	if
+		old
+		and old.battle == record.battle
+		and old.siege == siege
+		and old.siegeBy == record.siegeBy
+		and old.owner == record.owner
+	then
+		return
+	end
+	provinceStates[record.id] =
+		{ battle = record.battle, siege = siege, siegeBy = record.siegeBy, owner = record.owner }
+	if record.battle or siege or statuses[record.id] then
+		renderStatus(record.id)
 	end
 end
 
-local function shortMen(men: number): string
-	if men >= 1000 then
-		return string.format("%gk", math.floor(men / 100) / 10)
+-- An army's badge outline: its nation's colour (Rebels red, garrisons grey), gold while selected.
+local function edgeOf(token: Token): Color3
+	if token.rebel then
+		return Palette.rebelEdge
+	elseif token.neutral then
+		return Palette.garrison
 	end
-	return tostring(men)
-end
-
--- Where an army's token should be: between two centres while moving, else at its province (side by side).
-local function tokenTarget(army: Snapshot.ArmyRecord, slot: number): Vector2
-	local pos = ClientState.position(army.id)
-	if pos and army.next ~= 0 then
-		return MapRenderer.centerOf(pos.from):Lerp(MapRenderer.centerOf(pos.to), pos.progress)
-	end
-	return MapRenderer.centerOf(army.location) + Vector2.new((slot - 1) * TOKEN_SPACING, -4)
+	return nationColor(token.owner)
 end
 
 local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
@@ -839,28 +1188,24 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	frame.BackgroundColor3 = if rebel then Palette.rebel else nationColor(army.owner)
 	frame.BorderSizePixel = 0
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = if rebel then Palette.rebelEdge else TOKEN_EDGE
-	stroke.Thickness = 2
+	stroke.Color = if rebel then Palette.rebelEdge else Theme.color.ink
+	stroke.Thickness = Theme.stroke
 	stroke.Parent = frame
 	-- an army token skin (cosmetic): the nation's sprite instead of the plain square
 	local nation = if neutral then nil else ClientState.nation(army.owner)
 	local skin = if nation then Cosmetics.of(army.owner).token else Catalogue.DEFAULTS.Token
 	local skinned = nation ~= nil and skin ~= Catalogue.DEFAULTS.Token
 	if nation and skinned then
-		frame.Size = UDim2.fromOffset(TOKEN_SKIN_SIZE, TOKEN_SKIN_SIZE)
+		px = TOKEN_SKIN_SIZE
+		frame.Size = UDim2.fromOffset(px, px)
 		frame.BackgroundTransparency = 1
 		stroke.Enabled = false
 		Cosmetics.tokenLabel(frame, skin, nation.colorIndex, UDim2.fromScale(1, 1))
 	end
-	local label = textLabel(frame, "")
-	label.AnchorPoint = Vector2.new(0.5, 1)
-	label.Position = UDim2.new(0.5, 0, 0, -2)
-	label.Size = UDim2.fromOffset(76, 18)
-	frame.Parent = layers.Tokens
 	local token: Token = {
 		frame = frame,
 		stroke = stroke,
-		label = label,
+		badge = newPill(frame, "Strength", "sword", Palette.garrison),
 		pos = target,
 		target = target,
 		neutral = neutral,
@@ -868,11 +1213,28 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		owner = army.owner,
 		province = army.location,
 		skinned = skinned,
+		half = px / 2,
+		resting = true,
+		slotX = 0,
+		row = -1,
+		text = "",
+		icon = "",
 	}
-	local detail = detailVisible(MapView.zoom())
-	frame.Visible = not neutral or detail
-	label.Visible = sizeShown(army.id, token, detail)
+	token.badge.stroke.Color = edgeOf(token)
+	token.badge.label.AnchorPoint = Vector2.new(0.5, 1)
+	token.badge.label.Visible = false -- stackBadges places and shows it
+	frame.Visible = not neutral or detailShown
+	frame.Parent = layers.Tokens
 	return token
+end
+
+-- Beside the other armies resting in its province (screen pixels from the province's anchor).
+local function setSlot(token: Token, x: number)
+	if token.slotX ~= x then
+		token.slotX = x
+		token.row = -2 -- its badge has to move back over the group
+		token.frame.Position = at(token.pos) + UDim2.fromOffset(x, 0)
+	end
 end
 
 local function refreshArmies()
@@ -881,27 +1243,36 @@ local function refreshArmies()
 		return
 	end
 	local alive: { [number]: boolean } = {}
-	local perProvince: { [number]: number } = {}
+	local resting: { [number]: { number } } = {}
 	for _, army in snapshot.armies do
 		alive[army.id] = true
-		local slot = (perProvince[army.location] or 0) + 1
-		perProvince[army.location] = slot
-		local target = tokenTarget(army, slot)
+		-- at its province's anchor, or between two anchors while marching (the same height above the province
+		-- centres, so a badge stacked over the armies it leaves stays clear of theirs)
+		local pos = ClientState.position(army.id)
+		local marching = pos ~= nil and army.next ~= 0
+		local target = if pos and marching
+			then anchorOf(pos.from):Lerp(anchorOf(pos.to), pos.progress)
+			else anchorOf(army.location)
 		local token = tokens[army.id]
 		if token == nil then
 			token = makeToken(army, target)
 			tokens[army.id] = token
 		end
-		local t = assert(token, "token")
-		local icon = if t.rebel
-			then "🏴 "
-			elseif t.neutral then "🛡 "
-			elseif army.inBattle then "💥 "
-			elseif army.retreating then "🏳 "
-			else "⚔ "
-		t.label.Text = icon .. shortMen(army.men)
+		local t = token :: Token
 		t.target = target
 		t.province = army.location
+		t.resting = not marching
+		if t.resting then
+			local list = resting[army.location] or {}
+			table.insert(list, army.id)
+			resting[army.location] = list
+		end
+		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating)
+		local text = MapBadges.shortMen(army.men)
+		if t.icon ~= icon or t.text ~= text then
+			t.icon, t.text = icon, text
+			setPill(t.badge, icon, text)
+		end
 	end
 	for id, token in tokens do
 		if not alive[id] then
@@ -909,6 +1280,39 @@ local function refreshArmies()
 			tokens[id] = nil
 		end
 	end
+	-- armies resting together stand side by side, always in the same order
+	for _, ids in resting do
+		table.sort(ids)
+		for slot, id in ids do
+			setSlot(tokens[id], MapBadges.slotOffset(slot, #ids, TOKEN_SLOT))
+		end
+	end
+	-- each province's badge stack: the armies resting there, then those marching out of it (their badges ride
+	-- with them a row up, clear of the ones staying behind, until they reach the next province)
+	local stacks: { [number]: { number } } = {}
+	for location, ids in resting do
+		stacks[location] = table.clone(ids)
+	end
+	local leaving: { number } = {}
+	for id, token in tokens do
+		if not token.resting then
+			setSlot(token, 0)
+			table.insert(leaving, id)
+		end
+	end
+	table.sort(leaving)
+	for _, id in leaving do
+		local location = tokens[id].province
+		local list = stacks[location] or {}
+		table.insert(list, id)
+		stacks[location] = list
+	end
+	groups = stacks
+	-- a garrison came, went, or began or stopped fighting: lay the names and garrison badges out again
+	if detailShown and garrisonsChanged() then
+		layoutNames(MapView.zoom(), true, true)
+	end
+	stackBadges()
 end
 
 -- What is under a screen point: an army token (they sit on top) or a province.
@@ -917,7 +1321,7 @@ function MapRenderer.pick(screenPos: Vector2): ("Army" | "Province" | nil, numbe
 	local bestDistance = TOKEN_PICK
 	for id, token in tokens do
 		if token.frame.Visible then
-			local d = (MapView.toScreen(token.pos) - screenPos).Magnitude
+			local d = (MapView.toScreen(token.pos) + Vector2.new(token.slotX, 0) - screenPos).Magnitude
 			if d < bestDistance then
 				best, bestDistance = id, d
 			end
@@ -937,7 +1341,7 @@ function MapRenderer.pick(screenPos: Vector2): ("Army" | "Province" | nil, numbe
 	return nil, nil
 end
 
--- Route dots through province centres (the selected army's way, or a preview before confirming).
+-- Route dots through province centres (the selected army's way in white, or a gold preview before confirming).
 function MapRenderer.showRoute(from: number?, path: { number }?, preview: boolean?)
 	local routeLayer = layers.Route
 	if routeLayer == nil then
@@ -947,7 +1351,7 @@ function MapRenderer.showRoute(from: number?, path: { number }?, preview: boolea
 	if from == nil or path == nil or #path == 0 then
 		return
 	end
-	local color = if preview then Color3.fromRGB(255, 230, 90) else Color3.new(1, 1, 1)
+	local color = if preview then Theme.color.gold else Theme.color.text
 	local prev = MapRenderer.centerOf(from)
 	for _, id in path do
 		local nextPoint = MapRenderer.centerOf(id)
@@ -956,33 +1360,44 @@ function MapRenderer.showRoute(from: number?, path: { number }?, preview: boolea
 	end
 end
 
+-- The selected province: PixelArt outlines it in white, and its name turns gold.
 function MapRenderer.select(provinceId: number?)
 	local a = art
 	if a then
 		PixelArt.select(a, provinceId)
 	end
+	local old = if selectedProvince then labels[selectedProvince] else nil
+	if old then
+		old.name.TextColor3 = Theme.color.text
+	end
+	selectedProvince = provinceId
+	local new = if provinceId then labels[provinceId] else nil
+	if new then
+		new.name.TextColor3 = Theme.color.gold
+	end
 end
 
+-- The selected army: a gold outline round its token and its badge, and the badge shows at any zoom.
 function MapRenderer.selectArmy(armyId: number?)
 	local previous = selectedArmy
-	if previous and tokens[previous] then
-		local old = tokens[previous]
-		old.stroke.Color = if old.rebel then Palette.rebelEdge else TOKEN_EDGE
-		old.stroke.Thickness = 2
+	local old = if previous then tokens[previous] else nil
+	if old then
+		old.stroke.Color = if old.rebel then Palette.rebelEdge else Theme.color.ink
+		old.stroke.Thickness = Theme.stroke
 		old.stroke.Enabled = not old.skinned
+		old.badge.stroke.Color = edgeOf(old)
+		old.badge.stroke.Thickness = 1
 	end
 	selectedArmy = armyId
-	local detail = detailVisible(MapView.zoom())
-	if previous and tokens[previous] then
-		tokens[previous].label.Visible = sizeShown(previous, tokens[previous], detail)
-	end
 	local token = if armyId then tokens[armyId] else nil
-	if token and armyId then
-		token.stroke.Color = Color3.fromRGB(255, 230, 90)
+	if token then
+		token.stroke.Color = Theme.color.gold
 		token.stroke.Thickness = 3
 		token.stroke.Enabled = true
-		token.label.Visible = true
+		token.badge.stroke.Color = Theme.color.gold
+		token.badge.stroke.Thickness = Theme.stroke
 	end
+	stackBadges()
 end
 
 function MapRenderer.init()
@@ -1057,7 +1472,7 @@ function MapRenderer.init()
 		for _, token in tokens do
 			if (token.pos - token.target).Magnitude > 0.05 then
 				token.pos = token.pos:Lerp(token.target, a)
-				token.frame.Position = at(token.pos)
+				token.frame.Position = at(token.pos) + UDim2.fromOffset(token.slotX, 0)
 			end
 		end
 		-- victory animations cycle through their frames
