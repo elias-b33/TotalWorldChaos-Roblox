@@ -379,7 +379,13 @@ T.test("bots Meteor the biggest enemy army in a war, never an immune nation, alo
 	state.nations[AURORA].charges = Config.Primordial.Powers.Meteor.charges
 	T.equal(meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")), nil)
 	state.tick += Config.Primordial.ImmunityTicks
-	T.expect(meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")) ~= nil, "immunity over")
+	T.equal(
+		meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")),
+		nil,
+		"immunity over, but Aurora may not hit Zephyr again so soon"
+	)
+	state.tick += Config.Primordial.TargetCooldownTicks - Config.Primordial.ImmunityTicks
+	T.expect(meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")) ~= nil, "its cooldown on Zephyr over too")
 end)
 
 T.test("a bot that lost 30% of its provinces in a war accepts peace", function()

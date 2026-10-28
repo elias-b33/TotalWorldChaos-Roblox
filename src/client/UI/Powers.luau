@@ -259,9 +259,25 @@ function Powers.tap(kind: "Army" | "Province" | nil, id: number?)
 	-- a harmful power can't hit a nation that is still immune (the server would refuse it): no Confirm
 	local victim = if hit ~= 0 then ClientState.nation(hit) else nil
 	local immuneFor = if victim then victim.powerImmuneUntil - ClientState.tick() else 0
+	-- nor one this player hit less than Config.Primordial.TargetCooldownTicks ago (Primordial.casterKey)
+	local cooldownFor = 0
+	if target and Primordial.HARMFUL[power] and victim then
+		local snap = ClientState.snapshot()
+		local mine = ClientState.myPrimordial()
+		local key = if mine then "u" .. mine.userId else "n" .. tostring(ClientState.myNation())
+		for _, c in if snap then snap.powerCooldowns or {} else {} do
+			if c.caster == key and c.target == hit then
+				cooldownFor = c.untilTick - ClientState.tick()
+			end
+		end
+	end
 	if target and Primordial.HARMFUL[power] and immuneFor > 0 then
 		target = nil
 		blocked = string.format("🛡 %s is immune for %d s", nationName(hit), immuneFor)
+		toast(blocked)
+	elseif target and Primordial.HARMFUL[power] and cooldownFor > 0 then
+		target = nil
+		blocked = string.format("⏳ You can hit %s again in %d s", nationName(hit), cooldownFor)
 		toast(blocked)
 	elseif target == nil then
 		toast(HINTS[want])

@@ -64,7 +64,7 @@ A world of your own, WorldBox style: the ten nations of a map play as bots while
 - **Where:** a sandbox needs a server of its own, so it runs on a reserved server of the same place, like the tutorial. The entry point is `Intents.enterSandbox(mapId?)` on the client (`RequestSandbox "Enter"` → `SandboxService.enter(player, mapId?)`): from any server it teleports the player to a fresh reserved server with teleport data `{ mode = "sandbox", map = mapId }`; on a sandbox server it starts a new world instead. The start menu's Singleplayer button calls it. A reserved server learns what it is for from its first player's teleport data (`ServerMode`); without `mode = "sandbox"` it plays the tutorial as before. The data comes through the client, so a forged one could only swap a tutorial for a sandbox, and neither pays anything. A new player sent to a sandbox is never sent on to the tutorial. **World → Play online** goes back to a public server; a failed teleport is a toast and the button works again. In Studio (no teleports, no reserved servers) the Workspace attribute `Sandbox` (`true`, or a map id) makes the server a sandbox from the start; `MapId` works too.
 - **The world:** the map the player was sent with (the default map otherwise), all ten nations as Normal bots (`Config.Sandbox.Difficulty`), no Lobby. A player arrives **watching**. **World → New world** starts over on any of the three maps, at 1× with disasters off, everyone watching again.
 - **Play as (take over any nation):** two taps, Play as then a nation, any time. The player leads that nation from then on, with its land, armies, gold, wars and alliances; the nation they leave goes back to a bot at once (the bots plan for it from the next tick). **Watch** gives the nation back and keeps only the powers. Every people of the map is playable this way, one after another. Only a living nation nobody else holds can be taken (another player's is "Taken": only Studio tests have two). A player whose nation falls goes back to watching: no Primordial rises, since their powers are free anyway.
-- **Free powers:** all six Primordial powers, with no charges, in every phase (Peace too), whether the player leads a nation or watches. The targeting rules stay: never a mountain, Earthquake only on a province with a building, Rebels, Blessing and Shield on a nation's province, Meteor on an army, Plague on a nation. The 30 s immunity is off for the whole world, and a harmful power may hit the player's own nation (it's their world). Bots still pay with their nations' charges and wait for War, as in a match.
+- **Free powers:** all six Primordial powers, with no charges, in every phase (Peace too), whether the player leads a nation or watches. The targeting rules stay: never a mountain, Earthquake only on a province with a building, Rebels, Blessing and Shield on a nation's province, Meteor on an army, Plague on a nation. The immunity and the per-caster cooldown are off for the whole world, and a harmful power may hit the player's own nation (it's their world). Bots still pay with their nations' charges and wait for War, as in a match.
 - **Time:** pause, 1×, 2× and 4× (`Config.Sandbox.Speeds`): the server runs that many ticks a second. Its loop wakes every `Config.Sandbox.BeatSeconds` (0.25 s) and runs a tick whenever the speed has gathered a game second; a late beat catches up at most `MaxTicksPerBeat` ticks. Paused, the clock stops and the bots wait, but orders and powers still land within a beat. The controls travel in the snapshot and its deltas (`MatchState.sandbox`), so the client's clock and the armies' glide follow the speed, and stand still when paused.
 - **Phases:** the usual Peace (3:00, so the peoples spread over the neutral land first), then War for ever. No Cataclysm, no Results, no win check: domination, alliance victory and 25:00 end nothing. The top bar's clock counts up.
 - **Disasters:** off at the start. **World → Disasters** switches them on: a random harmful power on a random valid target (the Cataclysm's rule) every 60 s from that moment, in any phase, until switched off.
@@ -237,7 +237,7 @@ Each map's water is split into named **sea zones** (on Skyshards, **space zones*
 
 ### Primordial powers
 
-Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s, counted from the moment they rose (each Primordial has its own clock; nations share the match clock because they all start at 0:00). A nation can be hit by a Primordial power at most once per 30 s.
+Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s, counted from the moment they rose (each Primordial has its own clock; nations share the match clock because they all start at 0:00). A nation can be hit by a harmful power at most once per 60 s, from anyone, and the same caster can hit the same nation at most once per 2 minutes, so no Primordial can focus one nation (`Config.Primordial.ImmunityTicks`, `TargetCooldownTicks`; owner request).
 
 | Power | Effect | Charges |
 | --- | --- | --- |
@@ -250,9 +250,9 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 
 - Targets: Meteor an army; Plague a nation; Rebels, Blessing and Shield a nation's province; Earthquake a province with a building. Mountains are never a target.
 - Powers work in War and Cataclysm, not in Peace. Charges stop at `Config.Primordial.MaxCharges` (5).
-- The 30 s limit applies to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Shield are gifts and ignore it.
+- Both limits apply to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Shield are gifts and ignore them. A Cataclysm disaster has no caster, so only the immunity applies to it. A caster is a living nation, or a Primordial (a player keeps one cooldown clock per target while a nation and gets a fresh one on rising).
 - Meteor's limit is checked for the army's owner, who then becomes immune. The province it stands in loses its development level only if that province's owner isn't immune, and that loss doesn't make the owner immune.
-- The power picker shows an immune nation as unavailable (with the seconds left) instead of sending a power the server would refuse.
+- The power picker shows an immune nation as unavailable (with the seconds left), and a nation you hit less than 2 minutes ago as "You can hit X again in N s", instead of sending a power the server would refuse.
 - Rebels besiege the province they rise in; when the siege ends it turns neutral. On the map they are a black 🏴 token that always shows, unlike neutral garrisons.
 - A Primordial may target anyone, including the nation that eliminated them.
 - Cataclysm disasters are a random harmful power on a random valid nation target (seeded), every 60 s from 21:00.
@@ -433,7 +433,7 @@ export type Nation = {
     manpower: number,
     charges: number,
     allianceId: number?,
-    powerImmuneUntil: number,  -- 30 s Primordial-power protection
+    powerImmuneUntil: number,  -- 60 s protection from harmful Primordial powers
     eliminated: boolean,
 }
 
@@ -733,6 +733,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] `AIService` on Normal; bots fill empty slots and replace leavers
 - [x] Elimination and the Primordial role
 - [x] 6 Primordial powers with charges and cooldowns
+- [x] No focus-firing: a 60 s immunity after any harmful power, and a 2-minute cooldown per caster per nation (owner request; the power picker shows both)
 - [x] Catch-up rules: overextension, underdog, coalition
 - [x] Cataclysm phase
 

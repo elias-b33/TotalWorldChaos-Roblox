@@ -17,6 +17,7 @@ local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Pathing = require("./Pathing")
+local Primordial = require("./Primordial")
 local Races = require("./Races")
 local Rng = require("./Rng")
 local Troops = require("./Troops")
@@ -1243,6 +1244,7 @@ local function primordial(ctx: Ctx): { Command }?
 			ctx.isEnemy[a.owner]
 			and owner
 			and owner.powerImmuneUntil <= state.tick
+			and Primordial.cooldownLeft(state, { nation = ctx.me }, a.owner) == 0
 			and playerWarAllowed(ctx, a.owner)
 			and a.men > bestMen
 		then

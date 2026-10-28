@@ -78,7 +78,7 @@ local function run()
 	H.shot(alice, "meteor_alice")
 	H.shot(bob, "meteor_bob")
 
-	-- the 30 s immunity: the picker shows Aurora as unavailable instead of sending a power the server refuses
+	-- the 60 s immunity: the picker shows Aurora as unavailable instead of sending a power the server refuses
 	state.primordials[bobId].charges = 3
 	Emulator.run(1.5)
 	Emulator.press(bob, "PowerButton")

@@ -83,6 +83,8 @@ export type DiplomacyData = {
 
 -- An eliminated player's Primordial: only charges change, so the list is sent whole whenever it changes.
 export type PrimordialRecord = { userId: number, charges: number }
+-- A caster (Sim.Primordial.casterKey) that may not hit `target` with a harmful power before `untilTick`.
+export type CooldownRecord = { caster: string, target: number, untilTick: number }
 
 -- Unreliable position updates for moving armies: the client slides tokens between province centres.
 export type ArmyPosition = { id: number, from: number, to: number, progress: number }
@@ -98,6 +100,7 @@ export type SnapshotData = {
 	fleets: { FleetRecord }, -- the fleets the viewer sees (Sim.Navy.visible)
 	diplomacy: DiplomacyData,
 	primordials: { PrimordialRecord },
+	powerCooldowns: { CooldownRecord }, -- the power picker greys these targets out for their caster
 	result: Types.MatchResult?,
 	cosmetics: { Types.NationCosmetics }, -- each nation's equipped looks, next to MatchState (Sim.Shop)
 	theme: string, -- the map theme everyone sees (MatchState.theme; "" = classic). Set before the match starts.
@@ -115,6 +118,7 @@ export type DeltaData = {
 	removedFleets: { number }, -- sunk, merged into another fleet (a FleetMerged event) or out of sight
 	diplomacy: DiplomacyData?, -- only when it changed
 	primordials: { PrimordialRecord }?, -- only when it changed
+	powerCooldowns: { CooldownRecord }?, -- only when it changed
 	result: Types.MatchResult?, -- only when it changed
 	cosmetics: { Types.NationCosmetics }?, -- only when it changed
 	sandbox: Types.SandboxState?, -- only when it changed
@@ -232,12 +236,27 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?,
 		fleets = Snapshot.fleets(state, viewer or 0),
 		diplomacy = Snapshot.diplomacy(state),
 		primordials = Snapshot.primordials(state),
+		powerCooldowns = Snapshot.powerCooldowns(state),
 		result = state.result,
 		cosmetics = cosmetics or {},
 		theme = state.theme or "",
 		-- a copy: the last snapshot sent is the baseline the next delta is diffed against
 		sandbox = if state.sandbox then table.clone(state.sandbox) else nil,
 	}
+end
+
+function Snapshot.powerCooldowns(state: MatchState): { CooldownRecord }
+	local out = {}
+	for key, ends in state.powerCooldowns or {} do
+		local caster, target = string.match(key, "^(%w+)>(%d+)$")
+		if caster and target and ends > state.tick then
+			table.insert(out, { caster = caster, target = tonumber(target) :: number, untilTick = ends })
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.caster < b.caster or (a.caster == b.caster and a.target < b.target)
+	end)
+	return out
 end
 
 function Snapshot.primordials(state: MatchState): { PrimordialRecord }
@@ -370,6 +389,9 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		removedFleets = removedFleets,
 		diplomacy = if encode(before.diplomacy) ~= encode(after.diplomacy) then after.diplomacy else nil,
 		primordials = if encode(before.primordials) ~= encode(after.primordials) then after.primordials else nil,
+		powerCooldowns = if encode(before.powerCooldowns or {}) ~= encode(after.powerCooldowns or {})
+			then after.powerCooldowns
+			else nil,
 		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
 		cosmetics = if encode(before.cosmetics) ~= encode(after.cosmetics) then after.cosmetics else nil,
 		sandbox = if encode(before.sandbox) ~= encode(after.sandbox) then after.sandbox else nil,
@@ -385,6 +407,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		and before.phase == after.phase
 		and delta.diplomacy == nil
 		and delta.primordials == nil
+		and delta.powerCooldowns == nil
 		and delta.result == nil
 		and delta.cosmetics == nil
 		and delta.sandbox == nil
@@ -443,6 +466,9 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	end
 	if delta.primordials then
 		snapshot.primordials = delta.primordials
+	end
+	if delta.powerCooldowns then
+		snapshot.powerCooldowns = delta.powerCooldowns
 	end
 	if delta.result then
 		snapshot.result = delta.result

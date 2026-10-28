@@ -48,7 +48,7 @@ export type Nation = {
 	manpower: number,
 	charges: number,
 	allianceId: number?,
-	powerImmuneUntil: number, -- 30 s Primordial-power protection
+	powerImmuneUntil: number, -- 60 s protection from harmful Primordial powers
 	plagueUntil: number?, -- tick when a Plague ends (nil = none)
 	eliminated: boolean,
 	battlesWon: number, -- counts towards the score
@@ -198,6 +198,9 @@ export type MatchState = {
 	alliances: { [number]: Alliance },
 	truces: { Truce },
 	primordials: { [number]: Primordial }, -- keyed by userId
+	-- when each caster may next hit each nation with a harmful power ("<caster>><nation>" -> tick); a caster is
+	-- "n<nation id>" for a living nation or "u<userId>" for a Primordial (Sim.Primordial.casterKey)
+	powerCooldowns: { [string]: number }?,
 	seats: { [number]: NationId }, -- userId -> the nation that player last held (a rejoining player gets it back)
 	nextArmyId: ArmyId, -- army ids are never reused (clients and queued commands refer to armies by id)
 	mergedInto: { [ArmyId]: ArmyId }, -- an army merged into another stack -> the army that took its men (Army.resolve)
