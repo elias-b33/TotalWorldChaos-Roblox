@@ -20,8 +20,10 @@ local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local MapRenderer = require(Client.MapRenderer)
 local Palette = require(Client.Palette)
+local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
+local Theme = Widgets.Theme
 local BANNER_HEIGHT = 48 -- covers the HUD's top bar (44 px) while drafting
 local PANEL_WIDTH = 272
 local CELL = Vector2.new(120, 44)
@@ -32,6 +34,7 @@ local Draft = {}
 local gui: ScreenGui
 local banner: Frame
 local bannerText: TextLabel
+local bannerIcon: GuiObject
 local timer: TextLabel
 local panel: Frame
 local orderLabel: TextLabel
@@ -39,6 +42,7 @@ local themeLabel: TextLabel
 local grid: Frame
 local confirm: TextButton
 local buttons: { [number]: TextButton } = {} -- nation id -> its button in the list
+local stars: { [number]: GuiObject } = {} -- nation id -> the star on your own nation's button
 local builtFor: any = nil -- the snapshot the buttons were made for
 local selected: number? = nil -- nation chosen by a map tap, waiting for the confirm button
 
@@ -72,25 +76,28 @@ local function render()
 	local me = Players.LocalPlayer.UserId
 	local picker = LobbyState.picker()
 	if picker and picker.userId == me then
-		bannerText.Text = "🎯 Your turn! Pick a nation"
+		bannerText.Text = "Your turn! Pick a nation"
+		Icons.set(bannerIcon, "star")
 	elseif picker then
-		bannerText.Text = "⏳ " .. picker.name .. " is picking"
+		bannerText.Text = picker.name .. " is picking"
+		Icons.set(bannerIcon, "hourglass")
 	else
-		bannerText.Text = "✅ Draft done"
+		bannerText.Text = "Draft done"
+		Icons.set(bannerIcon, "check")
 	end
+	-- the pick order: → whose turn it is, ✓ who has picked
 	local parts = {}
 	for i, entry in view.order do
-		local mark = if i == view.turn then "👉" elseif entry.nation ~= 0 then "✔" else "·"
-		table.insert(parts, mark .. " " .. (if entry.userId == me then "You" else entry.name))
+		local mark = if i == view.turn then "→ " elseif entry.nation ~= 0 then "✓ " else ""
+		table.insert(parts, mark .. (if entry.userId == me then "You" else entry.name))
 	end
-	orderLabel.Text = if #parts > 0 then table.concat(parts, "   ") else "🤖 Bots only"
+	orderLabel.Text = if #parts > 0 then table.concat(parts, "  ·  ") else "Bots only"
 	-- the theme vote's winner and who brought it
 	local theme = Catalogue.item(view.theme)
 	local look = Cosmetics.themeLook(view.theme)
 	themeLabel.Visible = theme ~= nil and look ~= ""
 	if theme and look ~= "" then
-		local text =
-			string.format("%s %s %s", Cosmetics.THEME_ICONS[look] or "🎨", theme.name, Maps.get(snap.mapId).title)
+		local text = string.format("%s %s", theme.name, Maps.get(snap.mapId).title)
 		if #view.themeBy > 0 then
 			text ..= ", brought by " .. table.concat(view.themeBy, ", ")
 		end
@@ -105,6 +112,7 @@ local function render()
 		builtFor = snap
 		Widgets.clear(grid)
 		buttons = {}
+		stars = {}
 		for _, nation in snap.nations do
 			local id = nation.id
 			local button = Widgets.button(grid, "", CELL.X, nil, function()
@@ -114,23 +122,27 @@ local function render()
 				Intents.pick(id)
 			end)
 			button.Name = "Nation" .. id
-			button.TextSize = 14
-			button.TextStrokeTransparency = 0.3
+			button.TextSize = Theme.text.small + 1
+			button.TextStrokeTransparency = 0.2
+			button.TextStrokeColor3 = Theme.color.ink
 			button.LayoutOrder = id
 			buttons[id] = button
+			local star = Widgets.icon(button, "star", 16)
+			star.Position = UDim2.fromOffset(4, 4)
+			star.Visible = false
+			stars[id] = star
 		end
 	end
 	for _, nation in snap.nations do
 		local button = buttons[nation.id]
 		if button then
 			local taken = nation.userId ~= 0
-			if nation.userId == me then
-				button.Text = "⭐ " .. nation.name
-			elseif taken then
-				button.Text = nation.name .. "\n👤 " .. nameOf(nation.userId)
+			if taken and nation.userId ~= me then
+				button.Text = nation.name .. "\n" .. nameOf(nation.userId)
 			else
 				button.Text = nation.name
 			end
+			stars[nation.id].Visible = nation.userId == me -- your nation wears a star
 			-- taken nations fade into the panel (a grey nation colour must still read as free)
 			button.BackgroundColor3 = Palette.nation(nation.colorIndex)
 			button.BackgroundTransparency = if taken then TAKEN_FADE else 0
@@ -139,7 +151,7 @@ local function render()
 
 	local choice = if selected then ClientState.nation(selected) else nil
 	if choice and choice.userId == 0 and LobbyState.myTurn() then
-		confirm.Text = "✔ Pick " .. choice.name
+		confirm.Text = "Pick " .. choice.name
 		confirm.Visible = true
 	else
 		confirm.Visible = false
@@ -167,7 +179,7 @@ end
 local function updateTimer()
 	if gui.Enabled then
 		local s = if LobbyState.picker() then LobbyState.turnSecondsLeft() else LobbyState.secondsLeft()
-		timer.Text = string.format("⏳ %d:%02d", s // 60, s % 60)
+		timer.Text = string.format("%d:%02d", s // 60, s % 60)
 	end
 end
 
@@ -179,30 +191,34 @@ function Draft.init()
 	banner.Name = "Banner"
 	banner.Active = true
 	banner.Size = UDim2.new(1, 0, 0, BANNER_HEIGHT)
-	banner.BackgroundColor3 = Widgets.PANEL
+	banner.BackgroundColor3 = Theme.color.navy
 	banner.BorderSizePixel = 0
 	banner.Parent = gui
-	bannerText = Widgets.label(banner, "", 20, BANNER_HEIGHT)
+	Widgets.stroke(banner)
+	Widgets.bevel(banner, true)
+	bannerText = Widgets.title(banner, "", Theme.text.title, BANNER_HEIGHT)
 	bannerText.Position = UDim2.fromOffset(16, 0)
 	bannerText.Size = UDim2.new(1, -170, 1, 0)
-	timer = Widgets.label(banner, "", 20, BANNER_HEIGHT)
-	timer.AnchorPoint = Vector2.new(1, 0)
-	timer.Position = UDim2.new(1, -16, 0, 0)
-	timer.Size = UDim2.new(0, 140, 1, 0)
-	timer.TextXAlignment = Enum.TextXAlignment.Right
+	bannerIcon = Widgets.leadIcon(bannerText, "star", Theme.size.iconButton)
+	timer = Widgets.chip(banner, "hourglass", "", 96, 34)
+	timer.Name = "Timer"
+	timer.AnchorPoint = Vector2.new(1, 0.5)
+	timer.Position = UDim2.new(1, -16, 0.5, 0)
+	timer.TextSize = Theme.text.title - 2
 
 	panel = Widgets.panel(gui, PANEL_WIDTH)
 	panel.Name = "Nations"
 	panel.AnchorPoint = Vector2.new(1, 0)
 	panel.Position = UDim2.new(1, -8, 0, BANNER_HEIGHT + 8)
 	Widgets.list(panel, false, 6)
-	themeLabel = Widgets.label(panel, "", 14, 36)
+	themeLabel = Widgets.label(panel, "", Theme.text.small, 36)
 	themeLabel.Name = "ThemeCredit"
-	themeLabel.TextColor3 = Color3.fromRGB(242, 193, 78)
+	themeLabel.TextColor3 = Theme.color.gold
 	themeLabel.TextWrapped = true
 	themeLabel.LayoutOrder = 0
 	themeLabel.Visible = false
-	orderLabel = Widgets.label(panel, "", 14, 40)
+	Widgets.leadIcon(themeLabel, "palette", Theme.size.icon)
+	orderLabel = Widgets.label(panel, "", Theme.text.small, 40)
 	orderLabel.LayoutOrder = 1
 	grid = Instance.new("Frame")
 	grid.Name = "Grid"
@@ -217,7 +233,7 @@ function Draft.init()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = grid
 
-	confirm = Widgets.button(gui, "", 220, Widgets.GOOD, function()
+	confirm = Widgets.iconTextButton(gui, "check", "", 280, Widgets.GOOD, function()
 		if selected then
 			Intents.pick(selected)
 		end
@@ -225,8 +241,10 @@ function Draft.init()
 	confirm.Name = "Confirm"
 	confirm.AnchorPoint = Vector2.new(0.5, 1)
 	confirm.Position = UDim2.new(0.5, -PANEL_WIDTH // 2, 1, -12)
-	confirm.Size = UDim2.fromOffset(220, 48)
+	confirm.Size = UDim2.fromOffset(280, 48)
 	confirm.TextSize = 18
+	confirm.TextWrapped = false
+	confirm.TextTruncate = Enum.TextTruncate.AtEnd
 	confirm.Visible = false
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

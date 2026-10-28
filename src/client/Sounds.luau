@@ -54,6 +54,7 @@ local muted = false -- module state lives as long as the client session, across 
 local instances: { [string]: Sound } = {}
 local lastPlayed: { [string]: number } = {}
 local muteButton: TextButton? = nil
+local showMuted: ((boolean) -> ())? = nil -- draws the mute button's icon (the top bar's pixel icons)
 local hooked: { [Instance]: boolean } = {}
 
 local function soundFor(name: string): Sound?
@@ -107,15 +108,23 @@ function Sounds.setMuted(value: boolean)
 		end
 	end
 	local button = muteButton
-	if button then
+	if showMuted then
+		showMuted(muted)
+	elseif button then
 		button.Text = if muted then "🔇" else "🔊"
 	end
 end
 
--- The mute toggle: Hud builds the button in the top bar, Sounds keeps its icon in step.
-function Sounds.attachMuteButton(button: TextButton)
+-- The mute toggle: Hud builds the button in the top bar, Sounds keeps its icon in step (through `show` when given,
+-- else as the button's text).
+function Sounds.attachMuteButton(button: TextButton, show: ((boolean) -> ())?)
 	muteButton = button
-	button.Text = if muted then "🔇" else "🔊"
+	showMuted = show
+	if show then
+		show(muted)
+	else
+		button.Text = if muted then "🔇" else "🔊"
+	end
 	button.Activated:Connect(function()
 		Sounds.setMuted(not muted)
 	end)

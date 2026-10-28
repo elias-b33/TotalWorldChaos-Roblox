@@ -17,9 +17,11 @@ local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
+local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
-local BUTTON_SIZE = 72
+local Theme = Widgets.Theme
+local BUTTON_SIZE = 68
 local PICK_WIDTH = 150
 local PICK_HEIGHT = 56 -- big touch targets
 local FLASH_SECONDS = 4 -- a strike's badge stays this long on the map
@@ -33,6 +35,16 @@ local ICONS: { [string]: string } = {
 	Shield = "🛡️",
 }
 
+-- The pixel icon of each power (the emoji above stay for map badges and toasts).
+local POWER_ICONS: { [string]: string } = {
+	Meteor = "meteor",
+	Plague = "plague",
+	Rebels = "rebels",
+	Earthquake = "earthquake",
+	Blessing = "blessing",
+	Shield = "divineShield",
+}
+
 local HINTS: { [string]: string } = {
 	Army = "👆 Tap an army",
 	Nation = "👆 Tap a nation's land",
@@ -42,9 +54,12 @@ local HINTS: { [string]: string } = {
 local Powers = {}
 
 local powerButton: TextButton
+local chargesLabel: TextLabel
 local picker: Frame
 local bar: Frame
 local barTitle: TextLabel
+local barTitleIcon: GuiObject
+local barCost: TextLabel
 local barHint: TextLabel
 local barButtons: Frame
 local banner: TextLabel
@@ -84,6 +99,9 @@ local function closeAll()
 	blocked = nil
 	picker.Visible = false
 	bar.Visible = false
+	-- hidden panels drop their buttons (they are rebuilt on open), so they don't count against the GUI budget
+	Widgets.clear(picker)
+	Widgets.clear(barButtons)
 	clearHighlight()
 end
 
@@ -91,7 +109,7 @@ local function refreshButton()
 	local snap = ClientState.snapshot()
 	local charges = if snap and not snap.setup.settings.powers then nil else ClientState.myCharges() -- off: no button
 	powerButton.Visible = charges ~= nil
-	powerButton.Text = "✨\n⚡" .. tostring(charges or 0)
+	chargesLabel.Text = tostring(charges or 0)
 	if charges == nil then
 		closeAll()
 	end
@@ -103,22 +121,26 @@ local function renderPicker()
 	for i, power in Primordial.POWERS do
 		local cost = Primordial.cost(power)
 		local enough = charges >= cost
-		local b = Widgets.button(
+		local b = Widgets.actionButton(
 			picker,
-			ICONS[power] .. " " .. power .. "\n⚡" .. cost,
-			PICK_WIDTH,
-			if enough then Widgets.BUTTON else Widgets.BUTTON_OFF,
+			POWER_ICONS[power],
+			power,
+			{ { "charge", tostring(cost) } },
+			Vector2.new(PICK_WIDTH, PICK_HEIGHT),
+			Widgets.SPECIAL,
 			function()
 				if not enough then
 					toast("⚡ Not enough charges")
 					return
 				end
 				Powers.choose(power)
-			end
+			end,
+			power
 		)
-		b.Name = power
-		b.Size = UDim2.fromOffset(PICK_WIDTH, PICK_HEIGHT)
 		b.LayoutOrder = i
+		if not enough then
+			Widgets.setEnabled(b, false)
+		end
 	end
 end
 
@@ -128,17 +150,23 @@ local function renderBar()
 		bar.Visible = false
 		return
 	end
-	barTitle.Text = string.format("%s %s  ·  ⚡%d", ICONS[power], power, Primordial.cost(power))
-	barHint.Text = if target then "➜ " .. targetText else blocked or HINTS[Primordial.TARGETS[power]]
+	barTitle.Text = power
+	Icons.set(barTitleIcon, POWER_ICONS[power])
+	barCost.Text = tostring(Primordial.cost(power))
+	Widgets.setIconText(
+		barHint,
+		if target then "➜ " .. targetText else blocked or HINTS[Primordial.TARGETS[power]],
+		"arrow"
+	)
 	Widgets.clear(barButtons)
 	local chosen = target
 	if chosen then
-		Widgets.button(barButtons, "✅ Confirm", 140, Widgets.GOOD, function()
+		Widgets.iconTextButton(barButtons, "check", "Confirm", 140, Widgets.GOOD, function()
 			Intents.power(power, chosen)
 			closeAll()
-		end)
+		end, "✅ Confirm")
 	end
-	Widgets.button(barButtons, "✕ Cancel", 120, Widgets.BUTTON_OFF, closeAll)
+	Widgets.iconTextButton(barButtons, "close", "Cancel", 120, Widgets.BUTTON_OFF, closeAll, "✕ Cancel")
 	bar.Visible = true
 end
 
@@ -148,6 +176,7 @@ function Powers.choose(power: Types.PrimordialPower)
 	target = nil
 	blocked = nil
 	picker.Visible = false
+	Widgets.clear(picker)
 	clearHighlight()
 	renderBar()
 end
@@ -335,19 +364,8 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	onOpen = openHandler
 	local gui = Widgets.screen("Powers", 4)
 
-	powerButton = Instance.new("TextButton")
-	powerButton.Name = "PowerButton"
-	powerButton.AnchorPoint = Vector2.new(1, 1)
-	powerButton.Position = UDim2.new(1, -12, 1, -12)
-	powerButton.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
-	powerButton.BackgroundColor3 = Color3.fromRGB(120, 70, 200)
-	powerButton.Font = Enum.Font.GothamBold
-	powerButton.TextSize = 20
-	powerButton.TextColor3 = Color3.new(1, 1, 1)
-	powerButton.Visible = false
-	powerButton.Parent = gui
-	Widgets.corner(powerButton, BUTTON_SIZE // 2)
-	powerButton.Activated:Connect(function()
+	-- the power button: a big purple sparkle with your charges in a badge
+	powerButton = Widgets.iconButton(gui, "sparkles", "PowerButton", BUTTON_SIZE, Widgets.SPECIAL, function()
 		if picker.Visible then
 			closeAll()
 			return
@@ -357,12 +375,25 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 		renderPicker()
 		picker.Visible = true
 	end)
+	powerButton.AnchorPoint = Vector2.new(1, 1)
+	powerButton.Position = UDim2.new(1, -14, 1, -14)
+	powerButton.Visible = false
+	local round = powerButton:FindFirstChildOfClass("UICorner")
+	if round then
+		round.CornerRadius = UDim.new(0.5, 0)
+	end
+	chargesLabel = Widgets.chip(powerButton, "charge", "0", nil, 24)
+	chargesLabel.Name = "Charges"
+	chargesLabel.BackgroundColor3 = Theme.color.ink
+	chargesLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	chargesLabel.Position = UDim2.new(0.5, 0, 1, -2)
+	Widgets.stroke(chargesLabel, Theme.color.gold)
 
 	-- the picker: 2 columns × 3 rows above the button
-	picker = Widgets.panel(gui, 2 * PICK_WIDTH + 28)
+	picker = Widgets.panel(gui, 2 * PICK_WIDTH + 8 + 2 * Theme.space.l + 2) -- two columns
 	picker.Name = "Picker"
 	picker.AnchorPoint = Vector2.new(1, 1)
-	picker.Position = UDim2.new(1, -12, 1, -BUTTON_SIZE - 20)
+	picker.Position = UDim2.new(1, -12, 1, -BUTTON_SIZE - 30)
 	picker.Visible = false
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(PICK_WIDTH, PICK_HEIGHT)
@@ -371,16 +402,26 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	grid.Parent = picker
 
 	-- the targeting bar: which power, what to tap, Confirm / Cancel
-	bar = Widgets.panel(gui, 420)
+	bar = Widgets.sheet(gui, 440)
 	bar.Name = "TargetBar"
-	bar.AnchorPoint = Vector2.new(0.5, 1)
-	bar.Position = UDim2.new(0.5, 0, 1, -8)
 	bar.Visible = false
-	Widgets.list(bar, false, 6)
-	barTitle = Widgets.label(bar, "", 18, 26)
-	barTitle.LayoutOrder = 1
-	barHint = Widgets.label(bar, "", 15, 22)
+	Widgets.list(bar, false, Theme.space.s)
+	local titleRow = Instance.new("Frame")
+	titleRow.Name = "Title"
+	titleRow.BackgroundTransparency = 1
+	titleRow.Size = UDim2.new(1, 0, 0, 30)
+	titleRow.LayoutOrder = 1
+	titleRow.Parent = bar
+	Widgets.list(titleRow, true, Theme.space.m)
+	barTitle = Widgets.title(titleRow, "", Theme.text.title, 30)
+	barTitle.Size = UDim2.fromOffset(0, 30)
+	barTitle.AutomaticSize = Enum.AutomaticSize.X
+	barTitleIcon = Widgets.leadIcon(barTitle, "sparkles", Theme.size.iconButton)
+	barCost = Widgets.chip(titleRow, "charge", "", nil, 26)
+	barCost.LayoutOrder = 2
+	barHint = Widgets.label(bar, "", Theme.text.body, 22)
 	barHint.LayoutOrder = 2
+	Widgets.leadIcon(barHint, "arrow", Theme.size.icon)
 	barButtons = Instance.new("Frame")
 	barButtons.Name = "Buttons"
 	barButtons.BackgroundTransparency = 1
@@ -389,19 +430,19 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	barButtons.Parent = bar
 	Widgets.list(barButtons, true, 8)
 
-	banner = Instance.new("TextLabel")
+	banner = Widgets.label(gui, "You rose as a Primordial", Theme.text.body, 34)
 	banner.Name = "PrimordialBanner"
-	banner.Position = UDim2.fromOffset(12, 52) -- top left, clear of toasts, offers and the picker
-	banner.Size = UDim2.fromOffset(270, 32)
-	banner.BackgroundColor3 = Color3.fromRGB(90, 50, 160)
-	banner.BackgroundTransparency = 0.15
-	banner.Font = Enum.Font.GothamBold
-	banner.TextSize = 16
-	banner.TextColor3 = Color3.new(1, 1, 1)
-	banner.Text = "✨ You rose as a Primordial"
+	banner.Position = UDim2.fromOffset(12, 54) -- top left, clear of toasts, offers and the picker
+	banner.Size = UDim2.fromOffset(270, 34)
+	banner.BackgroundColor3 = Widgets.SPECIAL
+	banner.BackgroundTransparency = 0.05
+	banner.FontFace = Theme.font.display
+	banner.TextWrapped = false
 	banner.Visible = false
-	banner.Parent = gui
-	Widgets.corner(banner, 10)
+	Widgets.corner(banner, Theme.radius.m)
+	Widgets.stroke(banner)
+	Widgets.padding(banner, Theme.space.m, 0)
+	Widgets.leadIcon(banner, "sparkles", Theme.size.icon)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 

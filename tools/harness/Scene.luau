@@ -51,7 +51,15 @@ local function dumpGui(inst)
 			node.textXAlign = enumName(inst.TextXAlignment)
 			node.textWrapped = inst.TextWrapped
 			node.stroke = inst.TextStrokeTransparency < 0.9
+			node.strokeColor = c3(inst.TextStrokeColor3)
+			node.strokeT = inst.TextStrokeTransparency
 			node.textT = inst.TextTransparency
+			node.textYAlign = enumName(inst.TextYAlignment)
+			node.truncate = enumName(inst.TextTruncate) ~= "None"
+			node.font = { family = inst.FontFace.Family, weight = enumName(inst.FontFace.Weight) }
+		end
+		if inst.Rotation ~= 0 then
+			node.rotation = inst.Rotation
 		end
 		if inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
 			local image = Emulator.editableImage(inst.ImageContent.Uri or "")
@@ -62,12 +70,43 @@ local function dumpGui(inst)
 					width = image.Size.X,
 					height = image.Size.Y,
 					pixelated = enumName(inst.ResampleMode) == "Pixelated",
+					color = c3(inst.ImageColor3),
+					transparency = inst.ImageTransparency,
 				}
 			end
 		end
-		local stroke = inst:FindFirstChildOfClass("UIStroke")
-		if stroke and stroke.Enabled then
-			node.uiStroke = { color = c3(stroke.Color), thickness = stroke.Thickness }
+		-- the stroke Roblox draws: the last enabled one (Widgets' outline steps aside for the tutorial's glow)
+		for _, stroke in inst:GetChildren() do
+			if stroke:IsA("UIStroke") and stroke.Enabled then
+				node.uiStroke = {
+					color = c3(stroke.Color),
+					thickness = stroke.Thickness,
+					transparency = stroke.Transparency,
+					-- Contextual on a text object outlines the text, not the box
+					text = enumName(stroke.ApplyStrokeMode) == "Contextual"
+						and (inst:IsA("TextLabel") or inst:IsA("TextButton")),
+				}
+			end
+		end
+		local gradient = inst:FindFirstChildOfClass("UIGradient")
+		if gradient and gradient.Enabled then
+			local colors, alphas = {}, {}
+			for _, k in gradient.Color.Keypoints do
+				table.insert(colors, { k.Time, k.Value.R, k.Value.G, k.Value.B })
+			end
+			for _, k in gradient.Transparency.Keypoints do
+				table.insert(alphas, { k.Time, k.Value })
+			end
+			node.gradient = {
+				colors = colors,
+				transparency = alphas,
+				rotation = gradient.Rotation,
+				offset = { gradient.Offset.X, gradient.Offset.Y },
+			}
+		end
+		local scale = inst:FindFirstChildOfClass("UIScale")
+		if scale and scale.Scale ~= 1 then
+			node.scale = scale.Scale
 		end
 	elseif inst:IsA("UIListLayout") then
 		node.fill = enumName(inst.FillDirection)

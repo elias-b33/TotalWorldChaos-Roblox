@@ -235,7 +235,7 @@ local EVENT_PROPS = {
 		false,
 	},
 	{ "RunService", { "Heartbeat", "RenderStepped", "Stepped" }, false },
-	{ "GuiButton", { "Activated", "MouseButton1Click" }, false },
+	{ "GuiButton", { "Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "MouseLeave" }, false },
 	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged", "DescendantAdded" }, false },
 	{ "MarketplaceService", { "PromptGamePassPurchaseFinished", "PromptProductPurchaseFinished" }, false },
 }

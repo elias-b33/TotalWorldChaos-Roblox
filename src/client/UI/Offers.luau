@@ -1,5 +1,6 @@
 --!strict
 -- Alliance and peace offers made to you, as cards under the top bar with an Accept button. They expire on their own.
+-- Each card: the offer with its icon, a countdown chip and the Accept button.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,6 +10,9 @@ local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local Relations = require(Client.Relations)
 local Widgets = require(script.Parent.Widgets)
+
+local Theme = Widgets.Theme
+local WIDTH = 290
 
 local Offers = {}
 
@@ -32,19 +36,29 @@ local function render()
 	for i, o in offers do
 		local from = ClientState.nation(o.from)
 		local name = if from then from.name else "?"
-		local card = Widgets.panel(column, 290)
+		local card = Widgets.panel(column, WIDTH)
+		card.Name = "Offer"
 		card.LayoutOrder = i
-		Widgets.list(card, false, 6)
+		Widgets.list(card, false, Theme.space.s)
 		local text = if o.kind == "Ally"
-			then "🤝 " .. name .. " wants an alliance"
-			else "🕊 " .. name .. " offers peace" .. (if o.tribute > 0 then " +💰" .. o.tribute else "")
-		Widgets.label(card, string.format("%s  ⌛%d", text, math.max(0, o.expiresAt - tick)), 14, 36)
+			then name .. " wants an alliance"
+			else name .. " offers peace" .. (if o.tribute > 0 then " +" .. o.tribute .. " gold" else "")
+		local line = Widgets.label(card, text, Theme.text.body, 36)
+		line.LayoutOrder = 1
+		Widgets.leadIcon(line, if o.kind == "Ally" then "handshake" else "peace", Theme.size.iconButton)
+		local footer = Instance.new("Frame")
+		footer.BackgroundTransparency = 1
+		footer.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
+		footer.LayoutOrder = 2
+		footer.Parent = card
 		local action = if o.kind == "Ally" then "AcceptAlly" else "AcceptPeace"
 		local fromId = o.from
-		Widgets.button(card, "✅ Accept", 120, Widgets.GOOD, function()
+		Widgets.iconTextButton(footer, "check", "Accept", 130, Widgets.GOOD, function()
 			Intents.diplomacy(action, fromId)
-		end).LayoutOrder =
-			2
+		end, "✅ Accept")
+		local timer = Widgets.chip(footer, "hourglass", tostring(math.max(0, o.expiresAt - tick)) .. " s", 80)
+		timer.AnchorPoint = Vector2.new(1, 0.5)
+		timer.Position = UDim2.fromScale(1, 0.5)
 	end
 end
 
@@ -54,10 +68,10 @@ function Offers.init()
 	column.Name = "Column"
 	column.BackgroundTransparency = 1
 	column.AnchorPoint = Vector2.new(1, 0)
-	column.Position = UDim2.new(1, -8, 0, 52)
-	column.Size = UDim2.fromOffset(290, 300)
+	column.Position = UDim2.new(1, -10, 0, 54)
+	column.Size = UDim2.fromOffset(WIDTH, 300)
 	column.Parent = gui
-	Widgets.list(column, false, 6)
+	Widgets.list(column, false, Theme.space.m)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	-- once a second is plenty: offers change with deltas and count down slowly
 	local acc = 0

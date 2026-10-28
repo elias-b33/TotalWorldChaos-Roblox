@@ -411,6 +411,30 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - **Bots help:** every bot accepts the player's alliance offer; the ally prompt points at the nearest bot, the war prompt at the weakest bot on the player's border. When the war prompt starts, Peace ends at once (the clock jumps to 3:00); the power prompt tops the player up to 1 charge (a Blessing on their own land).
 - **Skip and done:** Skip takes two taps. Finishing or skipping saves `tutorialDone`; players who had already played a match count as done. Each prompt done is an onboarding funnel step and a skip is a `tutorial_skipped` event (`docs/LAUNCH.md` "Analytics events"); the server also prints started, finished and skipped in the Output.
 
+### UI style: "pixel kingdom"
+
+One look for every screen, made to sit on WorldBox's pixel map and read at a glance on a phone. Tokens live in `src/client/UI/Theme.luau`, components in `src/client/UI/Widgets.luau`, icons in `src/client/IconArt.luau` (painted) and `src/client/UI/Icons.luau` (on screen). Screens never pick their own colours, fonts or sizes.
+
+- **Look:** chunky navy panels with a 2 px ink outline and a gentle top-to-bottom bevel; warm gold for titles, highlights and the selected tab; buttons with a darker bottom edge that squash (94%) and sink while pressed; pixel icons, never emoji.
+- **Palette:**
+
+| Token | Colour | Use |
+| --- | --- | --- |
+| `ink` | `#0b0d1a` | every outline |
+| `navy` | `#1d2448` | panels, sheets, the top bar |
+| `navyDeep` | `#12172f` | chips, wells, unselected tabs, full-screen backdrops |
+| `navyRaised` | `#2a3366` | cards inside panels |
+| `gold` / `goldDeep` / `goldPale` | `#f5c242` / `#b67f24` / `#ffe9a6` | titles, selection, prices |
+| `text` / `textDim` / `textDark` | `#fff7e3` / `#b6bcdc` / `#2b1d0c` | body, hints, text on gold |
+| `primary` / `good` / `danger` / `secondary` / `special` | `#3d7ce0` / `#3aa856` / `#d9434b` / `#4a5385` / `#8a4fd8` | buttons: main, confirm, war, cancel, Primordial |
+| `disabled` | `#353a57` (text `#8a8fb0`) | can't be pressed now |
+
+- **Type:** Fredoka One for titles, buttons and numbers; Builder Sans Bold for labels, Builder Sans Medium for hints. Sizes: hero 28, title 22, heading 18, body 15, small 14 (nothing smaller).
+- **Spacing:** 4 / 6 / 8 / 12 / 16 px; corner radius 4 / 6 / 8; outlines 2 px; buttons at least 44 px tall.
+- **Icons:** 16×16 sprites in one 24-colour palette with a dark outline (`IconArt.ICONS`, plus recoloured variants), each painted once into its own 1 KB EditableImage on first use and shown with pixelated resampling at 16, 20, 24 or 32 px. Without EditableImage they fall back to emoji. A leading emoji in a toast or older string becomes its icon (`IconArt.EMOJI`). `lune run tools/harness/icon_sheet` paints them all into `tools/harness/out/gui/icons.png`; `tests/icons.spec.luau` checks every icon.
+- **Components** (`Widgets`): `panel`, `sheet` (bottom sheet), `card`, `header` (icon, gold title, close cross), `title`, `label`, `hint`, `button` (colours `BUTTON`, `GOOD`, `DANGER`, `BUTTON_OFF`, `GOLD`, `SPECIAL`), `iconTextButton`, `iconButton`, `actionButton` (icon, caption, cost line), `setEnabled`, `tab` / `setTab`, `chip` (icon + value), `badge`, `progress` / `setProgress`, `toast` / `setToast`, `icon`, `leadIcon`, `setIconText`.
+- **GUI objects:** a button is 4 objects (button, corner, outline, bevel); the press scale is made on the first press. Hidden sheets and pickers drop their buttons and rebuild them when they open, and the private server sheet is built on first open.
+
 ### Sound and effects
 
 Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): they read the delta's events and records, never change the match. WorldBox pixel style: square particles in whole map pixels, colours from `Palette.fx`, moved with TweenService.
@@ -432,7 +456,7 @@ Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): 
 
 - **Phones:** at most 240 pooled particle frames, 8 other nations' effects (14 with powers and your own fights) at once, 6 shield domes. Effects off screen are skipped, and other nations' battles and captures are skipped where the province is under 16 screen pixels wide.
 - **Sounds:** only files that ship inside every Roblox client (`rbxasset://sounds/...`), all listed in `Sounds.luau`. Each one must be played once in Studio before launch; swap any that is missing. A missing file is harmless (Roblox logs it and stays silent). You hear your own battles and captures even off screen.
-- **Mute:** a 🔊 button at the right end of the top bar; it mutes every sound and is remembered for the session.
+- **Mute:** a speaker button at the right end of the top bar; it mutes every sound and is remembered for the session.
 
 ## Bot AI
 
@@ -526,6 +550,8 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote (also shade sets and nameplate frames; map themes Night, Winter and Autumn; a private server's "Default" theme setting forces the classic look through `MatchService.forcedTheme`)
 - [x] Private server settings
 - [x] Sound and effects for battles and Primordial powers
+- [x] UI kit with a "pixel kingdom" look and runtime pixel icons, on the HUD, sheets, powers, nations, offers, map vote, draft, private settings and emotes ("UI style")
+- [ ] Shop, Quests, Results and Tutorial restyled on the UI kit
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 
