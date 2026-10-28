@@ -27,6 +27,7 @@ local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
 local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
+local QuestService = require(Server.Services.QuestService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -116,6 +117,7 @@ ShopService.init(function(): string
 	local state = MatchService.current()
 	return if state then state.phase else "Lobby"
 end, MatchService.current, MatchService.nationOf)
+QuestService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 nextMatch()
 

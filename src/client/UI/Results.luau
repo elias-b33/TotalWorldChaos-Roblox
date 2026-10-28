@@ -14,6 +14,8 @@ local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
 local Palette = require(Client.Palette)
 local ProfileState = require(Client.ProfileState)
+local QuestState = require(Client.QuestState)
+local Quests = require(script.Parent.Quests)
 local Widgets = require(script.Parent.Widgets)
 
 local HOW = {
@@ -39,7 +41,9 @@ local LINE_LABELS: { [string]: string } = {
 	PaidEarlier = "↩ Paid when you left",
 	LevelUp = "⬆ Level up",
 	RankUp = "👑 Rank up",
+	Calendar = "🗓 Play calendar",
 }
+local MAX_QUEST_LINES = 3 -- quests the match moved, shown under the scores
 local GOLD = Color3.fromRGB(255, 210, 90)
 local DIM_TEXT = Color3.fromRGB(190, 195, 210)
 local RESULTS_WIDTH = 330
@@ -125,6 +129,10 @@ local function renderReward(): boolean
 		if l.kind == "Placement" and reward.placement then
 			label ..= " #" .. reward.placement
 		end
+		local quests = QuestState.view()
+		if l.kind == "Calendar" and quests then
+			label ..= " " .. quests.calendar.step .. "/" .. #quests.calendar.glory
+		end
 		local bonus = l.kind == "LevelUp" or l.kind == "RankUp"
 		rewardRow(
 			label,
@@ -148,6 +156,54 @@ local function renderReward(): boolean
 	local total = Widgets.label(rewardBody, string.format("🏅 %d Glory", after.glory), 14, 20)
 	total.TextColor3 = DIM_TEXT
 	total.LayoutOrder = order + 3
+	return true
+end
+
+-- Under the scores: the quests this match moved (finished ones first), then the way to the Quests screen to claim
+-- them next to the "next match" note. Returns false before the server has sent the quests.
+local function renderQuests(hasReward: boolean): boolean
+	local view = QuestState.view()
+	if view == nil then
+		return false
+	end
+	if hasReward then
+		local moved: { Types.QuestEntry } = {}
+		for _, list in { view.daily, view.weekly } do
+			for _, q in list do
+				if view.gains[q.key] then
+					table.insert(moved, q)
+				end
+			end
+		end
+		table.sort(moved, function(a, b)
+			return (a.progress >= a.target) and not (b.progress >= b.target)
+		end)
+		for i = 1, math.min(#moved, MAX_QUEST_LINES) do
+			local q = moved[i]
+			local done = q.progress >= q.target
+			local text = if done
+				then "✅ " .. Quests.text(q) .. ": done!"
+				else string.format("📜 %s  %d/%d", Quests.text(q), q.progress, q.target)
+			local l = Widgets.label(body, text, 14, 20)
+			l.TextTruncate = Enum.TextTruncate.AtEnd
+			l.TextWrapped = false
+			l.TextColor3 = if done then GOLD else DIM_TEXT
+			l.LayoutOrder = 20 + i
+		end
+	end
+	local row = Instance.new("Frame")
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
+	row.LayoutOrder = 30
+	row.Parent = body
+	Widgets.list(row, true, 10)
+	local b = Widgets.button(row, Quests.buttonText(), 190, Color3.fromRGB(120, 90, 40), Quests.open)
+	b.Name = "QuestsButton"
+	b.TextSize = 14
+	local next = Widgets.label(row, "⏳ Next match soon", 13, Widgets.BUTTON_HEIGHT)
+	next.Size = UDim2.new(1, -200, 1, 0)
+	next.TextColor3 = DIM_TEXT
+	next.LayoutOrder = 2
 	return true
 end
 
@@ -197,8 +253,10 @@ local function render()
 			flag.Position = UDim2.new(1, -4, 0.5, 0)
 		end
 	end
-	Widgets.label(body, "⏳ Next match starts soon", 14, 22).LayoutOrder = 20
 	local hasReward = renderReward()
+	if not renderQuests(hasReward) then
+		Widgets.label(body, "⏳ Next match starts soon", 14, 22).LayoutOrder = 30
+	end
 	rewardBody.Visible = hasReward
 	local width = RESULTS_WIDTH + (if hasReward then COLUMN_GAP + REWARD_WIDTH else 0)
 	panel.Size = UDim2.fromOffset(width + 2 * PANEL_PADDING, 0)
@@ -256,6 +314,11 @@ function Results.init(showHandler: () -> ())
 	ProfileState.onChange(function()
 		if dim.Visible then
 			render() -- the reward can land just after the result
+		end
+	end)
+	QuestState.onChange(function()
+		if dim.Visible then
+			render() -- quest progress arrives with the reward
 		end
 	end)
 end

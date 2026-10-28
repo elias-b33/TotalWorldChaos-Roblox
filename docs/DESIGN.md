@@ -517,7 +517,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Tutorial match
 - [x] Progression rules in Sim: match XP and Glory, level curve, ranks
 - [x] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards
-- [ ] Daily and weekly quests, login calendar, play streak
+- [x] Daily and weekly quests, login calendar, play streak
 - [x] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
 - [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote (flags, border styles, shade sets, tokens, emotes, victory animations and nameplate frames are done; power effects have their data and the `Cosmetics.powerEffect` hook for the effects task; the theme vote waits for map themes)
 - [ ] Private server settings

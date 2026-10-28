@@ -218,10 +218,21 @@ export type PlayerMatchStats = {
 	powersUsed: number,
 	paidXp: number, -- already paid this match, when they left earlier
 	paidGlory: number,
+	-- for quests (Sim.Quests): what the player's nation did this match
+	neutralTaken: number, -- provinces captured from neutral land
+	capitalsTaken: number, -- enemy capitals captured
+	regiments: number, -- regiments recruited
+	buildings: number, -- buildings built
+	developed: number, -- Develop orders carried out
+	bestDevelopment: number, -- highest level a province reached by the player's Develop order
+	alliances: number, -- alliances formed
+	mostProvinces: number, -- most provinces held at once
+	questCounted: { [string]: number }, -- quest stat -> what quests already counted (a leave, then Results)
 }
 
 -- One row of a reward breakdown. kind: Finish, Placement, Provinces, Battles, Primordial, Powers, FirstMatch,
--- Vip, CustomRules, PaidEarlier (what an earlier leave already paid, negative), LevelUp, RankUp.
+-- Vip, CustomRules, PaidEarlier (what an earlier leave already paid, negative), LevelUp, RankUp, Calendar (the
+-- login calendar step the day's first finished match pays).
 export type RewardLine = { kind: string, xp: number, glory: number }
 
 export type MatchReward = {
@@ -233,7 +244,63 @@ export type MatchReward = {
 	afk: boolean, -- sent no command for Config.Progression.AfkTicks in a row: paid nothing
 }
 
--- The saved profile (ProfileStore data). Version 2.
+-- Quests, login calendar and play streak (docs/MONETIZATION.md 5.4–5.6). The pool is Config.Progression.Quests,
+-- the rules Sim.Quests and Sim.Login. Days are UTC day numbers, weeks start on Monday (Sim.Quests.weekOf).
+
+export type QuestTier = "Easy" | "Medium" | "Hard" | "Weekly"
+
+-- One quest in the pool. stat: what counts (Sim.Quests.tally); max: progress is the best single match, not a sum.
+export type QuestDef = { id: string, tier: QuestTier, stat: string, target: number, max: boolean? }
+
+-- One quest a player has. day: the UTC day it was given (a weekly quest: its week).
+export type QuestState = { key: string, id: string, day: number, progress: number, claimed: boolean }
+
+-- profile.quests. day/week: the last day and week the quests were refreshed for.
+export type QuestBook = {
+	day: number,
+	week: number,
+	rerollsUsed: number, -- today
+	videoRerolls: number, -- rerolls a rewarded video gave today (Phase 5; always 0 until then)
+	daily: { QuestState },
+	weekly: { QuestState },
+}
+
+-- profile.login. step: steps of the 7-step calendar done in this cycle (0..7); lastPlayDay: the last UTC day with
+-- a finished match (-1 = never); streak: consecutive play days; best: the longest streak (its flames stay earned);
+-- coveredWeek: the week whose one covered missed day is used (-1 = none).
+export type LoginState = { step: number, lastPlayDay: number, streak: number, best: number, coveredWeek: number }
+
+-- Quest requests: CommandRouter checks the shape, Sim.Quests the rules.
+export type QuestIntent = { kind: "Claim", key: string } | { kind: "Reroll", key: string }
+
+-- One quest as the player's client sees it.
+export type QuestEntry = {
+	key: string,
+	id: string,
+	tier: QuestTier,
+	stat: string,
+	target: number,
+	progress: number,
+	claimed: boolean,
+	xp: number,
+	glory: number,
+	daysLeft: number, -- days it stays after today (0 = goes at the end of today; weekly: 0)
+}
+
+-- What a player sees of their quests (the Quests remote, after every change).
+export type QuestView = {
+	daily: { QuestEntry },
+	weekly: { QuestEntry },
+	freeRerolls: number, -- free rerolls left today
+	rerollGlory: number, -- the price of a reroll once the free ones are used
+	calendar: { glory: { number }, step: number, playedToday: boolean },
+	streak: number, -- current play streak (0 when it has lapsed)
+	best: number,
+	flame: number, -- streak reward tier earned so far (0 = none; Config.Progression.Login.StreakFlames)
+	gains: { [string]: number }, -- quest key -> progress the last match added (the Results screen)
+}
+
+-- The saved profile (ProfileStore data). Version 3.
 export type PlayerProfile = {
 	version: number,
 	xp: number, -- total account XP
@@ -242,8 +309,8 @@ export type PlayerProfile = {
 	lastMatchDay: number, -- UTC day of the last paid match (first-match-of-the-day bonus)
 	owned: { [string]: boolean }, -- item id -> true
 	equipped: { [string]: string }, -- slot -> item id
-	quests: { day: number, week: number, rerollsUsed: number, daily: { any }, weekly: { any } }, -- placeholders
-	login: { step: number, lastPlayDay: number, streak: number }, -- placeholders
+	quests: QuestBook, -- version 3
+	login: LoginState, -- version 3
 	achievements: { [string]: number }, -- id -> progress
 	season: { id: string, xp: number, premium: boolean, claimed: { [string]: boolean } },
 	receipts: { [string]: number }, -- purchase id -> os.time() it was granted (the last 200)
@@ -312,6 +379,7 @@ export type NationCosmetics = {
 	victory: string,
 	powerFx: { [string]: string },
 	vip: boolean,
+	flame: number?, -- play-streak flame on the nameplate (Sim.Login.flameTier; nil or 0 = none)
 }
 
 -- Shop requests: CommandRouter checks the shape, Sim.Shop the rules. Equipping an item puts it in its slot.

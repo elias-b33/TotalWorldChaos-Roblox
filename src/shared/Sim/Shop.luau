@@ -6,6 +6,7 @@
 
 local Catalogue = require("../Catalogue")
 local Config = require("../Config")
+local Login = require("./Login")
 local Types = require("../Types")
 
 type Profile = Types.PlayerProfile
@@ -165,6 +166,7 @@ function Shop.cosmeticsOf(profile: Profile, vip: boolean, nationId: number): Cos
 		end
 	end
 	c.vip = vip
+	c.flame = Login.flameTier(profile.login) -- play-streak flame (earned for good, MONETIZATION 5.6)
 	return c
 end
 

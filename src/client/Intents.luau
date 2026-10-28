@@ -60,6 +60,12 @@ local REASONS: { [string]: string } = {
 	NotForSale = "🚫 Not on sale yet",
 	NotLoaded = "⏳ Your save is still loading",
 	TryAgain = "⏳ Try again in a moment",
+	Unknown = "🚫 That quest is gone",
+	Claimed = "✅ Already claimed",
+	NotDone = "📜 Not finished yet",
+	NotDaily = "📜 Only daily quests can be rerolled",
+	Done = "✅ That quest is finished",
+	NoOther = "📜 No other quest to swap in",
 }
 
 local Intents = {}
@@ -132,6 +138,15 @@ end
 
 function Intents.emote(itemId: string)
 	send("RequestEmote", itemId)
+end
+
+-- Quests: claim a finished quest's reward, or swap a daily quest for another (free rerolls first, then Glory).
+function Intents.claimQuest(key: string)
+	send("RequestClaim", key)
+end
+
+function Intents.rerollQuest(key: string)
+	send("RequestQuestReroll", key)
 end
 
 return Intents

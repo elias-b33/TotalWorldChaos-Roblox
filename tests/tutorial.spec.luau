@@ -258,7 +258,7 @@ T.test("new profiles still need the tutorial; players with a match behind them d
 	old.tutorialDone = false -- what ProfileStore's Reconcile fills in for a v1 save
 	old.stats.matches = 3
 	Progression.migrate(old)
-	T.equal(old.version, 2)
+	T.equal(old.version, Progression.PROFILE_VERSION)
 	T.equal(old.tutorialDone, true)
 	local new: any = Progression.newProfile()
 	new.version = 1

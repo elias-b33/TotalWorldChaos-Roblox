@@ -166,6 +166,55 @@ Config.Progression = {
 	},
 }
 
+-- Quests (docs/MONETIZATION.md 5.4–5.5): 3 daily quests (one per tier) and 3 weekly ones, picked from the pool by a
+-- generator seeded with the player and the day or week. stat: what counts (Sim.Quests.tally); max = true: the best
+-- single match counts, not the sum. Every quest can be done in normal play on every map; none asks to lose, betray
+-- an ally, quit or buy anything (being a Primordial needs losing your nation, so no Primordial-only quests).
+Config.Progression.Quests = {
+	Rewards = {
+		Easy = { xp = 100, glory = 30 },
+		Medium = { xp = 150, glory = 40 },
+		Hard = { xp = 200, glory = 50 },
+		Weekly = { xp = 1000, glory = 150 },
+	},
+	WeeklyCount = 3,
+	DailyKeepDays = 2, -- an unfinished daily quest stays on the day it came and the next one
+	MaxWaiting = 6, -- unfinished daily quests kept at most (the oldest go first)
+	FreeRerolls = 1, -- per day (VIP adds Config.Shop.VipQuestRerolls)
+	VideoRerolls = 2, -- per day from the rewarded video (Phase 5)
+	RerollGlory = 100, -- a reroll after the free ones
+	Pool = {
+		{ id = "play1", tier = "Easy", stat = "Matches", target = 1 },
+		{ id = "neutral3", tier = "Easy", stat = "NeutralCaptures", target = 3 },
+		{ id = "recruit5", tier = "Easy", stat = "Regiments", target = 5 },
+		{ id = "build2", tier = "Easy", stat = "Buildings", target = 2 },
+		{ id = "develop3", tier = "Easy", stat = "Developments", target = 3 },
+		{ id = "battles3", tier = "Medium", stat = "Battles", target = 3 },
+		{ id = "devlevel4", tier = "Medium", stat = "DevLevel", target = 4, max = true },
+		{ id = "ally1", tier = "Medium", stat = "Alliances", target = 1 },
+		{ id = "top5", tier = "Medium", stat = "Top5", target = 1 },
+		{ id = "powers2", tier = "Medium", stat = "Powers", target = 2 },
+		{ id = "capital1", tier = "Hard", stat = "Capitals", target = 1 },
+		{ id = "hold25", tier = "Hard", stat = "Held", target = 25, max = true },
+		{ id = "top3", tier = "Hard", stat = "Top3", target = 1 },
+		{ id = "battles6", tier = "Hard", stat = "Battles", target = 6 },
+		{ id = "capture10", tier = "Hard", stat = "Captures", target = 10 },
+		{ id = "w_matches10", tier = "Weekly", stat = "Matches", target = 10 },
+		{ id = "w_win1", tier = "Weekly", stat = "Wins", target = 1 },
+		{ id = "w_capture100", tier = "Weekly", stat = "Captures", target = 100 },
+		{ id = "w_battles50", tier = "Weekly", stat = "Battles", target = 50 },
+		{ id = "w_powers15", tier = "Weekly", stat = "Powers", target = 15 },
+		{ id = "w_top3x3", tier = "Weekly", stat = "Top3", target = 3 },
+	},
+}
+
+-- Login calendar and play streak (docs/MONETIZATION.md 5.6). Both move only on a day with a finished match.
+Config.Progression.Login = {
+	CalendarGlory = { 25, 25, 50, 50, 75, 75, 200 }, -- the 7 steps; missing days pause it, never reset it
+	StreakFlames = { 3, 7, 14, 30 }, -- streak days for: a flame, a bigger flame, a blue flame, "the Unyielding"
+	CoveredMissesPerWeek = 1, -- missed days a week that don't break the streak
+}
+
 -- Shop (docs/MONETIZATION.md 3.1–3.5): prices by rarity, offers, emotes. Robux numbers are list prices: the shop
 -- shows MarketplaceService's live price once a product id is set (Shared.Catalogue), so managed pricing can test it.
 -- Glory is never sold.
@@ -181,7 +230,7 @@ Config.Shop = {
 	StarterPackAfterMatches = 2, -- the starter-pack offer pops up (once per session) from this many finished matches
 	EmoteCooldownTicks = 10, -- one capital emote per player per this many seconds
 	EmoteShowSeconds = 3, -- how long an emote shows over the capital
-	VipQuestRerolls = 1, -- extra daily quest reroll for VIP (read by the quests task)
+	VipQuestRerolls = 1, -- extra daily quest reroll for VIP (Sim.Quests)
 	HistoryShown = 20, -- newest Robux purchases on the Purchase History screen
 }
 

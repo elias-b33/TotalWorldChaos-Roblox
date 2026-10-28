@@ -5,6 +5,7 @@
 --   DevTick     number  sets the match clock (179: War next second, 1199: the Cataclysm, 1499: the end)
 --   DevCharges  number  every nation and Primordial gets this many power charges
 --   DevGold     number  every nation with a player gets this much gold
+--   DevDay      number  moves the server's UTC day this many days on (quests, login calendar, first match today)
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -13,7 +14,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 ReplicatedStorage:WaitForChild("Shared")
 local Types = require(ReplicatedStorage.Shared.Types)
 
+local SECONDS_PER_DAY = 86400
+
 local DevService = {}
+
+local dayOffset = 0 -- days DevDay moved the clock on (Studio only)
+
+-- The UTC day number every service uses (Sim never reads the clock): os.time() in days, plus DevDay in Studio.
+function DevService.today(): number
+	return os.time() // SECONDS_PER_DAY + dayOffset
+end
 
 local function take(name: string): number?
 	local value = Workspace:GetAttribute(name)
@@ -55,6 +65,11 @@ function DevService.step(state: Types.MatchState)
 			end
 		end
 		print(string.format("[dev] every player nation has %d gold", gold))
+	end
+	local days = take("DevDay")
+	if days then
+		dayOffset += days
+		print(string.format("[dev] the UTC day moved %d day(s) on, to day %d", days, DevService.today()))
 	end
 end
 

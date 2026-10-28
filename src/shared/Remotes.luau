@@ -19,6 +19,8 @@ local EVENTS = {
 	"RequestBuy", -- shop: itemId, "Glory" | "Robux"
 	"RequestEquip", -- shop: itemId
 	"RequestEmote", -- shop: emote itemId
+	"RequestClaim", -- quests: quest key
+	"RequestQuestReroll", -- quests: quest key
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
@@ -29,6 +31,7 @@ local EVENTS = {
 	"Reward", -- your RewardReport at Results
 	"Tutorial", -- your TutorialView in the tutorial match (nil = no prompts)
 	"Shop", -- your ShopView (on join and after every change)
+	"Quests", -- your QuestView (on join, at Results and after every change)
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

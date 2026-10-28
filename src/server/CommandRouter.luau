@@ -39,6 +39,8 @@ local nationOf: (Player) -> number?
 local observers: { (Player, Types.Command, boolean) -> () } = {}
 local shopHandler: ((Player, Types.ShopIntent) -> (boolean, string?))? = nil
 local MAX_ITEM_ID = 40 -- longest catalogue id a shop request may name (the catalogue itself is checked by Sim.Shop)
+local questHandler: ((Player, Types.QuestIntent) -> (boolean, string?))? = nil
+local MAX_QUEST_KEY = 40 -- longest quest key a quest request may name (the book itself is checked by Sim.Quests)
 
 local function isId(v: unknown): boolean
 	return type(v) == "number" and v == v and v >= 1 and v <= 1e6 and v == math.floor(v)
@@ -209,6 +211,36 @@ function CommandRouter.init(getNation: (Player) -> number?)
 		acceptShop(player, requestId, if isItemId(item) then { kind = "Emote", item = item :: string } else nil)
 	end)
 
+	-- Quest intents (claim, reroll): like shop intents, QuestService answers them right away (it may yield to save).
+	local function acceptQuest(player: Player, requestId: unknown, kind: "Claim" | "Reroll", key: unknown)
+		if not isId(requestId) then
+			return
+		end
+		local id = requestId :: number
+		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+			reply(player, id, false, "TooFast")
+		elseif type(key) ~= "string" or #key == 0 or #key > MAX_QUEST_KEY or questHandler == nil then
+			reply(player, id, false, "BadRequest")
+		else
+			local handler = questHandler :: (Player, Types.QuestIntent) -> (boolean, string?)
+			local intent: Types.QuestIntent = if kind == "Claim"
+				then { kind = "Claim", key = key :: string }
+				else { kind = "Reroll", key = key :: string }
+			task.spawn(function()
+				local ok, reason = handler(player, intent)
+				reply(player, id, ok, reason)
+			end)
+		end
+	end
+
+	Remotes.event("RequestClaim").OnServerEvent:Connect(function(player: Player, requestId: unknown, key: unknown)
+		acceptQuest(player, requestId, "Claim", key)
+	end)
+
+	Remotes.event("RequestQuestReroll").OnServerEvent:Connect(function(player: Player, requestId: unknown, key: unknown)
+		acceptQuest(player, requestId, "Reroll", key)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
 	end)
@@ -293,6 +325,11 @@ end
 -- ShopService handles shop intents (buy, equip, emote); the player gets CommandResult with its answer.
 function CommandRouter.onShop(handler: (Player, Types.ShopIntent) -> (boolean, string?))
 	shopHandler = handler
+end
+
+-- QuestService handles quest intents (claim, reroll); the player gets CommandResult with its answer.
+function CommandRouter.onQuest(handler: (Player, Types.QuestIntent) -> (boolean, string?))
+	questHandler = handler
 end
 
 -- A new match makes queued intents meaningless.

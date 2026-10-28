@@ -14,10 +14,9 @@ local Types = require(Shared.Types)
 
 local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
+local DevService = require(script.Parent.DevService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local ShopService = require(script.Parent.ShopService)
-
-local SECONDS_PER_DAY = 86400
 
 local ProgressionService = {}
 
@@ -27,9 +26,12 @@ local stats: { [number]: Types.PlayerMatchStats } = {} -- by userId, for the cur
 -- Results rewards for players whose profile was still loading: paid when it loads (or dropped if they leave).
 local owed: { [number]: { state: Types.MatchState, entry: Types.PlayerMatchStats } } = {}
 local rewardRemote: RemoteEvent
+-- Run inside the reward's profile update, after the match reward: quests and the login calendar (QuestService).
+type RewardHook = (Player, Types.PlayerProfile, Types.PlayerMatchStats, Types.RewardReport) -> ()
+local rewardHooks: { RewardHook } = {}
 
 local function today(): number
-	return os.time() // SECONDS_PER_DAY -- UTC day number; Sim never reads the clock
+	return DevService.today() -- UTC day number; Sim never reads the clock
 end
 
 local function isVip(player: Player): boolean
@@ -52,11 +54,29 @@ local function startTracking(state: Types.MatchState)
 	end
 end
 
+-- The match reward, then the reward hooks (which may add lines, e.g. the calendar's Glory). Returns the report.
+local function grant(
+	player: Player,
+	data: Types.PlayerProfile,
+	state: Types.MatchState,
+	entry: Types.PlayerMatchStats
+): Types.RewardReport
+	local reward = Progression.matchReward(state, entry, options(player, data))
+	local report = Progression.grant(data, entry, reward, today())
+	for _, hook in rewardHooks do
+		local ok, err = pcall(hook, player, data, entry, report)
+		if not ok then
+			warn("[progression] reward hook failed: " .. tostring(err))
+		end
+	end
+	report.after = Progression.summary(data)
+	return report
+end
+
 -- Pay one player's Results reward, save, and show it. False if their profile isn't loaded yet.
 local function pay(player: Player, state: Types.MatchState, entry: Types.PlayerMatchStats): boolean
 	local report = PlayerDataService.update(player, function(data)
-		local reward = Progression.matchReward(state, entry, options(player, data))
-		return Progression.grant(data, entry, reward, today())
+		return grant(player, data, state, entry)
 	end)
 	if report then
 		rewardRemote:FireClient(player, report)
@@ -102,7 +122,7 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 	CommandRouter.observe(function(player: Player, command: Types.Command, ok: boolean)
 		local entry = stats[player.UserId]
 		if entry and current then
-			Progression.recordCommand(entry, current.tick, command, ok)
+			Progression.recordCommand(entry, current.tick, command, ok, current)
 		end
 	end)
 	-- leaving before Results: a prorated reward, saved with the profile's final save
@@ -113,8 +133,19 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 			return
 		end
 		Progression.leave(entry, state.tick) -- the record stays: rejoining carries on with it
-		Progression.grant(data, entry, Progression.matchReward(state, entry, options(player, data)), today())
+		grant(player, data, state, entry)
 	end)
+end
+
+-- Run `hook` with every match reward (at Results or when a player leaves), inside the profile update that saves it:
+-- it may change the profile and add lines to the report. It must not yield.
+function ProgressionService.onReward(hook: RewardHook)
+	table.insert(rewardHooks, hook)
+end
+
+-- The UTC day the rewards use (DevDay moves it in Studio).
+function ProgressionService.today(): number
+	return today()
 end
 
 -- After tick order steps 2-8, before the delta clears the events: count this tick's captures and battle wins,

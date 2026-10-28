@@ -28,13 +28,14 @@ Select Workspace in the Explorer and add attributes in the Properties window.
 | `MapId` | string | Locks the map: `earth`, `eldmoor` or `skyshards`. |
 | `Tutorial` | boolean | This server plays the tutorial match (in a live game, new players are teleported to one). |
 
-These three are Studio-only. Set them during a test run on the **server's** Workspace (in Clients and Servers, the Server window). Each is applied once on the next game second and then removed:
+These four are Studio-only. Set them during a test run on the **server's** Workspace (in Clients and Servers, the Server window). Each is applied once on the next game second and then removed:
 
 | Attribute | Type | Effect |
 | --- | --- | --- |
 | `DevTick` | number | Sets the match clock in seconds: `179` is War in a second, `1199` the Cataclysm, `1499` the end of the match. |
 | `DevCharges` | number | Every nation and Primordial gets this many power charges. |
 | `DevGold` | number | Every nation with a player gets this much gold. |
+| `DevDay` | number | Moves the server's UTC day this many days on (new daily quests, the login calendar and streak, the first-match bonus). Within 5 seconds everyone gets the new day's quests. `1` = tomorrow; `2` skips a day (the streak's covered missed day). Applied during a match or on Results, not in the Lobby. |
 
 ## Recipes
 
@@ -51,6 +52,7 @@ Start a test from the Test tab. Use Device to pick a phone in landscape (the UI 
 | Tutorial | Set `Tutorial`, Play solo, follow the six prompts; "⏭ Skip" takes two taps. |
 | Shop | In the Lobby tap 🛒 (or 🛒 in the top bar during a match). While the ids are 0, Robux items are free in Studio ("Studio test mode"). Equip a flag and check it by your capital and in the 🌍 list. |
 | Sounds | Every sound id is in `src/client/Sounds.luau`. Play each one once (the client command bar: `require(game.Players.LocalPlayer.PlayerScripts.Client.Sounds).play("MeteorImpact")`) and swap any that is missing. 🔊 in the top bar mutes. |
+| Quests, calendar, streak | Lobby: tap 📜 (bottom left, next to 🛒); in a match: 🌍 → "📜 Quests". Finish a match (`DevTick` = 1499 after doing what a quest asks, e.g. recruit 5 regiments): Results lists the quests it moved and the calendar step; tap "📜 Quests · 1 to claim" → Claim. Tap "🔄 Free" on a daily quest to reroll it (the next one costs 100 Glory). Set `DevDay` = 1 and finish another match: the calendar moves to step 2 and the streak to 2; at 3 days a 🔥 appears after your nation in the 🌍 list. |
 | Saving | Turn on Studio Access to API Services, finish a match, stop, play again: the level badge (🎖) and Glory are still there. |
 
 ## Before publishing
