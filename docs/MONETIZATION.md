@@ -750,7 +750,7 @@ Do:
 - Onboarding funnel, Shop, SeasonPass, StarterPack and MatchFlow funnels; Glory economy events; AccountLevel and SeasonTier progression events; the custom events
 - Keep under 100 custom event names and 3 custom fields
 Don't: log user names or any personal data; add a third-party SDK
-Done when: "View events" in Creator Hub shows each event from a Studio test session; build and lint pass
+Done when: each event shows in the Creator Hub Analytics dashboards from a published test session (AnalyticsService ignores Studio; Workspace "TelemetryLog" prints them there instead); build and lint pass
 ```
 
 ```text
@@ -900,7 +900,7 @@ Replace Phase 4's shop and player-data lines and add these lines to Phase 4 and 
 
 ### Phase 5: Soft launch
 
-- [ ] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
+- [x] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
 - [ ] Season pass (8 weeks, 50 tiers)
 - [ ] Rotating shop
 - [ ] Weekly, friends and global leaderboards; achievements

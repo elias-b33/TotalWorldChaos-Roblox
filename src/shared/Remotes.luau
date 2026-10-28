@@ -21,6 +21,7 @@ local EVENTS = {
 	"RequestEmote", -- shop: emote itemId
 	"RequestClaim", -- quests: quest key
 	"RequestQuestReroll", -- quests: quest key
+	"RequestTelemetry", -- analytics: a UI funnel signal (Sim.Telemetry.CLIENT_SIGNALS) and an optional short string
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",

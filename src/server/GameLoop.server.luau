@@ -28,6 +28,7 @@ local Replicator = require(Server.Replicator)
 local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
 local QuestService = require(Server.Services.QuestService)
+local TelemetryService = require(Server.Services.TelemetryService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -66,12 +67,14 @@ local function openLobby()
 	CommandRouter.clear()
 	Replicator.sendLobby(LobbyService.view())
 	ShopService.onPhase("Lobby")
+	TelemetryService.lobbyOpened() -- analytics: a new MatchFlow session for everyone here
 	print("[server] lobby open: vote on the map")
 end
 
 -- Lobby, part 2: the vote is over; the draft runs on a fresh match of the winning map, shown to everyone.
 local function startPick()
 	local state = MatchService.start(LobbyService.winner())
+	TelemetryService.voteOver(assert(LobbyService.state())) -- analytics: map_vote for every voter
 	CommandRouter.clear()
 	AIService.reset()
 	LobbyService.startPick(state)
@@ -119,6 +122,7 @@ ShopService.init(function(): string
 end, MatchService.current, MatchService.nationOf)
 QuestService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
+TelemetryService.init()
 nextMatch()
 
 Players.PlayerAdded:Connect(function(player)
@@ -154,6 +158,7 @@ local function tick()
 	AIService.step(state)
 	TutorialService.afterTick(state) -- the tutorial's prompts and the bots' part in it
 	ProgressionService.afterTick(state) -- match stats from this tick's events; XP and Glory at Results
+	TelemetryService.afterTick(state) -- analytics: MatchFlow, match and player events (after the rewards)
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end

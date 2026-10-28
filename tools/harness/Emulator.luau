@@ -761,6 +761,32 @@ function Emulator.processReceipt(receipt)
 	return fn(receipt)
 end
 
+---------------------------------------------------------------------------------------------- analytics
+
+-- AnalyticsService: every call is recorded in Emulator.analytics instead of going to Roblox, so a scenario can
+-- assert the events. Each record: { method, userId, args } (args = what came after the player; enums as names).
+Emulator.analytics = {}
+for _, method in {
+	"LogCustomEvent",
+	"LogFunnelStepEvent",
+	"LogOnboardingFunnelStepEvent",
+	"LogEconomyEvent",
+	"LogProgressionEvent",
+	"LogProgressionStartEvent",
+	"LogProgressionCompleteEvent",
+	"LogProgressionFailEvent",
+} do
+	roblox.implementMethod("AnalyticsService", method, function(_service, player, ...)
+		local args = table.pack(...)
+		for i = 1, args.n do
+			if typeof(args[i]) == "EnumItem" then
+				args[i] = args[i].Name
+			end
+		end
+		table.insert(Emulator.analytics, { method = method, userId = player and player.UserId, args = args })
+	end)
+end
+
 -- TextChatService.OnIncomingMessage is a client callback; keep it so the client can set it.
 local chatCallbacks: { [any]: any } = {}
 roblox.implementProperty("TextChatService", "OnIncomingMessage", function(service)

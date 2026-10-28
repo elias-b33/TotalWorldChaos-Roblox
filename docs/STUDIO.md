@@ -27,6 +27,7 @@ Select Workspace in the Explorer and add attributes in the Properties window.
 | `SkipLobby` | boolean | Matches start straight in Peace (no map vote or draft) and restart on the same map. Handy for solo tests. |
 | `MapId` | string | Locks the map: `earth`, `eldmoor` or `skyshards`. |
 | `Tutorial` | boolean | This server plays the tutorial match (in a live game, new players are teleported to one). |
+| `TelemetryLog` | boolean | Prints every analytics event as `[telemetry] …` in the Output. AnalyticsService only accepts events from a published game, so this is how to check them in Studio. |
 
 These four are Studio-only. Set them during a test run on the **server's** Workspace (in Clients and Servers, the Server window). Each is applied once on the next game second and then removed:
 
@@ -53,6 +54,7 @@ Start a test from the Test tab. Use Device to pick a phone in landscape (the UI 
 | Shop | In the Lobby tap 🛒 (or 🛒 in the top bar during a match). While the ids are 0, Robux items are free in Studio ("Studio test mode"). Equip a flag and check it by your capital and in the 🌍 list. |
 | Sounds | Every sound id is in `src/client/Sounds.luau`. Play each one once (the client command bar: `require(game.Players.LocalPlayer.PlayerScripts.Client.Sounds).play("MeteorImpact")`) and swap any that is missing. 🔊 in the top bar mutes. |
 | Quests, calendar, streak | Lobby: tap 📜 (bottom left, next to 🛒); in a match: 🌍 → "📜 Quests". Finish a match (`DevTick` = 1499 after doing what a quest asks, e.g. recruit 5 regiments): Results lists the quests it moved and the calendar step; tap "📜 Quests · 1 to claim" → Claim. Tap "🔄 Free" on a daily quest to reroll it (the next one costs 100 Glory). Set `DevDay` = 1 and finish another match: the calendar moves to step 2 and the streak to 2; at 3 days a 🔥 appears after your nation in the 🌍 list. |
+| Analytics | Set `TelemetryLog` (and nothing else), Clients and Servers, 2 players. In the server's Output: `Onboarding … joined`, `lobby_loaded`, `MatchFlow … lobby`; tap 🛒 and a tab (`Shop … shop_opened`, `item_viewed`); vote (`map_vote` when the vote ends); `DevTick` = 1499 for `nation_start`, `match_end`, `match_win` and `player_result`. The Glory `match_reward` and `AccountLevel` events need a match without a `DevTick` jump (a jump counts as idle time, and an AFK match pays nothing). Live: Creator Hub → your experience → Analytics (Funnels, Economy, Progression, Custom Events), about 24 hours later. |
 | Saving | Turn on Studio Access to API Services, finish a match, stop, play again: the level badge (🎖) and Glory are still there. |
 
 ## Before publishing

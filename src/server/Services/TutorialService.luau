@@ -23,6 +23,7 @@ local Types = require(Shared.Types)
 local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local TelemetryService = require(script.Parent.TelemetryService)
 
 local TutorialService = {}
 
@@ -30,7 +31,7 @@ local state: Types.MatchState? = nil
 local tut: Types.TutorialState? = nil
 local remote: RemoteEvent
 local sent: { [Player]: string } = {} -- the last view each player was sent, to send only changes
-local counts = { started = 0, finished = 0, skipped = 0 } -- this server's funnel (Analytics comes later)
+local counts = { started = 0, finished = 0, skipped = 0 } -- printed for Studio tests; analytics go through TelemetryService
 local seatedAt = 0 -- os.clock() when the tutorial player sat down (match ticks jump when Peace ends early)
 
 -- Teleports -------------------------------------------------------------------------------------------------
@@ -146,6 +147,7 @@ function TutorialService.afterTick(s: Types.MatchState)
 	local step = Tutorial.update(s, t)
 	local player = tutorialPlayer()
 	if step and player then
+		TelemetryService.tutorialPrompt(player, step - 1) -- analytics: onboarding steps 5-10
 		if Tutorial.finished(t) then
 			counts.finished += 1
 			print(
@@ -186,6 +188,7 @@ local function onRequest(player: Player, action: string)
 	end
 	if action == "Skip" and not t.skipped and not Tutorial.finished(t) then
 		Tutorial.skip(t)
+		TelemetryService.tutorialSkipped(player, t.step) -- analytics
 		counts.skipped += 1
 		print(
 			string.format(

@@ -270,4 +270,17 @@ Config.Tutorial = {
 	GiftCharges = 1, -- the power prompt tops the player's charges up to this (a Blessing costs 1)
 }
 
+-- Analytics (docs/LAUNCH.md "Analytics events"): Services/TelemetryService and Sim.Telemetry -------------------
+
+Config.Telemetry = {
+	BudgetBase = 120, -- AnalyticsService requests per window: BudgetBase + BudgetPerPlayer × players in the server
+	BudgetPerPlayer = 20,
+	BudgetWindowSeconds = 60, -- past the budget, events are dropped until the next window starts
+	NationStartTick = 60, -- nation_start records who holds each start nation after the first minute (or at Results)
+	HumanBuckets = { 3, 6, 12 }, -- match_end's humans field: 1-3, 4-6, 7-12
+	LevelBuckets = { 9, 29 }, -- economy level_bucket: 1-9, 10-29, 30+
+	OnboardingMatches = 2, -- onboarding steps are logged until a player has finished this many matches
+	ClientSignalsPerSecond = 5, -- UI funnel signals one client may send (RequestTelemetry)
+}
+
 return Config

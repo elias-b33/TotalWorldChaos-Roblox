@@ -14,6 +14,7 @@ local Config = require(Shared.Config)
 local Primordial = require(Shared.Sim.Primordial)
 local RateLimit = require(Shared.RateLimit)
 local Remotes = require(Shared.Remotes)
+local Telemetry = require(Shared.Sim.Telemetry)
 local Types = require(Shared.Types)
 
 type Pending = {
@@ -262,6 +263,27 @@ function CommandRouter.onTutorial(handler: (Player, string) -> ())
 			handler(player, action :: string)
 			reply(player, id, true, nil)
 		end
+	end)
+end
+
+-- Analytics signals for UI-only funnel steps (shop opened, starter pack on screen...): the kind must be one of
+-- Sim.Telemetry.CLIENT_SIGNALS, the argument a short string, and they have their own rate limit so they never use
+-- up a player's command budget. Nothing in the game changes: `handler` only logs. No reply.
+function CommandRouter.onTelemetry(handler: (Player, string, string?) -> ())
+	local signalLimiter = RateLimit.new(Config.Telemetry.ClientSignalsPerSecond)
+	Remotes.event("RequestTelemetry").OnServerEvent:Connect(function(player: Player, kind: unknown, arg: unknown)
+		if type(kind) ~= "string" or Telemetry.CLIENT_SIGNALS[kind] ~= true then
+			return
+		end
+		if arg ~= nil and (type(arg) ~= "string" or #arg > MAX_ITEM_ID) then
+			return
+		end
+		if RateLimit.allow(signalLimiter, player.UserId, os.clock()) then
+			handler(player, kind :: string, arg :: string?)
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		RateLimit.forget(signalLimiter, player.UserId)
 	end)
 end
 

@@ -149,4 +149,9 @@ function Intents.rerollQuest(key: string)
 	send("RequestQuestReroll", key)
 end
 
+-- Analytics: a UI-only funnel step ("Loaded", "ShopOpened", "ItemViewed", "OfferOpened"). No reply.
+function Intents.signal(kind: string, arg: string?)
+	Remotes.event("RequestTelemetry"):FireServer(kind, arg)
+end
+
 return Intents
