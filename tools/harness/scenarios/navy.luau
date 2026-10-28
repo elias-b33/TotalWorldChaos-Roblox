@@ -168,6 +168,20 @@ local function run()
 	Emulator.run(4)
 	H.expect(#fleet.path == 1 and fleet.path[1] == lyra and fleet.landAt == reach, "the fleet sails for Lyra Reach")
 	H.shot(alice, "sailing")
+	-- its progress comes on the unreliable positions channel, not in its record, and its token glides on with it
+	local pos = H.client(alice, "ClientState").fleetPosition(fleet.id)
+	H.expect(pos ~= nil and pos.to == lyra and pos.progress > 0, "Alice's client has the sailing fleet's position")
+	local token = H.mapObject(alice, "Fleet" .. fleet.id)
+	local was = token.Position
+	Emulator.run(2)
+	local now = token.Position
+	H.expect(
+		now.X.Scale ~= was.X.Scale
+			or now.X.Offset ~= was.X.Offset
+			or now.Y.Scale ~= was.Y.Scale
+			or now.Y.Offset ~= was.Y.Offset,
+		"its token glides on towards Lyra Reach"
+	)
 	H.expect(waitText(alice, "Landed at Cinder Reach", 20), "Alice gets a toast when her army lands")
 	local landed = false
 	for _, a in state.armies do

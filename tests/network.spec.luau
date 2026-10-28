@@ -1,6 +1,7 @@
 --!strict
 -- Snapshot/delta encoding and the intent rate limit.
 local Army = require("../src/shared/Sim/Army")
+local Config = require("../src/shared/Config")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
 local Navy = require("../src/shared/Sim/Navy")
@@ -79,7 +80,7 @@ T.test("a phase change alone is a delta", function()
 	T.equal(delta.phase, "War")
 end)
 
-T.test("fleets travel in the snapshot and in deltas: ships, men aboard, route, progress, blockades", function()
+T.test("fleets travel in the snapshot and in deltas: ships, men aboard, route, blockades", function()
 	local state = Match.new(Maps.get("skyshards"))
 	local client = Snapshot.full(state)
 	T.equal(#client.fleets, 0)
@@ -106,19 +107,19 @@ T.test("fleets travel in the snapshot and in deltas: ships, men aboard, route, p
 	T.equal(Troops.decode(r.troops).Archers, 500)
 	T.equal(r.next, 2)
 	T.equal(r.dest, 3)
-	T.equal(r.progress, 25, "2 of 8 ticks into the next zone")
 	T.equal(r.landAt, 94)
 	T.equal(r.inBattle, false)
 	T.equal(r.retreating, false)
 	Snapshot.apply(client, delta)
 	T.equal(#client.fleets, 1)
 
-	-- a moving fleet is a new record every tick; a standing one only when it changes
+	-- sailing on changes nothing in the record (its progress goes with the positions); stopping does
 	before = Snapshot.full(state)
 	fleet.moveProgress = 3
-	local moved = Snapshot.diff(before, Snapshot.full(state))
-	T.equal(moved and #moved.fleets, 1)
+	T.equal(Snapshot.diff(before, Snapshot.full(state)), nil, "only its progress changed")
 	fleet.path, fleet.moveProgress = {}, 0
+	local stopped = Snapshot.diff(before, Snapshot.full(state))
+	T.equal(stopped and #stopped.fleets, 1, "it stopped")
 	before = Snapshot.full(state)
 	state.tick += 1
 	T.equal(Snapshot.diff(before, Snapshot.full(state)), nil)
@@ -141,6 +142,60 @@ T.test("fleets travel in the snapshot and in deltas: ships, men aboard, route, p
 	T.equal(sunk.removedFleets[1], fleet.id)
 	Snapshot.apply(client, sunk)
 	T.equal(#client.fleets, 0)
+end)
+
+T.test("sailing fleets ride the positions channel after the moving armies, zone to zone", function()
+	local state = Match.new(Maps.get("skyshards"))
+	local function ticksToEnter(_province: number, _army: any): number
+		return 4
+	end
+	T.equal(#Snapshot.positions(state, ticksToEnter), 0, "nothing moves at the start")
+
+	local sailing = Navy.spawn(state, 1, 1, 2)
+	sailing.path, sailing.moveProgress = { 2, 3 }, 2
+	Navy.spawn(state, 2, 4, 1) -- standing still: no position
+	local fighting = Navy.spawn(state, 3, 5, 1)
+	fighting.path, fighting.moveProgress, fighting.inBattle = { 6 }, 4, true -- held up by a sea battle
+	local army = Army.spawn(state, 2, 3, 2000)
+	army.path, army.moveProgress = { 4 }, 1
+	local list = Snapshot.positions(state, ticksToEnter)
+	T.equal(#list, 2, "the marching army and the sailing fleet")
+	T.equal(list[1].fleet, false, "armies first")
+	T.equal(list[1].id, army.id)
+	T.equal(list[1].from, 3)
+	T.equal(list[1].to, 4)
+	T.near(list[1].progress, 0.25, 1e-9, "1 of 4 ticks")
+	local p = list[2]
+	T.equal(p.fleet, true)
+	T.equal(p.id, sailing.id)
+	T.equal(p.from, 1, "from its zone")
+	T.equal(p.to, 2, "to the next zone on its route")
+	T.near(p.progress, 2 / Config.Navy.MoveTicks, 1e-9, "the share of the way it has sailed")
+
+	-- it sails on: a new position every tick and no delta; it arrives: a delta, and the next leg from 0
+	local before = Snapshot.full(state)
+	sailing.moveProgress += 1
+	T.equal(Snapshot.diff(before, Snapshot.full(state)), nil)
+	T.near(Snapshot.positions(state, ticksToEnter)[2].progress, 3 / Config.Navy.MoveTicks, 1e-9)
+	sailing.zone, sailing.path, sailing.moveProgress = 2, { 3 }, 0
+	local arrived = Snapshot.diff(before, Snapshot.full(state))
+	T.equal(arrived and #arrived.fleets, 1, "a new zone and next zone")
+	local leg = Snapshot.positions(state, ticksToEnter)[2]
+	T.equal(leg.from, 2)
+	T.equal(leg.to, 3)
+	T.equal(leg.progress, 0)
+
+	-- only the fleets Navy.visible shows the viewer (everyone sees every fleet for now)
+	local visible = Navy.visible
+	Navy.visible = function(_state, viewer, fleet)
+		return fleet.owner == viewer
+	end
+	local ok, err = pcall(function()
+		T.equal(#Snapshot.positions(state, ticksToEnter, 1), 2, "nation 1 sees its own fleet")
+		T.equal(#Snapshot.positions(state, ticksToEnter, 2), 1, "nation 2 sees only the army")
+	end)
+	Navy.visible = visible
+	assert(ok, err)
 end)
 
 T.test("the snapshot holds only the fleets Navy.visible shows the viewer", function()

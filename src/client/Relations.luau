@@ -224,8 +224,9 @@ end
 -- Seconds a fleet takes to sail a route (Config.Navy.MoveTicks a zone), less the way it has come towards the first.
 function Relations.sailTime(path: { number }, fleet: Snapshot.FleetRecord?): number
 	local ticks = #path * Config.Navy.MoveTicks
-	if fleet and fleet.next ~= 0 and path[1] == fleet.next then
-		ticks -= math.floor(fleet.progress * Config.Navy.MoveTicks / 100)
+	local pos = if fleet and fleet.next ~= 0 then ClientState.fleetPosition(fleet.id) else nil
+	if fleet and pos and path[1] == fleet.next and pos.to == fleet.next then
+		ticks -= math.floor(pos.progress * Config.Navy.MoveTicks + 0.5)
 	end
 	return math.max(0, ticks) * Config.TickSeconds
 end

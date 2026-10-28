@@ -1608,8 +1608,8 @@ local function makeFleet(fleet: Snapshot.FleetRecord, target: Vector2): FleetTok
 	return token
 end
 
--- Fleet tokens from the snapshot: at their zone's anchor, or between two zone centres while sailing (the record's
--- progress, a new one every tick); fleets resting in one zone side by side, their badges stacked above them.
+-- Fleet tokens from the snapshot: at their zone's anchor, or between two zone centres while sailing (its latest
+-- position, ClientState.fleetPosition); fleets resting in one zone side by side, their badges stacked above them.
 local function refreshFleets()
 	local snapshot = ClientState.snapshot()
 	if snapshot == nil or layers.Fleets == nil then
@@ -1621,8 +1621,9 @@ local function refreshFleets()
 	for _, fleet in snapshot.fleets do
 		alive[fleet.id] = true
 		local sailing = fleet.next ~= 0
-		local target = if sailing
-			then seaLerp(fleetAnchorOf(fleet.zone), fleetAnchorOf(fleet.next), fleet.progress / 100)
+		local pos = ClientState.fleetPosition(fleet.id)
+		local target = if sailing and pos
+			then seaLerp(fleetAnchorOf(pos.from), fleetAnchorOf(pos.to), pos.progress)
 			else fleetAnchorOf(fleet.zone)
 		local token = fleetTokens[fleet.id]
 		if token == nil then
@@ -1900,8 +1901,13 @@ function MapRenderer.init()
 		refreshArmies()
 		MapRenderer.selectArmy(selected)
 	end)
-	ClientState.onPositions(function()
-		refreshArmies()
+	ClientState.onPositions(function(moved)
+		if next(moved.armies) then
+			refreshArmies()
+		end
+		if next(moved.fleets) then
+			refreshFleets()
+		end
 	end)
 	RunService.RenderStepped:Connect(function(dt: number)
 		-- tokens glide towards their targets (faster in a sandbox running at 2× or 4×, where positions come faster)

@@ -347,10 +347,10 @@ A sandbox server ("Sandbox") runs the same order at the speed its player sets (n
 
 ### Networking
 
-- **On join:** one full snapshot of provinces, nations and armies.
+- **On join:** one full snapshot of provinces, nations, armies and fleets.
 - **Every tick:** one batched delta with only what changed (owners, development, blockades, armies, fleets, battle events).
 - **Army movement:** an `UnreliableRemoteEvent` with progress between province centres; the client interpolates the token.
-- **Fleet movement:** a sailing fleet's record carries its progress towards the next zone, so it is in every delta while it sails (fleets are few); the client glides the token between zone centres. The snapshot holds only the fleets `Navy.visible` shows (everyone sees every fleet for now, so one delta still goes to everyone; fog of war will need one per viewer).
+- **Fleet movement:** a sailing fleet's progress towards its next zone goes on the same unreliable channel as the moving armies (in a list of its own), so its record is in a delta only when something else changes: a new zone, a battle, its hull, cargo or orders. The client glides the token between zone centres. The snapshot and the positions hold only the fleets `Navy.visible` shows (everyone sees every fleet for now, so one delta and one positions stream go to everyone; fog of war will need one per viewer). A sailing fleet costs about 36 bytes a tick (4 numbers) plus its record once per zone it enters, where it cost a whole record every tick before.
 - **Intents:** the client fires `Request…` remotes; the server answers with `CommandResult` (ok or reason).
 
 ### Security
@@ -579,7 +579,7 @@ export type Command =
 | `CommandResult` | server → client | requestId, ok, reason |
 | `Snapshot` | server → client | full match state, sent on join (every nation's race, every army's composition, the fleets you see with the men aboard) |
 | `Delta` | server → client | changed provinces (with their blockade), nations, armies (with their composition), fleets (with their progress while sailing), events |
-| `ArmyPositions` (unreliable) | server → client | armyId, from, to, progress |
+| `ArmyPositions` (unreliable) | server → client | tick; moving armies (id, from, to, progress %) and sailing fleets (id, from zone, to zone, progress %), two flat arrays, 16 a message |
 | `Notify` | server → client | toast type and text |
 | `RequestBuy` | client → server | itemId, "Glory" or "Robux" |
 | `RequestEquip` | client → server | itemId |
