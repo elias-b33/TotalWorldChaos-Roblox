@@ -242,6 +242,22 @@ function Cosmetics.armyLabel(
 	return label
 end
 
+-- A nation's fleet on the map (docs/DESIGN.md "Map rendering"): the map's ship (MapDef.ship, CosmeticArt.SHIPS) in
+-- its colours. nil when the device can't paint one (the token is a plain square then).
+function Cosmetics.shipLabel(parent: Instance, ship: string, colorIndex: number, size: UDim2): GuiObject?
+	local nation, border = colours(colorIndex)
+	local frame = image(string.format("ship:%s:%d", ship, colorIndex), function()
+		return CosmeticArt.ship(ship, nation, border)
+	end)
+	if frame == nil then
+		return nil
+	end
+	local label = pixelLabel(parent, { frame }, size, Palette.nation(colorIndex))
+	label.Name = "Ship"
+	label:SetAttribute("Ship", ship)
+	return label
+end
+
 -- A patch of map in a border style and shade set (catalogue art names), for the shop.
 function Cosmetics.swatchLabel(
 	parent: Instance,

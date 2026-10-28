@@ -696,6 +696,55 @@ CosmeticArt.SOLDIERS = {
 	},
 } :: { [string]: { string } }
 
+-- Ships (docs/DESIGN.md "Navies", "Map rendering"): each map's one ship type (MapDef.ship) as its fleets' token,
+-- in the nation's colours, 16×12 (a ship is longer than it is tall), bow to the right. It draws with the soldiers'
+-- colours (SOLDIER_COLOURS).
+CosmeticArt.SHIP_SIZE = { w = 16, h = 12 }
+CosmeticArt.SHIPS = {
+	Galleon = { -- Earth: a two-masted sailing ship, white sails with a stripe and pennants in the nation's colour
+		"....bNN....bNN..",
+		"..KKKKKK.KKKKKK.",
+		"..KWWWWK.KWWWWK.",
+		"..KNNNNK.KNNNNK.",
+		"..KWWWWK.KWWWWK.",
+		"..KKbKKK.KKbKKK.",
+		"....b......b....",
+		"KKKKKKKKKKKKKKKK",
+		"KBBBBBBBBBBBBBBK",
+		".KBDBBDBBDBBDBK.",
+		"..KBBBBBBBBBBK..",
+		"...KKKKKKKKKK...",
+	},
+	Dragonship = { -- Eldmoor: a longship with a dragon's head on the prow, a striped sail and a row of shields
+		".......b........",
+		"....KKKbKKKK....",
+		"....KNWNWNWK....",
+		"....KNWNWNWK....",
+		"....KNWNWNWK....",
+		"....KKKbKKKK..KK",
+		".K.....b.....KZK",
+		"KbK....b....KZRK",
+		"KBKKKKKKKKKKKZK.",
+		".KNDNDNDNDNDNK..",
+		"..KBBBBBBBBBK...",
+		"...KbKbKbKbK....",
+	},
+	Starship = { -- Skyshards: a steel starship with a stripe in the nation's colour, a cyan canopy and engine glow
+		"................",
+		".....KKK........",
+		"....KNNK........",
+		"...KNNNKKKKK....",
+		"KK.KSSSSSSSSKK..",
+		"CEKSSSSSCCSSSSK.",
+		"CEKNNNNNNNNNNNNK",
+		"KK.KSSSSSSSSSKK.",
+		"...KDDDKKKKKK...",
+		"....KDDK........",
+		".....KKK........",
+		"................",
+	},
+} :: { [string]: { string } }
+
 -- The soldiers' own colours: T skin, V an orc's skin, R red (an orc's eyes, a crest, a light), S s steel and its
 -- shade, B b wood and dark wood, H h a beard and its shade, Y fair hair, Z z scales and their shade, F an orange
 -- crest, A amber light, C c cyan glow and its shade, P a purple carapace, E energy light, M fur, X gunmetal.
@@ -804,6 +853,11 @@ end
 function CosmeticArt.soldier(race: string, nation: number, border: number): (buffer, number, number)
 	local rows = CosmeticArt.SOLDIERS[race] or CosmeticArt.TOKENS.square[1]
 	return paint(rows, nation, border, nil)
+end
+
+-- A ship's pixels (CosmeticArt.SHIPS, by the map's ship name) in a nation's colours. Unknown ships paint the Galleon.
+function CosmeticArt.ship(name: string, nation: number, border: number): (buffer, number, number)
+	return paint(CosmeticArt.SHIPS[name] or CosmeticArt.SHIPS.Galleon, nation, border, nil)
 end
 
 -- A shop preview of a border style and shade set: a little patch of grass washed in the nation's shades, inside

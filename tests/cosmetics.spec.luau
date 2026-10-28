@@ -225,6 +225,51 @@ T.test("every race has a soldier: a 12×12 grid of known colour codes, outlined,
 	)
 end)
 
+T.test("every map's ship is a 16×12 grid of known colour codes, outlined, in the nation's colours", function()
+	local codes = "NDLKWG."
+	for code in CosmeticArt.SOLDIER_COLOURS do
+		codes ..= code
+	end
+	local seen: { [string]: string } = {}
+	for _, mapId in Maps.ids do
+		local name = Maps.get(mapId).ship
+		local rows = CosmeticArt.SHIPS[name]
+		T.expect(rows ~= nil, mapId .. " has its ship drawn: " .. name)
+		T.equal(#rows, CosmeticArt.SHIP_SIZE.h, name .. " height")
+		for _, row in rows do
+			T.equal(#row, CosmeticArt.SHIP_SIZE.w, name .. " width")
+			T.expect(string.match(row, "^[" .. codes .. "]+$") ~= nil, name .. " codes: " .. row)
+		end
+		local px, w, h = CosmeticArt.ship(name, 0x3cd74b, 0x47b052)
+		T.equal(w, 16)
+		T.equal(h, 12)
+		local nation, border, outline, opaque = 0, 0, 0, 0
+		for y = 0, h - 1 do
+			for x = 0, w - 1 do
+				local c, a = CosmeticArt.pixel(px, w, x, y)
+				if a > 0 then
+					opaque += 1
+					nation += if c == 0x3cd74b then 1 else 0
+					border += if c == 0x47b052 then 1 else 0
+					outline += if c == 0x1d1d24 then 1 else 0
+				end
+			end
+		end
+		T.expect(nation >= 8, name .. " flies its nation's colour (" .. nation .. " pixels)")
+		T.expect(border >= 4, name .. " has some of the border colour")
+		T.expect(outline >= 20, name .. " is outlined")
+		T.expect(opaque < 16 * 12 * 0.8, name .. " sails on the map, transparent round it")
+		local key = buffer.tostring(px)
+		T.expect(seen[key] == nil, name .. " looks different from " .. tostring(seen[key]))
+		seen[key] = name
+	end
+	T.equal(
+		buffer.tostring((CosmeticArt.ship("Raft", 1, 2))),
+		buffer.tostring((CosmeticArt.ship("Galleon", 1, 2))),
+		"an unknown ship is the Galleon"
+	)
+end)
+
 T.test("tokens: transparent outside the sprite, animated ones have frames", function()
 	local px, w = CosmeticArt.token("shield", 0xe6194b, 0x97233d)
 	local _, alpha = CosmeticArt.pixel(px, w, 0, 0)

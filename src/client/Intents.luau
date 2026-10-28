@@ -86,6 +86,14 @@ local REASONS: { [string]: string } = {
 	BadSpeed = "🚫 Not a speed",
 	UnknownNation = "🚫 Unknown nation",
 	Eliminated = "💀 That nation has fallen",
+	-- navies (Sim.Navy)
+	NoCoast = "⚓ That's not on the coast",
+	Blockaded = "⚓ Blockaded: no ships can launch",
+	UnknownFleet = "🚫 That fleet is gone",
+	NotYourFleet = "🚫 Not your fleet",
+	UnknownZone = "🚫 Unknown sea",
+	NoTroops = "⛵ No troops aboard",
+	FleetFull = "⛵ The fleet is full",
 }
 
 local Intents = {}
@@ -100,6 +108,11 @@ function Intents.init(showMessage: (string) -> ())
 			onRefused(REASONS[reason or ""] or ("🚫 " .. tostring(reason)))
 		end
 	end)
+end
+
+-- The message for a reason code, for refusals the client sees coming (the server would answer the same).
+function Intents.text(reason: string): string
+	return REASONS[reason] or ("🚫 " .. reason)
 end
 
 local function send(remoteName: string, ...: any)
@@ -122,6 +135,24 @@ end
 
 function Intents.move(armyId: number, to: number)
 	send("RequestMove", armyId, to)
+end
+
+-- Navies: launch 1-5 ships from a coastal province; sail a fleet to a sea zone, or to a coast to land the men aboard
+-- there; walk an army to a fleet's coast and board it.
+function Intents.buildShips(provinceId: number, ships: number)
+	send("RequestBuildShips", provinceId, ships)
+end
+
+function Intents.sail(fleetId: number, zoneId: number)
+	send("RequestSail", fleetId, zoneId)
+end
+
+function Intents.land(fleetId: number, provinceId: number)
+	send("RequestLand", fleetId, provinceId)
+end
+
+function Intents.embark(armyId: number, fleetId: number)
+	send("RequestEmbark", armyId, fleetId)
 end
 
 -- action: War | Ally | AcceptAlly | Peace | AcceptPeace

@@ -126,6 +126,83 @@ for _, mapId in Maps.ids do
 	end)
 end
 
+T.test("the client's route over a map's zone list (Navy.search) is the server's (Navy.route)", function()
+	for _, mapId in Maps.ids do
+		local map = Maps.get(mapId)
+		local state = Match.new(map)
+		local function neighbors(z: number): { number }
+			return map.seaZones[z].neighbors
+		end
+		for _, from in map.seaZones do
+			for _, to in map.seaZones do
+				local function want(z: number): boolean
+					return z == to.id
+				end
+				local server = Navy.route(state, from.id, want)
+				local client = Navy.search(neighbors, from.id, want)
+				T.equal(
+					table.concat(client or {}, ","),
+					table.concat(server or {}, ","),
+					mapId .. " " .. from.id .. "-" .. to.id
+				)
+				T.expect(server ~= nil, "every zone reaches every other")
+			end
+		end
+	end
+	-- the nearest of several: the first found, fewest zones
+	local map = Maps.get("skyshards")
+	local path = Navy.search(
+		function(z)
+			return map.seaZones[z].neighbors
+		end,
+		1,
+		function(z)
+			return z == 3 or z == 9
+		end
+	)
+	T.equal(path and #path, 2, "two zones either way round the ring")
+	local here = Navy.search(
+		function()
+			return {}
+		end,
+		1,
+		function(z)
+			return z == 1
+		end
+	)
+	T.equal(here and #here, 0, "already there: an empty route")
+end)
+
+T.test("Pathing.searchNearest walks to the nearest wanted province, ties to the lower id", function()
+	local neighbors: { [number]: { number } } = { [1] = { 3, 2 }, [2] = { 1, 4 }, [3] = { 1, 4 }, [4] = { 2, 3 } }
+	local path = Pathing.searchNearest(
+		function(id)
+			return neighbors[id]
+		end,
+		function()
+			return true
+		end,
+		1,
+		function(id)
+			return id == 2 or id == 3
+		end
+	)
+	T.equal(path and table.concat(path, ","), "2", "one step, the lower id")
+	local blocked = Pathing.searchNearest(
+		function(id)
+			return neighbors[id]
+		end,
+		function(id)
+			return id ~= 2 and id ~= 3
+		end,
+		1,
+		function(id)
+			return id == 4
+		end
+	)
+	T.equal(blocked, nil, "no way through closed land")
+end)
+
 T.test("skyshards: the space zones are symmetric, one per home shard", function()
 	local map = Maps.get("skyshards")
 	T.equal(#map.seaZones, #map.nations)

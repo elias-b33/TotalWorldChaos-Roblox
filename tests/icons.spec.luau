@@ -49,6 +49,9 @@ local REQUIRED = {
 	"back",
 	"border",
 	"frame",
+	-- navies
+	"ship",
+	"anchor",
 }
 
 local function luminance(c: number): number

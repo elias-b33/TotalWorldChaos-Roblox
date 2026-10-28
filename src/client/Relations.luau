@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
+local Navy = require(Shared.Sim.Navy)
 local Pathing = require(Shared.Sim.Pathing)
 local Races = require(Shared.Sim.Races)
 local Snapshot = require(Shared.Snapshot)
@@ -71,6 +72,8 @@ function Relations.icon(a: number, b: number): string
 	return ""
 end
 
+-- Do a and b border each other by land, or by sea (both hold a coast of one sea zone, Sim.Diplomacy.sharesSea)? Either
+-- lets them go to war.
 function Relations.borders(a: number, b: number): boolean
 	local snap, map = ClientState.snapshot(), ClientState.map()
 	if snap == nil or map == nil then
@@ -83,6 +86,17 @@ function Relations.borders(a: number, b: number): boolean
 					return true
 				end
 			end
+		end
+	end
+	for _, zone in map.seaZones do
+		local aHere, bHere = false, false
+		for _, p in zone.coasts do
+			local owner = snap.provinces[p].owner
+			aHere = aHere or owner == a
+			bHere = bHere or owner == b
+		end
+		if aHere and bHere then
+			return true
 		end
 	end
 	return false
@@ -98,17 +112,147 @@ function Relations.canEnter(nationId: number, provinceId: number): boolean
 	return owner == 0 or owner == nationId or Relations.allied(nationId, owner) or Relations.atWar(nationId, owner)
 end
 
+-- Each strait's two ends (both ways) and the sea zone it crosses, per map.
+local straitZones: { [string]: { [number]: { [number]: number } } } = {}
+
+-- A province's neighbours an army of `nationId` may step to: all of them, minus the straits whose sea zone holds a
+-- fleet at war with it (Sim.Pathing.open, docs/DESIGN.md "Navies").
+local function openNeighbors(map: Types.MapDef, nationId: number): (number) -> { number }
+	local blocked: { [number]: boolean } = {}
+	local snap = ClientState.snapshot()
+	local fleets: { Snapshot.FleetRecord } = if snap then snap.fleets else {}
+	for _, f in fleets do
+		if not f.retreating and Relations.atWar(nationId, f.owner) then
+			blocked[f.zone] = true
+		end
+	end
+	if next(blocked) == nil then
+		return function(id)
+			return map.provinces[id].neighbors
+		end
+	end
+	local ends = straitZones[map.id]
+	if ends == nil then
+		local made: { [number]: { [number]: number } } = {}
+		for _, st in map.straits do
+			made[st.a] = made[st.a] or {}
+			made[st.b] = made[st.b] or {}
+			made[st.a][st.b], made[st.b][st.a] = st.zone, st.zone
+		end
+		straitZones[map.id] = made
+		ends = made
+	end
+	local across = ends :: { [number]: { [number]: number } }
+	return function(id)
+		local out = {}
+		for _, n in map.provinces[id].neighbors do
+			local zone = if across[id] then across[id][n] else nil
+			if zone == nil or not blocked[zone] then
+				table.insert(out, n)
+			end
+		end
+		return out
+	end
+end
+
 -- The route an army of `nationId` would take, or nil if it can't get there.
 function Relations.path(nationId: number, from: number, to: number): { number }?
 	local map = ClientState.map()
 	if map == nil then
 		return nil
 	end
-	return Pathing.search(function(id)
-		return map.provinces[id].neighbors
-	end, function(id)
+	return Pathing.search(openNeighbors(map, nationId), function(id)
 		return Relations.canEnter(nationId, id)
 	end, from, to)
+end
+
+-- Navies --------------------------------------------------------------------------------------------------------
+
+-- The sea zones a province is a coast of, its port (where ships launch) first; empty inland.
+function Relations.shores(provinceId: number): { number }
+	local map = ClientState.map()
+	local def = if map then map.provinces[provinceId] else nil
+	return if def and def.zones then def.zones else {}
+end
+
+-- A sea zone of the current map by id, or nil.
+function Relations.zone(zoneId: number): Types.SeaZoneDef?
+	local map = ClientState.map()
+	if map then
+		local z = map.seaZones[zoneId]
+		if z and z.id == zoneId then
+			return z
+		end
+		for _, def in map.seaZones do
+			if def.id == zoneId then
+				return def
+			end
+		end
+	end
+	return nil
+end
+
+-- The zones a fleet sails through from `from` to the nearest zone `want` accepts: the server's own route
+-- (Sim.Navy.search). {} if it is there already, nil if it can't get there.
+function Relations.seaRoute(from: number, want: (number) -> boolean): { number }?
+	if Relations.zone(from) == nil then
+		return nil
+	end
+	return Navy.search(function(z)
+		local def = Relations.zone(z)
+		return if def then def.neighbors else {}
+	end, from, want)
+end
+
+-- The route to sail to a zone, or to the nearest zone off a coastal province (to land there).
+function Relations.sailPath(from: number, zone: number): { number }?
+	return Relations.seaRoute(from, function(z)
+		return z == zone
+	end)
+end
+
+function Relations.landingPath(from: number, provinceId: number): { number }?
+	local shores = Relations.shores(provinceId)
+	if #shores == 0 then
+		return nil
+	end
+	return Relations.seaRoute(from, function(z)
+		return table.find(shores, z) ~= nil
+	end)
+end
+
+-- Seconds a fleet takes to sail a route (Config.Navy.MoveTicks a zone), less the way it has come towards the first.
+function Relations.sailTime(path: { number }, fleet: Snapshot.FleetRecord?): number
+	local ticks = #path * Config.Navy.MoveTicks
+	if fleet and fleet.next ~= 0 and path[1] == fleet.next then
+		ticks -= math.floor(fleet.progress * Config.Navy.MoveTicks / 100)
+	end
+	return math.max(0, ticks) * Config.TickSeconds
+end
+
+-- Men a fleet can still take aboard (Sim.Navy.room).
+function Relations.room(fleet: Snapshot.FleetRecord): number
+	return math.max(0, fleet.ships * Config.Navy.ShipCapacity - fleet.men)
+end
+
+-- Where an army walks to board a fleet: the nearest coast of the zone the fleet is in or heading to (Sim.Navy.embark),
+-- or nil if it can't get there.
+function Relations.boardingPath(army: Snapshot.ArmyRecord, fleet: Snapshot.FleetRecord): { number }?
+	local map = ClientState.map()
+	if map == nil then
+		return nil
+	end
+	local zone = fleet.dest
+	return Pathing.searchNearest(
+		openNeighbors(map, army.owner),
+		function(id)
+			return Relations.canEnter(army.owner, id)
+		end,
+		army.location,
+		function(id)
+			return table.find(Relations.shores(id), zone) ~= nil
+		end
+	)
 end
 
 -- Seconds an army takes to walk a route (Sim.Movement.moveTicks): its slowest troop's speed, with a Forest race

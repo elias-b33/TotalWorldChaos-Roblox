@@ -2,7 +2,8 @@
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
 -- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each troop
 -- your race can raise, under the names and icons the map gives them, move an army) and diplomacy on foreign ones
--- (war, ally, peace). Every button shows its price; the server decides.
+-- (war, ally, peace). Every button shows its price; the server decides. On an owned coast, "Ships" opens the choice of
+-- how many of the map's ships to launch (docs/DESIGN.md "Navies"); a blockaded coast's tile is greyed with an anchor.
 -- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
 
 local Players = game:GetService("Players")
@@ -42,6 +43,7 @@ local info: Frame
 local status: Frame
 local actions: Frame
 local selected: number? = nil
+local shipPicker = false -- "Ships" was pressed: the actions are the 1-5 ships to launch, and Back
 local onClose: (() -> ())? = nil
 local onSelectArmy: ((number) -> ())? = nil
 
@@ -94,6 +96,11 @@ local function renderStatus(provinceId: number, record: Snapshot.ProvinceRecord)
 				math.floor(100 * record.siegeProgress / record.siegeRequired)
 			)
 		)
+	end
+	if record.blockade ~= 0 then -- an enemy fleet off this coast (docs/DESIGN.md "Navies")
+		local by = ClientState.nation(record.blockade)
+		local c = chip(status, "anchor", "Blockade: " .. (if by then by.name else "?"))
+		c.Name = "Blockade"
 	end
 	if snap then
 		for _, a in snap.armies do
@@ -169,6 +176,34 @@ local function render()
 	renderStatus(provinceId, record)
 
 	Widgets.clear(actions)
+	local coastal = def.zones ~= nil and #def.zones > 0
+	if shipPicker and mine and me and coastal then
+		-- how many ships to launch into the port zone, Config.Navy.ShipGold each (MaxShipsPerCommand at most)
+		for n = 1, Config.Navy.MaxShipsPerCommand do
+			local cost = n * Config.Navy.ShipGold
+			action(
+				"ship",
+				if n == 1 then "1 ship" else n .. " ships",
+				{ { "gold", tostring(cost) } },
+				Widgets.GOOD,
+				me.gold >= cost,
+				function()
+					shipPicker = false
+					Intents.buildShips(provinceId, n)
+					render()
+				end,
+				"Ships_" .. n
+			)
+		end
+		action("back", "Back", {}, Widgets.BUTTON_OFF, true, function()
+			shipPicker = false
+			render()
+		end, "ShipsBack")
+		actions.Visible = true
+		sheet.Visible = true
+		return
+	end
+	shipPicker = false
 	if mine and me then
 		local gold = me.gold
 		if record.development < Config.Economy.MaxDevelopment then
@@ -210,6 +245,28 @@ local function render()
 					Intents.recruit(provinceId, 1, troop)
 				end,
 				if troop == "Infantry" then "Regiment" else "Recruit_" .. troop
+			)
+		end
+		-- ships on a coast: the tile opens the 1-5 choice. A blockaded coast launches nothing: greyed, with the
+		-- anchor and why (a tap asks the server anyway, which says so in a toast)
+		if coastal then
+			local blockaded = record.blockade ~= 0
+			local shipGold = Config.Navy.ShipGold
+			action(
+				"ship",
+				"Ships",
+				{ if blockaded then { "anchor", "Blockaded" } else { "gold", tostring(shipGold) } },
+				Widgets.BUTTON,
+				not blockaded and gold >= shipGold,
+				function()
+					if blockaded then
+						Intents.buildShips(provinceId, 1)
+					else
+						shipPicker = true
+						render()
+					end
+				end,
+				"Ships"
 			)
 		end
 	end
@@ -265,6 +322,9 @@ local function render()
 end
 
 function ProvinceSheet.show(provinceId: number?)
+	if provinceId ~= selected then
+		shipPicker = false
+	end
 	selected = provinceId
 	render()
 end

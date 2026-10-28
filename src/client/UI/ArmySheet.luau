@@ -1,7 +1,9 @@
 --!strict
 -- Bottom sheet while an army is selected (docs/DESIGN.md "Moving armies"): tap the army, tap the destination,
--- see the route and arrival time, tap Go. Built from the UI kit: a title with the army's size, its composition as
--- chips (a troop icon and its men each, docs/DESIGN.md "Troops"), a hint line with an icon, and Go / Cancel buttons.
+-- see the route and arrival time, tap Go. Or tap one of your fleets instead of a destination: the army walks to the
+-- fleet's coast and boards it (docs/DESIGN.md "Navies"), confirmed with Board. Built from the UI kit: a title with the
+-- army's size, its composition as chips (a troop icon and its men each, docs/DESIGN.md "Troops"), a hint line with an
+-- icon, and Go (or Board) / Cancel buttons.
 
 local Players = game:GetService("Players")
 
@@ -23,9 +25,27 @@ local chips: Frame
 local hint: TextLabel
 local hintIcon: GuiObject
 local buttons: Frame
-local current: { army: number, dest: number?, path: { number }? }? = nil
+-- board: the fleet the army is about to walk to and board, and the march to its coast
+type Boarding = { fleet: number, path: { number } }
+
+local current: { army: number, dest: number?, path: { number }?, board: Boarding? }? = nil
 local onGo: ((number, number) -> ())? = nil
 local onCancel: (() -> ())? = nil
+local onBoard: ((number, number) -> ())? = nil
+
+-- Do you have a fleet on the map (so the hint can say armies board them)?
+local function haveFleet(): boolean
+	local snap = ClientState.snapshot()
+	local me = ClientState.myNation()
+	if snap and me ~= 0 then
+		for _, f in snap.fleets do
+			if f.owner == me then
+				return true
+			end
+		end
+	end
+	return false
+end
 
 local function shortMen(men: number): string
 	return if men >= 1000 then string.format("%gk", math.floor(men / 100) / 10) else tostring(men)
@@ -51,7 +71,8 @@ local function render()
 		chip.LayoutOrder = i
 	end
 	Widgets.clear(buttons)
-	local dest, path = sel.dest, sel.path
+	local dest, path, board = sel.dest, sel.path, sel.board
+	local fleet = if board then ClientState.fleet(board.fleet) else nil
 	local icon = "arrow"
 	if army.retreating then
 		local home = if army.dest ~= 0 then map.provinces[army.dest].name else "home"
@@ -66,13 +87,27 @@ local function render()
 				onGo(armyId, dest)
 			end
 		end, "✅ Go")
+	elseif board and fleet then
+		local zone = Relations.zone(fleet.dest)
+		hint.Text = string.format(
+			"Board in %s  ·  %d s march",
+			if zone then zone.name else "?",
+			Relations.travelTime(board.path, army)
+		)
+		icon = "ship"
+		local armyId, fleetId = sel.army, board.fleet
+		Widgets.iconTextButton(buttons, "ship", "Board", 120, Widgets.GOOD, function()
+			if onBoard then
+				onBoard(armyId, fleetId)
+			end
+		end, "Board")
 	elseif army.inBattle then
 		hint.Text = "In battle: wait for it to end"
 		icon = "battle"
 	elseif army.dest ~= 0 then
 		hint.Text = string.format("Marching to %s · tap a new destination", map.provinces[army.dest].name)
 	else
-		hint.Text = "Tap where to go"
+		hint.Text = if haveFleet() then "Tap where to go, or a fleet to board" else "Tap where to go"
 		icon = "flag"
 	end
 	Icons.set(hintIcon, icon)
@@ -84,14 +119,21 @@ local function render()
 	sheet.Visible = true
 end
 
-function ArmySheet.show(armyId: number?, dest: number?, path: { number }?)
-	current = if armyId then { army = armyId, dest = dest, path = path } else nil
+-- dest and path: a destination to confirm with Go; board: a fleet to walk to and board, confirmed with Board.
+function ArmySheet.show(armyId: number?, dest: number?, path: { number }?, board: Boarding?)
+	current = if armyId then { army = armyId, dest = dest, path = path, board = board } else nil
 	render()
 end
 
-function ArmySheet.init(goHandler: (number, number) -> (), cancelHandler: () -> ())
+-- go(army, destination) for Go; cancel() for Cancel; board(army, fleet) for Board.
+function ArmySheet.init(
+	goHandler: (number, number) -> (),
+	cancelHandler: () -> (),
+	boardHandler: ((number, number) -> ())?
+)
 	onGo = goHandler
 	onCancel = cancelHandler
+	onBoard = boardHandler
 	local gui = Widgets.screen("ArmySheet", 2)
 	sheet = Widgets.sheet(gui, SHEET_WIDTH)
 	sheet.Name = "Sheet"
