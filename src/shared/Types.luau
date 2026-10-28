@@ -167,7 +167,24 @@ export type MatchSettings = {
 export type MatchSetup = {
 	private: boolean, -- a private server: rewards depend on the rules and the number of players (Sim.Settings)
 	settings: MatchSettings,
+	sandbox: boolean?, -- a singleplayer sandbox world (Sim.Sandbox): no end, free powers, no immunity, no rewards
 }
+
+-- A sandbox world's controls (Sim.Sandbox), which its player changes while it runs (MatchState.sandbox).
+export type SandboxState = {
+	speed: number, -- game ticks per real second (Config.Sandbox.Speeds); 0 = paused
+	disasters: boolean, -- the Cataclysm's disasters, every Config.Primordial.CataclysmDisasterTicks while on
+	disastersFrom: number, -- the tick they were last switched on (they count from there)
+}
+
+-- What a sandbox player asks for (the RequestSandbox remote; Sim.Sandbox and SandboxService).
+export type SandboxIntent =
+	{ kind: "Enter", map: string } -- from any other server: off to a new sandbox world ("" = the default map)
+	| { kind: "Leave" } -- from a sandbox: back to a public server
+	| { kind: "Speed", speed: number }
+	| { kind: "Play", nation: NationId } -- take over a living nation; 0 = just watch
+	| { kind: "Disasters", on: boolean }
+	| { kind: "NewWorld", map: string } -- start the world again on this map ("" = the same map)
 
 export type MatchState = {
 	mapId: string,
@@ -198,6 +215,7 @@ export type MatchState = {
 	result: MatchResult?, -- set when someone has won; the phase is then Results
 	theme: string?, -- the map theme everyone sees (a Theme catalogue item id, from the theme vote); nil = classic.
 	-- Cosmetic only: no rule reads it.
+	sandbox: SandboxState?, -- a sandbox world's controls (setup.sandbox); nil in a match
 }
 
 -- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside

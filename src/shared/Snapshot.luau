@@ -79,6 +79,7 @@ export type SnapshotData = {
 	result: Types.MatchResult?,
 	cosmetics: { Types.NationCosmetics }, -- each nation's equipped looks, next to MatchState (Sim.Shop)
 	theme: string, -- the map theme everyone sees (MatchState.theme; "" = classic). Set before the match starts.
+	sandbox: Types.SandboxState?, -- a sandbox world's controls (time, disasters); nil in a match
 }
 
 export type DeltaData = {
@@ -92,6 +93,7 @@ export type DeltaData = {
 	primordials: { PrimordialRecord }?, -- only when it changed
 	result: Types.MatchResult?, -- only when it changed
 	cosmetics: { Types.NationCosmetics }?, -- only when it changed
+	sandbox: Types.SandboxState?, -- only when it changed
 	events: { Types.MatchEvent },
 }
 
@@ -175,6 +177,8 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 		result = state.result,
 		cosmetics = cosmetics or {},
 		theme = state.theme or "",
+		-- a copy: the last snapshot sent is the baseline the next delta is diffed against
+		sandbox = if state.sandbox then table.clone(state.sandbox) else nil,
 	}
 end
 
@@ -300,6 +304,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		primordials = if encode(before.primordials) ~= encode(after.primordials) then after.primordials else nil,
 		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
 		cosmetics = if encode(before.cosmetics) ~= encode(after.cosmetics) then after.cosmetics else nil,
+		sandbox = if encode(before.sandbox) ~= encode(after.sandbox) then after.sandbox else nil,
 		events = if events then table.clone(events) else {},
 	}
 	if
@@ -312,6 +317,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		and delta.primordials == nil
 		and delta.result == nil
 		and delta.cosmetics == nil
+		and delta.sandbox == nil
 		and #delta.events == 0
 	then
 		return nil
@@ -351,6 +357,9 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	end
 	if delta.result then
 		snapshot.result = delta.result
+	end
+	if delta.sandbox then
+		snapshot.sandbox = delta.sandbox
 	end
 	if delta.cosmetics then
 		snapshot.cosmetics = delta.cosmetics

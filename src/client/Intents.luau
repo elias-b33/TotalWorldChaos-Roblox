@@ -82,6 +82,10 @@ local REASONS: { [string]: string } = {
 	TierLocked = "🔒 Reach that tier first",
 	NeedPass = "🎟 That reward needs the premium pass",
 	NothingToClaim = "🎟 Nothing to claim yet",
+	NotSandbox = "🌍 Only in Singleplayer",
+	BadSpeed = "🚫 Not a speed",
+	UnknownNation = "🚫 Unknown nation",
+	Eliminated = "💀 That nation has fallen",
 }
 
 local Intents = {}
@@ -147,6 +151,19 @@ end
 -- Tutorial: "Skip" it, or "Leave" for a public server once it is over.
 function Intents.tutorial(action: string)
 	send("RequestTutorial", action)
+end
+
+-- Singleplayer: off to a sandbox world of your own on `mapId` (nil = the default map; the player can make a new
+-- world on another map there). The start menu's Singleplayer button calls this. On a sandbox server it starts a new
+-- world instead. In Studio teleports can't run: set the Workspace attribute "Sandbox" (docs/STUDIO.md).
+function Intents.enterSandbox(mapId: string?)
+	send("RequestSandbox", "Enter", mapId or "")
+end
+
+-- Sandbox controls: "Speed" (0 pauses, 1, 2, 4), "Play" (a nation id to take over; 0 = watch), "Disasters" (on),
+-- "NewWorld" (a map id), "Leave" (back to a public server).
+function Intents.sandbox(action: string, value: (number | boolean | string)?)
+	send("RequestSandbox", action, value)
 end
 
 -- Shop: buy an item or offer with "Glory" or "Robux", wear an owned item, show an owned emote over your capital.

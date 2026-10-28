@@ -274,7 +274,8 @@ local function updateClock()
 	local setup = if snap then snap.setup else nil -- a private server's match length and Peace
 	local phase = if snap and snap.result then "Results" else Match.phaseAt(tick, setup)
 	local remaining = if phase == "Results" then 0 else Settings.timing(setup).matchEnd - tick
-	clockLabel.Text = formatClock(remaining)
+	-- a sandbox world never ends: its clock counts the time it has run instead
+	clockLabel.Text = formatClock(if setup and setup.sandbox then tick else remaining)
 	if clockLabel:GetAttribute("Phase") ~= phase then
 		clockLabel:SetAttribute("Phase", phase)
 		Icons.set(clockIcon, PHASE_ICONS[phase] or "clock")

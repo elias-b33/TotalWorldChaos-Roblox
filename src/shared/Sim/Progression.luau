@@ -251,12 +251,16 @@ Progression.addLine = add
 -- What the match pays one player. Call at Results for everyone still here, or when a player leaves early.
 -- Whatever an earlier leave already paid this match comes off the total, so leaving and rejoining pays the
 -- caps once. Finish and the first-match bonus need a nation or a Primordial at some point (no spectators).
+-- A sandbox world (Sim.Sandbox) pays nothing at all.
 function Progression.matchReward(state: MatchState, stats: Stats, options: RewardOptions): MatchReward
 	local result = state.result
 	local stayed = result ~= nil and stats.leftAt == nil
 	local endTick = stats.leftAt or (if result then result.endedAt else state.tick)
 	local idle = math.max(stats.longestIdle, endTick - stats.lastCommandAt)
 	local reward: MatchReward = { xp = 0, glory = 0, lines = {}, placement = nil, stayed = stayed, afk = false }
+	if state.setup.sandbox then
+		return reward
+	end
 	if idle >= P.AfkTicks then
 		reward.afk = true
 		return reward

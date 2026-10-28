@@ -27,6 +27,7 @@ local CommandRouter = require(Server.CommandRouter)
 local MatchService = require(script.Parent.MatchService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local Replicator = require(Server.Replicator)
+local ServerMode = require(Server.ServerMode)
 local TelemetryService = require(script.Parent.TelemetryService)
 
 local TutorialService = {}
@@ -106,16 +107,10 @@ local function canLeave(): boolean
 	return TutorialService.enabled() and canTeleport()
 end
 
--- Is this a tutorial server? Workspace "Tutorial" in Studio; online, a reserved server (no private-server owner):
--- reserved servers are only ever made for the tutorial.
+-- Is this a tutorial server? Workspace "Tutorial" in Studio; online, a reserved server whose first player wasn't
+-- sent to a sandbox (ServerMode).
 function TutorialService.enabled(): boolean
-	if workspace:GetAttribute("Tutorial") == true then
-		return true
-	end
-	local ok, reserved = pcall(function()
-		return game.PrivateServerId ~= "" and game.PrivateServerOwnerId == 0
-	end)
-	return ok and reserved == true
+	return ServerMode.get() == "Tutorial"
 end
 
 local function markDone(player: Player)
@@ -290,9 +285,10 @@ function TutorialService.init()
 			Tutorial.recordCommand(t, command, ok)
 		end
 	end)
-	-- a public server sends players who haven't played the tutorial (or any match) to one; a private server doesn't
+	-- a public server sends players who haven't played the tutorial (or any match) to one; a private server doesn't,
+	-- and neither does a sandbox (the player chose it)
 	PlayerDataService.onLoaded(function(player, data)
-		if Tutorial.needed(data) and not TutorialService.enabled() and not MatchService.isPrivate() then
+		if Tutorial.needed(data) and ServerMode.get() == "Match" and not MatchService.isPrivate() then
 			print(string.format("[tutorial] %s is new: off to the tutorial", player.Name))
 			teleport({ player }, true)
 		end

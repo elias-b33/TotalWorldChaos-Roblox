@@ -39,6 +39,10 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	Primordial.step(state, rng) -- 6: eliminations, charges, effect timers, Cataclysm disasters
 	-- 7: bots (Phase 3)
 	Diplomacy.expire(state) -- 8
+	if state.setup.sandbox then
+		-- a sandbox world never ends: no win check and no last tick (Sim.Sandbox)
+		return if state.phase ~= before then state.phase else nil
+	end
 	local result = Victory.check(state)
 	if result == nil and state.phase == "Results" then
 		result = Victory.byScore(state)

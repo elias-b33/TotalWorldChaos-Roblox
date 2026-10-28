@@ -1510,8 +1510,8 @@ function MapRenderer.init()
 		refreshArmies()
 	end)
 	RunService.RenderStepped:Connect(function(dt: number)
-		-- tokens glide towards their targets
-		local a = 1 - math.exp(-TOKEN_SMOOTHING * dt)
+		-- tokens glide towards their targets (faster in a sandbox running at 2× or 4×, where positions come faster)
+		local a = 1 - math.exp(-TOKEN_SMOOTHING * dt * math.max(1, ClientState.timeScale()))
 		for _, token in tokens do
 			if (token.pos - token.target).Magnitude > 0.05 then
 				token.pos = token.pos:Lerp(token.target, a)
