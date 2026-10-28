@@ -66,6 +66,8 @@ docs/MONETIZATION.md   Shop, prices, Glory, progression, season pass, live ops, 
 docs/LAUNCH.md         Soft-launch gates, store page, ads, creators, analytics events
 docs/STUDIO.md         Testing in Roblox Studio: settings, Workspace test switches, a recipe per feature
 docs/BALANCE.md        Balance analysis: economy, battles, sieges, catch-up, match length
+docs/UI_DIRECTION.md   The "Slate & Brass" GUI: palette, painted frames, component specs, the build plan
+docs/NEXT_FEATURES.md  Plans and task cards for the next features (pings, replay and awards, music, empires, friends, …)
 assets/maps/           Generated per-map data (layout.json, province_ids.png) and previews
 assets/textures/       Generated seamless terrain tiles per theme
 tools/mapgen/          Python (numpy + Pillow) generator for everything in assets/
