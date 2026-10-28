@@ -1,6 +1,8 @@
 --!strict
 -- Sends a full snapshot to a player when they join (or a new match starts), then one delta per tick to everyone.
--- Records carry what clients need: every nation's race, every army's composition (Shared.Snapshot).
+-- Records carry what clients need: every nation's race, every army's composition, the fleets with the men aboard
+-- and their progress while sailing, each coast's blockade (Shared.Snapshot). Everyone sees every fleet for now
+-- (Sim.Navy.visible), so one delta goes to all; fog of war will need one per viewer (Snapshot.full's viewer).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

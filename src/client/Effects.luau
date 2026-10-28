@@ -1,8 +1,9 @@
 --!strict
 -- Map "juice" in the WorldBox pixel style (docs/DESIGN.md "UI and controls", "Sound and effects"): dust puffs and
 -- crossed swords where a battle starts, a burst when it ends (bigger, with a skull, if an army was destroyed), a
--- ring in the new owner's colour when a province changes hands, an effect for each Primordial power, and a flash
--- and banner when the phase changes (the UI kit's look: a coloured plate, a pixel icon, Fredoka One). Sounds for the
+-- ring in the new owner's colour when a province changes hands, spray and crossed swords where a sea battle starts and
+-- a burst at its zone's centre when it ends (with a skull if a fleet sank), an effect for each Primordial power, and
+-- a flash and banner when the phase changes (the UI kit's look: a coloured plate, a pixel icon, Fredoka One). Sounds for the
 -- same moments come from Sounds.
 --
 -- Power-effect cosmetics: a power is drawn in its caster's equipped look (Cosmetics.powerEffect, PowerFx.LOOKS).
@@ -92,6 +93,8 @@ local active = 0
 local domes: { [number]: Dome } = {}
 local battles: { [number]: boolean } = {}
 local armyAt: { [number]: number } = {}
+local fleetAt: { [number]: number } = {} -- each fleet's sea zone
+local seaFights: { [number]: boolean } = {} -- zones with a sea battle going on
 local phase = ""
 local lastShown = ""
 local lastProvince = 0
@@ -345,6 +348,57 @@ local function battleEnded(provinceId: number, winner: number, loser: number, de
 		local c, u = MapRenderer.centerOf(provinceId), unit()
 		local colors = { nationColor(winner), fx.white, fx.dust }
 		if destroyed then
+			pop(c, fx.white, 16 * u, 0.4)
+			burst(c, colors, 22, 2 * u, 13 * u, 2 * u, 0.9, 2 * u)
+			sprite(c - Vector2.new(0, 7 * u), SKULL, SKULL_COLORS, u, 0.8)
+		else
+			burst(c, colors, 12, 2 * u, 8 * u, 2 * u, 0.6, u)
+		end
+		Sounds.play(sound)
+	elseif mine then
+		Sounds.play(sound)
+	end
+end
+
+-- Sea battles (docs/DESIGN.md "Navies"): at the zone's centre, where its fleets stand.
+
+local function seaVisible(zoneId: number): boolean
+	return layer ~= nil and MapView.onScreen(MapRenderer.zoneCenterOf(zoneId), SCREEN_MARGIN)
+end
+
+local function myFleetIn(zoneId: number): boolean
+	local me = ClientState.myNation()
+	local snapshot = ClientState.snapshot()
+	if me ~= 0 and snapshot then
+		for _, f in snapshot.fleets do
+			if f.zone == zoneId and f.owner == me then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function seaBattleStarted(zoneId: number)
+	local mine = myFleetIn(zoneId)
+	if seaVisible(zoneId) and begin(mine, 1.2, "SeaBattleStart", 0) then
+		local c, u = MapRenderer.zoneCenterOf(zoneId), unit()
+		burst(c, { fx.white, fx.shield }, 10, 3 * u, 7 * u, 2 * u, 0.7, 2 * u)
+		sprite(c - Vector2.new(0, 7 * u), SWORDS, SWORD_COLORS, u, 0.6)
+		Sounds.play("BattleStart")
+	elseif mine then
+		Sounds.play("BattleStart")
+	end
+end
+
+local function seaBattleEnded(zoneId: number, winner: number, loser: number, sunk: boolean)
+	local me = ClientState.myNation()
+	local mine = me ~= 0 and (winner == me or loser == me)
+	local sound: Sounds.SoundName = if sunk then "ArmyDestroyed" else "BattleEnd"
+	if seaVisible(zoneId) and begin(mine, 1.4, if sunk then "FleetSunk" else "SeaBattleEnd", 0) then
+		local c, u = MapRenderer.zoneCenterOf(zoneId), unit()
+		local colors = { nationColor(winner), fx.white, fx.shield }
+		if sunk then
 			pop(c, fx.white, 16 * u, 0.4)
 			burst(c, colors, 22, 2 * u, 13 * u, 2 * u, 0.9, 2 * u)
 			sprite(c - Vector2.new(0, 7 * u), SKULL, SKULL_COLORS, u, 0.8)
@@ -788,12 +842,18 @@ end
 -- Wiring ---------------------------------------------------------------------------------------------------
 
 local function remember(snapshot: Snapshot.SnapshotData)
-	battles, armyAt = {}, {}
+	battles, armyAt, fleetAt, seaFights = {}, {}, {}, {}
 	for _, record in snapshot.provinces do
 		battles[record.id] = record.battle
 	end
 	for _, a in snapshot.armies do
 		armyAt[a.id] = a.location
+	end
+	for _, f in snapshot.fleets do
+		fleetAt[f.id] = f.zone
+		if f.inBattle then
+			seaFights[f.zone] = true
+		end
 	end
 	phase = snapshot.phase
 end
@@ -816,11 +876,42 @@ local function onDelta(delta: Snapshot.DeltaData)
 		bind()
 	end
 	-- armies gone this tick, by where they stood: a battle there destroyed an army (one that merged into another
-	-- stack, a "Merged" event, wasn't destroyed)
+	-- stack, a "Merged" event, or went aboard a fleet, "Embarked", wasn't destroyed); fleets gone, by their zone: a sea
+	-- battle sank them (one that merged into another, "FleetMerged", didn't sink)
 	local merged: { [number]: boolean } = {}
+	local fleetMerged: { [number]: boolean } = {}
 	for _, e in delta.events do
 		if e.kind == "Merged" then
 			merged[e.b] = true
+		elseif e.kind == "Embarked" then
+			merged[e.a] = true
+		elseif e.kind == "FleetMerged" then
+			fleetMerged[e.b] = true
+		end
+	end
+	local sunkAt: { [number]: boolean } = {}
+	for _, id in delta.removedFleets do
+		local zone = fleetAt[id]
+		if zone and not fleetMerged[id] then
+			sunkAt[zone] = true
+		end
+		fleetAt[id] = nil
+	end
+	for _, f in delta.fleets do
+		fleetAt[f.id] = f.zone
+	end
+	-- sea battles starting: zones where a fleet fights now and nobody fought before this delta
+	local fightingNow: { [number]: boolean } = {}
+	local snapshot = ClientState.snapshot()
+	local fleets: { Snapshot.FleetRecord } = if snapshot then snapshot.fleets else {}
+	for _, f in fleets do
+		if f.inBattle then
+			fightingNow[f.zone] = true
+		end
+	end
+	for zone in fightingNow do
+		if not seaFights[zone] then
+			seaBattleStarted(zone)
 		end
 	end
 	local destroyedAt: { [number]: boolean } = {}
@@ -850,8 +941,14 @@ local function onDelta(delta: Snapshot.DeltaData)
 			captured(e.province, e.a, e.b)
 		elseif e.kind == "Power" or e.kind == "Disaster" then
 			power(Primordial.POWERS[e.a], e.b, e.province, e.by or 0)
+		elseif e.kind == "SeaBattle" and e.zone then
+			if not (fightingNow[e.zone] or seaFights[e.zone]) then
+				seaBattleStarted(e.zone) -- over in a single round: the start and the end land together
+			end
+			seaBattleEnded(e.zone, e.a, e.b, sunkAt[e.zone] == true)
 		end
 	end
+	seaFights = fightingNow
 	for _, a in delta.armies do
 		armyAt[a.id] = a.location
 	end

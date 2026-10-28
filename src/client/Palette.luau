@@ -44,7 +44,7 @@ local Palette = {
 	rebelEdge = Color3.fromHex("#ff3b30"), -- ...with a red edge, so they never pass for the charcoal nation
 	strait = Color3.fromHex("#ffffff"), -- sea lanes
 	energyLink = Color3.fromHex("#7cfbef"), -- Skyshards' bridges between platforms
-	zoneName = Color3.fromHex("#cfe6ff"), -- sea and space zone names: a pale sea blue, quieter than province names
+	zoneName = Color3.fromHex("#a9cdf5"), -- sea and space zone names: a soft sea blue, quieter than province names
 	-- Effects' pixel particles (src/client/Effects.luau): WorldBox-like dust, fire, plague, gold and shield colours
 	fx = {
 		white = Color3.fromHex("#ffffff"),

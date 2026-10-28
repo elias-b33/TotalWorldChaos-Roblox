@@ -65,12 +65,13 @@ local BADGE_ICON = 16 -- the pixel icon in a badge or pill
 local BADGE_PAD = 4 -- inside a pill, left of its icon and right of its text
 local BADGE_TEXT_GAP = 2 -- between a pill's icon and its text
 local GARRISON_PRIORITY = -1e6 -- idle garrisons' badges claim room after every province name (LabelLayout)
-local FLEET_WIDTH, FLEET_HEIGHT = 24, 18 -- a fleet's 16×12 ship, screen pixels (1.5 a sprite pixel, like soldiers)
-local FLEET_PICK = 22 -- a tap this close to a fleet's centre (screen pixels) picks it
-local FLEET_SLOT = 28 -- screen pixels between fleets resting side by side in one zone
+local FLEET_WIDTH, FLEET_HEIGHT = 32, 24 -- a fleet's 16×12 ship, screen pixels (2 a sprite pixel: it reads on dark space)
+local FLEET_PICK = 26 -- a tap this close to a fleet's centre (screen pixels) picks it
+local FLEET_SLOT = 36 -- screen pixels between fleets resting side by side in one zone
 local ZONE_NAME_OFFSET = 6 -- screen pixels between a zone's centre and the top of its name (its fleets stand above)
 local ZONE_PRIORITY = -1e5 -- zone names claim room after every province name, bigger zones first (LabelLayout)
 local ZONE_LABEL_ID = 1e5 -- zone names' ids in the label layout (provinces use their own ids, garrisons negative ones)
+local CAPITAL_BOX_ID = -1e6 -- the capitals' flag-and-army corners in the label layout, kept clear of zone names
 local STATUS_WIDTH = 240 -- a province's status row (its pills are centred in it)
 local CROWN_SIZE = Theme.size.icon -- the coalition leader's crown, on top of its flag pole
 local NOTICE_TOP = 60 -- the "map art is off" notice: screen pixels under the top bars, below the toasts' line
@@ -496,8 +497,21 @@ local function layoutNames(z: number, detail: boolean, force: boolean?): boolean
 			})
 		end
 	end
-	-- zoomed out, the sea zones' names, wherever they cover no province name
+	-- zoomed out, the sea zones' names, wherever they cover no province name, no capital's flag and no army standing
+	-- at a capital (those corners are placed after every province name, so they never hide one)
 	if not detail then
+		for id in capitalAt do
+			local c = MapRenderer.centerOf(id) * z
+			local top = c.Y - TOKEN_LIFT * z - TOKEN_SKIN_SIZE
+			table.insert(boxes, {
+				id = CAPITAL_BOX_ID - id,
+				x = c.X + FLAG_RIGHT - FLAG_WIDTH - POLE,
+				y = top,
+				w = FLAG_WIDTH + POLE - FLAG_RIGHT + TOKEN_SKIN_SIZE / 2,
+				h = c.Y + FLAG_BOTTOM - top,
+				priority = -1,
+			})
+		end
 		for id, zone in zoneLabels do
 			local c = MapRenderer.zoneCenterOf(id) * z
 			table.insert(boxes, {

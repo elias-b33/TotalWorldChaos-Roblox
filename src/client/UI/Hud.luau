@@ -309,6 +309,11 @@ local function provinceName(id: number): string
 	return if map and map.provinces[id] then map.provinces[id].name else "?"
 end
 
+local function zoneName(id: number?): string
+	local zone = if id then Relations.zone(id) else nil
+	return if zone then zone.name else "the sea"
+end
+
 -- The toast for a world event, from this player's point of view (nil = not worth interrupting for).
 -- Without a nation (spectating, or between seats) myNation is 0, the same id events use for neutral land,
 -- garrisons and Rebels: nil then, so nothing neutral reads as "you".
@@ -343,6 +348,24 @@ local function eventText(e: Types.MatchEvent): string?
 		end
 	elseif e.kind == "Offer" and e.b == me then
 		return "📜 " .. nationName(e.a) .. " sent you an offer"
+	-- navies (docs/DESIGN.md "Navies")
+	elseif e.kind == "SeaBattle" then
+		if e.a == me then
+			return "🎉 Sea battle won in " .. zoneName(e.zone)
+		elseif e.b == me then
+			return "💀 Sea battle lost in " .. zoneName(e.zone)
+		end
+	elseif e.kind == "Blockade" then
+		if e.b == me then
+			return "⚓ " .. nationName(e.a) .. " blockades " .. provinceName(e.province) .. "!"
+		elseif e.a == me then
+			return "⚓ You blockade " .. nationName(e.b) .. "'s coast"
+		end
+	elseif e.kind == "Landed" then
+		local army = ClientState.army(e.a) -- the army that landed (in this same delta)
+		if army and army.owner == me then
+			return "⛵ Landed at " .. provinceName(e.province)
+		end
 	end
 	return nil
 end
