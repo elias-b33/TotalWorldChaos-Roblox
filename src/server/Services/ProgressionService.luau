@@ -10,6 +10,7 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Progression = require(Shared.Sim.Progression)
 local Remotes = require(Shared.Remotes)
+local Settings = require(Shared.Sim.Settings)
 local Types = require(Shared.Types)
 
 local Server = script.Parent.Parent
@@ -36,11 +37,11 @@ local function isVip(player: Player): boolean
 	return ShopService.isVip(player) -- +25% match XP and Glory (MONETIZATION 3.3)
 end
 
-local function options(player: Player, data: Types.PlayerProfile): Progression.RewardOptions
+local function options(player: Player, data: Types.PlayerProfile, state: Types.MatchState): Progression.RewardOptions
 	return {
 		vip = isVip(player),
 		firstMatchToday = Progression.isFirstMatchToday(data, today()),
-		standardRules = true, -- private-server custom rules arrive later
+		standardRules = Settings.fullRewards(state), -- private servers: default rules and 4+ players, or half
 	}
 end
 
@@ -55,7 +56,7 @@ end
 -- Pay one player's Results reward, save, and show it. False if their profile isn't loaded yet.
 local function pay(player: Player, state: Types.MatchState, entry: Types.PlayerMatchStats): boolean
 	local report = PlayerDataService.update(player, function(data)
-		local reward = Progression.matchReward(state, entry, options(player, data))
+		local reward = Progression.matchReward(state, entry, options(player, data, state))
 		return Progression.grant(data, entry, reward, today())
 	end)
 	if report then
@@ -113,7 +114,7 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 			return
 		end
 		Progression.leave(entry, state.tick) -- the record stays: rejoining carries on with it
-		Progression.grant(data, entry, Progression.matchReward(state, entry, options(player, data)), today())
+		Progression.grant(data, entry, Progression.matchReward(state, entry, options(player, data, state)), today())
 	end)
 end
 

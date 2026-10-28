@@ -22,11 +22,16 @@ local rng = Rng.new(1)
 local difficulty = Config.Bots.Difficulty :: Bot.Difficulty
 
 -- A new match: forget every bot's schedule and memory. `level` overrides Config.Bots.Difficulty for this match
--- (the tutorial plays Easy).
+-- (the tutorial plays Easy, a private server what its owner set).
 function AIService.reset(level: string?)
 	schedule = Bot.newSchedule()
 	rng = Rng.new(os.time() + 1) -- the planner's own random choices; Sim never calls math.random
 	difficulty = (level or Config.Bots.Difficulty) :: Bot.Difficulty
+end
+
+-- What the bots play on this match (a private server's setting, Easy in the tutorial, else Config.Bots.Difficulty).
+function AIService.difficulty(): Bot.Difficulty
+	return difficulty
 end
 
 -- The bots due this tick plan and submit their commands.

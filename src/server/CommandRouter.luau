@@ -27,6 +27,7 @@ type LobbyPending = { player: Player, requestId: number, intent: Types.LobbyInte
 
 local BUILDINGS = { Farm = true, Barracks = true, Fort = true }
 local MAX_MAP_ID = 32 -- longest map id a vote may name (the map list itself is checked by Sim.Lobby)
+local MAX_SETTING = 16 -- longest setting key or string value (the values themselves are checked by Sim.Settings)
 local DIPLOMACY_ACTIONS = { War = true, Ally = true, AcceptAlly = true, Peace = true, AcceptPeace = true }
 
 local CommandRouter = {}
@@ -168,6 +169,32 @@ function CommandRouter.init(getNation: (Player) -> number?)
 	Remotes.event("RequestPick").OnServerEvent:Connect(function(player: Player, requestId: unknown, nation: unknown)
 		acceptLobby(player, requestId, if isId(nation) then { kind = "Pick", nation = nation :: number } else nil)
 	end)
+
+	-- a private server's owner changes a setting: value is a string, a whole number or a boolean; extra a number
+	Remotes.event("RequestSetting").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, key: unknown, value: unknown, extra: unknown)
+			local more = if extra == nil then 0 else extra
+			local ok = type(key) == "string"
+				and #key <= MAX_SETTING
+				and ((type(value) == "string" and #value <= MAX_SETTING) or (type(value) == "number" and value == value and math.abs(
+					value
+				) <= 1e12) or type(value) == "boolean")
+				and type(more) == "number"
+				and more == more
+				and math.abs(more) <= 1e12
+			acceptLobby(
+				player,
+				requestId,
+				if ok
+					then {
+						kind = "Setting",
+						key = key :: string,
+						value = value :: string | number | boolean,
+						extra = more :: number,
+					}
+					else nil
+			)
+		end)
 
 	-- Shop intents: not tied to the match clock, so ShopService answers them right away (it may yield to save).
 	local function acceptShop(player: Player, requestId: unknown, intent: Types.ShopIntent?)

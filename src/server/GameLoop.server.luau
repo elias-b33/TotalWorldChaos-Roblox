@@ -12,6 +12,7 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Types = require(Shared.Types)
 
 Remotes.create()
 Players.CharacterAutoLoads = false -- the game is the map; nobody needs an avatar walking around
@@ -42,19 +43,32 @@ local function seat(player: Player): number?
 	return MatchService.seat(player)
 end
 
+-- Seat everyone who is already here (in join order), apply a private server's bot count and teams, then send
+-- each their snapshot.
+local function seatAll(state: Types.MatchState, prepare: boolean)
+	local seats: { [Player]: number? } = {}
+	for _, player in Players:GetPlayers() do
+		seats[player] = seat(player)
+	end
+	if prepare then
+		MatchService.prepare()
+	end
+	Replicator.reset(state)
+	for _, player in Players:GetPlayers() do
+		Replicator.sendSnapshot(player, state, seats[player])
+	end
+end
+
 local function startMatch()
 	local tutorial = TutorialService.enabled()
-	local state = MatchService.start(if tutorial then Config.Tutorial.Map else MatchService.chooseMap())
+	local setup = if tutorial then nil else LobbyService.setup()
+	local state = MatchService.start(if tutorial then Config.Tutorial.Map else MatchService.chooseMap(setup), setup)
 	CommandRouter.clear()
-	AIService.reset(if tutorial then Config.Tutorial.Difficulty else nil)
+	AIService.reset(if tutorial then Config.Tutorial.Difficulty else state.setup.settings.difficulty)
 	if tutorial then
 		TutorialService.start(state)
 	end
-	Replicator.reset(state)
-	-- seat everyone who is already here, in join order
-	for _, player in Players:GetPlayers() do
-		Replicator.sendSnapshot(player, state, seat(player))
-	end
+	seatAll(state, not tutorial)
 	ShopService.onPhase("Peace")
 	print(string.format("[server] match started on %s", state.mapId))
 end
@@ -70,9 +84,9 @@ end
 
 -- Lobby, part 2: the vote is over; the draft runs on a fresh match of the winning map, shown to everyone.
 local function startPick()
-	local state = MatchService.start(LobbyService.winner())
+	local state = MatchService.start(LobbyService.winner(), LobbyService.setup())
 	CommandRouter.clear()
-	AIService.reset()
+	AIService.reset(state.setup.settings.difficulty)
 	LobbyService.startPick(state)
 	Replicator.reset(state)
 	for _, player in Players:GetPlayers() do
@@ -85,10 +99,7 @@ end
 local function startDraftedMatch()
 	LobbyService.finish()
 	local state = MatchService.state()
-	Replicator.reset(state)
-	for _, player in Players:GetPlayers() do
-		Replicator.sendSnapshot(player, state, MatchService.seat(player))
-	end
+	seatAll(state, true)
 	Replicator.sendLobby(LobbyService.view()) -- "None": the lobby screens close
 	Replicator.notifyAll("Phase", "🕊 The match begins! Expand and build")
 	ShopService.onPhase("Peace") -- Robux purchases close for the match

@@ -33,7 +33,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 
 **Phases**
 
-1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, later private servers) shows only that card and skips the vote.
+1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, teams, map and theme.
 2. **Pick (up to 30 s):** the chosen map shows every nation's start territory, and players pick a start nation one at a time in a random draft order, by tapping its land (then confirming) or its name in the list. Each turn lasts 30 s ÷ players (3–8 s); a turn that runs out picks a random free nation. Someone who joins during the draft goes to the end of the order. Bots take the rest. The match clock starts at 0:00 when the draft ends.
 3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
 4. **Open war (3–20 min):** everything unlocked.
@@ -446,7 +446,7 @@ Each bot checks a short priority list every few seconds and does the first actio
 
 | Difficulty | Plans every | Attack ratio | Behaviour |
 | --- | --- | --- | --- |
-| Easy | 6 s | 1.6× | Won't declare war on a player in the first 8 min |
+| Easy | 6 s | 1.6× | Won't declare war on a player, march into a player's land or use a power on one in the first 8 min (it still defends) |
 | Normal | 3 s | 1.3× | Default |
 | Hard | 2 s | 1.1× | Targets the leading player |
 
@@ -520,7 +520,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [ ] Daily and weekly quests, login calendar, play streak
 - [x] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
 - [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote (flags, border styles, shade sets, tokens, emotes, victory animations and nameplate frames are done; power effects have their data and the `Cosmetics.powerEffect` hook for the effects task; the theme vote waits for map themes)
-- [ ] Private server settings
+- [x] Private server settings
 - [x] Sound and effects for battles and Primordial powers
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
@@ -529,7 +529,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 - [ ] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
 - [ ] Weekly balance patch from the data
-- [ ] Easy and Hard bots
+- [x] Easy and Hard bots (evidence: `docs/BALANCE.md` 16)
 - [ ] Per-map balance from win rate by start position
 - [ ] Season pass (8 weeks, 50 tiers)
 - [ ] Rotating shop

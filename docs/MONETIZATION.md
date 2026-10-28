@@ -129,7 +129,7 @@ DESIGN.md's price stays. A group of friends can split it, and a paid price (not 
 | Setting | Options | Default |
 | --- | --- | --- |
 | Map | Earth, Eldmoor, Skyshards (+ new maps) | Vote |
-| Map theme | Any theme the owner owns | Default |
+| Map theme | Vote (the winning map's voters' theme, like public servers) or Default (always the default theme); owned themes can join the list with the map-themes task | Vote |
 | Match length | 15, 25, 35 min | 25 |
 | Peace phase | 0, 3, 5 min | 3 |
 | Bots | 0–9, Easy / Normal / Hard | Fill to 10, Normal |
@@ -137,7 +137,7 @@ DESIGN.md's price stays. A group of friends can split it, and a paid price (not 
 | Cataclysm disasters | On / off | On |
 | Lock teams | Owner pre-sets alliances | Off |
 
-**Rewards in private servers:** with default rules and 4+ real players, everything counts (XP, Glory, quests). With custom rules or fewer than 4 real players: 50% XP and Glory, quests still progress except "win" quests, and no leaderboard points. That stops one player farming nine Easy bots.
+**Rewards in private servers:** with default rules and 4+ real players, everything counts (XP, Glory, quests). With custom rules or fewer than 4 real players: 50% XP and Glory, quests still progress except "win" quests, and no leaderboard points. That stops one player farming nine Easy bots. The map and the theme only change how a match looks, so they never count as custom rules; "real players" are those who held a nation during the match. Allowed values live in `Config.Private`, the rules in `Sim/Settings.luau`; the owner sets them in the Lobby (⚙ Settings, during the map vote) and Studio simulates a private server with the Workspace attribute `PrivateServerOwner` (`docs/STUDIO.md`).
 
 ### 3.5 Starter pack and bundles
 

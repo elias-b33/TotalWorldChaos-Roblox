@@ -65,6 +65,7 @@ export type ArmyPosition = { id: number, from: number, to: number, progress: num
 
 export type SnapshotData = {
 	mapId: string,
+	setup: Types.MatchSetup, -- the private server's settings (fixed for the match: never in a delta)
 	tick: number,
 	phase: Types.Phase,
 	provinces: { ProvinceRecord },
@@ -157,6 +158,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 	end
 	return {
 		mapId = state.mapId,
+		setup = state.setup,
 		tick = state.tick,
 		phase = state.phase,
 		provinces = provinces,

@@ -25,7 +25,7 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 		return nil -- Results: the world stands still until the next match
 	end
 	local before = state.phase
-	state.phase = Match.phaseAt(state.tick)
+	state.phase = Match.phaseAt(state.tick, state.setup)
 	Movement.step(state) -- 2
 	Battle.step(state, rng) -- 3
 	Siege.step(state) -- 4

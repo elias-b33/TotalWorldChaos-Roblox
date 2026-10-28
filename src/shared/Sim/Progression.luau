@@ -5,6 +5,7 @@
 
 local Config = require("../Config")
 local Match = require("./Match")
+local Settings = require("./Settings")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -15,7 +16,7 @@ type Stats = Types.PlayerMatchStats
 export type RewardOptions = {
 	vip: boolean,
 	firstMatchToday: boolean, -- no paid match yet on this UTC day
-	standardRules: boolean, -- false on a private server with custom rules
+	standardRules: boolean, -- false on a private server with custom rules or too few players (Sim.Settings.fullRewards)
 }
 
 local P = Config.Progression
@@ -192,7 +193,7 @@ function Progression.matchReward(state: MatchState, stats: Stats, options: Rewar
 	end
 
 	-- the part of the match they played (a full match ends at 25:00; the first minute counts as the start)
-	local matchTicks = if stayed and result then result.endedAt else Config.Phases.MatchEndTick
+	local matchTicks = if stayed and result then result.endedAt else Settings.timing(state.setup).matchEnd
 	local played = stats.playedTicks + endTick - stats.joinedAt
 	local share = math.clamp(played / math.max(1, matchTicks - P.LateJoinGraceTicks), 0, 1)
 	local seated = stats.seated or seatedNow(state, stats.userId)

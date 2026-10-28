@@ -3,6 +3,7 @@
 
 local Army = require("./Army")
 local Config = require("../Config")
+local Settings = require("./Settings")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -11,8 +12,24 @@ type Phase = Types.Phase
 
 local Match = {}
 
+-- Phase for a match tick, on this setup's clock (nil = the defaults in Config.Phases). Lobby and Pick come before
+-- tick 0 and are run by Sim.Lobby.
+function Match.phaseAt(tick: number, setup: Types.MatchSetup?): Phase
+	local t = Settings.timing(setup)
+	if tick < t.peaceEnd then
+		return "Peace"
+	elseif tick < t.warEnd then
+		return "War"
+	elseif tick < t.matchEnd then
+		return "Cataclysm"
+	end
+	return "Results"
+end
+
 -- A fresh match on a map: start territories, capitals, start gold and manpower. Every nation starts as a bot.
-function Match.new(map: MapDef): MatchState
+-- `setup` carries a private server's settings (nil = a public server's defaults); Settings.prepare applies the
+-- bot count and teams once the players are seated.
+function Match.new(map: MapDef, setup: Types.MatchSetup?): MatchState
 	local provinces: { [number]: Types.Province } = {}
 	for _, def in map.provinces do
 		provinces[def.id] = {
@@ -47,10 +64,12 @@ function Match.new(map: MapDef): MatchState
 			battlesWon = 0,
 		}
 	end
+	local matchSetup = setup or Settings.setup(false)
 	local state: MatchState = {
 		mapId = map.id,
+		setup = matchSetup,
 		tick = 0,
-		phase = "Peace",
+		phase = Match.phaseAt(0, matchSetup),
 		provinces = provinces,
 		nations = nations,
 		armies = {},
@@ -72,19 +91,6 @@ function Match.new(map: MapDef): MatchState
 		end
 	end
 	return state
-end
-
--- Phase for a match tick. Lobby and Pick come before tick 0 and are run by Sim.Lobby.
-function Match.phaseAt(tick: number): Phase
-	local p = Config.Phases
-	if tick < p.PeaceEndTick then
-		return "Peace"
-	elseif tick < p.WarEndTick then
-		return "War"
-	elseif tick < p.MatchEndTick then
-		return "Cataclysm"
-	end
-	return "Results"
 end
 
 -- True once Results has been shown long enough to start the next match.

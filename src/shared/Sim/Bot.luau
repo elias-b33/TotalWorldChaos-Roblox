@@ -21,7 +21,7 @@ type MatchState = Types.MatchState
 type Army = Types.Army
 type Command = Types.Command
 
-export type Difficulty = "Easy" | "Normal" | "Hard"
+export type Difficulty = Types.Difficulty
 
 export type Settings = {
 	planTicks: number,
@@ -446,7 +446,14 @@ end
 
 local function playerWarAllowed(ctx: Ctx, target: number): boolean
 	local nation = ctx.state.nations[target]
-	return nation.controller ~= "Player" or ctx.state.tick >= ctx.settings.noPlayerWarTicks
+	return nation == nil or nation.controller ~= "Player" or ctx.state.tick >= ctx.settings.noPlayerWarTicks
+end
+
+-- Easy leaves players alone early: until noPlayerWarTicks it doesn't march into a player's land (or Meteor them)
+-- even in a war it was dragged into or the player started; it only defends its own.
+local function mayInvade(ctx: Ctx, provinceId: number): boolean
+	local owner = ctx.state.provinces[provinceId].owner
+	return owner == nil or playerWarAllowed(ctx, owner)
 end
 
 -- The living player (not me) holding the most provinces.
@@ -821,7 +828,8 @@ local function attack(ctx: Ctx): { Command }?
 		local stack = guardStacks[key]
 		local watching = ctx.reserved[stack.armies[1].id] :: number
 		if
-			aboveRatio(ctx, watching, stack.armies, hostileAt(ctx, watching))
+			mayInvade(ctx, watching)
+			and aboveRatio(ctx, watching, stack.armies, hostileAt(ctx, watching))
 			and clearRoute(ctx, stack.armies[1], watching)
 		then
 			local result = tryAll(ctx, moveStack(stack, watching))
@@ -841,6 +849,7 @@ local function attack(ctx: Ctx): { Command }?
 			return owner ~= nil
 				and ctx.isEnemy[owner] == true
 				and (not onlyFocus or owner == focus)
+				and mayInvade(ctx, p)
 				and not ctx.targeted[p]
 				and (rivalsAt(ctx, p)) == 0
 				and aboveRatio(ctx, p, stack.armies, hostileAt(ctx, p))
@@ -1155,7 +1164,13 @@ local function primordial(ctx: Ctx): { Command }?
 	for _, id in sortedKeys(state.armies) do
 		local a = state.armies[id]
 		local owner = state.nations[a.owner]
-		if ctx.isEnemy[a.owner] and owner and owner.powerImmuneUntil <= state.tick and a.men > bestMen then
+		if
+			ctx.isEnemy[a.owner]
+			and owner
+			and owner.powerImmuneUntil <= state.tick
+			and playerWarAllowed(ctx, a.owner)
+			and a.men > bestMen
+		then
 			best, bestMen = a, a.men
 		end
 	end
@@ -1203,7 +1218,14 @@ end
 -- Tick order step 7: the bots due this tick plan, at most Config.Bots.BotsPlanningPerTick of them, longest
 -- waiting first; each then waits its difficulty's planTicks. A nation that just became a bot (a player left)
 -- jumps the queue. Returns the orders to submit through CommandRouter, in order.
-function Bot.step(schedule: Schedule, state: MatchState, rng: Rng.Rng, difficulty: Difficulty): { Order }
+-- `levels` (optional) gives some nations another difficulty than `difficulty` (mixed bot tournaments).
+function Bot.step(
+	schedule: Schedule,
+	state: MatchState,
+	rng: Rng.Rng,
+	difficulty: Difficulty,
+	levels: { [number]: Difficulty }?
+): { Order }
 	local orders: { Order } = {}
 	if state.result ~= nil or not ACTIVE_PHASES[state.phase] then
 		return orders
@@ -1229,14 +1251,14 @@ function Bot.step(schedule: Schedule, state: MatchState, rng: Rng.Rng, difficult
 		end
 		return a < b
 	end)
-	local planTicks = Bot.settings(difficulty).planTicks
 	local meteored: { [number]: boolean } = {} -- nations a bot's power hits this tick
 	for i = 1, math.min(#due, Config.Bots.BotsPlanningPerTick) do
 		local id = due[i]
-		schedule.nextDue[id] = state.tick + planTicks
+		local level = if levels and levels[id] then levels[id] else difficulty
+		schedule.nextDue[id] = state.tick + Bot.settings(level).planTicks
 		local memory = schedule.memory[id] or Bot.newMemory()
 		schedule.memory[id] = memory
-		for _, command in Bot.plan(state, id, rng, difficulty, memory) do
+		for _, command in Bot.plan(state, id, rng, level, memory) do
 			-- two bots planning on the same tick could Meteor the same nation; the second would hit its immunity
 			local hit = if command.kind == "Power" and state.armies[command.target]
 				then state.armies[command.target].owner

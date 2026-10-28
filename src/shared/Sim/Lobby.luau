@@ -1,7 +1,8 @@
 --!strict
 -- The lobby before every match (docs/DESIGN.md "Match structure"):
 -- 1. Lobby: players join and vote on the map. Most votes wins; a tie (or no votes) is settled by the Rng.
---    A map the server set (Workspace "MapId", later private servers) skips the vote.
+--    A map the server set (Workspace "MapId", a private server's map setting) skips the vote. On a private server
+--    the owner changes the next match's settings during the vote (Sim.Settings).
 -- 2. Pick: on the chosen map, players pick a start nation one at a time in a random draft order. A turn that runs
 --    out picks a random free nation for that player. Bots keep every nation nobody picked.
 -- Pure: takes the lobby (and the new match during the draft) plus an Rng, and changes them.
@@ -9,6 +10,7 @@
 local Config = require("../Config")
 local Match = require("./Match")
 local Rng = require("./Rng")
+local Settings = require("./Settings")
 local Types = require("../Types")
 
 type LobbyState = Types.LobbyState
@@ -26,17 +28,25 @@ export type LobbyView = {
 	order: { { userId: number, name: string, nation: number } }, -- the draft order; nation 0 = not picked yet
 	turn: number, -- index in order of who picks now
 	turnTicksLeft: number,
+	private: boolean, -- a private server: everyone sees the settings, the owner changes them
+	owner: number, -- the private server's owner (userId), 0 = none here or a public server
+	settings: Types.MatchSettings, -- the next match's settings
+	players: { { userId: number, name: string } }, -- everyone in the server (the settings sheet's team list)
 }
 
 local Lobby = {}
 
--- A fresh lobby: the vote on these maps, or no vote when the server locked one.
-function Lobby.new(maps: { string }, locked: string?): LobbyState
+-- A fresh lobby: the vote on these maps, or no vote when the server locked one. A private server passes its owner
+-- and its settings (kept from the last lobby): a map setting locks the map too.
+function Lobby.new(maps: { string }, locked: string?, owner: number?, settings: Types.MatchSettings?): LobbyState
+	local s = settings or Settings.defaults()
+	local lock = locked or (if s.map ~= "" then s.map else nil)
 	return {
 		phase = "Lobby",
 		ticksLeft = Config.Phases.LobbyTicks,
-		maps = if locked then { locked } else table.clone(maps),
-		locked = locked,
+		maps = if lock then { lock } else table.clone(maps),
+		pool = table.clone(maps),
+		locked = lock,
 		votes = {},
 		mapId = nil,
 		order = {},
@@ -44,7 +54,37 @@ function Lobby.new(maps: { string }, locked: string?): LobbyState
 		turnTicks = Config.Phases.PickTurnMaxTicks,
 		turnTicksLeft = 0,
 		picks = {},
+		owner = owner,
+		settings = s,
 	}
+end
+
+-- Lock the vote to one map (nil: vote on every map again).
+function Lobby.lock(lobby: LobbyState, mapId: string?)
+	lobby.locked = mapId
+	lobby.maps = if mapId then { mapId } else table.clone(lobby.pool)
+end
+
+-- A private server owner changes a setting. Only the owner, only during the vote (the draft already shows the
+-- chosen map).
+function Lobby.setting(
+	lobby: LobbyState,
+	userId: number,
+	key: string,
+	value: string | number | boolean,
+	extra: number
+): (boolean, string?)
+	if lobby.owner == nil or lobby.owner ~= userId then
+		return false, "NotOwner"
+	end
+	if lobby.phase ~= "Lobby" then
+		return false, "WrongPhase"
+	end
+	local ok, reason = Settings.set(lobby.settings, key, value, extra, lobby.pool)
+	if ok and key == "map" then
+		Lobby.lock(lobby, if lobby.settings.map ~= "" then lobby.settings.map else nil)
+	end
+	return ok, reason
 end
 
 -- Votes per map, in the order of lobby.maps.
@@ -199,6 +239,8 @@ function Lobby.apply(
 			return false, "WrongPhase"
 		end
 		return Lobby.pick(lobby, match, userId, intent.nation)
+	elseif intent.kind == "Setting" then
+		return Lobby.setting(lobby, userId, intent.key, intent.value, intent.extra)
 	end
 	return false, "BadRequest"
 end
@@ -264,13 +306,25 @@ function Lobby.step(lobby: LobbyState, match: MatchState?, rng: Rng.Rng): boolea
 	return Lobby.current(lobby) == nil
 end
 
--- The draft is over: the match starts at tick 0 in Peace.
+-- The draft is over: the match starts at tick 0 (in Peace, unless a private server set no Peace).
 function Lobby.finish(match: MatchState)
-	match.phase = Match.phaseAt(match.tick)
+	match.phase = Match.phaseAt(match.tick, match.setup)
 end
 
--- The lobby as clients see it. `names` maps userIds to display names. nil = no lobby (a match is running).
-function Lobby.view(lobby: LobbyState?, names: { [number]: string }): LobbyView
+local function playerList(names: { [number]: string }): { { userId: number, name: string } }
+	local out = {}
+	for userId, name in names do
+		table.insert(out, { userId = userId, name = name })
+	end
+	table.sort(out, function(a, b)
+		return a.userId < b.userId
+	end)
+	return out
+end
+
+-- The lobby as clients see it. `names` maps userIds to display names (everyone in the server). nil = no lobby (a
+-- match is running). `private`: this is a private server (its owner may not be here).
+function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: boolean?): LobbyView
 	if lobby == nil then
 		return {
 			phase = "None",
@@ -283,6 +337,10 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }): LobbyView
 			order = {},
 			turn = 0,
 			turnTicksLeft = 0,
+			private = private == true,
+			owner = 0,
+			settings = Settings.defaults(),
+			players = {},
 		}
 	end
 	local tally = Lobby.tally(lobby)
@@ -312,6 +370,10 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }): LobbyView
 		order = order,
 		turn = lobby.turn,
 		turnTicksLeft = math.max(lobby.turnTicksLeft, 0),
+		private = private == true or lobby.owner ~= nil,
+		owner = lobby.owner or 0,
+		settings = Settings.copy(lobby.settings),
+		players = playerList(names),
 	}
 end
 

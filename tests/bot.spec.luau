@@ -283,6 +283,57 @@ T.test("Easy won't declare war on a player in the first 8 minutes", function()
 	T.equal(declaresWar(Bot.plan(state, AURORA, Rng.new(1), "Easy")), ZEPHYR)
 end)
 
+T.test("Easy leaves a player's land alone in the first 8 minutes, even in a war the player started", function()
+	local state = attackSetup(4000) -- 8000 against 4000: every difficulty would strike
+	state.nations[ZEPHYR].controller = "Player"
+	state.nations[ZEPHYR].userId = 42
+	warPhase(state, 5 * 60)
+	assert(Diplomacy.declareWar(state, ZEPHYR, AURORA))
+	state.nations[AURORA].charges = Config.Primordial.Powers.Meteor.charges
+	local function meteors(commands: { Types.Command }): boolean
+		for _, c in commands do
+			if c.kind == "Power" then
+				return true
+			end
+		end
+		return false
+	end
+	local easy = Bot.plan(state, AURORA, Rng.new(1), "Easy")
+	T.expect(not movesInto(state, easy, ZEPHYR), "Easy marched into the player's land at 5:00")
+	T.expect(not meteors(easy), "Easy used a power on the player at 5:00")
+	local normal = Bot.plan(state, AURORA, Rng.new(1), "Normal")
+	T.expect(movesInto(state, normal, ZEPHYR) and meteors(normal), "Normal strikes back at once")
+	warPhase(state, Config.Bots.Easy.noPlayerWarTicks)
+	local later = Bot.plan(state, AURORA, Rng.new(1), "Easy")
+	T.expect(movesInto(state, later, ZEPHYR) and meteors(later), "from 8:00 Easy strikes back too")
+	-- bots are fair game for Easy all along
+	state.nations[ZEPHYR].controller = "Bot"
+	state.nations[ZEPHYR].userId = nil
+	warPhase(state, 5 * 60)
+	T.expect(movesInto(state, Bot.plan(state, AURORA, Rng.new(1), "Easy"), ZEPHYR), "Easy attacks a bot at 5:00")
+end)
+
+T.test("mixed difficulties: each bot plans on its own difficulty's clock", function()
+	local state = Match.new(map)
+	warPhase(state)
+	local schedule = Bot.newSchedule()
+	local levels: { [number]: Bot.Difficulty } = { [2] = "Hard", [3] = "Easy" }
+	local seen: { [number]: number } = {}
+	for _ = 1, 20 do
+		state.tick += 1
+		Bot.step(schedule, state, Rng.new(state.tick), "Normal", levels)
+		for nationId, due in schedule.nextDue do
+			local level = levels[nationId] or "Normal"
+			if due == state.tick + Bot.settings(level).planTicks then
+				seen[nationId] = Bot.settings(level).planTicks
+			end
+		end
+	end
+	T.equal(seen[2], Config.Bots.Hard.planTicks, "nation 2 waits Hard's planTicks")
+	T.equal(seen[3], Config.Bots.Easy.planTicks, "nation 3 waits Easy's planTicks")
+	T.equal(seen[4], Config.Bots.Normal.planTicks, "the others wait Normal's")
+end)
+
 T.test("Hard goes after the leading player, Normal after the weakest neighbour", function()
 	local state = attackSetup(4000)
 	state.provinces[id("Storm Reach")].owner = UMBRA -- Aurora now also borders Umbra, a weak bot
