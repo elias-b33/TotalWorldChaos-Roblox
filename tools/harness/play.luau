@@ -188,26 +188,74 @@ function scenarios.look()
 	Emulator.pinch(alice, 3.5)
 	Emulator.run(2)
 	H.shot(alice, "region")
+	-- the region zoom shows the whole-map painting; zoomed in, the close-up detail is laid over it
+	local function closeUp()
+		local canvas = MapView.canvas()
+		local layer = canvas and canvas:FindFirstChild("Image")
+		return layer and layer:FindFirstChild("Detail")
+	end
+	H.expect(closeUp() == nil, "no close-up detail at the region zoom")
 	Emulator.pinch(alice, 3)
 	Emulator.run(2)
+	H.expect(closeUp() ~= nil and closeUp().Visible, "the close-up detail shows at close zoom")
 	H.shot(alice, "close_up")
 
-	-- the nearest mountain, close up
+	-- the nearest mountain, the nearest coast and the nearest forest, close up
 	local map = H.client(alice, "ClientState").map()
 	local here = H.provinceMap(alice, capital)
-	local best, bestD = nil, math.huge
-	for _, def in map.provinces do
-		local d = (H.provinceMap(alice, def.id) - here).Magnitude
-		if def.terrain == "Mountain" and d < bestD then
-			best, bestD = def.id, d
+	local function nearest(test)
+		local best, bestD = nil, math.huge
+		for _, def in map.provinces do
+			local d = (H.provinceMap(alice, def.id) - here).Magnitude
+			if test(def) and d < bestD then
+				best, bestD = def.id, d
+			end
 		end
+		return best
 	end
-	if best then
-		MapView.centreOn(H.provinceMap(alice, best), false)
+	local mountain = nearest(function(def)
+		return def.terrain == "Mountain"
+	end)
+	if mountain then
+		-- (centre first and let the camera arrive: a pinch holds the point under the fingers where it is)
+		MapView.centreOn(H.provinceMap(alice, mountain), false)
+		Emulator.run(1.5)
 		Emulator.pinch(alice, 2)
 		Emulator.run(2)
 		H.shot(alice, "mountain")
 	end
+	local grid = MapGrid.decode(map)
+	local coast, coastD = nil, math.huge
+	for y = 1, grid.height - 2, 2 do
+		for x = 1, grid.width - 2, 2 do
+			if MapGrid.at(grid, x, y) ~= 0 and MapGrid.at(grid, x, y + 1) == 0 then
+				local p = Emulator.roblox.Vector2.new(x, y)
+				if (p - here).Magnitude < coastD then
+					coast, coastD = p, (p - here).Magnitude
+				end
+			end
+		end
+	end
+	if coast then
+		MapView.centreOn(coast, false)
+		Emulator.run(2)
+		H.expect(closeUp() ~= nil and closeUp().Visible, "the close-up follows the camera")
+		H.shot(alice, "coast")
+	end
+	local woods = { forest = true, jungle = true, taiga = true, wildwood = true, crystalgrove = true }
+	local forest = nearest(function(def)
+		return woods[def.biome] == true
+	end)
+	if forest then
+		MapView.centreOn(H.provinceMap(alice, forest), false)
+		Emulator.run(2)
+		H.shot(alice, "forest")
+	end
+
+	-- zoomed out again, the close-up's image is freed
+	MapView.showWholeMap()
+	Emulator.run(0.5)
+	H.expect(closeUp() == nil, "the close-up is freed when zoomed out")
 end
 
 local function provinceByName(name: string): number
