@@ -1,9 +1,10 @@
 --!strict
 -- Bottom sheet while an army is selected (docs/DESIGN.md "Moving armies"): tap the army, tap the destination,
 -- see the route and arrival time, tap Go. Or tap one of your fleets instead of a destination: the army walks to the
--- fleet's coast and boards it (docs/DESIGN.md "Navies"), confirmed with Board. Built from the UI kit: a title with the
--- army's size, its composition as chips (a troop icon and its men each, docs/DESIGN.md "Troops"), a hint line with an
--- icon, and Go (or Board) / Cancel buttons.
+-- fleet's coast and boards it (docs/DESIGN.md "Navies"), confirmed with Board. Built from the UI kit
+-- (docs/UI_DIRECTION.md 7.10): the army's size and place on a title plate, its composition as chips (each troop's
+-- icon and its men, docs/DESIGN.md "Troops": five fit a row), the route line (an icon, the destination, the march
+-- time dimmer) and Go (or Board) / Cancel.
 
 local Players = game:GetService("Players")
 
@@ -16,6 +17,8 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local SHEET_WIDTH = 444
+local BUTTON_WIDTH = 200 -- Go and Cancel side by side fill the sheet
+local LINE_HEIGHT = 22
 
 local ArmySheet = {}
 
@@ -24,6 +27,7 @@ local title: TextLabel
 local chips: Frame
 local hint: TextLabel
 local hintIcon: GuiObject
+local march: TextLabel -- "· 18 s march", dimmer, after the destination
 local buttons: Frame
 -- board: the fleet the army is about to walk to and board, and the march to its coast
 type Boarding = { fleet: number, path: { number } }
@@ -62,11 +66,11 @@ local function render()
 		return
 	end
 	title.Text = string.format("%s at %s", shortMen(army.men), map.provinces[army.location].name)
-	-- the composition: one chip per troop type in the stack
+	-- the composition: one chip per troop type in the stack, its icon (as the map and the recruit tiles show it)
+	-- and its men
 	Widgets.clear(chips)
 	for i, part in RaceInfo.composition(army.troops) do
-		local name = RaceInfo.troopName(part.troop) -- as the map calls it
-		local chip = Widgets.chip(chips, RaceInfo.troopIcon(part.troop), shortMen(part.men) .. " " .. name, nil, 26)
+		local chip = Widgets.chip(chips, RaceInfo.troopIcon(part.troop), shortMen(part.men), nil, Theme.size.chip)
 		chip.Name = "Troop_" .. part.troop
 		chip.LayoutOrder = i
 	end
@@ -74,29 +78,30 @@ local function render()
 	local dest, path, board = sel.dest, sel.path, sel.board
 	local fleet = if board then ClientState.fleet(board.fleet) else nil
 	local icon = "arrow"
+	march.Visible = false
 	if army.retreating then
 		local home = if army.dest ~= 0 then map.provinces[army.dest].name else "home"
 		hint.Text = string.format("Retreating to %s: no orders till it arrives", home)
 		icon = "retreat"
 	elseif dest and path then
-		hint.Text = string.format("%s  ·  %d s march", map.provinces[dest].name, Relations.travelTime(path, army))
+		hint.Text = map.provinces[dest].name
+		march.Text = string.format("·  %d s march", Relations.travelTime(path, army))
+		march.Visible = true
 		icon = "clock"
 		local armyId = sel.army
-		Widgets.iconTextButton(buttons, "check", "Go", 120, Widgets.GOOD, function()
+		Widgets.iconTextButton(buttons, "check", "Go", BUTTON_WIDTH, Widgets.GOOD, function()
 			if onGo then
 				onGo(armyId, dest)
 			end
 		end, "✅ Go")
 	elseif board and fleet then
 		local zone = Relations.zone(fleet.dest)
-		hint.Text = string.format(
-			"Board in %s  ·  %d s march",
-			if zone then zone.name else "?",
-			Relations.travelTime(board.path, army)
-		)
+		hint.Text = "Board in " .. (if zone then zone.name else "?")
+		march.Text = string.format("·  %d s march", Relations.travelTime(board.path, army))
+		march.Visible = true
 		icon = "ship"
 		local armyId, fleetId = sel.army, board.fleet
-		Widgets.iconTextButton(buttons, "ship", "Board", 120, Widgets.GOOD, function()
+		Widgets.iconTextButton(buttons, "ship", "Board", BUTTON_WIDTH, Widgets.GOOD, function()
 			if onBoard then
 				onBoard(armyId, fleetId)
 			end
@@ -111,7 +116,7 @@ local function render()
 		icon = "flag"
 	end
 	Icons.set(hintIcon, icon)
-	Widgets.iconTextButton(buttons, "close", "Cancel", 120, Widgets.BUTTON_OFF, function()
+	Widgets.iconTextButton(buttons, "close", "Cancel", BUTTON_WIDTH, Widgets.BUTTON_OFF, function()
 		if onCancel then
 			onCancel()
 		end
@@ -145,13 +150,33 @@ function ArmySheet.init(
 	chips = Instance.new("Frame")
 	chips.Name = "Troops"
 	chips.BackgroundTransparency = 1
-	chips.Size = UDim2.new(1, 0, 0, 26)
+	chips.Size = UDim2.new(1, 0, 0, Theme.size.chip)
 	chips.LayoutOrder = 2
 	chips.Parent = sheet
 	Widgets.list(chips, true, Theme.space.s)
-	hint = Widgets.label(sheet, "", Theme.text.body, 22)
-	hint.LayoutOrder = 3
+	-- the route line: an icon and where to (or what is going on), then the march time, dimmer
+	local route = Instance.new("Frame")
+	route.Name = "Route"
+	route.BackgroundTransparency = 1
+	route.Size = UDim2.new(1, 0, 0, LINE_HEIGHT)
+	route.LayoutOrder = 3
+	route.Parent = sheet
+	Widgets.list(route, true, Theme.space.s)
+	hint = Widgets.label(route, "", Theme.text.body, LINE_HEIGHT)
+	hint.Name = "Hint"
+	hint.Size = UDim2.fromOffset(0, LINE_HEIGHT)
+	hint.AutomaticSize = Enum.AutomaticSize.X
+	hint.TextWrapped = false
+	hint.LayoutOrder = 1
 	hintIcon = Widgets.leadIcon(hint, "arrow", Theme.size.icon)
+	march = Widgets.hint(route, "", Theme.text.body, LINE_HEIGHT)
+	march.Name = "March"
+	march.FontFace = Theme.font.body
+	march.Size = UDim2.fromOffset(0, LINE_HEIGHT)
+	march.AutomaticSize = Enum.AutomaticSize.X
+	march.TextWrapped = false
+	march.LayoutOrder = 2
+	march.Visible = false
 	buttons = Instance.new("Frame")
 	buttons.Name = "Buttons"
 	buttons.BackgroundTransparency = 1

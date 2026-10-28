@@ -361,6 +361,13 @@ local function setPips(obj: GuiObject, development: number)
 	end
 end
 
+-- The pip bar for a development level (the province sheet shows it in a well), and its size in pixels; nil
+-- without EditableImage.
+function MapRenderer.pipBar(level: number): (Content?, Vector2)
+	local bar = pipImage(level)
+	return if bar then Content.fromObject(bar) else nil, Vector2.new(PIP_BAR_W, PIP_BAR_H)
+end
+
 -- The height the pips take under a name (the layout keeps names and pips clear of each other).
 local PIPS_HEIGHT = PIPS_GAP + PIP_BAR_H * PIPS_SCALE
 

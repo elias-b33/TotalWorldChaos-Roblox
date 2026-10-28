@@ -2,7 +2,8 @@
 -- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its flag, province count and your relation,
 -- and at the top the way to your quests during a match (the top bar has no room for another button).
 -- One row per nation: flag, race, who plays it, name (in a nameplate frame if they own one), streak flame, VIP badge,
--- then provinces and your relation as pixel icons. Under the rows, your race and its one-line bonus.
+-- then provinces (in a well) and your relation as pixel icons; your own row sits on a raised plate. Under the rows,
+-- your race and its one-line bonus. An iron drawer with its title on a plate (docs/UI_DIRECTION.md 7.10).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +25,8 @@ local WIDTH = 256 -- the longest name (Ashen Dominion) fits next to its flag and
 local ROW_HEIGHT = 22 -- ten rows, the header and the race line fit a 390 px tall phone
 local RACE_LINE_HEIGHT = 34 -- two lines of small text
 local COUNT_WIDTH = 54
+local MARK_WIDTH = 22 -- the relation icon at the row's right end
+local ROW_PAD = 4 -- inside your own row's raised plate
 local TITLE_MAX_WIDTH = 96 -- a worn title after the name, cut with … past this
 
 local Nations = {}
@@ -71,15 +74,26 @@ local function render()
 		return Relations.score(a.id) > Relations.score(b.id)
 	end)
 	for i, n in list do
-		local row = Instance.new("Frame")
+		-- your own row on a raised plate (painted on an ImageLabel), the others straight on the drawer
+		local row: GuiObject
+		if n.id == me then
+			local plate = Instance.new("ImageLabel")
+			plate.BorderSizePixel = 0
+			Widgets.material(plate, "raised")
+			Widgets.padding(plate, ROW_PAD, 0)
+			row = plate
+		else
+			local f = Instance.new("Frame")
+			f.BackgroundTransparency = 1
+			row = f
+		end
 		row.Name = "Nation" .. n.id
-		row.BackgroundTransparency = 1
 		row.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
 		row.LayoutOrder = i
 		row.Parent = rows
 		local left = Instance.new("Frame")
 		left.BackgroundTransparency = 1
-		left.Size = UDim2.new(1, -(COUNT_WIDTH + 22), 1, 0)
+		left.Size = UDim2.new(1, -(COUNT_WIDTH + MARK_WIDTH), 1, 0)
 		left.Parent = row
 		left.ClipsDescendants = true -- a very long name and title stop at the province count
 		Widgets.list(left, true, Theme.space.xs)
@@ -140,10 +154,10 @@ local function render()
 		local count = Widgets.chip(row, "flag", tostring(Relations.provinceCount(n.id)), COUNT_WIDTH, 22)
 		count.Name = "Provinces"
 		count.AnchorPoint = Vector2.new(1, 0.5)
-		count.Position = UDim2.new(1, -22, 0.5, 0)
+		count.Position = UDim2.new(1, -MARK_WIDTH, 0.5, 0)
 		local status = if n.eliminated then "skull" else Icons.fromEmoji(Relations.icon(me, n.id))
 		if status then
-			local mark = Widgets.icon(row, status, 18)
+			local mark = Widgets.icon(row, status, Theme.icon.small)
 			mark.AnchorPoint = Vector2.new(1, 0.5)
 			mark.Position = UDim2.fromScale(1, 0.5)
 		end

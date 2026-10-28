@@ -448,6 +448,16 @@ A full-width Frame, `ink`, height `TopbarInset.Max.Y` + 20, with a `UIGradient` 
 
 **Draft:** an iron panel of slate tiles, each with the nation's flag, its name tinted in its colour and the race icon. Taken nations are dimmed with the player's name. The tapped nation gets an Inner `gold` stroke. "Pick <nation>" is the screen's gold primary.
 
+**As built (step 4).** Every race now recruits five troops, so the province sheet grew wider instead of taller:
+
+- The sheet is 676 wide on an 844 px phone (the widest that still clears the power button when centred) and docks left at 566 on a 667 px phone. Its tiles sit **five to a row**: a build row (Develop, Farm, Barracks, Fort, then Move by the thumb), a recruit row (the five troops) and, on a foreign province, a diplomacy row. `Widgets.tileWidth` gives 124 px tiles on 844 and 102 on 667.
+- **Slot tile** (`Widgets.slotTile`): 64 tall. The caption runs across the top (Fredoka One 14, so "Horse archers" fits a 102 px tile), the 32 px icon sits under it at the left, and up to two costs stack to its right. A cost you can't pay is `negative`; a tile that can't be used now takes the `disabled` palette. The flat look fills the tile with its group's base colour.
+- Battle, siege and army chips join the info row when they fit (an estimate that errs wide), so the sheet usually stays at about 206 px.
+- **Ships (navies):** on an owned coast the build row takes a Ships tile after the buildings (Move stays last). A row with six tiles goes six to a row while the tiles stay at least 100 px wide (102 on an 844 px phone); on a 667 px phone the sixth wraps onto a new row. Ships opens the 1–5 choice in place of the build row, with a slate Back tile. A blockaded coast's tile reads "Blockaded" with an anchor, greyed, and the "Blockade: X" chip joins the status chips.
+- **Room for what is coming:** a row is a `UIGridLayout`, so extra tiles wrap onto a new row. The diplomacy pack's Insult, Send gift and Military access go in the diplomacy row as decision tiles, but their captions need to stay at about 94 px or less in Fredoka One 14. "Military access" is 101 px, so call it "Access".
+- The army sheet's composition chips show the troop's icon and men only, so five types fit its 412 px row. The route line is a second, dimmer label after the destination. The fleet sheet works the same way: its chips show the troops aboard as icon and men, its route line has the sailing time dimmer, and Sail or Land (emerald) sits beside Cancel (slate), each 200 wide.
+- The power picker is an iron panel with a "Powers" title plate and a 3 × 2 grid of royal slot tiles. It docks at the bottom, left of the power button, which keeps it clear of the toasts. The offers column starts one toast height lower than before for the same reason.
+
 **Optional, ask the owner first:** when a sheet opens over the selected province, `MapView` pans so the province sits in the free band above the sheet. This is a camera behaviour, so it is listed, not assumed.
 
 ### 7.11 Map badges and labels
