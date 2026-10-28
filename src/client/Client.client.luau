@@ -37,6 +37,7 @@ local Shop = require(Client.UI.Shop)
 local ShopState = require(Client.ShopState)
 local Quests = require(Client.UI.Quests)
 local QuestState = require(Client.QuestState)
+local Ads = require(Client.Ads)
 
 local selectedArmy: number? = nil
 
@@ -166,6 +167,7 @@ Quests.init()
 Emotes.init()
 Effects.init() -- after MapRenderer: draws on the canvas it builds
 Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
+Ads.init() -- the notification opt-in prompt after the first finished match
 ProfileState.init()
 ShopState.init()
 QuestState.init()

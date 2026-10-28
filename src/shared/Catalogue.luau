@@ -54,6 +54,7 @@ Catalogue.PRODUCT_IDS = {
 	theme_autumn = 0,
 	starter = 0,
 	set_royal = 0,
+	quest_reroll = 0, -- "Quest reroll" (Config.Ads.QuestRerollRobux): the rewarded video's reward (Sim.Ads), not a shop item
 } :: { [string]: number }
 
 Catalogue.VIP_PASS_ID = 0

@@ -762,6 +762,74 @@ function Emulator.processReceipt(receipt)
 	return fn(receipt)
 end
 
+---------------------------------------------------------------------------------------------- ads and notifications
+
+-- AdService (rewarded video) and ExperienceNotificationService (the opt-in prompt). A scenario sets what they answer:
+--   Emulator.adAvailability  the Enum.AdAvailabilityResult name GetAdAvailabilityNowAsync answers ("NoFill")
+--   Emulator.adResult        the Enum.ShowAdResult name ShowRewardedVideoAdAsync answers ("ShowCompleted"); on
+--                            ShowCompleted the reward's receipt (channel AdReward) goes to ProcessReceipt, as Roblox
+--   Emulator.canPromptOptIn  what CanPromptOptInAsync answers (false)
+-- Every call is recorded in Emulator.adCalls: { method, userId, arg }.
+Emulator.adAvailability = "NoFill"
+Emulator.adResult = "ShowCompleted"
+Emulator.canPromptOptIn = false
+Emulator.adCalls = {}
+local adReceipts = 0
+
+local function recordAd(method: string, inst, arg)
+	local m = machineOf(inst)
+	local userId = if m and m.localPlayer then m.localPlayer.UserId else nil
+	table.insert(Emulator.adCalls, { method = method, userId = userId, arg = arg })
+end
+
+roblox.implementMethod("AdService", "GetAdAvailabilityNowAsync", function(service, format)
+	task.wait()
+	recordAd("GetAdAvailabilityNowAsync", service, format and format.Name)
+	return { AdAvailabilityResult = roblox.Enum.AdAvailabilityResult[Emulator.adAvailability] }
+end)
+roblox.implementMethod("AdService", "RegisterAdOpportunityAsync", function(service, button)
+	recordAd("RegisterAdOpportunityAsync", service, button and button.Name)
+end)
+roblox.implementMethod("AdService", "CreateAdRewardFromDevProductId", function(service, productId)
+	recordAd("CreateAdRewardFromDevProductId", service, productId)
+	return { productId = productId }
+end)
+roblox.implementMethod("AdService", "ShowRewardedVideoAdAsync", function(service, player, reward)
+	recordAd("ShowRewardedVideoAdAsync", service, player and player.UserId)
+	task.wait(1) -- the video
+	local result = Emulator.adResult
+	if result == "ShowCompleted" then
+		adReceipts += 1
+		task.spawn(Emulator.processReceipt, {
+			PurchaseId = "ad-" .. adReceipts,
+			PlayerId = player.UserId,
+			ProductId = reward.productId,
+			CurrencySpent = 0,
+			ProductPurchaseChannel = roblox.Enum.ProductPurchaseChannel.AdReward,
+		})
+	end
+	return roblox.Enum.ShowAdResult[result]
+end)
+roblox.implementMethod("ExperienceNotificationService", "CanPromptOptInAsync", function(service)
+	task.wait()
+	recordAd("CanPromptOptInAsync", service, nil)
+	return Emulator.canPromptOptIn
+end)
+roblox.implementMethod("ExperienceNotificationService", "PromptOptIn", function(service)
+	recordAd("PromptOptIn", service, nil)
+end)
+
+-- How many times `method` was called (by the client with this user id, if given).
+function Emulator.adCallCount(method: string, userId: number?): number
+	local n = 0
+	for _, c in Emulator.adCalls do
+		if c.method == method and (userId == nil or c.userId == userId) then
+			n += 1
+		end
+	end
+	return n
+end
+
 ---------------------------------------------------------------------------------------------- analytics
 
 -- AnalyticsService: every call is recorded in Emulator.analytics instead of going to Roblox, so a scenario can

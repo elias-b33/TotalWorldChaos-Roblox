@@ -300,7 +300,7 @@ export type QuestBook = {
 	day: number,
 	week: number,
 	rerollsUsed: number, -- today
-	videoRerolls: number, -- rerolls a rewarded video gave today (Phase 5; always 0 until then)
+	videoRerolls: number, -- rerolls a rewarded video gave today (Sim.Quests.grantVideoReroll)
 	daily: { QuestState },
 	weekly: { QuestState },
 }
@@ -333,6 +333,7 @@ export type QuestView = {
 	weekly: { QuestEntry },
 	freeRerolls: number, -- free rerolls left today
 	rerollGlory: number, -- the price of a reroll once the free ones are used
+	videoRerolls: number, -- rewarded videos the Quests screen may offer now (0: none; Sim.Quests.videoRerollsLeft)
 	calendar: { glory: { number }, step: number, playedToday: boolean },
 	streak: number, -- current play streak (0 when it has lapsed)
 	best: number,

@@ -167,6 +167,7 @@ We don't launch with an experience subscription:
 - **Product:** "Quest reroll" developer product, 10 Robux. It has to be on sale for the ad reward to be allowed.
 - Shown only after `AdService:GetAdAvailabilityNowAsync` says yes, and only to players 13+. Turn on "Exclude your most likely purchasers".
 - No ads anywhere else: never during a match and never on the Results screen.
+- **How it works** (`Sim/Ads.luau`, `AdRewardService`, `Client/Ads.luau`): the "📺 Watch an ad · +1 free reroll" button sits in the Quests screen's header. It shows only during the Lobby's map vote with at least `Config.Ads.MinVoteSecondsLeft` (32 s) to go, so a video never runs into the draft or the match, only once the day's free rerolls are used and a daily quest is left to reroll, and only while `AdService:GetAdAvailabilityNowAsync(Enum.AdFormat.RewardedVideo)` answers `IsAvailable` for this player (Roblox answers `PlayerIneligible` for under-13s). The server plays the video with `CreateAdRewardFromDevProductId` and `ShowRewardedVideoAdAsync`; the reward arrives in `ProcessReceipt` with `ProductPurchaseChannel.AdReward` and adds one free reroll for today (it stays out of the Robux purchase history). After the first ad the button hides until that reroll is spent, so a player never banks ads. The same product bought with Robux on the store page also gives one free reroll, outside the 2-a-day cap; the game itself never offers it for Robux.
 
 ### 3.8 Rotating shop
 
@@ -206,8 +207,10 @@ The catalogue is `src/shared/Catalogue.luau`; prices by rarity are in `Config.Sh
 | `emote_fire`, `emote_crown` (animated emotes) | 49 |
 | `starter` (Starter Pack, once per account) | 149 |
 | `set_royal` (Royal Set: Crown flag, Runes border, Shield token) | 199 |
+| `quest_reroll` ("Quest reroll": one more free daily quest reroll today; the rewarded video's reward, `Config.Ads.QuestRerollRobux`) | 10 |
 
-3. Opt in to managed pricing if you want: the shop reads live prices with `MarketplaceService:GetProductInfo`, and the Config numbers are only shown while an id is 0.
+3. **Rewarded video** (section 3.7; needs 2,000+ monthly visitors, an ID-verified owner with 2-step verification and the maturity questionnaire): Monetization → Ads → Settings → Rewarded Video → turn on **Serving enabled**, pick the "Quest reroll" product as the reward and turn on "Exclude your most likely purchasers". The product must stay on sale. While `quest_reroll` is 0, Studio grants the ad's reroll without a video and a live server shows no ad button.
+4. Opt in to managed pricing if you want: the shop reads live prices with `MarketplaceService:GetProductInfo`, and the Config numbers are only shown while an id is 0.
 
 **How a purchase flows.** The client asks (`RequestBuy`); `CommandRouter` checks the shape; `ShopService` checks the rules (`Sim/Shop`): Robux prompts only open in the Lobby, the draft and on Results, never during a match. Developer products are granted in `MarketplaceService.ProcessReceipt` → `PlayerDataService.processReceipt`: each purchase id is granted once, recorded in the purchase history and saved before `PurchaseGranted`; a receipt that arrives while the player's profile is still loading (Roblox retries unfinished purchases on join) waits for it. VIP is checked with `UserOwnsGamePassAsync` on join (if that call fails, the saved ownership counts) and again after `PromptGamePassPurchaseFinished` before it is granted, and the pass is added to the purchase history too. Saving: Glory purchases save at once; equips and settings ride on the autosave and the save on leave; a refused request writes nothing, and shop requests have their own rate limit (`Config.Net.MaxShopIntentsPerSecond`).
 
@@ -510,6 +513,8 @@ Theme: molten earth, ember and the old gods waking. Map theme: Ember Eldmoor.
 ### 7.6 Notifications
 
 Experience notifications (opt-in, 13+) at most twice a week: season start, event start, and "your weekly rewards are ready". Never "come back or lose your streak".
+
+The opt-in prompt comes once per profile, after the player's first finished match (not the tutorial): back in the Lobby the client asks `ExperienceNotificationService:CanPromptOptInAsync()` and, only if it says yes, calls `PromptOptIn()` (Roblox's standard prompt; its text can't be changed). Roblox itself never shows it to under-13s, to players who already opted in, or more than once in 30 days. Sending notifications needs Open Cloud and a notification string made on the Creator Dashboard (not built yet).
 
 ## 8. Live-ops calendar: the first 6 months
 
@@ -904,7 +909,7 @@ Replace Phase 4's shop and player-data lines and add these lines to Phase 4 and 
 - [ ] Season pass (8 weeks, 50 tiers)
 - [ ] Rotating shop
 - [ ] Weekly, friends and global leaderboards; achievements
-- [ ] Rewarded video quest reroll; experience notifications
+- [x] Rewarded video quest reroll; experience notifications
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 ```
 

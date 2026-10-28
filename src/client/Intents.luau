@@ -71,6 +71,10 @@ local REASONS: { [string]: string } = {
 	TeamFull = "👥 That team is full (3)",
 	PowersOff = "✨ Powers are off on this server",
 	TeamsLocked = "🔒 Teams are set on this server",
+	AdNotNow = "📺 Ads only play early in the map vote",
+	AdBusy = "📺 An ad is already playing",
+	NoAdReward = "📺 No ad reroll to earn right now",
+	AdFailed = "📺 The ad didn't play to the end",
 }
 
 local Intents = {}
@@ -162,6 +166,11 @@ end
 -- Analytics: a UI-only funnel step ("Loaded", "ShopOpened", "ItemViewed", "OfferOpened"). No reply.
 function Intents.signal(kind: string, arg: string?)
 	Remotes.event("RequestTelemetry"):FireServer(kind, arg)
+end
+
+-- Rewarded video: play an ad for its reward ("quest_reroll": one more free quest reroll today).
+function Intents.watchAd(placement: string)
+	send("RequestAd", placement)
 end
 
 -- The map-theme opt-out: true = always show me the classic map.

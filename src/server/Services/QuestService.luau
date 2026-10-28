@@ -5,14 +5,14 @@
 -- Thin wrapper: the rules are in Shared.Sim.Quests and Shared.Sim.Login, saving is PlayerDataService's, the match
 -- stats are ProgressionService's.
 --
--- Rewarded video (Phase 5): the one ad placement, on the Quests screen, calls Quests.grantVideoReroll on the
--- player's book after a finished video, through PlayerDataService.update, then sendView. Nothing calls it yet.
+-- Rewarded video: AdRewardService grants the ad's reroll (Quests.grantVideoReroll) in its receipt, then sendView.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Config = require(Shared.Config)
 local Login = require(Shared.Sim.Login)
 local Progression = require(Shared.Sim.Progression)
 local Quests = require(Shared.Sim.Quests)
@@ -24,6 +24,7 @@ local CommandRouter = require(Server.CommandRouter)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local ShopService = require(script.Parent.ShopService)
+local TelemetryService = require(script.Parent.TelemetryService)
 
 local DAY_CHECK_SECONDS = 5 -- how often to look for a new UTC day (midnight, or DevDay in Studio)
 
@@ -94,16 +95,24 @@ function QuestService.apply(player: Player, intent: Types.QuestIntent): (boolean
 	local result = PlayerDataService.update(player, function(data)
 		Quests.refresh(data.quests, player.UserId, day)
 		local ok, reason
+		local source: string? = nil
 		if intent.kind == "Claim" then
 			ok, reason = Quests.claim(data, intent.key)
 		else
+			source = Quests.rerollSource(data.quests, vip)
 			ok, reason = Quests.reroll(data, intent.key, vip, Quests.rerollRng(data.quests, player.UserId))
 		end
-		return { ok = ok, reason = reason }
+		return { ok = ok, reason = reason, source = source }
 	end)
 	QuestService.sendView(player)
 	if result == nil then
 		return false, "NotLoaded"
+	end
+	if result.ok and result.source then
+		TelemetryService.questRerolled(player, result.source) -- analytics: free, vip, ad or glory
+		if result.source == "glory" then
+			TelemetryService.glory(player, "Sink", Config.Progression.Quests.RerollGlory, "Gameplay", "quest_reroll")
+		end
 	end
 	return result.ok, result.reason
 end

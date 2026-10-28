@@ -204,7 +204,14 @@ end
 -- in the purchase history, and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
 -- Roblox retries an unfinished purchase when the player joins, while their profile is still loading: the receipt
 -- waits for it (while they stay, up to RECEIPT_WAIT_SECONDS) instead of putting the item off to the next session.
-function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Data) -> ()): Enum.ProductPurchaseDecision
+-- notPurchase: a reward that cost no Robux (a rewarded video's): saved once like any receipt, but kept out of the
+-- purchase history, which lists Robux purchases only.
+function PlayerDataService.processReceipt(
+	receipt: any,
+	item: string,
+	grant: (Data) -> (),
+	notPurchase: boolean?
+): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	local profile = if player then profiles[player] else nil
 	local deadline = os.clock() + RECEIPT_WAIT_SECONDS
@@ -220,10 +227,10 @@ function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Da
 	if data.receipts[id] == nil then
 		grant(data)
 		data.receipts[id] = os.time()
-		table.insert(
-			data.purchaseHistory,
-			{ product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time(), item = item }
-		)
+		if not notPurchase then
+			local record = { product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time(), item = item }
+			table.insert(data.purchaseHistory, record)
+		end
 		trimReceipts(data)
 		profile:Save()
 		if player then
