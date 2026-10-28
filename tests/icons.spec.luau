@@ -25,6 +25,8 @@ local REQUIRED = {
 	"cart",
 	"soundOn",
 	"soundOff",
+	"music",
+	"musicOff",
 	"gear",
 	"trophy",
 	"medal",

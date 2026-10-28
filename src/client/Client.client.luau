@@ -25,6 +25,7 @@ local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
 local MapVote = require(Client.UI.MapVote)
 local Menu = require(Client.UI.Menu)
+local Music = require(Client.Music)
 local Nations = require(Client.UI.Nations)
 local Offers = require(Client.UI.Offers)
 local Powers = require(Client.UI.Powers)
@@ -344,6 +345,7 @@ Trophies.init()
 Emotes.init()
 Effects.init() -- after MapRenderer: draws on the canvas it builds
 Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
+Music.init() -- follows the menu, the Lobby and the match from here on
 Ads.init() -- the notification opt-in prompt after the first finished match
 ProfileState.init()
 ShopState.init()

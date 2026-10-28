@@ -17,6 +17,7 @@ local function run()
 	local LobbyService = H.server("Services.LobbyService")
 	H.expect(LobbyService.phase() == "Lobby", "the server opens the Lobby")
 	H.expect(Emulator.findText(alice, "Vote for the map") ~= nil, "Alice sees the map vote")
+	H.expect(H.client(alice, "Music").state().track == "Lobby", "the map vote plays the Lobby theme")
 	Emulator.run(2) -- the thumbnails are painted
 	H.shot(alice, "vote")
 

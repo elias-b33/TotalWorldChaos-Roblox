@@ -26,6 +26,7 @@ local Relations = require(Client.Relations)
 local Sounds = require(Client.Sounds)
 local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
+local Speaker = require(script.Parent.Speaker)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
@@ -478,7 +479,8 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	if onShopButton then
 		add(barButton("ShopButton", "cart", onShopButton), 5, ITEM, 0, ITEM, true)
 	end
-	-- sound on and off for the session (docs/DESIGN.md "Sound and effects")
+	-- the speaker: its popover has the Music and Sounds toggles, saved in the profile (docs/DESIGN.md "Sound and
+	-- effects"); muted when both are off
 	local mute = barButton("Mute", "soundOn", function() end)
 	add(mute, 5, ITEM, 0, ITEM, true)
 	local muteIcon = mute:FindFirstChild("Icon") :: GuiObject
@@ -486,6 +488,7 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 		Icons.set(muteIcon, if muted then "soundOff" else "soundOn")
 		mute:SetAttribute("Muted", muted)
 	end)
+	Speaker.attach(mute)
 
 	toastLabel = Widgets.toast(gui, 0, TOAST_WIDTH)
 	place()

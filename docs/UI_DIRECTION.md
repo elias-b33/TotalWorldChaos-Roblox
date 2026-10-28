@@ -406,7 +406,7 @@ A full-width Frame, `ink`, height `TopbarInset.Max.Y` + 20, with a `UIGradient` 
 | Level | Chip, 46 wide: medal 16 and the level. | `Level` |
 | Nations | Slate icon button with `globe` 32. | `NationsButton` |
 | Shop | Slate icon button with `cart` 32. | `ShopButton` |
-| Mute | Slate icon button with `soundOn` / `soundOff` 32. | `Mute` (Attribute `Muted`) |
+| Mute | Slate icon button with `soundOn` / `soundOff` 32 (`soundOff` when Music and Sounds are both off). It opens the speaker popover under it: a `plate` with two 44 px toggles, `MusicToggle` (`music` / `musicOff`) and `SoundsToggle` (`soundOn` / `soundOff`), emerald when on, slate when off (`UI/Speaker.luau`). | `Mute` (Attribute `Muted`) |
 
 **Fit** (`fitBar`): drop the Level, then the Rank, then the nation's name (the Capital button shrinks to its flag, 48 wide). Never drop gold, manpower, the clock or the three buttons. At 844 px with a 104 px Roblox control area everything fits (the harness checks `Level`). At 667 px the Level, Rank and name step aside (`06_small_phone.png`).
 

@@ -42,6 +42,7 @@ Telemetry.CUSTOM_EVENTS = {
 	"menu_shown",
 	"menu_choice",
 	"first_pick",
+	"music_setting",
 }
 
 -- The one-time onboarding funnel (LogOnboardingFunnelStepEvent), in step order.
@@ -402,6 +403,17 @@ function Telemetry.firstPick(lobby: Types.LobbyState, mapId: string): Event?
 	local seconds = Config.Phases.FirstPickTicks - math.max(lobby.ticksLeft, 0)
 	local how = if lobby.votes[chooser] then "picked" else "timeout"
 	return Telemetry.custom("first_pick", seconds, { mapId, how }, chooser)
+end
+
+-- The speaker ----------------------------------------------------------------------------------------------------
+
+-- A speaker toggle changed (RequestPreference "music" or "sounds"): both toggles after the change ("on" or "off")
+-- and what the server was doing (Telemetry.menuWhere).
+function Telemetry.musicSetting(music: boolean, sounds: boolean, where: string, userId: number): Event
+	local function onOff(on: boolean): string
+		return if on then "on" else "off"
+	end
+	return Telemetry.custom("music_setting", 1, { onOff(music), onOff(sounds), where }, userId)
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

@@ -5,6 +5,7 @@
 
 local Config = require("../Config")
 local Match = require("./Match")
+local Preferences = require("./Preferences")
 local Settings = require("./Settings")
 local Types = require("../Types")
 
@@ -65,6 +66,8 @@ function Progression.summary(profile: Profile): Types.ProfileSummary
 		glory = profile.glory,
 		rank = rank,
 		rankName = rankName,
+		music = Preferences.get(profile, "music") == true,
+		sounds = Preferences.get(profile, "sounds") == true,
 	}
 end
 

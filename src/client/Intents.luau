@@ -254,4 +254,9 @@ function Intents.defaultTheme(on: boolean)
 	send("RequestDefaultTheme", on)
 end
 
+-- A saved preference (Sim.Preferences): "music" or "sounds" and whether it is on.
+function Intents.preference(key: string, value: boolean | number | string)
+	send("RequestPreference", key, value)
+end
+
 return Intents
