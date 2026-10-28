@@ -34,6 +34,7 @@ local PlayerDataService = {}
 local store = ProfileStore.New(STORE_NAME, Progression.newProfile())
 local profiles: { [Player]: Profile } = {}
 local leaveHooks: { (Player, Data) -> () } = {}
+local loadHooks: { (Player, Data) -> () } = {}
 local profileRemote: RemoteEvent
 
 local function sendSummary(player: Player, data: Data)
@@ -69,6 +70,9 @@ local function load(player: Player)
 	end
 	profiles[player] = profile
 	sendSummary(player, profile.Data)
+	for _, hook in loadHooks do
+		task.spawn(hook, player, profile.Data)
+	end
 end
 
 local function release(player: Player)
@@ -135,10 +139,15 @@ local function trimReceipts(data: Data)
 	end
 end
 
--- The ProcessReceipt hook for developer products (no shop yet: ShopService will set
--- MarketplaceService.ProcessReceipt to call this with the product's grant function). Grants each purchase id once,
--- and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
-function PlayerDataService.processReceipt(receipt: any, grant: (Data) -> ()): Enum.ProductPurchaseDecision
+-- Run `hook` once a joining player's profile has loaded (e.g. ShopService checks the VIP pass).
+function PlayerDataService.onLoaded(hook: (Player, Data) -> ())
+	table.insert(loadHooks, hook)
+end
+
+-- The ProcessReceipt hook for developer products: ShopService's MarketplaceService.ProcessReceipt calls this with
+-- the catalogue item or offer the product sells and its grant function. Grants each purchase id once, records it
+-- in the purchase history, and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
+function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Data) -> ()): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	local profile = if player then profiles[player] else nil
 	if profile == nil then
@@ -151,10 +160,13 @@ function PlayerDataService.processReceipt(receipt: any, grant: (Data) -> ()): En
 		data.receipts[id] = os.time()
 		table.insert(
 			data.purchaseHistory,
-			{ product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time() }
+			{ product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time(), item = item }
 		)
 		trimReceipts(data)
 		profile:Save()
+		if player then
+			sendSummary(player, data)
+		end
 	end
 	while profile:IsActive() and (profile.LastSavedData :: Data).receipts[id] == nil do
 		task.wait()

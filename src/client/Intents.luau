@@ -47,6 +47,17 @@ local REASONS: { [string]: string } = {
 	UnknownMap = "🚫 Unknown map",
 	NotYourTurn = "⏳ Wait for your turn",
 	Taken = "🚫 Already taken",
+	UnknownItem = "🚫 Unknown item",
+	NotForGlory = "🏅 Not sold for Glory",
+	NotForRobux = "🚫 Not sold for Robux",
+	NotEnoughGlory = "🏅 Not enough Glory",
+	Owned = "✅ You already own it",
+	NotOwned = "🔒 You don't own it yet",
+	CantEquip = "🚫 Can't wear that",
+	InMatch = "🛒 Robux purchases open after the match",
+	NotForSale = "🚫 Not on sale yet",
+	NotLoaded = "⏳ Your save is still loading",
+	TryAgain = "⏳ Try again in a moment",
 }
 
 local Intents = {}
@@ -101,6 +112,19 @@ end
 
 function Intents.pick(nationId: number)
 	send("RequestPick", nationId)
+end
+
+-- Shop: buy an item or offer with "Glory" or "Robux", wear an owned item, show an owned emote over your capital.
+function Intents.buy(itemId: string, currency: string)
+	send("RequestBuy", itemId, currency)
+end
+
+function Intents.equip(itemId: string)
+	send("RequestEquip", itemId)
+end
+
+function Intents.emote(itemId: string)
+	send("RequestEmote", itemId)
 end
 
 return Intents

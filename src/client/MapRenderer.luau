@@ -10,12 +10,15 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Catalogue = require(Shared.Catalogue)
 local CatchUp = require(Shared.Sim.CatchUp)
+local Config = require(Shared.Config)
 local MapGrid = require(Shared.MapGrid)
 local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
 
 local ClientState = require(script.Parent.ClientState)
+local Cosmetics = require(script.Parent.Cosmetics)
 local MapView = require(script.Parent.MapView)
 local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
@@ -24,12 +27,17 @@ local NAME_MIN_PIXELS = 70 -- a province's name shows once the province is this 
 local DETAIL_ZOOM = 0.9 -- garrisons and development pips show from this share of the region zoom inwards
 local TEXT_SIZE = 14 -- the smallest text on the map (docs/DESIGN.md "UI and controls")
 local TOKEN_SIZE = 14 -- army token, screen pixels
+local TOKEN_SKIN_SIZE = 18 -- a token skin's 12×12 sprite, screen pixels
 local TOKEN_PICK = 20 -- a tap this close to a token's centre (screen pixels) picks the army
 local TOKEN_SPACING = 4 -- map pixels between tokens standing in one province
 local TOKEN_SMOOTHING = 6 -- higher = tokens catch up with their target faster
 local DOT_SPACING = 4 -- map pixels between the dots of a route or strait
 local PIXELATED_FROM = 1.5 -- zoom from which map pixels are drawn hard-edged (smooth below, so thin lines don't flicker)
 local PAINT_SLICE = 0.008 -- seconds of painting per frame while a map is painted for the first time
+local FLAG_WIDTH, FLAG_HEIGHT = 24, 18 -- a capital's 16×12 flag, screen pixels
+local EMOTE_SIZE = 26 -- capital emote icon, screen pixels
+local VICTORY_SIZE = 32 -- victory animation over a winner's capital
+local VICTORY_FRAME_SECONDS = 0.4
 
 local MapRenderer = {}
 
@@ -41,6 +49,7 @@ type Token = {
 	target: Vector2,
 	neutral: boolean,
 	province: number,
+	skinned: boolean, -- drawn with a token skin sprite (no square outline unless selected)
 }
 
 local grid: MapGrid.Grid? = nil
@@ -59,6 +68,9 @@ local markers: { [number]: TextLabel } = {}
 local effects: { [number]: TextLabel } = {}
 local crowns: { [number]: TextLabel } = {}
 local tokens: { [number]: Token } = {}
+local flags: { [number]: { frame: Frame, key: string } } = {}
+local victories: { { label: TextLabel, frames: { string } } } = {}
+local victoryClock = 0
 local selectedArmy: number? = nil
 
 local function at(p: Vector2): UDim2
@@ -185,11 +197,128 @@ local function paintOwners()
 	end
 	local colors: { [number]: number } = {}
 	local borders: { [number]: number } = {}
+	local styles: { [number]: PixelArt.NationStyle } = {}
 	for _, nation in snapshot.nations do
 		colors[nation.id] = packed(Palette.nation(nation.colorIndex))
 		borders[nation.id] = packed(Palette.border(nation.colorIndex))
+		-- border style and shade set (cosmetics): always shades of the nation's own colours
+		local c = Cosmetics.of(nation.id)
+		local border, shades = Cosmetics.art(c.border), Cosmetics.art(c.shades)
+		if border ~= "solid" or shades ~= "default" then
+			styles[nation.id] = { border = border, shades = shades }
+		end
 	end
+	PixelArt.setStyles(a, styles)
 	PixelArt.setOwners(a, owners, colors, borders)
+end
+
+-- Each nation's flag (its equipped cosmetic) on a little pole left of its capital (armies stand at the centre),
+-- while it holds the capital.
+local function refreshFlags()
+	local snapshot = ClientState.snapshot()
+	local flagLayer = layers.Flags
+	if snapshot == nil or flagLayer == nil then
+		return
+	end
+	local owners: { [number]: number } = {}
+	for _, record in snapshot.provinces do
+		owners[record.id] = record.owner
+	end
+	local alive: { [number]: boolean } = {}
+	for _, nation in snapshot.nations do
+		local show = not nation.eliminated and owners[nation.capital] == nation.id
+		local flagId = Cosmetics.of(nation.id).flag
+		local key = flagId .. ":" .. nation.colorIndex
+		local entry = flags[nation.id]
+		if entry and (not show or entry.key ~= key) then
+			entry.frame:Destroy()
+			flags[nation.id] = nil
+			entry = nil
+		end
+		if show and entry == nil then
+			local holder = Instance.new("Frame")
+			holder.Name = "Flag" .. nation.id
+			holder.AnchorPoint = Vector2.new(1, 1)
+			holder.Position = at(MapRenderer.centerOf(nation.capital)) + UDim2.fromOffset(-10, 8)
+			holder.Size = UDim2.fromOffset(FLAG_WIDTH + 3, FLAG_HEIGHT + 8)
+			holder.BackgroundTransparency = 1
+			holder.Parent = flagLayer
+			local pole = Instance.new("Frame")
+			pole.Name = "Pole"
+			pole.Size = UDim2.new(0, 2, 1, 0)
+			pole.BackgroundColor3 = Color3.fromRGB(40, 32, 26)
+			pole.BorderSizePixel = 0
+			pole.Parent = holder
+			local flag =
+				Cosmetics.flagLabel(holder, flagId, nation.colorIndex, UDim2.fromOffset(FLAG_WIDTH, FLAG_HEIGHT))
+			flag.Position = UDim2.fromOffset(3, 0)
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(20, 20, 28)
+			stroke.Thickness = 1
+			stroke.Parent = flag
+			flags[nation.id] = { frame = holder, key = key }
+		end
+		alive[nation.id] = true
+	end
+	for id, entry in flags do
+		if not alive[id] then
+			entry.frame:Destroy()
+			flags[id] = nil
+		end
+	end
+end
+
+-- A capital emote (MatchEvent "Emote": a = nation, b = emote index, province = capital) for a few seconds.
+local function showEmote(e: Types.MatchEvent)
+	local item = Catalogue.ofSlot("Emote")[e.b]
+	local emoteLayer = layers.Emotes
+	if item == nil or emoteLayer == nil or e.province == 0 then
+		return
+	end
+	local label = textLabel(emoteLayer, item.art)
+	label.Name = "Emote" .. e.a
+	label.TextSize = EMOTE_SIZE
+	label.AnchorPoint = Vector2.new(0.5, 1)
+	label.Position = at(MapRenderer.centerOf(e.province)) + UDim2.fromOffset(0, -58)
+	label.Size = UDim2.fromOffset(EMOTE_SIZE + 12, EMOTE_SIZE + 8)
+	label.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
+	label.BackgroundTransparency = 0.25
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = label
+	local myGeneration = generation
+	task.delay(Config.Shop.EmoteShowSeconds, function()
+		if generation == myGeneration then
+			label:Destroy()
+		end
+	end)
+end
+
+-- The winners' victory animations over their capitals while Results shows (frames of the item's art, cycled).
+local function refreshVictory()
+	local snapshot = ClientState.snapshot()
+	local victoryLayer = layers.Emotes
+	for _, v in victories do
+		v.label:Destroy()
+	end
+	victories = {}
+	local result = if snapshot then snapshot.result else nil
+	if result == nil or victoryLayer == nil then
+		return
+	end
+	for _, nationId in result.winners do
+		local nation = ClientState.nation(nationId)
+		if nation then
+			local frames = string.split(Cosmetics.art(Cosmetics.of(nationId).victory), " ")
+			local label = textLabel(victoryLayer, frames[1] or "🏆")
+			label.Name = "Victory" .. nationId
+			label.TextSize = VICTORY_SIZE
+			label.AnchorPoint = Vector2.new(0.5, 1)
+			label.Position = at(MapRenderer.centerOf(nation.capital)) + UDim2.fromOffset(0, -32)
+			label.Size = UDim2.fromOffset(VICTORY_SIZE + 16, VICTORY_SIZE + 8)
+			table.insert(victories, { label = label, frames = frames })
+		end
+	end
 end
 
 local function build(map: Types.MapDef)
@@ -200,6 +329,8 @@ local function build(map: Types.MapDef)
 	effects = {}
 	crowns = {}
 	tokens = {}
+	flags = {}
+	victories = {}
 	layers = {}
 	widths = {}
 	selectedArmy = nil
@@ -298,9 +429,11 @@ local function build(map: Types.MapDef)
 			labels[def.id] = { frame = frame, pips = dev }
 		end
 	end
+	layer("Flags", canvas)
 	layer("Tokens", canvas)
 	layer("Markers", canvas)
 	layer("Crowns", canvas)
+	layer("Emotes", canvas)
 	onZoom(MapView.zoom())
 end
 
@@ -434,6 +567,16 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	stroke.Color = Color3.fromRGB(20, 20, 28)
 	stroke.Thickness = 2
 	stroke.Parent = frame
+	-- an army token skin (cosmetic): the nation's sprite instead of the plain square
+	local nation = if neutral then nil else ClientState.nation(army.owner)
+	local skin = if nation then Cosmetics.of(army.owner).token else Catalogue.DEFAULTS.Token
+	local skinned = nation ~= nil and skin ~= Catalogue.DEFAULTS.Token
+	if nation and skinned then
+		frame.Size = UDim2.fromOffset(TOKEN_SKIN_SIZE, TOKEN_SKIN_SIZE)
+		frame.BackgroundTransparency = 1
+		stroke.Enabled = false
+		Cosmetics.tokenLabel(frame, skin, nation.colorIndex, UDim2.fromScale(1, 1))
+	end
 	local label = textLabel(frame, "")
 	label.AnchorPoint = Vector2.new(0.5, 1)
 	label.Position = UDim2.new(0.5, 0, 0, -2)
@@ -447,6 +590,7 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		target = target,
 		neutral = neutral,
 		province = army.location,
+		skinned = skinned,
 	}
 	frame.Visible = not neutral or detailVisible(MapView.zoom())
 	return token
@@ -539,12 +683,14 @@ function MapRenderer.selectArmy(armyId: number?)
 		local old = tokens[selectedArmy]
 		old.stroke.Color = Color3.fromRGB(20, 20, 28)
 		old.stroke.Thickness = 2
+		old.stroke.Enabled = not old.skinned
 	end
 	selectedArmy = armyId
 	local token = if armyId then tokens[armyId] else nil
 	if token then
 		token.stroke.Color = Color3.fromRGB(255, 230, 90)
 		token.stroke.Thickness = 3
+		token.stroke.Enabled = true
 	end
 end
 
@@ -578,6 +724,8 @@ function MapRenderer.init()
 			end
 			refreshArmies()
 			refreshCrowns()
+			refreshFlags()
+			refreshVictory()
 		end
 	end)
 	ClientState.onDelta(function(delta)
@@ -587,10 +735,35 @@ function MapRenderer.init()
 		if #delta.provinces > 0 or #delta.nations > 0 then
 			paintOwners()
 			refreshCrowns()
+			refreshFlags()
 		end
 		if #delta.armies > 0 or #delta.removedArmies > 0 then
 			refreshArmies()
 		end
+		if delta.result then
+			refreshVictory()
+		end
+		for _, e in delta.events do
+			if e.kind == "Emote" then
+				showEmote(e)
+			end
+		end
+	end)
+	-- someone equipped something: flags, borders, shades and tokens follow
+	Cosmetics.onChange(function()
+		if layers.Tokens == nil then
+			return
+		end
+		paintOwners()
+		refreshFlags()
+		for id, token in tokens do
+			token.frame:Destroy()
+			tokens[id] = nil
+		end
+		local selected = selectedArmy
+		selectedArmy = nil
+		refreshArmies()
+		MapRenderer.selectArmy(selected)
 	end)
 	ClientState.onPositions(function()
 		refreshArmies()
@@ -602,6 +775,15 @@ function MapRenderer.init()
 			if (token.pos - token.target).Magnitude > 0.05 then
 				token.pos = token.pos:Lerp(token.target, a)
 				token.frame.Position = at(token.pos)
+			end
+		end
+		-- victory animations cycle through their frames
+		victoryClock += dt
+		if victoryClock >= VICTORY_FRAME_SECONDS and #victories > 0 then
+			victoryClock = 0
+			for _, v in victories do
+				local i = (table.find(v.frames, v.label.Text) or 0) % #v.frames + 1
+				v.label.Text = v.frames[i]
 			end
 		end
 		-- the pixel art goes to the screen at most once a frame

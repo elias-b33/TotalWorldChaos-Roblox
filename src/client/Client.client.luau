@@ -22,6 +22,10 @@ local ProfileState = require(Client.ProfileState)
 local ProvinceSheet = require(Client.UI.ProvinceSheet)
 local Relations = require(Client.Relations)
 local Results = require(Client.UI.Results)
+local Cosmetics = require(Client.Cosmetics)
+local Emotes = require(Client.UI.Emotes)
+local Shop = require(Client.UI.Shop)
+local ShopState = require(Client.ShopState)
 
 local selectedArmy: number? = nil
 
@@ -113,7 +117,9 @@ end
 
 -- Listeners first (in draw order), then start listening to the server.
 MapRenderer.init()
-Hud.init(centreOnCapital, Nations.toggle)
+Hud.init(centreOnCapital, Nations.toggle, function()
+	Shop.toggle()
+end)
 ProvinceSheet.init(function()
 	MapRenderer.select(nil)
 end, selectArmy)
@@ -139,6 +145,10 @@ Draft.init()
 ClientState.onReset(function()
 	selectedArmy = nil
 end)
+Cosmetics.init()
+Shop.init(Hud.toast)
+Emotes.init()
 ProfileState.init()
+ShopState.init()
 LobbyState.init()
 ClientState.init()

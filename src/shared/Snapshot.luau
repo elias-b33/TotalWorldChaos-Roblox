@@ -70,6 +70,7 @@ export type SnapshotData = {
 	diplomacy: DiplomacyData,
 	primordials: { PrimordialRecord },
 	result: Types.MatchResult?,
+	cosmetics: { Types.NationCosmetics }, -- each nation's equipped looks, next to MatchState (Sim.Shop)
 }
 
 export type DeltaData = {
@@ -82,6 +83,7 @@ export type DeltaData = {
 	diplomacy: DiplomacyData?, -- only when it changed
 	primordials: { PrimordialRecord }?, -- only when it changed
 	result: Types.MatchResult?, -- only when it changed
+	cosmetics: { Types.NationCosmetics }?, -- only when it changed
 	events: { Types.MatchEvent },
 }
 
@@ -96,7 +98,8 @@ local function sortedKeys(t: { [number]: any }): { number }
 	return keys
 end
 
-function Snapshot.full(state: MatchState): SnapshotData
+-- cosmetics (optional): every nation's equipped cosmetics (Sim.Shop.nationCosmetics); none = an empty list.
+function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?): SnapshotData
 	local provinces = {}
 	for _, id in sortedKeys(state.provinces) do
 		local p = state.provinces[id]
@@ -156,6 +159,7 @@ function Snapshot.full(state: MatchState): SnapshotData
 		diplomacy = Snapshot.diplomacy(state),
 		primordials = Snapshot.primordials(state),
 		result = state.result,
+		cosmetics = cosmetics or {},
 	}
 end
 
@@ -279,6 +283,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		diplomacy = if encode(before.diplomacy) ~= encode(after.diplomacy) then after.diplomacy else nil,
 		primordials = if encode(before.primordials) ~= encode(after.primordials) then after.primordials else nil,
 		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
+		cosmetics = if encode(before.cosmetics) ~= encode(after.cosmetics) then after.cosmetics else nil,
 		events = if events then table.clone(events) else {},
 	}
 	if
@@ -290,6 +295,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		and delta.diplomacy == nil
 		and delta.primordials == nil
 		and delta.result == nil
+		and delta.cosmetics == nil
 		and #delta.events == 0
 	then
 		return nil
@@ -329,6 +335,9 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	end
 	if delta.result then
 		snapshot.result = delta.result
+	end
+	if delta.cosmetics then
+		snapshot.cosmetics = delta.cosmetics
 	end
 	if #delta.removedArmies > 0 then
 		local gone: { [number]: boolean } = {}

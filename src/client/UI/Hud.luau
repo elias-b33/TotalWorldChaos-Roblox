@@ -164,7 +164,7 @@ local function eventText(e: Types.MatchEvent): string?
 	return nil
 end
 
-function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
+function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopButton: (() -> ())?)
 	gui = Instance.new("ScreenGui")
 	gui.Name = "Hud"
 	gui.ResetOnSpawn = false
@@ -242,6 +242,21 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
 		local summary = ProfileState.summary()
 		levelLabel.Text = if summary then "🎖 " .. summary.level else ""
 	end)
+
+	-- the shop (MONETIZATION.md 3): cosmetics only, Robux purchases open after the match
+	if onShopButton then
+		local shopButton = Instance.new("TextButton")
+		shopButton.Name = "ShopButton"
+		shopButton.Size = UDim2.fromOffset(BAR_HEIGHT, BAR_HEIGHT)
+		shopButton.BackgroundTransparency = 1
+		shopButton.Font = Enum.Font.GothamBold
+		shopButton.TextSize = 22
+		shopButton.Text = "🛒"
+		shopButton.TextColor3 = Color3.new(1, 1, 1)
+		shopButton.LayoutOrder = 10
+		shopButton.Parent = bar
+		shopButton.Activated:Connect(onShopButton)
+	end
 
 	toastLabel = Instance.new("TextLabel")
 	toastLabel.Name = "Toast"

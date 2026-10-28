@@ -215,7 +215,7 @@ export type PlayerProfile = {
 	achievements: { [string]: number }, -- id -> progress
 	season: { id: string, xp: number, premium: boolean, claimed: { [string]: boolean } },
 	receipts: { [string]: number }, -- purchase id -> os.time() it was granted (the last 200)
-	purchaseHistory: { { product: number, robux: number, at: number } },
+	purchaseHistory: { PurchaseRecord },
 	stats: { matches: number, wins: number, provincesTaken: number, battlesWon: number, powersUsed: number },
 	settings: { [string]: any },
 }
@@ -233,5 +233,69 @@ export type ProfileSummary = {
 
 -- Sent to a player at Results: the reward (with level-up and rank-up lines) and their profile before and after.
 export type RewardReport = { reward: MatchReward, before: ProfileSummary, after: ProfileSummary }
+
+-- Shop and cosmetics (docs/MONETIZATION.md 3, 10). Item data is in Shared.Catalogue, the rules in Sim.Shop.
+
+export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
+export type CosmeticSlot = "Flag" | "Border" | "Shades" | "Token" | "Frame" | "Victory" | "Emote" | "PowerFx"
+
+export type CatalogueItem = {
+	id: string,
+	slot: CosmeticSlot,
+	rarity: Rarity,
+	name: string,
+	art: string, -- the design the client draws (CosmeticArt), or the icon of an emote, effect or animation
+	glory: number?, -- Glory price; nil = not sold for Glory
+	robux: number?, -- list price in Robux (the shop shows MarketplaceService's live price); nil = not sold for Robux
+	free: boolean?, -- everyone owns it: the defaults
+	vipOnly: boolean?, -- comes with the VIP pass, never sold alone
+	power: PrimordialPower?, -- PowerFx: the power it re-skins
+	animated: boolean?,
+}
+
+-- A pass or developer product that grants several items: VIP, the starter pack, nation skin sets.
+export type ShopOffer = {
+	id: string,
+	kind: "Pass" | "Product",
+	name: string,
+	icon: string,
+	items: { string },
+	robux: number, -- list price
+	oncePerAccount: boolean,
+}
+
+-- One Robux purchase in the receipt ledger (newest last). item: the catalogue item or offer id.
+export type PurchaseRecord = { product: number, robux: number, at: number, item: string? }
+
+-- One nation's equipped cosmetics, replicated next to MatchState (Snapshot.cosmetics). Item ids; bots and nations
+-- without a player get the defaults. powerFx: power name -> PowerFx item id (missing = the default look).
+export type NationCosmetics = {
+	nation: NationId,
+	flag: string,
+	border: string,
+	shades: string,
+	token: string,
+	frame: string,
+	victory: string,
+	powerFx: { [string]: string },
+	vip: boolean,
+}
+
+-- Shop requests: CommandRouter checks the shape, Sim.Shop the rules. Equipping an item puts it in its slot.
+export type ShopIntent =
+	{ kind: "Buy", item: string, currency: "Glory" | "Robux" }
+	| { kind: "Equip", item: string }
+	| { kind: "Emote", item: string }
+
+-- What a player sees of their own shop state (the Shop remote, after every change).
+export type ShopView = {
+	owned: { string }, -- item and offer ids
+	equipped: { [string]: string }, -- equip key -> item id
+	vip: boolean,
+	history: { PurchaseRecord }, -- newest first
+	robuxOpen: boolean, -- Robux purchases are open now (never during a match)
+	starterOffer: boolean, -- show the starter-pack offer now (at most once per session)
+	testMode: boolean, -- some product ids are still 0: Studio grants those purchases free
+}
 
 return {}

@@ -165,6 +165,25 @@ Config.Progression = {
 	},
 }
 
+-- Shop (docs/MONETIZATION.md 3.1–3.5): prices by rarity, offers, emotes. Robux numbers are list prices: the shop
+-- shows MarketplaceService's live price once a product id is set (Shared.Catalogue), so managed pricing can test it.
+-- Glory is never sold.
+
+Config.Shop = {
+	RobuxPrice = { Common = 49, Rare = 99, Epic = 149, Legendary = 249 },
+	GloryPrice = { Common = 500, Rare = 1200, Epic = 2500 }, -- Legendary: Robux, season pass or achievement only
+	EmoteRobux = { Static = 25, Animated = 49 },
+	EmoteGlory = { Static = 300, Animated = 500 },
+	VipRobux = 249, -- game pass
+	StarterPackRobux = 149, -- once per account
+	RareSetRobux = 199, -- nation skin set: flag + border + token
+	StarterPackAfterMatches = 2, -- the starter-pack offer pops up (once per session) from this many finished matches
+	EmoteCooldownTicks = 10, -- one capital emote per player per this many seconds
+	EmoteShowSeconds = 3, -- how long an emote shows over the capital
+	VipQuestRerolls = 1, -- extra daily quest reroll for VIP (read by the quests task)
+	HistoryShown = 20, -- newest Robux purchases on the Purchase History screen
+}
+
 -- Network and security ---------------------------------------------------------------------------
 
 Config.Net = {

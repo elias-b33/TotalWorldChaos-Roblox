@@ -23,6 +23,7 @@ local MatchService = require(Server.Services.MatchService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
+local ShopService = require(Server.Services.ShopService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -39,6 +40,7 @@ local function startMatch()
 	for _, player in Players:GetPlayers() do
 		Replicator.sendSnapshot(player, state, MatchService.seat(player))
 	end
+	ShopService.onPhase("Peace")
 	print(string.format("[server] match started on %s", state.mapId))
 end
 
@@ -47,6 +49,7 @@ local function openLobby()
 	LobbyService.open(MatchService.lockedMap())
 	CommandRouter.clear()
 	Replicator.sendLobby(LobbyService.view())
+	ShopService.onPhase("Lobby")
 	print("[server] lobby open: vote on the map")
 end
 
@@ -73,6 +76,7 @@ local function startDraftedMatch()
 	end
 	Replicator.sendLobby(LobbyService.view()) -- "None": the lobby screens close
 	Replicator.notifyAll("Phase", "🕊 The match begins! Expand and build")
+	ShopService.onPhase("Peace") -- Robux purchases close for the match
 	print(string.format("[server] match started on %s", state.mapId))
 end
 
@@ -89,6 +93,14 @@ Replicator.init()
 CommandRouter.init(MatchService.nationOf)
 PlayerDataService.init()
 ProgressionService.init(MatchService.current)
+ShopService.init(function(): string
+	if LobbyService.active() then
+		return LobbyService.phase()
+	end
+	local state = MatchService.current()
+	return if state then state.phase else "Lobby"
+end, MatchService.current, MatchService.nationOf)
+Replicator.setCosmetics(ShopService.cosmetics)
 nextMatch()
 
 Players.PlayerAdded:Connect(function(player)
@@ -124,6 +136,9 @@ local function tick()
 	ProgressionService.afterTick(state) -- match stats from this tick's events; XP and Glory at Results
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
+	end
+	if newPhase then
+		ShopService.onPhase(newPhase) -- after the rewards: the starter-pack offer counts finished matches
 	end
 	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
 end

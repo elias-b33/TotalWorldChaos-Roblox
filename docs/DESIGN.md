@@ -365,6 +365,10 @@ export type Command =
 | `Delta` | server → client | changed provinces, nations, armies, events |
 | `ArmyPositions` (unreliable) | server → client | armyId, from, to, progress |
 | `Notify` | server → client | toast type and text |
+| `RequestBuy` | client → server | itemId, "Glory" or "Robux" |
+| `RequestEquip` | client → server | itemId |
+| `RequestEmote` | client → server | emote itemId |
+| `Shop` | server → client | your owned and equipped items, VIP, purchase history, whether Robux purchases are open, the starter-pack offer |
 
 ## UI and controls
 
@@ -473,10 +477,10 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Map vote in the Lobby with the three vote cards
 - [ ] Tutorial match
 - [x] Progression rules in Sim: match XP and Glory, level curve, ranks
-- [ ] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards (XP, Glory, saving and the Results rewards are done; items and receipts are connected with the shop)
+- [x] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards
 - [ ] Daily and weekly quests, login calendar, play streak
-- [ ] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
-- [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote
+- [x] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
+- [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote (flags, border styles, shade sets, tokens, emotes, victory animations and nameplate frames are done; power effects have their data and the `Cosmetics.powerEffect` hook for the effects task; the theme vote waits for map themes)
 - [ ] Private server settings
 - [ ] Sound and effects for battles and Primordial powers
 
