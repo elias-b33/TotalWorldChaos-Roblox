@@ -57,6 +57,21 @@ Joining mid-match takes over a bot's nation. For Studio solo tests (and the harn
 - A player who leaves is replaced by a bot instantly, so the map never has dead nations.
 - The match remembers which nation each player held. A player who rejoins gets that nation back while a bot still runs it, or rises as its Primordial if it was eliminated meanwhile, so leaving never trades a dying nation for a healthy one. Newcomers take a nation nobody held before; a held nation goes to a newcomer only when no other is free. Someone joining during Results isn't seated (they watch and get a nation in the next match); a bot's order still queued for a nation a player has just taken is dropped.
 
+## Sandbox (singleplayer)
+
+A world of your own, WorldBox style: the ten nations of a map play as bots while you watch, lead any people you like, cast every Primordial power for free and set the speed of time. No end and no rewards. It keeps WorldBox's powers and time controls, not its terrain painting or creatures (those stay cut, see the table above).
+
+- **Where:** a sandbox needs a server of its own, so it runs on a reserved server of the same place, like the tutorial. The entry point is `Intents.enterSandbox(mapId?)` on the client (`RequestSandbox "Enter"` → `SandboxService.enter(player, mapId?)`): from any server it teleports the player to a fresh reserved server with teleport data `{ mode = "sandbox", map = mapId }`; on a sandbox server it starts a new world instead. The start menu's Singleplayer button calls it. A reserved server learns what it is for from its first player's teleport data (`ServerMode`); without `mode = "sandbox"` it plays the tutorial as before. The data comes through the client, so a forged one could only swap a tutorial for a sandbox, and neither pays anything. A new player sent to a sandbox is never sent on to the tutorial. **World → Play online** goes back to a public server; a failed teleport is a toast and the button works again. In Studio (no teleports, no reserved servers) the Workspace attribute `Sandbox` (`true`, or a map id) makes the server a sandbox from the start; `MapId` works too.
+- **The world:** the map the player was sent with (the default map otherwise), all ten nations as Normal bots (`Config.Sandbox.Difficulty`), no Lobby. A player arrives **watching**. **World → New world** starts over on any of the three maps, at 1× with disasters off, everyone watching again.
+- **Play as (take over any nation):** two taps, Play as then a nation, any time. The player leads that nation from then on, with its land, armies, gold, wars and alliances; the nation they leave goes back to a bot at once (the bots plan for it from the next tick). **Watch** gives the nation back and keeps only the powers. Every people of the map is playable this way, one after another. Only a living nation nobody else holds can be taken (another player's is "Taken": only Studio tests have two). A player whose nation falls goes back to watching: no Primordial rises, since their powers are free anyway.
+- **Free powers:** all six Primordial powers, with no charges, in every phase (Peace too), whether the player leads a nation or watches. The targeting rules stay: never a mountain, Earthquake only on a province with a building, Rebels, Blessing and Shield on a nation's province, Meteor on an army, Plague on a nation. The 30 s immunity is off for the whole world, and a harmful power may hit the player's own nation (it's their world). Bots still pay with their nations' charges and wait for War, as in a match.
+- **Time:** pause, 1×, 2× and 4× (`Config.Sandbox.Speeds`): the server runs that many ticks a second. Its loop wakes every `Config.Sandbox.BeatSeconds` (0.25 s) and runs a tick whenever the speed has gathered a game second; a late beat catches up at most `MaxTicksPerBeat` ticks. Paused, the clock stops and the bots wait, but orders and powers still land within a beat. The controls travel in the snapshot and its deltas (`MatchState.sandbox`), so the client's clock and the armies' glide follow the speed, and stand still when paused.
+- **Phases:** the usual Peace (3:00, so the peoples spread over the neutral land first), then War for ever. No Cataclysm, no Results, no win check: domination, alliance victory and 25:00 end nothing. The top bar's clock counts up.
+- **Disasters:** off at the start. **World → Disasters** switches them on: a random harmful power on a random valid target (the Cataclysm's rule) every 60 s from that moment, in any phase, until switched off.
+- **No rewards:** no XP, Glory, quests, login calendar, achievements, season pass or leaderboard progress (the sandbox never tracks match stats, and `Progression.matchReward` pays 0 for one). Analytics send only `sandbox_started` (`docs/LAUNCH.md`) and the economy events of real purchases; no funnels, onboarding steps or match events. The shop works as during a match (Robux purchases stay closed).
+- **Authority:** every sandbox action is a `RequestSandbox` intent through `CommandRouter` (shape and rate limit), then `SandboxService`, which accepts it only on a sandbox server (`NotSandbox` elsewhere; `Enter` works anywhere). These run at once rather than at the next tick, so the time controls work while paused. Powers are ordinary `RequestPower` commands: in a sandbox `Sim.Commands` casts a player's power for free. Bots keep sending the same commands as players. Rules: `Sim/Sandbox.luau`, and the sandbox cases in `Settings.timing`, `Tick`, `Primordial` and `Progression`.
+- **UI:** a small panel at the top left, under the top bar (`UI/Sandbox`): the four time tabs (the selected one in gold), **Play as**, ✨ **Powers** (the usual power picker, opened beside the panel, every power free; the round power button stays hidden) and ⚙ **World**. Play as and World open in the panel's place, with ✕ to close. Every decision is two taps; it fits 844×390 and 667×375.
+
 ## Core systems
 
 Two resources (gold and manpower), a cast of five races on every map (fifteen in all), three shared troop roles plus one elite per race, and one siege rule carry the whole game. Every number below is a starting value for playtests and lives in one `Config` module.
@@ -219,6 +234,7 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 - Rebels besiege the province they rise in; when the siege ends it turns neutral. On the map they are a black 🏴 token that always shows, unlike neutral garrisons.
 - A Primordial may target anyone, including the nation that eliminated them.
 - Cataclysm disasters are a random harmful power on a random valid nation target (seeded), every 60 s from 21:00.
+- A sandbox world ("Sandbox") turns the immunity off, lets its player cast every power for free in any phase, and runs disasters only while its player has them on.
 
 ### Catch-up
 
@@ -250,6 +266,7 @@ src/
     GameLoop.server.luau       -- match phases + 1 s tick
     CommandRouter.luau         -- validates every intent from players and bots
     Replicator.luau            -- snapshot on join, deltas each tick
+    ServerMode.luau            -- what this server is for: matches, the tutorial or a sandbox (reserved servers)
     Services/                  -- thin Roblox wrappers around shared/Sim
       MapService.luau          -- provinces, ownership, neighbours, pathfinding
       EconomyService.luau      -- income, upkeep, buildings, development
@@ -260,6 +277,7 @@ src/
       MatchService.luau        -- phases, win checks, scoring
       PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
       TutorialService.luau     -- the tutorial match on a reserved server (Phase 4)
+      SandboxService.luau      -- the singleplayer sandbox on a reserved server: intents, teleports in and out
   client/
     MapView.luau               -- the 2D map GUI: pan, pinch zoom, taps
     PixelArt.luau              -- paints the pixel-art map (terrain, owners, borders) into an image buffer
@@ -289,6 +307,8 @@ tools/mapgen/                  -- Python generator for everything in assets/
 7. Bots plan (staggered: 1–2 bots per tick).
 8. Check win conditions and phase changes.
 9. Send one delta to every client.
+
+A sandbox server ("Sandbox") runs the same order at the speed its player sets (none paused, up to 4 ticks a second), without the win check and without match stats, rewards or analytics.
 
 ### Networking
 
@@ -490,6 +510,7 @@ export type Command =
 | `Shop` | server → client | your owned and equipped items, VIP, purchase history, whether Robux purchases are open, the starter-pack offer |
 | `RequestAd` | client → server | the rewarded video placement (`quest_reroll`); the reply comes when the video ends |
 | `NotificationPrompt` | server → client | after your first finished match: ask to turn on experience notifications (once per profile) |
+| `RequestSandbox` | client → server | `Enter` map (from any server: off to a new sandbox world), `Leave`, `Speed` 0/1/2/4, `Play` nation (0 = watch), `Disasters` on, `NewWorld` map; all but `Enter` only on a sandbox server ("Sandbox") |
 
 ## UI and controls
 
@@ -684,6 +705,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Rotating shop
 - [x] Weekly, friends and global leaderboards; achievements
 - [x] Rewarded video quest reroll; experience notifications
+- [x] Singleplayer sandbox ("Sandbox"): a reserved server of your own, all ten nations as bots, Play as any nation, free powers, pause to 4×, no end and no rewards (harness scenario `sandbox`)
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 
 ## Open questions

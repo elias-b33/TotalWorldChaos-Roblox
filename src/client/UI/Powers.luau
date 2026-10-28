@@ -105,19 +105,26 @@ local function closeAll()
 	clearHighlight()
 end
 
+-- A sandbox world: every power is free, whether you hold a nation or watch (Sim.Sandbox).
+local function free(): boolean
+	local snap = ClientState.snapshot()
+	return snap ~= nil and snap.setup.sandbox == true
+end
+
 local function refreshButton()
 	local snap = ClientState.snapshot()
 	local charges = if snap and not snap.setup.settings.powers then nil else ClientState.myCharges() -- off: no button
-	powerButton.Visible = charges ~= nil
+	-- in a sandbox the sandbox panel's Powers button opens the picker instead (UI/Sandbox)
+	powerButton.Visible = charges ~= nil and not free()
 	chargesLabel.Text = tostring(charges or 0)
-	if charges == nil then
+	if charges == nil and not free() then
 		closeAll()
 	end
 end
 
 local function renderPicker()
 	Widgets.clear(picker)
-	local charges = ClientState.myCharges() or 0
+	local charges = if free() then math.huge else ClientState.myCharges() or 0
 	for i, power in Primordial.POWERS do
 		local cost = Primordial.cost(power)
 		local enough = charges >= cost
@@ -125,7 +132,7 @@ local function renderPicker()
 			picker,
 			POWER_ICONS[power],
 			power,
-			{ { "charge", tostring(cost) } },
+			if free() then {} else { { "charge", tostring(cost) } },
 			Vector2.new(PICK_WIDTH, PICK_HEIGHT),
 			Widgets.SPECIAL,
 			function()
@@ -153,6 +160,7 @@ local function renderBar()
 	barTitle.Text = power
 	Icons.set(barTitleIcon, POWER_ICONS[power])
 	barCost.Text = tostring(Primordial.cost(power))
+	barCost.Visible = not free()
 	Widgets.setIconText(
 		barHint,
 		if target then "➜ " .. targetText else blocked or HINTS[Primordial.TARGETS[power]],
@@ -359,22 +367,36 @@ local function refreshPrimordial()
 	wasPrimordial = isPrimordial
 end
 
+-- Open the picker of the six powers, or close it (and any power waiting for a target) if it is open.
+function Powers.toggle()
+	if picker.Visible then
+		closeAll()
+		return
+	end
+	closeAll()
+	onOpen()
+	renderPicker()
+	picker.Visible = true
+end
+
+-- True while the picker is open.
+function Powers.isOpen(): boolean
+	return picker.Visible
+end
+
+-- Move the picker (the sandbox panel opens it beside itself instead of above the power button).
+function Powers.placePicker(anchor: Vector2, position: UDim2)
+	picker.AnchorPoint = anchor
+	picker.Position = position
+end
+
 function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	toast = showToast
 	onOpen = openHandler
 	local gui = Widgets.screen("Powers", 4)
 
 	-- the power button: a big purple sparkle with your charges in a badge
-	powerButton = Widgets.iconButton(gui, "sparkles", "PowerButton", BUTTON_SIZE, Widgets.SPECIAL, function()
-		if picker.Visible then
-			closeAll()
-			return
-		end
-		closeAll()
-		onOpen()
-		renderPicker()
-		picker.Visible = true
-	end)
+	powerButton = Widgets.iconButton(gui, "sparkles", "PowerButton", BUTTON_SIZE, Widgets.SPECIAL, Powers.toggle)
 	powerButton.AnchorPoint = Vector2.new(1, 1)
 	powerButton.Position = UDim2.new(1, -14, 1, -14)
 	powerButton.Visible = false

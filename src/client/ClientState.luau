@@ -60,6 +60,16 @@ function ClientState.init()
 		end
 		Snapshot.apply(current, delta)
 		tickReceivedAt = os.clock()
+		if current.setup.sandbox and #delta.nations > 0 then
+			-- a sandbox player takes nations over and lets them go: the nation that names us is ours (0 = watching).
+			-- Set before the listeners run, so every screen redraws for the new nation.
+			myNationId = 0
+			for _, n in current.nations do
+				if n.userId == Players.LocalPlayer.UserId then
+					myNationId = n.id
+				end
+			end
+		end
 		for _, a in delta.armies do
 			if a.next == 0 then
 				positions[a.id] = nil
@@ -158,12 +168,24 @@ function ClientState.myCharges(): number?
 	return nil
 end
 
--- Match tick, counted forward locally between deltas (deltas only arrive when something changed).
+-- A sandbox world's controls (time, disasters), or nil in a match.
+function ClientState.sandbox(): Types.SandboxState?
+	return if snapshot then snapshot.sandbox else nil
+end
+
+-- How fast the world's clock runs: 1 in a match; a sandbox's speed (0 while paused).
+function ClientState.timeScale(): number
+	local controls = ClientState.sandbox()
+	return if controls then controls.speed else 1
+end
+
+-- Match tick, counted forward locally between deltas (deltas only arrive when something changed), at the world's
+-- speed.
 function ClientState.tick(): number
 	if snapshot == nil then
 		return 0
 	end
-	return snapshot.tick + math.floor(os.clock() - tickReceivedAt)
+	return snapshot.tick + math.floor((os.clock() - tickReceivedAt) * ClientState.timeScale())
 end
 
 return ClientState

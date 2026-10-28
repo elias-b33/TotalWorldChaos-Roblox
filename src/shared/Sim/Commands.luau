@@ -162,7 +162,11 @@ end
 -- A bot (userId nil) acts for its nation while a bot still runs it: once a player has taken the nation over, a
 -- bot command still in the queue is refused (bots get no reply, so it is dropped silently). A player (userId set; nationId is the nation they hold, if any) acts
 -- for their living nation, or as their Primordial once it is eliminated. Anyone else is spectating.
+-- In a sandbox world a player's powers are free and need no nation (Sim.Sandbox); bots still pay theirs.
 function Commands.applyFor(state: MatchState, userId: number?, nationId: number?, command: Command): (boolean, string?)
+	if userId and state.setup.sandbox and command.kind == "Power" then
+		return Primordial.use(state, { userId = userId, free = true }, command.power, command.target)
+	end
 	local nation = if nationId then state.nations[nationId] else nil
 	if nationId and nation and not nation.eliminated then
 		local mine = if userId then nation.userId == userId else nation.controller == "Bot" and nation.userId == nil

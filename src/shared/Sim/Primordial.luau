@@ -9,6 +9,8 @@
 -- Meteor targets an army: the army's owner must not be immune and becomes immune. It kills half of every troop type
 -- in the army. The development level it also costs the province is skipped while that province's owner is immune,
 -- and doesn't start their immunity. Rebels are infantry.
+-- A sandbox world (Sim.Sandbox) has no immunity at all, and its player casts for free (a `free` caster) in every
+-- phase, holding a nation or watching; its disasters run while its player has them switched on.
 
 local Army = require("./Army")
 local Config = require("../Config")
@@ -22,10 +24,16 @@ type Power = Types.PrimordialPower
 
 export type TargetKind = "Army" | "Nation" | "Province"
 
--- A living nation (nation set) or an eliminated player's Primordial (userId set).
-export type Caster = { nation: number?, userId: number? }
+-- A living nation (nation set) or an eliminated player's Primordial (userId set). `free`: a sandbox player (userId
+-- set), who needs no charges and pays none.
+export type Caster = { nation: number?, userId: number?, free: boolean? }
 
 local Primordial = {}
+
+-- The 30 s immunity to harmful powers: on in every match, off in a sandbox world.
+local function immunityOn(state: MatchState): boolean
+	return state.setup.sandbox ~= true
+end
 
 -- Fixed order: events carry a power as its index in this list.
 Primordial.POWERS = { "Meteor", "Plague", "Rebels", "Earthquake", "Blessing", "Shield" } :: { Power }
@@ -129,7 +137,12 @@ function Primordial.check(state: MatchState, power: Power, target: number): (num
 			return nil, 0, "BadTarget" -- Rebels, Blessing and Shield need a nation's province
 		end
 	end
-	if Primordial.HARMFUL[power] and hit ~= 0 and state.nations[hit].powerImmuneUntil > state.tick then
+	if
+		Primordial.HARMFUL[power]
+		and hit ~= 0
+		and immunityOn(state)
+		and state.nations[hit].powerImmuneUntil > state.tick
+	then
 		return nil, 0, "Immune"
 	end
 	return hit, at, nil
@@ -164,7 +177,7 @@ local function strike(state: MatchState, power: Power, target: number, hit: numb
 	elseif power == "Shield" then
 		state.provinces[target].shieldUntil = state.tick + p.Shield.ticks
 	end
-	if Primordial.HARMFUL[power] and hit ~= 0 then
+	if Primordial.HARMFUL[power] and hit ~= 0 and immunityOn(state) then
 		state.nations[hit].powerImmuneUntil = state.tick + Config.Primordial.ImmunityTicks
 	end
 	return killed
@@ -182,8 +195,13 @@ function Primordial.chargesOf(state: MatchState, caster: Caster): number?
 end
 
 -- Cast a power: phase, charges and target are all checked here. Returns true, or false plus a reason code.
+-- A free caster (a sandbox player) needs no charges, pays none and may cast in Peace; only a sandbox world has one.
 function Primordial.use(state: MatchState, caster: Caster, power: Power, target: number): (boolean, string?)
-	local charges = Primordial.chargesOf(state, caster)
+	local free = caster.free == true
+	if free and (state.setup.sandbox ~= true or caster.userId == nil) then
+		return false, "NotSandbox"
+	end
+	local charges = if free then math.huge else Primordial.chargesOf(state, caster)
 	if charges == nil then
 		return false, "NoNation"
 	end
@@ -193,11 +211,11 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 	if not state.setup.settings.powers then
 		return false, "PowersOff" -- a private server's setting
 	end
-	if state.phase == "Peace" then
+	if state.phase == "Peace" and not free then
 		return false, "NoPowersYet"
 	elseif state.phase == "Results" then
 		return false, "MatchOver"
-	elseif state.phase ~= "War" and state.phase ~= "Cataclysm" then
+	elseif state.phase ~= "War" and state.phase ~= "Cataclysm" and not (free and state.phase == "Peace") then
 		return false, "WrongPhase"
 	end
 	if Primordial.TARGETS[power] == "Army" then
@@ -214,13 +232,14 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 	if charges < cost then
 		return false, "NotEnoughCharges"
 	end
-	if caster.nation then
+	if caster.nation and not free then
 		state.nations[caster.nation].charges -= cost
-	elseif caster.userId then
+	elseif caster.userId and not free then
 		state.primordials[caster.userId].charges -= cost
 	end
 	local killed = strike(state, power, target, hit, at)
-	-- the caster's nation (a Primordial's: the one it held) goes along, so clients show its power-effect cosmetic
+	-- the caster's nation (a Primordial's: the one it held; a sandbox player's: the one they hold, if any) goes along,
+	-- so clients show its power-effect cosmetic
 	local by = caster.nation or (if caster.userId then state.seats[caster.userId] else nil)
 	Events.push(state, "Power", Primordial.index(power), hit, at, by, killed)
 	return true, nil
@@ -337,7 +356,13 @@ function Primordial.eliminate(state: MatchState, nationId: number)
 	state.offers = offers
 
 	local userId = nation.userId
-	if nation.controller == "Player" and userId then
+	if nation.controller == "Player" and userId and state.setup.sandbox then
+		-- a sandbox player whose people fall goes back to watching (Sim.Sandbox): no Primordial rises, since their
+		-- powers are free anyway, and they can take over any nation still alive
+		nation.controller = "Bot"
+		nation.userId = nil
+		state.seats[userId] = nil
+	elseif nation.controller == "Player" and userId then
 		local existing = state.primordials[userId]
 		local charges =
 			math.min(Config.Primordial.MaxCharges, nation.charges + (if existing then existing.charges else 0))
@@ -424,8 +449,14 @@ function Primordial.targets(state: MatchState, power: Power): { number }
 end
 
 -- True on the ticks a Cataclysm disaster strikes: every CataclysmDisasterTicks after the Cataclysm begins (never
--- when a private server turned disasters off).
+-- when a private server turned disasters off). A sandbox world has no Cataclysm: its disasters strike every
+-- CataclysmDisasterTicks from the moment its player switched them on, in any phase, until they switch them off.
 function Primordial.disasterDue(state: MatchState): boolean
+	local controls = state.sandbox
+	if controls then
+		local fromOn = state.tick - controls.disastersFrom
+		return controls.disasters and fromOn > 0 and fromOn % Config.Primordial.CataclysmDisasterTicks == 0
+	end
 	local since = state.tick - Settings.timing(state.setup).warEnd
 	return state.setup.settings.disasters
 		and state.phase == "Cataclysm"

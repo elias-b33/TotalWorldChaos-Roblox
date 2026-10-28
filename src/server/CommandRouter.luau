@@ -341,6 +341,44 @@ function CommandRouter.onTutorial(handler: (Player, string) -> ())
 	end)
 end
 
+-- Sandbox intents (docs/DESIGN.md "Sandbox"): action and one value, "Enter" map | "Leave" | "Speed" ticks per second
+-- | "Play" nation (0 = watch) | "Disasters" on | "NewWorld" map. The shape and the rate limit are checked here, then
+-- `handler` (SandboxService, which accepts all but Enter only on a sandbox server) runs at once: the time controls
+-- must work while the world is paused, when no tick applies the queue. The player gets CommandResult with its answer.
+function CommandRouter.onSandbox(handler: (Player, Types.SandboxIntent) -> (boolean, string?))
+	Remotes.event("RequestSandbox").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, action: unknown, value: unknown)
+			if not isId(requestId) then
+				return
+			end
+			local id = requestId :: number
+			local intent: Types.SandboxIntent? = nil
+			local map = if value == nil then "" else value
+			local isMap = type(map) == "string" and #map <= MAX_MAP_ID
+			if action == "Enter" and isMap then
+				intent = { kind = "Enter", map = map :: string }
+			elseif action == "NewWorld" and isMap then
+				intent = { kind = "NewWorld", map = map :: string }
+			elseif action == "Leave" then
+				intent = { kind = "Leave" }
+			elseif action == "Speed" and isAmount(value) then
+				intent = { kind = "Speed", speed = value :: number }
+			elseif action == "Play" and isAmount(value) then
+				intent = { kind = "Play", nation = value :: number }
+			elseif action == "Disasters" and type(value) == "boolean" then
+				intent = { kind = "Disasters", on = value :: boolean }
+			end
+			if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+				reply(player, id, false, "TooFast")
+			elseif intent == nil then
+				reply(player, id, false, "BadRequest")
+			else
+				local ok, reason = handler(player, intent)
+				reply(player, id, ok, reason)
+			end
+		end)
+end
+
 -- Rewarded video requests (the placement name, at most MAX_ITEM_ID long): the shape and the rate limit are checked
 -- here, then `handler` runs in its own thread (it yields while the ad plays) and the player gets CommandResult with
 -- its answer. AdRewardService checks the rules (Sim.Ads).

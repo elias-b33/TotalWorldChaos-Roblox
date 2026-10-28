@@ -7,7 +7,6 @@
 local Config = require("../../../src/shared/Config")
 local Emulator = require("../Emulator")
 local H = require("../H")
-local within = H.within
 
 local function run()
 	local ShopRotation = require("../../../src/shared/Sim/ShopRotation")

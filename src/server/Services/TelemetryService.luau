@@ -12,7 +12,8 @@
 --   SeasonPass funnel  ready (TelemetryService.seasonPass), unused until the season pass exists
 --   Economy            Glory sources (match_reward, level_up) and sinks (shop items); Robux IAP sinks
 --   Progression        AccountLevel (Complete for each level passed, Start for the new one); SeasonTier ready
---   Custom events      the 16 in LAUNCH.md plus tutorial_skipped (Sim.Telemetry.CUSTOM_EVENTS)
+--   Custom events      the 18 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
+--                      sandbox_started and the economy
 --
 -- AnalyticsService only accepts events from servers of a published game: in Studio the calls go nowhere. Set a
 -- "TelemetryLog" attribute on Workspace in Studio to print every event to the Output instead (docs/STUDIO.md).
@@ -129,9 +130,14 @@ local function deliver(player: Player, e: Event)
 end
 
 -- Send one event (for `player`, or the Player its userId names). Dropped past the budget or with nobody to send for.
+-- A sandbox server sends only sandbox_started and the economy (Sim.Telemetry.sandboxAllows): no funnels.
 function TelemetryService.send(e: Event, player: Player?)
 	local target = player or playerFor(e)
 	if target == nil then
+		return
+	end
+	local state = MatchService.current()
+	if state and state.setup.sandbox and not Telemetry.sandboxAllows(e) then
 		return
 	end
 	local ok, dropped = Telemetry.allow(budget, os.clock(), #Players:GetPlayers())
@@ -191,6 +197,11 @@ end
 function TelemetryService.tutorialSkipped(player: Player, prompt: number)
 	local name = Tutorial.STEPS[prompt] or "done"
 	TelemetryService.send(Telemetry.custom("tutorial_skipped", prompt, { name }, player.UserId), player)
+end
+
+-- A sandbox world started for this player ("first" on arrival, "new_world" for another one).
+function TelemetryService.sandboxStarted(player: Player, mapId: string, start: string)
+	TelemetryService.send(Telemetry.sandboxStarted(mapId, start, player.UserId), player)
 end
 
 -- MatchFlow -----------------------------------------------------------------------------------------------------

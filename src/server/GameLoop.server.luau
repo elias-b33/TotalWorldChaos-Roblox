@@ -3,7 +3,9 @@
 -- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 7 (bots) is AIService, step 9 is
 -- Replicator. Between matches the Lobby runs instead (map vote, then nation draft; LobbyService), unless Workspace
 -- has SkipLobby set, which starts every match straight away. A tutorial server (TutorialService) skips the Lobby too
--- and plays the tutorial match.
+-- and plays the tutorial match. A sandbox server (SandboxService) plays one never-ending world in its own loop, at
+-- the speed its player sets. A reserved server first waits for its player to learn which of the two it is
+-- (ServerMode).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +14,7 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Sandbox = require(Shared.Sim.Sandbox)
 local Types = require(Shared.Types)
 
 Remotes.create()
@@ -26,6 +29,8 @@ local MatchService = require(Server.Services.MatchService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
+local SandboxService = require(Server.Services.SandboxService)
+local ServerMode = require(Server.ServerMode)
 local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
 local QuestService = require(Server.Services.QuestService)
@@ -41,9 +46,11 @@ local PHASE_TOASTS = {
 	Results = "The match is over",
 }
 
--- A tutorial match seats its player in the tutorial nation.
+-- A tutorial match seats its player in the tutorial nation; a sandbox player arrives watching.
 local function seat(player: Player): number?
-	if TutorialService.active() then
+	if SandboxService.enabled() then
+		return SandboxService.seat(player)
+	elseif TutorialService.active() then
 		return TutorialService.seat(player)
 	end
 	return MatchService.seat(player)
@@ -124,6 +131,78 @@ local function startDraftedMatch()
 	print(string.format("[server] match started on %s", state.mapId))
 end
 
+-- The sandbox ----------------------------------------------------------------------------------------------------
+
+-- A new sandbox world on a map: every nation a bot, everyone here watching, no Lobby (docs/DESIGN.md "Sandbox").
+local function startSandbox(mapId: string)
+	TutorialService.stop()
+	local state = MatchService.start(mapId, Sandbox.setup())
+	state.theme = MatchService.forcedTheme(nil) -- the server's theme (Workspace "Theme"), or classic
+	SandboxService.start(state)
+	CommandRouter.clear()
+	AIService.reset(Config.Sandbox.Difficulty)
+	Replicator.reset(state)
+	for _, player in Players:GetPlayers() do
+		Replicator.sendSnapshot(player, state, SandboxService.seat(player))
+	end
+	ShopService.onPhase(state.phase)
+end
+
+-- One sandbox tick: the match's tick order without its end (Sim.Sandbox) and without match stats, rewards or
+-- analytics (a sandbox pays nothing and logs only sandbox_started).
+local function sandboxTick(state: Types.MatchState)
+	DevService.step(state) -- Studio-only test switches
+	CommandRouter.applyQueued(state) -- 1. apply queued commands
+	local newPhase = MatchService.advance() -- 2-8. armies, battles, sieges, income, powers (no win check)
+	AIService.step(state) -- 7. bots plan
+	if newPhase and PHASE_TOASTS[newPhase] then
+		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
+	end
+	Replicator.broadcast(state) -- 9. one delta to every client
+end
+
+-- The sandbox's loop: a beat every Config.Sandbox.BeatSeconds runs a tick whenever the world's speed has gathered a
+-- game second (4× ticks at every beat, 1× at every fourth). Paused, the clock stops and the bots wait, but orders and
+-- powers still land at each beat. The controls and a take-over are sent at the next beat whether or not it ticked.
+local function runSandbox()
+	local owed = 0 -- game seconds the clock owes
+	local last = os.clock()
+	while true do
+		task.wait(Config.Sandbox.BeatSeconds)
+		local now = os.clock()
+		local ok, err = pcall(function()
+			local newWorld = SandboxService.takeNewWorld()
+			if newWorld then
+				startSandbox(newWorld)
+				owed = 0
+				return
+			end
+			local state = MatchService.state()
+			local speed = SandboxService.speed()
+			local changed = SandboxService.takeChanged()
+			CommandRouter.applyLobbyQueued(nil) -- votes and picks mean nothing here
+			local ran = 0
+			owed += (now - last) * speed
+			while owed >= Config.TickSeconds and ran < Config.Sandbox.MaxTicksPerBeat do
+				owed -= Config.TickSeconds
+				ran += 1
+				sandboxTick(state)
+			end
+			owed = math.min(owed, Config.TickSeconds) -- a long stall is skipped, not replayed
+			if ran == 0 and speed == 0 then
+				CommandRouter.applyQueued(state) -- paused: orders and powers land, the clock stays
+			end
+			if ran == 0 and (speed == 0 or changed) then
+				Replicator.broadcast(state)
+			end
+		end)
+		last = now
+		if not ok then
+			warn("[server] sandbox beat failed: " .. tostring(err))
+		end
+	end
+end
+
 -- The next match: the Lobby, or straight into Peace with SkipLobby.
 local function nextMatch()
 	if LobbyService.skipped() or TutorialService.enabled() then
@@ -152,7 +231,13 @@ AchievementService.init() -- after QuestService: its reward hook runs after the 
 LeaderboardService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
-nextMatch()
+SandboxService.init()
+ServerMode.await() -- a reserved server learns from its first player whether it plays the tutorial or a sandbox
+if SandboxService.enabled() then
+	startSandbox(SandboxService.firstMap())
+else
+	nextMatch()
+end
 
 Players.PlayerAdded:Connect(function(player)
 	if LobbyService.active() then
@@ -214,6 +299,10 @@ local function lobbyTick()
 	if drafted then
 		Replicator.broadcast(drafted) -- the picks, as nation changes
 	end
+end
+
+if SandboxService.enabled() then
+	runSandbox() -- never returns: a sandbox world never ends
 end
 
 -- Fixed-rate loop that doesn't drift: each tick is scheduled from the previous target time.

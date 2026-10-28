@@ -655,6 +655,16 @@ Config.Tutorial = {
 	TeleportRetrySeconds = 5, -- ...this long apart
 }
 
+-- The singleplayer sandbox (docs/DESIGN.md "Sandbox"): Sim.Sandbox, Services/SandboxService, UI/Sandbox ----------
+
+Config.Sandbox = {
+	Speeds = { 0, 1, 2, 4 }, -- the time controls: game ticks per real second (0 = paused)
+	StartSpeed = 1,
+	Difficulty = "Normal", -- every bot in a sandbox world
+	BeatSeconds = 0.25, -- the sandbox loop wakes this often: controls and orders land within a beat, even paused
+	MaxTicksPerBeat = 4, -- a late beat catches up at most this many ticks (a longer stall is skipped, not replayed)
+}
+
 -- Analytics (docs/LAUNCH.md "Analytics events"): Services/TelemetryService and Sim.Telemetry -------------------
 
 Config.Telemetry = {

@@ -52,10 +52,14 @@ function Settings.setup(private: boolean, settings: MatchSettings?): MatchSetup
 end
 
 -- Phase boundaries. The Cataclysm always lasts its default length and ends the match; Peace lasts the setting.
+-- A sandbox world (Sim.Sandbox) has the usual Peace, then War for ever: no Cataclysm, no Results.
 function Settings.timing(setup: MatchSetup?): Timing
 	local p = Config.Phases
 	if setup == nil then
 		return { peaceEnd = p.PeaceEndTick, warEnd = p.WarEndTick, matchEnd = p.MatchEndTick }
+	end
+	if setup.sandbox then
+		return { peaceEnd = p.PeaceEndTick, warEnd = math.huge, matchEnd = math.huge }
 	end
 	local s = setup.settings
 	local matchEnd = s.minutes * TICKS_PER_MINUTE

@@ -38,6 +38,7 @@ Telemetry.CUSTOM_EVENTS = {
 	"purchase_failed",
 	"notification_opt_in",
 	"tutorial_skipped",
+	"sandbox_started",
 }
 
 -- The one-time onboarding funnel (LogOnboardingFunnelStepEvent), in step order.
@@ -338,6 +339,19 @@ function Telemetry.powerUsed(state: MatchState, userId: number, power: string): 
 	end
 	local kind = if living then "living" else "primordial"
 	return Telemetry.custom("primordial_power_used", 1, { power, state.mapId, kind }, userId)
+end
+
+-- The sandbox ---------------------------------------------------------------------------------------------------
+
+-- A sandbox world started for a player: start is "first" (they just arrived) or "new_world" (they made another).
+function Telemetry.sandboxStarted(mapId: string, start: string, userId: number): Event
+	return Telemetry.custom("sandbox_started", 1, { mapId, start }, userId)
+end
+
+-- What a sandbox server may send: sandbox_started and the economy events (real Robux and Glory spent in the shop).
+-- No funnels, no onboarding steps, no match or player events: a sandbox is not a match.
+function Telemetry.sandboxAllows(e: Event): boolean
+	return e.kind == "Economy" or (e.kind == "Custom" and e.name == "sandbox_started")
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

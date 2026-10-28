@@ -26,6 +26,7 @@ local EVENTS = {
 	"RequestDefaultTheme", -- shop: true = always show the classic map (the theme opt-out)
 	"RequestAd", -- rewarded video: the placement ("quest_reroll", Sim.Ads.PLACEMENT)
 	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
+	"RequestSandbox", -- sandbox: "Enter" map | "Leave" | "Speed" n | "Play" nation | "Disasters" on | "NewWorld" map
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
