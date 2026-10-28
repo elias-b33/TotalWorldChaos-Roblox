@@ -99,6 +99,65 @@ function H.iconShown(client, icon: string): boolean
 	return false
 end
 
+-- The GUI object named `container` (a shop card, a quest row, a season cell) and everything in it, or nil.
+local function within(client, container: string)
+	local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
+	if root == nil then
+		return nil
+	end
+	local all = root:GetDescendants()
+	table.insert(all, 1, root)
+	return all
+end
+
+-- True when `obj` (or a visible object in it) shows the pixel icon `icon`.
+local function hasIcon(obj, icon: string): boolean
+	for _, d in { obj, table.unpack(obj:GetDescendants()) } do
+		if d:IsA("GuiObject") and d:GetAttribute("Icon") == icon and shown(d) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Press a visible button inside the object named `container` (the container itself counts) whose text contains
+-- `needle` or whose Name is `needle`; with `icon`, the button must also show that pixel icon (a Glory price shows
+-- the medal, a reroll the reroll arrows). Errors if there is none.
+function H.pressIn(client, container: string, needle: string, icon: string?)
+	local all = within(client, container)
+	assert(all, container .. " is not on screen")
+	for _, d in all do
+		local text = d:IsA("TextButton") and string.find(d.Text, needle, 1, true) ~= nil
+		if d:IsA("GuiButton") and shown(d) and (text or d.Name == needle) and (icon == nil or hasIcon(d, icon)) then
+			Emulator.eventOf(d, "Activated"):Fire(nil, 1)
+			return d
+		end
+	end
+	error(container .. " has no button " .. needle .. (if icon then " with the " .. icon .. " icon" else ""))
+end
+
+-- True when a visible text object inside the object named `container` shows a text containing `needle`.
+function H.within(client, container: string, needle: string): boolean
+	for _, d in within(client, container) or {} do
+		if (d:IsA("TextLabel") or d:IsA("TextButton")) and shown(d) and string.find(d.Text, needle, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+-- True when the pixel icon `icon` shows inside the object named `container`.
+function H.iconIn(client, container: string, icon: string): boolean
+	local all = within(client, container)
+	return all ~= nil and hasIcon(all[1], icon)
+end
+
+-- The pixel icon a label or button made by the UI kit shows (its child "Icon"), or nil.
+function H.iconOf(obj): string?
+	local icon = obj and obj:FindFirstChild("Icon")
+	return if icon then icon:GetAttribute("Icon") else nil
+end
+
 -- A server-side module's table, e.g. H.server("Services.MatchService").
 function H.server(path: string)
 	local node = Emulator.server.dm:GetService("ServerScriptService").Server
@@ -1360,17 +1419,7 @@ end
 function scenarios.shop()
 	local ROBUX = utf8.char(0xE002)
 	-- press a button on one shop card (several cards show the same price)
-	local function pressIn(client, container: string, needle: string)
-		local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
-		assert(root, container .. " is not on screen")
-		for _, d in root:GetDescendants() do
-			if d:IsA("TextButton") and string.find(d.Text, needle, 1, true) then
-				Emulator.eventOf(d, "Activated"):Fire(nil, 1)
-				return
-			end
-		end
-		error(container .. " has no button " .. needle)
-	end
+	local pressIn = H.pressIn
 	-- call a server function that may yield (saves) on the emulator's scheduler and wait for its answer
 	local function await(fn, ...)
 		local args = table.pack(...)
@@ -1416,24 +1465,24 @@ function scenarios.shop()
 	-- the shop: offers first
 	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "🏅 3,000") ~= nil, "the shop shows Alice's Glory")
+	H.expect(H.textOf(alice, "Glory") == "3,000" and H.iconShown(alice, "medal"), "the shop shows Alice's Glory")
 	H.expect(Emulator.findText(alice, ROBUX .. " 249") ~= nil, "VIP shows its Robux price")
 	H.shot(alice, "shop_offers")
 
 	-- a flag for Glory
-	Emulator.press(alice, "Flags")
+	Emulator.press(alice, "Tab_Flag")
 	Emulator.run(0.5)
 	H.shot(alice, "shop_flags")
-	pressIn(alice, "Card_flag_sun", "🏅 1,200")
+	pressIn(alice, "Card_flag_sun", "1,200", "medal")
 	Emulator.run(1)
 	local data = Data.data(player)
 	H.expect(data.owned.flag_sun == true and data.glory == 1800, "Rising Sun bought for 1,200 Glory")
-	H.expect(Emulator.findText(alice, "🏅 1,800") ~= nil, "the shop shows the new balance")
+	H.expect(H.textOf(alice, "Glory") == "1,800", "the shop shows the new balance")
 
 	-- too little Glory for the Epic Comet: refused, nothing taken
-	Emulator.press(alice, "▶")
+	Emulator.press(alice, "NextPage")
 	Emulator.run(0.3)
-	pressIn(alice, "Card_flag_comet", "🏅 2,500")
+	pressIn(alice, "Card_flag_comet", "2,500", "medal")
 	Emulator.run(1)
 	H.expect(data.glory == 1800 and data.owned.flag_comet == nil, "a Glory purchase with too little Glory fails cleanly")
 	H.expect(Emulator.findText(alice, "Not enough Glory") ~= nil, "and says why")
@@ -1451,7 +1500,7 @@ function scenarios.shop()
 	pressIn(alice, "Card_flag_comet", "Equip")
 	Emulator.run(1)
 	H.expect(data.equipped.Flag == "flag_comet", "Alice equipped the Comet")
-	H.expect(Emulator.findText(alice, "✅ Equipped") ~= nil, "the card says Equipped")
+	H.expect(H.within(alice, "Card_flag_comet", "Equipped") and H.iconIn(alice, "Card_flag_comet", "check"), "the card says Equipped")
 	H.shot(alice, "shop_flag_equipped")
 
 	-- ProcessReceipt firing twice for one purchase grants once
@@ -1467,36 +1516,36 @@ function scenarios.shop()
 	H.expect(unknown == Emulator.roblox.Enum.ProductPurchaseDecision.NotProcessedYet, "an unknown product is not granted")
 
 	-- VIP (game pass, test mode): the VIP set and the gold frame
-	Emulator.press(alice, "Offers")
+	Emulator.press(alice, "Tab_Offers")
 	Emulator.run(0.3)
 	pressIn(alice, "Card_vip", ROBUX .. " 249")
 	Emulator.run(1.5)
 	H.expect(ShopService.isVip(player), "Alice has VIP")
 	H.expect(player:GetAttribute("Vip") == true, "her player carries the VIP attribute (chat tag)")
-	H.expect(Emulator.findText(alice, "👑 VIP") ~= nil, "the shop shows her VIP")
+	H.expect(H.textOf(alice, "Vip") == "VIP" and H.iconShown(alice, "crown"), "the shop shows her VIP")
 
 	-- a border for Glory, a token and an emote for Robux, all equipped
-	Emulator.press(alice, "Borders")
+	Emulator.press(alice, "Tab_Border")
 	Emulator.run(0.3)
-	pressIn(alice, "Card_border_dashes", "🏅 1,200")
+	pressIn(alice, "Card_border_dashes", "1,200", "medal")
 	Emulator.run(1)
 	H.expect(data.owned.border_dashes and data.glory == 600, "Dashes border bought for Glory")
 	pressIn(alice, "Card_border_dashes", "Equip")
 	Emulator.run(1)
-	Emulator.press(alice, "Tokens")
+	Emulator.press(alice, "Tab_Token")
 	Emulator.run(0.3)
 	pressIn(alice, "Card_token_shield", ROBUX .. " 99")
 	Emulator.run(1.5)
 	pressIn(alice, "Card_token_shield", "Equip")
 	Emulator.run(1)
 	H.expect(data.equipped.Border == "border_dashes" and data.equipped.Token == "token_shield", "border and token equipped")
-	Emulator.press(alice, "Emotes")
+	Emulator.press(alice, "Tab_Emote")
 	Emulator.run(0.3)
 	pressIn(alice, "Card_emote_charge", ROBUX .. " 25")
 	Emulator.run(1.5)
 	H.expect(data.owned.emote_charge == true, "an emote bought")
 	H.shot(alice, "shop_emotes")
-	Emulator.press(alice, "History")
+	Emulator.press(alice, "Tab_History")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Comet Flag") ~= nil, "Purchase History lists the Comet")
 	H.expect(Emulator.findText(alice, "VIP") ~= nil, "and VIP")
@@ -1659,18 +1708,8 @@ end
 -- the server's day on: new quests, and the calendar and streak move on the next finished match (a missed day is
 -- covered), up to the streak flame in the nations list.
 function scenarios.quests()
-	-- press a button inside one quest row (several rows show "Claim" or "🔄")
-	local function pressIn(client, container: string, needle: string)
-		local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
-		assert(root, container .. " is not on screen")
-		for _, d in root:GetDescendants() do
-			if d:IsA("TextButton") and string.find(d.Text, needle, 1, true) then
-				Emulator.eventOf(d, "Activated"):Fire(nil, 1)
-				return
-			end
-		end
-		error(container .. " has no button " .. needle)
-	end
+	-- press a button inside one quest row (several rows show "Claim" or a reroll)
+	local pressIn = H.pressIn
 	local LobbyService = H.server("Services.LobbyService")
 	local Data = H.server("Services.PlayerDataService")
 	local workspace = Emulator.server.dm:GetService("Workspace")
@@ -1724,10 +1763,10 @@ function scenarios.quests()
 		table.insert(firstIds, q.id)
 	end
 
-	-- the Lobby's 📜 button opens the Quests screen
+	-- the Lobby's scroll button opens the Quests screen
 	Emulator.run(2)
 	H.shot(alice, "lobby_button")
-	Emulator.press(alice, "📜")
+	Emulator.press(alice, "QuestsButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Daily quests") ~= nil, "the Quests screen opens from the Lobby")
 	H.expect(Emulator.findText(alice, "1 free reroll today") ~= nil, "with today's free reroll")
@@ -1792,15 +1831,18 @@ function scenarios.quests()
 	end
 	H.expect(claimed == true, "the quest is claimed")
 	H.expect(data.xp == xp0 + 100 and data.glory >= glory0 + 30, "it paid 100 XP and 30 Glory")
-	H.expect(Emulator.findText(alice, "✅ Recruit 5 regiments") ~= nil, "the row shows it claimed")
-	pressIn(alice, "Quest_recruit5", "✅")
+	H.expect(
+		H.within(alice, "Quest_recruit5", "Recruit 5 regiments") and H.iconIn(alice, "Quest_recruit5", "check"),
+		"the row shows it claimed"
+	)
+	H.client(alice, "Intents").claimQuest(recruitKey) -- the row has no Claim button any more: ask the server anyway
 	Emulator.run(0.5)
 	H.expect(data.xp == xp0 + 100, "a second claim pays nothing")
 
 	-- reroll the hard quest (the free one)
 	local hard = data.quests.daily[3]
 	local hardId = hard.id
-	pressIn(alice, "Quest_" .. hardId, "🔄 Free")
+	pressIn(alice, "Quest_" .. hardId, "Free", "reroll")
 	Emulator.run(1)
 	H.expect(data.quests.daily[3].id ~= hardId and data.quests.rerollsUsed == 1, "the hard quest was rerolled for another")
 	H.expect((Emulator.findText(alice, "Rerolls: 100") ~= nil), "the next reroll costs 100 Glory")
@@ -1908,17 +1950,7 @@ function scenarios.analytics()
 		end
 		return nil
 	end
-	local function pressIn(client, container: string, needle: string)
-		local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
-		assert(root, container .. " is not on screen")
-		for _, d in root:GetDescendants() do
-			if d:IsA("TextButton") and string.find(d.Text, needle, 1, true) then
-				Emulator.eventOf(d, "Activated"):Fire(nil, 1)
-				return
-			end
-		end
-		error(container .. " has no button " .. needle)
-	end
+	local pressIn = H.pressIn
 	local function await(fn, ...)
 		local args = table.pack(...)
 		local result
@@ -1977,15 +2009,15 @@ function scenarios.analytics()
 	end)
 	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
-	Emulator.press(alice, "Flags")
+	Emulator.press(alice, "Tab_Flag")
 	Emulator.run(0.5)
-	pressIn(alice, "Card_flag_sun", "🏅 1,200")
+	pressIn(alice, "Card_flag_sun", "1,200", "medal")
 	Emulator.run(1)
 	local sun = economy(a, "flag_sun")
 	H.expect(sun and sun.args[1] == "Sink" and sun.args[2] == "Glory" and sun.args[5] == "Shop", "a Glory Shop sink: flag_sun")
 	H.expect(sun.args[3] == 1200 and sun.args[4] == 1800, "1,200 Glory, ending balance 1,800")
 	H.expect(fields(sun) == "1-9,false,false", "with level_bucket, is_vip, is_payer")
-	Emulator.press(alice, "▶")
+	Emulator.press(alice, "NextPage")
 	Emulator.run(0.3)
 	pressIn(alice, "Card_flag_comet", ROBUX .. " 149")
 	Emulator.run(1.5)
@@ -2220,17 +2252,7 @@ function scenarios.themes()
 	local Primordial = require("../../src/shared/Sim/Primordial")
 	local Army = require("../../src/shared/Sim/Army")
 	-- press a button on one shop card (several cards show the same price)
-	local function pressIn(client, container: string, needle: string)
-		local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
-		assert(root, container .. " is not on screen")
-		for _, d in root:GetDescendants() do
-			if d:IsA("TextButton") and string.find(d.Text, needle, 1, true) then
-				Emulator.eventOf(d, "Activated"):Fire(nil, 1)
-				return
-			end
-		end
-		error(container .. " has no button " .. needle)
-	end
+	local pressIn = H.pressIn
 	Emulator.run(1)
 	local alice = Emulator.addClient("Alice")
 	local bob = Emulator.addClient("Bob")
@@ -2261,10 +2283,10 @@ function scenarios.themes()
 	Emulator.run(1)
 	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
-	Emulator.press(alice, "Themes")
+	Emulator.press(alice, "Tab_Theme")
 	Emulator.run(1)
 	H.expect(alice.localPlayer.PlayerGui:FindFirstChild("ThemePreview", true) ~= nil, "theme cards show a painted map")
-	pressIn(alice, "Card_theme_night", "🏅 1,200")
+	pressIn(alice, "Card_theme_night", "1,200", "medal")
 	Emulator.run(1)
 	local data = Data.data(alice.serverPlayer)
 	H.expect(data.owned.theme_night == true and data.glory == 1800, "Night bought for 1,200 Glory")
@@ -2273,7 +2295,7 @@ function scenarios.themes()
 	H.expect(data.equipped.Theme == "theme_night", "Alice equipped Night")
 	H.expect(Emulator.findText(alice, "What you see") ~= nil, "the Themes tab has the opt-out card")
 	H.shot(alice, "shop_themes")
-	Emulator.press(alice, "Powers")
+	Emulator.press(alice, "Tab_PowerFx")
 	Emulator.run(1)
 	H.expect(alice.localPlayer.PlayerGui:FindFirstChild("EffectPreview", true) ~= nil, "power effects show a preview")
 	H.shot(alice, "shop_powers")
@@ -2322,7 +2344,7 @@ function scenarios.themes()
 	-- Bob opts out: "always classic", saved in his profile; his map repaints in the classic look
 	Emulator.press(bob, "ShopButton")
 	Emulator.run(0.5)
-	Emulator.press(bob, "Themes")
+	Emulator.press(bob, "Tab_Theme")
 	Emulator.run(0.5)
 	pressIn(bob, "Card_ThemeSetting", "Always classic")
 	Emulator.run(1)
@@ -2703,24 +2725,14 @@ function scenarios.ads()
 		end
 		return out
 	end
-	local function pressIn(client, container: string, needle: string)
-		local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
-		assert(root, container .. " is not on screen")
-		for _, d in root:GetDescendants() do
-			if d:IsA("TextButton") and string.find(d.Text, needle, 1, true) then
-				Emulator.eventOf(d, "Activated"):Fire(nil, 1)
-				return
-			end
-		end
-		error(container .. " has no button " .. needle)
-	end
+	local pressIn = H.pressIn
 	local function adShown(client): boolean
 		return Emulator.findText(client, "Watch an ad") ~= nil
 	end
 	local function reopen(client)
 		Emulator.press(client, "✕")
 		Emulator.run(0.3)
-		Emulator.press(client, "📜")
+		Emulator.press(client, "QuestsButton")
 		Emulator.run(0.5)
 	end
 	local function setProductId(client, id: number)
@@ -2763,14 +2775,14 @@ function scenarios.ads()
 	H.expect(LobbyService.active(), "the Lobby is open")
 
 	-- a free reroll is left: no ad
-	Emulator.press(alice, "📜")
+	Emulator.press(alice, "QuestsButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "1 free reroll today") ~= nil, "the Quests screen opens with a free reroll")
 	H.expect(not adShown(alice), "no ad while the free reroll is left")
 	H.shot(alice, "free_reroll_first")
 
 	-- Studio test mode (product id 0): after the free reroll the button shows, without asking AdService
-	pressIn(alice, "Quest_" .. openDaily(data), "🔄 Free")
+	pressIn(alice, "Quest_" .. openDaily(data), "Free", "reroll")
 	Emulator.run(1)
 	H.expect(QuestState.view().videoRerolls == 2, "2 ad rerolls on offer today")
 	H.expect(adShown(alice) and Emulator.findText(alice, "(test)") ~= nil, "the ad button shows (Studio test mode)")
@@ -2784,7 +2796,7 @@ function scenarios.ads()
 	H.expect(#data.purchaseHistory == 0, "an ad reward isn't a Robux purchase: not in the purchase history")
 	H.expect(table.concat(customs("ad_rewarded", uid), "|") == "quest_reroll,completed", "ad_rewarded: completed")
 	H.shot(alice, "ad_reward_test_mode")
-	pressIn(alice, "Quest_" .. openDaily(data), "🔄 Free")
+	pressIn(alice, "Quest_" .. openDaily(data), "Free", "reroll")
 	Emulator.run(1)
 	H.expect(table.find(customs("quest_rerolled", uid), "ad,") ~= nil, "quest_rerolled: source ad")
 	H.expect(table.find(customs("quest_rerolled", uid), "free,") ~= nil, "quest_rerolled: source free")
@@ -2827,7 +2839,7 @@ function scenarios.ads()
 	Emulator.run(2)
 	H.expect(data.quests.videoRerolls == 2 and QuestState.view().freeRerolls == 1, "the ad's receipt gave a free reroll")
 	H.expect(#data.purchaseHistory == 0, "still nothing in the purchase history")
-	pressIn(alice, "Quest_" .. openDaily(data), "🔄 Free")
+	pressIn(alice, "Quest_" .. openDaily(data), "Free", "reroll")
 	Emulator.run(1)
 	H.expect(QuestState.view().videoRerolls == 0 and not adShown(alice), "2 ads a day: the button is gone")
 	H.expect(Emulator.findText(alice, "Rerolls: 100") ~= nil, "the next reroll costs Glory")
@@ -2854,6 +2866,16 @@ function scenarios.ads()
 	H.expect(#data.purchaseHistory == 1 and data.purchaseHistory[1].robux == 10, "and listed in the purchase history")
 	Emulator.press(alice, "✕")
 	Emulator.run(0.3)
+	H.server("Services.ShopService").refresh(player) -- the reroll's receipt doesn't resend the shop view
+	Emulator.run(0.5)
+	H.client(alice, "UI.Shop").open("History")
+	Emulator.run(0.5)
+	H.expect(
+		Emulator.findText(alice, "Quest reroll") ~= nil and Emulator.findText(alice, "quest_reroll") == nil,
+		"the shop's purchase history names it, not its product id"
+	)
+	H.client(alice, "UI.Shop").close()
+	Emulator.run(0.3)
 
 	-- the match: no ad button there, and the server refuses a request
 	Emulator.canPromptOptIn = true
@@ -2870,7 +2892,7 @@ function scenarios.ads()
 	Emulator.run(0.3)
 	Emulator.press(alice, "📜 Quests")
 	Emulator.run(0.5)
-	pressIn(alice, "Quest_" .. openDaily(data), "🔄 Free")
+	pressIn(alice, "Quest_" .. openDaily(data), "Free", "reroll")
 	Emulator.run(1)
 	H.expect(QuestState.view().videoRerolls == 2, "the rules would offer an ad")
 	H.expect(not adShown(alice), "but never during a match")
@@ -2918,7 +2940,7 @@ function scenarios.ads()
 	H.expect(Emulator.adCallCount("PromptOptIn", uid) == 1, "then Roblox's opt-in prompt")
 	H.expect(table.concat(customs("notification_opt_in", uid), "|") == "shown,", "notification_opt_in: shown")
 	-- the Lobby again: the ads are back (a free reroll was spent in the match, an ad is available)
-	Emulator.press(alice, "📜")
+	Emulator.press(alice, "QuestsButton")
 	Emulator.run(0.5)
 	H.expect(adShown(alice) and Emulator.findText(alice, "2 left today") ~= nil, "back in the Lobby the ad is on offer again")
 	H.shot(alice, "lobby_again")
@@ -2926,24 +2948,14 @@ function scenarios.ads()
 	H.expect(saved.settings.notificationsAsked == true, "asked once per profile: saved")
 end
 
--- Phase 5: the season pass and the rotating shop. Alice opens the season from the Lobby's 🎟 button, claims tier 1,
+-- Phase 5: the season pass and the rotating shop. Alice opens the season from the Lobby's ticket button, claims tier 1,
 -- earns season XP in a match, claims free tiers from the Results screen, buys the pass (Studio test mode) and claims
 -- the premium rewards it opens; then the shop's 🔄 Today tab on two days (DevDay), the same schedule any server
 -- computes for those days.
 function scenarios.season()
 	local ShopRotation = require("../../src/shared/Sim/ShopRotation")
 	local log = Emulator.analytics
-	local function pressIn(client, container: string, needle: string)
-		local root = client.localPlayer.PlayerGui:FindFirstChild(container, true)
-		assert(root, container .. " is not on screen")
-		for _, d in root:GetDescendants() do
-			if d:IsA("TextButton") and string.find(d.Text, needle, 1, true) then
-				Emulator.eventOf(d, "Activated"):Fire(nil, 1)
-				return
-			end
-		end
-		error(container .. " has no button " .. needle)
-	end
+	local pressIn = H.pressIn
 	local function await(fn, ...)
 		local args = table.pack(...)
 		local result
@@ -3005,7 +3017,7 @@ function scenarios.season()
 			lobbyButton = d
 		end
 	end
-	H.expect(lobbyButton ~= nil and lobbyButton.Visible, "the Lobby shows the 🎟 button")
+	H.expect(lobbyButton ~= nil and lobbyButton.Visible and H.iconOf(lobbyButton) == "ticket", "the Lobby shows the ticket button")
 	H.shot(alice, "lobby_button")
 
 	-- the season screen from the Lobby: both tracks, tier 1 to claim, the pass label before buying
@@ -3019,7 +3031,7 @@ function scenarios.season()
 	Emulator.run(1)
 	local data = Data.data(player)
 	H.expect(data.owned.emote_gg == true and data.season.claimed.F1 == true, "Alice claimed tier 1: the GG emote")
-	H.expect(alice.localPlayer.PlayerGui:FindFirstChild("Reward_F1", true):FindFirstChild("Action").Text == "✅", "the cell shows it claimed")
+	H.expect(H.iconOf(alice.localPlayer.PlayerGui:FindFirstChild("Reward_F1", true):FindFirstChild("Action")) == "check", "the cell shows it claimed")
 	local again, why = await(SeasonService.apply, player, { kind = "Claim", tier = 1, track = "Free" })
 	H.expect(again == false and why == "Claimed", "a second claim is refused")
 	again, why = await(SeasonService.apply, player, { kind = "Claim", tier = 1, track = "Premium" })
@@ -3080,7 +3092,8 @@ function scenarios.season()
 	Emulator.run(1)
 	H.expect(data.glory == glory0 + 100, "tier 3 paid 100 Glory")
 	H.expect(data.owned.flag_ember_sigil == true, "tier 5 gave the Ember Sigil flag")
-	H.expect(alice.localPlayer.PlayerGui:FindFirstChild("Reward_P2", true):FindFirstChild("Action").Text == "🎟 Pass", "premium cells ask for the pass")
+	local passTag = alice.localPlayer.PlayerGui:FindFirstChild("Reward_P2", true):FindFirstChild("Action")
+	H.expect(passTag.Text == "Pass" and H.iconOf(passTag) == "ticket", "premium cells ask for the pass")
 	H.shot(alice, "free_claimed")
 
 	-- the pass (Studio test mode: free, through the receipt path): every premium reward up to tier 6 opens at once
@@ -3091,7 +3104,7 @@ function scenarios.season()
 	H.expect(data.purchaseHistory[#data.purchaseHistory].item == "season_pass", "recorded in the purchase history")
 	view = SeasonState.view()
 	H.expect(view.premium and view.ready == 6, "premium tiers 1-6 are claimable at once")
-	H.expect(Emulator.findText(alice, "Premium pass ✅") ~= nil, "the footer shows the pass")
+	H.expect(H.textOf(alice, "PassStatus") == "Premium pass active", "the footer shows the pass")
 	H.shot(alice, "pass_bought")
 	Emulator.press(alice, "ClaimAll")
 	Emulator.run(1)
@@ -3152,7 +3165,7 @@ function scenarios.season()
 	ok, reason = await(ShopService.apply, player, { kind = "Buy", item = offRare, currency = "Glory" })
 	H.expect(ok == false and reason == "NotInShop" and not data.owned[offRare], offRare .. " is not sold outside its days")
 	local rare = rotation.daily[3]
-	pressIn(alice, "Card_" .. rare, "🏅")
+	pressIn(alice, "Card_" .. rare, "BuyGlory", "medal")
 	Emulator.run(1)
 	H.expect(data.owned[rare] == true, "today's Rare (" .. rare .. ") bought for Glory")
 
@@ -3165,7 +3178,7 @@ function scenarios.season()
 	H.expect(table.concat(rotation.daily, ",") == table.concat(expected.daily, ","), "day 2's daily slots: " .. table.concat(rotation.daily, ", "))
 	H.expect(table.concat(rotation.daily, ",") ~= table.concat(ShopRotation.rotation(today).daily, ","), "different from day 1's")
 	H.shot(alice, "shop_day2")
-	Emulator.press(alice, "Offers")
+	Emulator.press(alice, "Tab_Offers")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Season Pass") ~= nil and Emulator.findText(alice, "See your pass") ~= nil, "the Offers tab has the season pass card")
 	H.shot(alice, "shop_offers")
@@ -3173,6 +3186,13 @@ function scenarios.season()
 	Emulator.run(0.5)
 	H.expect(H.client(alice, "UI.Season").isOpen() and not alice.localPlayer.PlayerGui.Shop.ShopPanel.Visible, "it opens the season screen")
 	Emulator.press(alice, "✕")
+	ShopUI.open("History")
+	Emulator.run(0.5)
+	H.expect(
+		Emulator.findText(alice, "Season Pass") ~= nil and Emulator.findText(alice, "season_pass") == nil,
+		"the purchase history names the pass, not its product id"
+	)
+	ShopUI.close()
 	local saved = H.saved(player.UserId).Data
 	H.expect(saved.season.premium and saved.season.claimed.P1 and saved.owned.token_ember_knight, "the pass and the claims are saved")
 end
@@ -3235,10 +3255,10 @@ function scenarios.leaderboards()
 		H.expect(id == ALICE or id == BOB or id == CAROL or id == DAVE, "the friends list is read only for a player's own friends")
 	end
 
-	-- the Lobby's 🏆 button, next to 🛒 and 📜, opens the Trophies screen
+	-- the Lobby's trophy button, next to the cart and the scroll, opens the Trophies screen
 	Emulator.run(2)
 	H.shot(alice, "lobby_button")
-	Emulator.press(alice, "🏆")
+	Emulator.press(alice, "TrophiesButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "0 of 30 earned") ~= nil, "the Trophies screen opens from the Lobby")
 	H.shot(alice, "lobby_trophies")
@@ -3316,7 +3336,10 @@ function scenarios.leaderboards()
 	-- the Trophies screen from the Results screen: achievements, weekly, friends and level boards
 	Emulator.press(alice, "TrophiesButton")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "✅ Domination") ~= nil, "the Trophies screen opens from Results, Domination done")
+	H.expect(
+		H.within(alice, "Achievement_domination", "Domination") and H.iconIn(alice, "Achievement_domination", "check"),
+		"the Trophies screen opens from Results, Domination done"
+	)
 	H.shot(alice, "achievements")
 	Emulator.press(alice, "TitleButton")
 	Emulator.run(1)
@@ -3348,11 +3371,14 @@ function scenarios.leaderboards()
 	Emulator.run(0.5)
 	Emulator.press(alice, "Tab_Frame")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "Centurion") ~= nil and Emulator.findText(alice, "🏆 Achievement") ~= nil, "the shop shows the Centurion frame: earned, not for sale")
+	H.expect(
+		H.within(alice, "Card_frame_centurion", "Trophy") and H.iconIn(alice, "Card_frame_centurion", "trophy"),
+		"the shop shows the Centurion frame: earned, not for sale"
+	)
 	H.shot(alice, "shop_frames")
-	Emulator.press(alice, "▶")
+	Emulator.press(alice, "NextPage")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "Warlord") ~= nil and Emulator.findText(alice, "Equipped") ~= nil, "and the Warlord frame Alice wears")
+	H.expect(H.within(alice, "Card_frame_warlord", "Equipped"), "and the Warlord frame Alice wears")
 	H.shot(alice, "shop_warlord")
 	Emulator.press(alice, "✕")
 

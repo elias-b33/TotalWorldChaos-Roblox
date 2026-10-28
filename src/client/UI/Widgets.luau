@@ -555,4 +555,138 @@ function Widgets.clear(parent: Instance)
 	end
 end
 
+-- The meta screens (shop, season pass, quests, trophies) --------------------------------------------------------
+
+-- A full-screen panel (the shop, the season pass...): the panel look, a margin round it, hidden until opened.
+-- Screens build its contents when it opens and drop them when it closes (Widgets.clear), to save GUI objects.
+function Widgets.window(parent: Instance, name: string): Frame
+	local f = Widgets.panel(parent, 0)
+	f.Name = name
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Position = UDim2.fromScale(0.5, 0.5)
+	f.Size = UDim2.new(1, -2 * Theme.space.m, 1, -2 * Theme.space.m)
+	f.AutomaticSize = Enum.AutomaticSize.None
+	f.Visible = false
+	local pad = f:FindFirstChildOfClass("UIPadding")
+	if pad then -- a phone in landscape is 375 px tall at least: keep the vertical margin small
+		pad.PaddingTop = UDim.new(0, Theme.space.m)
+		pad.PaddingBottom = UDim.new(0, Theme.space.m)
+	end
+	return f
+end
+
+-- A button 44 px tall and as wide as its (optional) pixel icon and text: a price ("R$ 149", or the Glory medal and
+-- "1,200"), Claim, Equip. Centre it with AnchorPoint and Position. `name` (optional) is the button's Name.
+function Widgets.fitButton(
+	parent: Instance,
+	icon: string?,
+	text: string,
+	color: Color3?,
+	onPress: () -> (),
+	name: string?
+): TextButton
+	local b = Widgets.button(parent, text, 0, color, onPress)
+	b.AutomaticSize = Enum.AutomaticSize.X
+	b.TextWrapped = false
+	Widgets.padding(b, Theme.space.m, 0)
+	if icon then
+		Widgets.leadIcon(b, icon, Theme.size.icon, Theme.space.xs)
+	end
+	if name then
+		b.Name = name
+	end
+	return b
+end
+
+local PAGE_LABEL = 44 -- room for "12/12" between a pager's arrows
+
+-- A pager: a "previous" arrow, the page ("2/5") and a "next" arrow, the arrows 44 px icon buttons named `prevName`
+-- and `nextName` (PrevPage and NextPage by default). Returns the row (sized to fit) and the page label.
+function Widgets.pager(
+	parent: Instance,
+	onPrev: () -> (),
+	onNext: () -> (),
+	prevName: string?,
+	nextName: string?
+): (Frame, TextLabel)
+	local s = Widgets.BUTTON_HEIGHT
+	local row = Instance.new("Frame")
+	row.Name = "Pager"
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.fromOffset(2 * s + PAGE_LABEL, s)
+	row.Parent = parent
+	Widgets.iconButton(row, "back", prevName or "PrevPage", s, Theme.color.secondary, onPrev)
+	local label = Widgets.label(row, "1/1", Theme.text.body, s)
+	label.Name = "Page"
+	label.FontFace = Theme.font.display
+	label.Position = UDim2.fromOffset(s, 0)
+	label.Size = UDim2.fromOffset(PAGE_LABEL, s)
+	label.TextWrapped = false
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	local nextButton = Widgets.iconButton(row, "arrow", nextName or "NextPage", s, Theme.color.secondary, onNext)
+	nextButton.Position = UDim2.fromOffset(s + PAGE_LABEL, 0)
+	return row, label
+end
+
+Widgets.CORNER_BUTTON = 52 -- the Lobby's round buttons
+
+-- A round icon button in the Lobby's bottom-left row (the shop, quests, trophies, the season pass), `slot` 0, 1,
+-- 2... from the left. Widgets.cornerRowEnd(n) is where a row of n of them ends, for anything placed beside the row.
+function Widgets.cornerButton(
+	parent: Instance,
+	slot: number,
+	icon: string,
+	name: string,
+	color: Color3,
+	onPress: () -> ()
+): TextButton
+	local s = Widgets.CORNER_BUTTON
+	local b = Widgets.iconButton(parent, icon, name, s, color, onPress)
+	b.AnchorPoint = Vector2.new(0, 1)
+	b.Position = UDim2.new(0, Theme.space.l + slot * (s + Theme.space.m), 1, -Theme.space.l)
+	local round = b:FindFirstChildOfClass("UICorner")
+	if round then
+		round.CornerRadius = UDim.new(0.5, 0)
+	end
+	local i = b:FindFirstChild("Icon")
+	if i and i:IsA("GuiObject") then
+		i.Size = UDim2.fromOffset(Theme.size.iconLarge, Theme.size.iconLarge)
+	end
+	return b
+end
+
+function Widgets.cornerRowEnd(count: number): number
+	return Theme.space.l + count * Widgets.CORNER_BUTTON + (count - 1) * Theme.space.m
+end
+
+-- A count badge at the top-right corner of a button (quests or season rewards waiting): hidden at 0.
+function Widgets.countBadge(button: GuiObject): TextLabel
+	local b = Widgets.badge(button, "")
+	b.AnchorPoint = Vector2.new(1, 0)
+	b.Position = UDim2.new(1, Theme.space.xs, 0, -Theme.space.xs)
+	b.Visible = false
+	return b
+end
+
+function Widgets.setCount(badge: TextLabel, count: number)
+	badge.Visible = count > 0
+	badge.Text = tostring(count)
+end
+
+-- A status tag in a dark well (Owned, Equipped, Not today, a lock): an icon and an optional short text, sized to
+-- fit. Not a button: it says why there is nothing to press.
+function Widgets.tag(parent: Instance, icon: string, text: string?, height: number?): TextLabel
+	local t = Widgets.chip(parent, icon, text or "", nil, height or 36)
+	t.Name = "Tag"
+	t.TextSize = Theme.text.small
+	t.BackgroundTransparency = 0
+	if text == nil or text == "" then -- just the icon, centred
+		local pad = t:FindFirstChildOfClass("UIPadding")
+		if pad then
+			pad.PaddingRight = UDim.new(0, Theme.space.s - Theme.space.xs)
+		end
+	end
+	return t
+end
+
 return Widgets

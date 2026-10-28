@@ -40,6 +40,15 @@ local REQUIRED = {
 	"close",
 	"check",
 	"arrow",
+	-- the meta screens (shop, season pass, quests, trophies)
+	"ticket",
+	"gift",
+	"calendar",
+	"reroll",
+	"video",
+	"back",
+	"border",
+	"frame",
 }
 
 local function luminance(c: number): number
@@ -145,6 +154,20 @@ T.test("a leading emoji becomes an icon", function()
 	T.equal(rest, "Plain text")
 	icon = IconArt.split("🫠 unknown emoji")
 	T.equal(icon, nil, "an emoji without an icon stays text")
+	-- the meta screens' strings (other screens show them too: "🎟 Season · tier 3" on Results)
+	icon, rest = IconArt.split("🎟 Season · tier 3")
+	T.equal(icon, "ticket")
+	T.equal(rest, "Season · tier 3")
+	T.equal((IconArt.split("🔄 Free")), "reroll")
+	T.equal((IconArt.split("🎁 Starter Pack")), "gift")
+	T.equal((IconArt.split("📅 Weekly")), "calendar")
+end)
+
+T.test("the previous-page arrow mirrors the next-page one", function()
+	local arrow, back = IconArt.rows("arrow") :: { string }, IconArt.rows("back") :: { string }
+	for y = 1, IconArt.SIZE do
+		T.equal(back[y], string.reverse(arrow[y]), "row " .. y)
+	end
 end)
 
 T.test("the whole set is small in memory", function()
