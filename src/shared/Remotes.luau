@@ -24,6 +24,7 @@ local EVENTS = {
 	"RequestQuestReroll", -- quests: quest key
 	"RequestTelemetry", -- analytics: a UI funnel signal (Sim.Telemetry.CLIENT_SIGNALS) and an optional short string
 	"RequestDefaultTheme", -- shop: true = always show the classic map (the theme opt-out)
+	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
@@ -35,6 +36,7 @@ local EVENTS = {
 	"Tutorial", -- your TutorialView in the tutorial match (nil = no prompts)
 	"Shop", -- your ShopView (on join and after every change)
 	"Quests", -- your QuestView (on join, at Results and after every change)
+	"Season", -- your SeasonView (on join, at Results and after every change)
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

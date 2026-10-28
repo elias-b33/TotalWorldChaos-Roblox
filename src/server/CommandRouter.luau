@@ -43,6 +43,8 @@ local shopHandler: ((Player, Types.ShopIntent) -> (boolean, string?))? = nil
 local MAX_ITEM_ID = 40 -- longest catalogue id a shop request may name (the catalogue itself is checked by Sim.Shop)
 local questHandler: ((Player, Types.QuestIntent) -> (boolean, string?))? = nil
 local MAX_QUEST_KEY = 40 -- longest quest key a quest request may name (the book itself is checked by Sim.Quests)
+local seasonHandler: ((Player, Types.SeasonIntent) -> (boolean, string?))? = nil
+local MAX_SEASON_TIER = 100 -- highest tier number a season request may name (the tiers themselves: Sim.Season)
 
 local function isId(v: unknown): boolean
 	return type(v) == "number" and v == v and v >= 1 and v <= 1e6 and v == math.floor(v)
@@ -273,6 +275,38 @@ function CommandRouter.init(getNation: (Player) -> number?)
 		acceptShop(player, requestId, if type(on) == "boolean" then { kind = "DefaultTheme", on = on } else nil)
 	end)
 
+	-- Season intents (claim a tier, claim all, the screen opened): SeasonService answers them right away (it may
+	-- yield to save).
+	Remotes.event("RequestSeason").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, action: unknown, tier: unknown, track: unknown)
+			if not isId(requestId) then
+				return
+			end
+			local id = requestId :: number
+			local intent: Types.SeasonIntent? = nil
+			if action == "Claim" and isId(tier) and (tier :: number) <= MAX_SEASON_TIER then
+				if track == "Free" or track == "Premium" then
+					intent = { kind = "Claim", tier = tier :: number, track = track :: Types.SeasonTrack }
+				end
+			elseif action == "ClaimAll" then
+				intent = { kind = "ClaimAll" }
+			elseif action == "Viewed" then
+				intent = { kind = "Viewed" }
+			end
+			if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+				reply(player, id, false, "TooFast")
+			elseif intent == nil or seasonHandler == nil then
+				reply(player, id, false, "BadRequest")
+			else
+				local handler = seasonHandler :: (Player, Types.SeasonIntent) -> (boolean, string?)
+				local accepted = intent :: Types.SeasonIntent
+				task.spawn(function()
+					local ok, reason = handler(player, accepted)
+					reply(player, id, ok, reason)
+				end)
+			end
+		end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
 	end)
@@ -383,6 +417,11 @@ end
 -- QuestService handles quest intents (claim, reroll); the player gets CommandResult with its answer.
 function CommandRouter.onQuest(handler: (Player, Types.QuestIntent) -> (boolean, string?))
 	questHandler = handler
+end
+
+-- SeasonService handles season intents (claims, the screen opened); the player gets CommandResult with its answer.
+function CommandRouter.onSeason(handler: (Player, Types.SeasonIntent) -> (boolean, string?))
+	seasonHandler = handler
 end
 
 -- A new match makes queued intents meaningless.

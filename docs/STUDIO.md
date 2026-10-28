@@ -38,7 +38,7 @@ The test switches below are Studio-only. Set them during a test run on the **ser
 | `DevTick` | number | Sets the match clock in seconds: `179` is War in a second, `1199` the Cataclysm, `1499` the end of the match. |
 | `DevCharges` | number | Every nation and Primordial gets this many power charges. |
 | `DevGold` | number | Every nation with a player gets this much gold. |
-| `DevDay` | number | Moves the server's UTC day this many days on (new daily quests, the login calendar and streak, the first-match bonus). Within 5 seconds everyone gets the new day's quests. `1` = tomorrow; `2` skips a day (the streak's covered missed day). Applied during a match or on Results, not in the Lobby. |
+| `DevDay` | number | Moves the server's UTC day this many days on (new daily quests, the login calendar and streak, the first-match bonus, the rotating shop, and the season the day falls in). Within 5 seconds everyone gets the new day's quests. `1` = tomorrow; `2` skips a day (the streak's covered missed day). Applied during a match or on Results, not in the Lobby. |
 
 ## Recipes
 
@@ -59,6 +59,8 @@ Start a test from the Test tab. Use Device to pick a phone in landscape (the UI 
 | Shop | In the Lobby tap 🛒 (or 🛒 in the top bar during a match). While the ids are 0, Robux items are free in Studio ("Studio test mode"). Equip a flag and check it by your capital and in the 🌍 list. |
 | Sounds | Every sound id is in `src/client/Sounds.luau`. Play each one once (the client command bar: `require(game.Players.LocalPlayer.PlayerScripts.Client.Sounds).play("MeteorImpact")`) and swap any that is missing. 🔊 in the top bar mutes. |
 | Quests, calendar, streak | Lobby: tap 📜 (bottom left, next to 🛒); in a match: 🌍 → "📜 Quests". Finish a match (`DevTick` = 1499 after doing what a quest asks, e.g. recruit 5 regiments): Results lists the quests it moved and the calendar step; tap "📜 Quests · 1 to claim" → Claim. Tap "🔄 Free" on a daily quest to reroll it (the next one costs 100 Glory). Set `DevDay` = 1 and finish another match: the calendar moves to step 2 and the streak to 2; at 3 days a 🔥 appears after your nation in the 🌍 list. |
+| Season pass | Season 1's days are in `Config.Season.Seasons` (from 2026-10-23 for 8 weeks): if today is outside them, the 🎟 screen says when the next season starts, so move `startDay` (UTC days since 1970) to test. Play solo. In the Lobby tap 🎟 (bottom left, next to 📜): tier 1's GG emote has a Claim button, the premium cells say "🎟 Pass". Claim it. Finish a match (`DevTick` = 1499): the Results screen has "🎟 Season · tier N" next to 📜 Quests, and the season XP grew by the match XP. Tap it, then "🎟 Pass R$ 299" (free in Studio test mode, through the receipt path): every premium reward up to your tier gets a Claim button; "Claim all" takes them. The pass and bundle buttons are grey during a match (purchases open in the Lobby, the draft and on Results). In the shop, 🛒 → Tokens shows the Ember Knight once claimed; equip it. |
+| Rotating shop | 🛒 → 🔄 Today: 4 daily cards (2 Common, 1 Rare, 1 Epic) and 2 weekly ones (a Legendary item and a nation skin set), with the time until each section changes. Two test sessions on the same UTC day (or Studio and a live server) show the same cards: the schedule depends only on the day. A rotating item in its slot tab says "🔄 Not today · Back within 60 days". Set `DevDay` = 1 during a match: within 5 seconds the Today tab shows the next day's cards (the weekly ones change on Mondays). |
 | Analytics | Set `TelemetryLog` (and nothing else), Clients and Servers, 2 players. In the server's Output: `Onboarding … joined`, `lobby_loaded`, `MatchFlow … lobby`; tap 🛒 and a tab (`Shop … shop_opened`, `item_viewed`); vote (`map_vote` when the vote ends); `DevTick` = 1499 for `nation_start`, `match_end`, `match_win` and `player_result`. The Glory `match_reward` and `AccountLevel` events need a match without a `DevTick` jump (a jump counts as idle time, and an AFK match pays nothing). Live: Creator Hub → your experience → Analytics (Funnels, Economy, Progression, Custom Events), about 24 hours later. |
 | Saving | Turn on Studio Access to API Services, finish a match, stop, play again: the level badge (🎖) and Glory are still there. |
 
@@ -66,5 +68,6 @@ Start a test from the Test tab. Use Device to pick a phone in landscape (the UI 
 
 - Allow Mesh / Image APIs is on.
 - Every sound in `Sounds.luau` plays.
-- The VIP game pass and the developer products exist, and their ids are in `src/shared/Catalogue.luau` (docs/MONETIZATION.md 3.10).
+- The VIP game pass and the developer products exist (including `season_pass` and `season_bundle`), and their ids are in `src/shared/Catalogue.luau` (docs/MONETIZATION.md 3.10).
+- `Config.Season.Seasons` has the real Season 1 dates.
 - The soft-launch checklist in docs/LAUNCH.md.

@@ -347,7 +347,7 @@ export type PlayerProfile = {
 	quests: QuestBook, -- version 3
 	login: LoginState, -- version 3
 	achievements: { [string]: number }, -- id -> progress
-	season: { id: string, xp: number, premium: boolean, claimed: { [string]: boolean } },
+	season: SeasonState, -- the season pass (Sim.Season)
 	receipts: { [string]: number }, -- purchase id -> os.time() it was granted (the last 200)
 	purchaseHistory: { PurchaseRecord },
 	stats: { matches: number, wins: number, provincesTaken: number, battlesWon: number, powersUsed: number },
@@ -386,6 +386,7 @@ export type CatalogueItem = {
 	vipOnly: boolean?, -- comes with the VIP pass, never sold alone
 	power: PrimordialPower?, -- PowerFx: the power it re-skins
 	animated: boolean?,
+	season: string?, -- a season-pass reward of this season id: never sold (MONETIZATION 6)
 }
 
 -- A pass or developer product that grants several items: VIP, the starter pack, nation skin sets.
@@ -397,6 +398,7 @@ export type ShopOffer = {
 	items: { string },
 	robux: number, -- list price
 	oncePerAccount: boolean,
+	weekly: boolean?, -- a bundle that rotates through the weekly shop slot (Sim.ShopRotation); else always offered
 }
 
 -- One Robux purchase in the receipt ledger (newest last). item: the catalogue item or offer id.
@@ -434,6 +436,61 @@ export type ShopView = {
 	starterOffer: boolean, -- show the starter-pack offer now (at most once per session)
 	testMode: boolean, -- some product ids are still 0: Studio grants those purchases free
 	defaultTheme: boolean, -- the player always sees the classic map, whatever theme won the vote
+	rotation: RotationView?, -- today's rotating shop (Sim.ShopRotation; ShopService adds it)
+}
+
+-- The rotating shop (docs/MONETIZATION.md 3.8, Sim.ShopRotation): the same for every player and server on a day.
+-- daily: item ids (2 Common, 1 Rare, 1 Epic); weekly: a Legendary item id and a bundle offer id. *Left: seconds
+-- until the next refresh when the server sent it (00:00 UTC; weekly: Monday 00:00 UTC).
+export type RotationView = { day: number, daily: { string }, weekly: { string }, dailyLeft: number, weeklyLeft: number }
+
+-- Season pass (docs/MONETIZATION.md 6). Seasons and their rewards are Config.Season, the rules Sim.Season.
+export type SeasonTrack = "Free" | "Premium"
+
+-- One reward on a tier: a catalogue item, Glory, a title or a season badge (titles and badges are earned, never sold).
+export type SeasonReward = { item: string?, glory: number?, title: string?, badge: string? }
+
+-- One tier of a season's reward list (an empty track = nothing on that tier).
+export type SeasonTier = { free: { SeasonReward }, premium: { SeasonReward } }
+
+-- A season: id ("S1"), name, its UTC days [startDay, endDay) and its 50 tiers.
+export type SeasonDef = { id: string, name: string, startDay: number, endDay: number, tiers: { SeasonTier } }
+
+-- profile.season. xp: account XP earned this season (Sim.Progression.addXp counts it); premium: bought the pass;
+-- bundle: bought the pass bundle (+Config.Season.BundleTiers tiers, once); claimed: "F12" / "P12" -> true;
+-- bonus: bonus rewards past the last tier already paid.
+export type SeasonState = {
+	id: string,
+	xp: number,
+	premium: boolean,
+	bundle: boolean,
+	claimed: { [string]: boolean },
+	bonus: number,
+}
+
+-- Season requests: CommandRouter checks the shape, Sim.Season the rules. "Viewed": the season screen opened
+-- (analytics only). The pass itself is bought through the shop (RequestBuy "season_pass" / "season_bundle").
+export type SeasonIntent =
+	{ kind: "Claim", tier: number, track: SeasonTrack }
+	| { kind: "ClaimAll" }
+	| { kind: "Viewed" }
+
+-- What a player sees of the season pass (the Season remote). id = "" when no season is running.
+export type SeasonView = {
+	id: string,
+	name: string,
+	daysLeft: number, -- days after today until the season ends
+	xp: number, -- season XP, with the bundle's tiers
+	tier: number, -- 1..maxTier (0 without a season)
+	maxTier: number,
+	xpIntoTier: number, -- progress to the next tier (or to the next bonus reward at the last tier)
+	xpForTier: number,
+	premium: boolean,
+	bundle: boolean,
+	claimed: { string }, -- "F3", "P3"
+	ready: number, -- rewards claimable now (bonus rewards included)
+	bonusReady: number, -- bonus rewards past the last tier waiting to be claimed
+	nextStartDay: number?, -- without a season: when the next one starts (nil = none planned)
 }
 
 -- Analytics (docs/LAUNCH.md 7): Sim.Telemetry builds these, Services/TelemetryService sends them to

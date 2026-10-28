@@ -232,6 +232,95 @@ Config.Shop = {
 	EmoteShowSeconds = 3, -- how long an emote shows over the capital
 	VipQuestRerolls = 1, -- extra daily quest reroll for VIP (Sim.Quests)
 	HistoryShown = 20, -- newest Robux purchases on the Purchase History screen
+	EpicSetRobux = 299, -- nation skin set of three Epic pieces
+}
+
+-- Rotating shop (docs/MONETIZATION.md 3.8, Sim.ShopRotation): a fixed schedule from a seeded generator, the same for
+-- every player and server. Core items (Shared.Catalogue.CORE) are always on sale; every other sold item rotates.
+Config.ShopRotation = {
+	Daily = { Common = 2, Rare = 1, Epic = 1 }, -- new at 00:00 UTC
+	WeeklyLegendary = 1, -- new on Monday 00:00 UTC: Legendary items
+	WeeklyBundles = 1, -- and bundles (nation skin sets)
+	ReturnDays = 60, -- every rotating item is back within this many days, and the shop says so
+	Seed = 31013, -- the schedule's seed (changing it reshuffles every future day)
+}
+
+-- Season pass (docs/MONETIZATION.md 6, Sim.Season): 8-week seasons, 50 tiers, a free and a premium track. Season XP is
+-- the account XP earned during the season. Tier n opens at (n - 1) × XpPerTier; after the last tier's bar is full
+-- (Tiers × XpPerTier), every BonusXp more pays BonusGlory. No single tier skips are sold: only the bundle's tiers,
+-- once, with the pass. Buying the pass late opens every premium reward up to your tier at once.
+Config.Season = {
+	Tiers = 50,
+	XpPerTier = 1200,
+	BonusXp = 2400,
+	BonusGlory = 100,
+	BundleTiers = 10,
+	PassRobux = 299, -- developer product "season_pass"
+	BundleRobux = 499, -- developer product "season_bundle": the pass + BundleTiers tiers
+	-- Seasons by UTC day number, [startDay, endDay): the current one is chosen by the day. Add the next season here.
+	Seasons = {
+		{ id = "S1", name = "Rise of the Primordials", startDay = 20749, endDay = 20805 }, -- Fri 2026-10-23, 8 weeks
+	},
+}
+
+-- Each season's rewards, one row per tier: { free, premium }. A number is Glory, "title:…" a title, "badge:…" a season
+-- badge, any other string a Shared.Catalogue item id, a table several of these, false nothing.
+Config.Season.Rewards = {
+	S1 = {
+		{ "emote_gg", "token_ember_knight" }, -- 1
+		{ false, 100 },
+		{ 100, "flag_ember_banner" },
+		{ false, "emote_laugh" },
+		{ "flag_ember_sigil", "frame_molten" }, -- 5
+		{ false, 100 },
+		{ false, "fx_plague_ember" },
+		{ 100, "emote_volcano" },
+		{ false, "border_embers" },
+		{ "border_runes", "fx_meteor_ember" }, -- 10
+		{ false, 100 },
+		{ false, "fx_plague_ash" },
+		{ 150, "emote_crown_toss" },
+		{ false, "flag_titan_eye" },
+		{ "emote_salute", "frame_lava_seam" }, -- 15
+		{ false, 150 },
+		{ false, "fx_blessing_molten" },
+		{ 150, "token_obsidian" },
+		{ false, "emote_skull" },
+		{ "fx_meteor_stone", "victory_eruption" }, -- 20
+		{ false, 150 },
+		{ false, "fx_meteor_firestorm" },
+		{ 200, "flag_cracked_crown" },
+		{ false, "fx_blessing_ember" },
+		{ "frame_ashen", "theme_autumn" }, -- 25
+		{ false, 150 },
+		{ false, "victory_magma" },
+		{ 200, "token_phoenix_rider" },
+		{ false, "emote_eruption" },
+		{ "token_stone_golem", "flag_storm_titan" }, -- 30
+		{ false, 200 },
+		{ false, "fx_plague_void" },
+		{ 250, "frame_obsidian" },
+		{ false, "emote_roar" },
+		{ "emote_volcano_peak", "fx_meteor_lava" }, -- 35
+		{ false, 200 },
+		{ false, "fx_blessing_worldsplitter" },
+		{ 250, "token_cinder_golem" },
+		{ false, 250 },
+		{ "flag_storm_banner", "fx_blessing_starfall" }, -- 40
+		{ false, "emote_meteor_shower" },
+		{ false, 250 },
+		{ 300, "frame_primordial_eye" },
+		{ false, "fx_blessing_sunfire" },
+		{ "fx_plague_cinder", "shades_royal" }, -- 45
+		{ false, 300 },
+		{ false, "flag_obsidian_crown" },
+		{ 300, 300 },
+		{ false, "frame_rift" },
+		{ -- 50
+			{ 500, "title:Season 1 Veteran", "badge:S1" },
+			{ "token_titan", "fx_meteor_phoenix", "victory_titan", "title:Primordial Herald" },
+		},
+	},
 }
 
 -- Network and security ---------------------------------------------------------------------------

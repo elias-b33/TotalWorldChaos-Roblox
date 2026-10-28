@@ -29,6 +29,7 @@ local Replicator = require(Server.Replicator)
 local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
 local QuestService = require(Server.Services.QuestService)
+local SeasonService = require(Server.Services.SeasonService)
 local TelemetryService = require(Server.Services.TelemetryService)
 
 local PHASE_TOASTS = {
@@ -139,6 +140,7 @@ ShopService.init(function(): string
 	return if state then state.phase else "Lobby"
 end, MatchService.current, MatchService.nationOf)
 QuestService.init()
+SeasonService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
 nextMatch()
