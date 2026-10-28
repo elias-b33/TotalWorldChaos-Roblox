@@ -28,7 +28,7 @@ The full spec is `docs/DESIGN.md`; the three maps, textures and map data pipelin
 | Run Sim tests | `lune run tests/run` |
 | Install missing tools | `bash scripts/cloud-setup.sh` |
 | Regenerate maps and textures | `python3 tools/mapgen/generate.py` (or `--only earth`, `--only tiles`, …) |
-| Play the game headlessly | `lune run tools/harness/play all` after `rojo build` (screenshots in `tools/harness/out/`; `MAP=earth` for another map) |
+| Play the game headlessly | `lune run tools/harness/play all` after `rojo build` (or `play <scenario>`; screenshots in `tools/harness/out/`; `MAP=earth` for another map) |
 | Play a whole match with bots | `lune run tools/harness/soak` after `rojo build` (25 minutes in about 20 s; errors, GUI budget, armies per minute) |
 | Repaint the docs' map pictures | `python3 tools/harness/paint_maps.py` |
 
@@ -70,6 +70,7 @@ assets/maps/           Generated per-map data (layout.json, province_ids.png) an
 assets/textures/       Generated seamless terrain tiles per theme
 tools/mapgen/          Python (numpy + Pillow) generator for everything in assets/
 tools/harness/         Lune emulator that runs the built place's real scripts, plays scenarios and renders screenshots
+                       (one file per scenario in tools/harness/scenarios/, shared helpers in H.luau)
 roblox.yml             Roblox API list for Selene (committed; see Commands)
 scripts/cloud-setup.sh Installs rojo, stylua, selene, lune
 scripts/session-start.sh  SessionStart hook: installs missing tools in the background (cloud only)
