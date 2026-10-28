@@ -1,6 +1,8 @@
 --!nocheck
 -- Phase 3: Alice and nine bots for six game minutes on Skyshards. The bots expand in Peace and go to war after
--- it, every command goes through the real CommandRouter, and a nation whose player leaves plays on as a bot.
+-- it, every command goes through the real CommandRouter, and a nation whose player leaves plays on as a bot. Then
+-- navies: the match runs on until a bot lands an army across the sea (ships built, the army embarked and landed,
+-- all through CommandRouter).
 
 local Emulator = require("../Emulator")
 local H = require("../H")
@@ -23,10 +25,11 @@ local function run()
 
 	-- count what bots submit and what the server refuses (dry runs inside the planner use copies of the state)
 	local CommandRouter = H.server("CommandRouter")
-	local submitted, rejected = {}, {}
+	local submitted, rejected, kinds = {}, {}, {}
 	local submit = CommandRouter.submitForBot
 	CommandRouter.submitForBot = function(nationId, command)
 		submitted[nationId] = (submitted[nationId] or 0) + 1
+		kinds[command.kind] = (kinds[command.kind] or 0) + 1
 		submit(nationId, command)
 	end
 	local sharedNode = Emulator.server.dm:GetService("ReplicatedStorage").Shared
@@ -92,6 +95,53 @@ local function run()
 		print("    rejected: " .. line)
 	end
 	H.expect(sent > 100 and #rejected <= 2, string.format("%d bot commands, %d refused by the server", sent, #rejected))
+
+	-- navies: wait (up to the Cataclysm) for the first army a bot's fleet puts ashore abroad (a fleet whose target
+	-- was taken meanwhile lands its men at home instead)
+	local Events = Emulator.server.modules[sharedNode.Sim.Events]
+	local push = Events.push
+	local landings = {}
+	Events.push = function(s, kind, a, b, province, ...)
+		local army = if kind == "Landed" and s == H.state() then s.armies[a] else nil
+		if army and s.provinces[province].owner ~= army.owner then
+			table.insert(landings, { owner = army.owner, province = province, men = army.men })
+		end
+		return push(s, kind, a, b, province, ...)
+	end
+	local Config = require("../../../src/shared/Config")
+	while #landings == 0 and Emulator.now() < Config.Phases.WarEndTick do
+		Emulator.run(10)
+	end
+	Events.push = push
+	local first = landings[1]
+	H.expect(
+		first ~= nil and first.owner ~= me and state.nations[first.owner].controller == "Bot",
+		if first
+			then string.format(
+				"%s landed %d men at %s at %d:%02d",
+				state.nations[first.owner].name,
+				first.men,
+				state.provinces[first.province].name,
+				Emulator.now() // 60,
+				Emulator.now() % 60
+			)
+			else "no bot landed an army abroad by 20:00"
+	)
+	H.expect(
+		(kinds.BuildShips or 0) > 0 and (kinds.Embark or 0) > 0 and (kinds.Land or 0) > 0,
+		string.format(
+			"bots sent BuildShips × %d, Embark × %d, Land × %d, Sail × %d",
+			kinds.BuildShips or 0,
+			kinds.Embark or 0,
+			kinds.Land or 0,
+			kinds.Sail or 0
+		)
+	)
+	H.shot(alice, "landing")
+	for _, line in rejected do
+		print("    rejected: " .. line)
+	end
+	H.expect(#rejected <= 2, string.format("%d bot commands refused by the server in all", #rejected))
 	Commands.apply = apply
 	CommandRouter.submitForBot = submit
 end

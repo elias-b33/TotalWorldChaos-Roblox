@@ -217,7 +217,7 @@ One elite per race (Knights are both the Kingdom's and the Humans'):
 
 ### Navies
 
-Each map's water is split into named **sea zones** (on Skyshards, **space zones** in the void around the shards). Nations build ships in their coastal provinces, carry armies across the water, fight at sea, close straits and blockade coasts. Rules: `Sim/Navy.luau`; numbers: `Config.Navy`; the zones of each map: `docs/MAPS.md` "Sea zones"; balance: measured with bot tournaments once bots sail (stage 3).
+Each map's water is split into named **sea zones** (on Skyshards, **space zones** in the void around the shards). Nations build ships in their coastal provinces, carry armies across the water, fight at sea, close straits and blockade coasts. Rules: `Sim/Navy.luau`; numbers: `Config.Navy`; the zones of each map: `docs/MAPS.md` "Sea zones"; how bots use fleets: "Bot AI"; balance, measured with bot tournaments: `docs/BALANCE.md` section 20.
 
 - **Sea zones:** Earth has 22 (the oceans and seas, such as the North Atlantic and the Mediterranean), Eldmoor 10 round its coasts, Skyshards 10 (one wedge of space round each home shard). A zone lists its neighbouring zones and its coasts: the provinces it touches. A province touching several zones is a coast of each; the one it shares the most shore with is its **port**. Every strait lies in one zone. Lakes (the Caspian, Moonmere) have no zone. Zones are tappable: the map data's sea grid gives every water pixel its zone id (`MapGrid.decodeSea`), as the province grid does for land.
 - **Ships:** one ship type per map: a sailing **Galleon** on Earth, a **Dragonship** on Eldmoor, a **Starship** on Skyshards, with the same numbers everywhere. A ship costs 25 gold (no manpower) and 1 gold upkeep a month, fights with a hull of 1,000 (like a regiment's 1,000 men, attack and defence 1) and carries one regiment: 1,000 men of any troop type. Ships are built 1–5 at a time in an owned coastal province and launch into its port zone, joining the nation's fleet standing there or forming a new one. A blockaded province can't launch ships.
@@ -667,16 +667,21 @@ Each bot checks a short priority list every few seconds and does the first actio
 1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there: archers (the best defenders) if I can pay for them and they make up at most 30% of my men, else infantry.
 2. **Recruit:** total army is below provinces × 800 men and manpower is available. Infantry is the base; at war, my race's elite or cavalry if I can pay for it and still keep 2 months of upkeep, while the two make up at most 30% of my men (the elite first when it costs no more upkeep than cavalry, else whichever I have fewer men of).
 3. **Expand:** a neutral neighbour whose garrison I can beat → attack it.
-4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
-5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders (Hills races pay half), then develop; with everything built, spare gold buys regiments (the Recruit step's troop).
-6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
-7. **Primordial power:** with 2 charges, Meteor the biggest army of a nation I'm at war with that isn't immune right now. This rides along with whatever else the plan does, so charges don't pile up.
+4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce. With no neighbour by land to take on, a nation across the sea (we both hold a coast of one sea zone, see "Navies") whose coast there a landing from one of my free stacks would beat the same way, if I can have the ships for it (step 5). An enemy across a sea we share counts as in reach, so a bot at war with one doesn't look for another war.
+5. **Sea:** a coast my armies can't walk to (no route by land, because it runs through a nation at peace with me, or a closed one: an enemy fleet in a strait, an enemy army on the way), at most 2 zones from my port: neutral land a landing beats, or enemy land where it is above the attack ratio, reached without meeting a stronger fleet. Ships are built at my coast nearest my free stack, and my spare fleets sail there; once they carry the stack (at most the difficulty's ships for one landing, below), it embarks. One landing at a time. Ships are bought only with gold left over after 2 months of upkeep (theirs included), and their upkeep stays under the difficulty's share of my gold income.
+6. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders (Hills races pay half), then develop; with everything built, spare gold buys regiments (the Recruit step's troop).
+7. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
 
-| Difficulty | Plans every | Attack ratio | Behaviour |
-| --- | --- | --- | --- |
-| Easy | 6 s | 1.6× | Won't declare war on a player, march into a player's land or use a power on one in the first 8 min (it still defends) |
-| Normal | 3 s | 1.3× | Default |
-| Hard | 2 s | 1.1× | Targets the leading player |
+Two kinds of order ride along with whatever the plan does:
+
+- **Fleet orders** (they spend nothing; at most one per fleet): a fleet whose army has all boarded lands it on the coast it wins (the same choice as step 5), else on my nearest coast; my nearest empty fleet that beats the blockaders by the attack ratio sails against a blockade of my coast; an empty fleet sails off an enemy coast my army besieges, so the siege runs faster; the other empty fleets gather at the port of the landing being prepared, else at my home port (the port nearest my capital), unless they stand off an enemy coast, which they blockade. No fleet sails a route through a fleet it wouldn't beat by the attack ratio, and a bot reckons only with the fleets `Navy.visible` shows it.
+- **Primordial power:** with 2 charges, Meteor the biggest army of a nation I'm at war with that isn't immune right now, so charges don't pile up.
+
+| Difficulty | Plans every | Attack ratio | Ships: upkeep within this share of gold income, ships for one landing | Behaviour |
+| --- | --- | --- | --- | --- |
+| Easy | 6 s | 1.6× | 10%, 3 | Won't declare war on a player, march or land in a player's land or use a power on one in the first 8 min (it still defends, at sea too) |
+| Normal | 3 s | 1.3× | 15%, 5 | Default |
+| Hard | 2 s | 1.1× | 20%, 5 | Targets the leading player |
 
 No cheating: harder bots think faster and take more risks, but they never get free gold or manpower.
 
@@ -777,7 +782,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 - [x] Navies, stage 1: sea and space zones in the map data (generator, validator, `MapData`), the rules for ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades and war across the sea (`Sim/Navy.luau`, tests in `tests/navy.spec.luau`)
 - [x] Navies, stage 2: the orders through `CommandRouter`, fleets in the snapshot, the ship art for each map, fleet tokens and sea zones on the map, the fleet sheet, toasts, a harness scenario (`tools/harness/scenarios/navy.luau`), a `docs/STUDIO.md` recipe
-- [ ] Navies, stage 3: bots at sea, bot tournaments and balance (Earth's Americas)
+- [x] Navies, stage 3: bots at sea (`Sim/Bot.luau`: the Sea step and fleet orders, tests in `tests/botsea.spec.luau`), navy numbers in the bot tournament, balance (`docs/BALANCE.md` section 20, Earth's Americas), fleets in the soak, a landing in the bots scenario
 
 ## Open questions
 

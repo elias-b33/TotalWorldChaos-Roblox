@@ -624,10 +624,33 @@ Config.Net = {
 
 Config.Bots = {
 	-- noPlayerWarTicks: no war declared on a player before this tick; targetsLeadingPlayer: wars go to the player
-	-- holding the most provinces first
-	Easy = { planTicks = 6, attackRatio = 1.6, noPlayerWarTicks = 8 * 60, targetsLeadingPlayer = false },
-	Normal = { planTicks = 3, attackRatio = 1.3, noPlayerWarTicks = 0, targetsLeadingPlayer = false },
-	Hard = { planTicks = 2, attackRatio = 1.1, noPlayerWarTicks = 0, targetsLeadingPlayer = true },
+	-- holding the most provinces first. At sea (docs/DESIGN.md "Bot AI"): navyGoldShare: its ships' upkeep stays
+	-- under this share of its gold income; fleetShips: ships for one landing (one front). attackRatio also decides
+	-- which fleets a bot dares to fight.
+	Easy = {
+		planTicks = 6,
+		attackRatio = 1.6,
+		noPlayerWarTicks = 8 * 60,
+		targetsLeadingPlayer = false,
+		navyGoldShare = 0.1,
+		fleetShips = 3,
+	},
+	Normal = {
+		planTicks = 3,
+		attackRatio = 1.3,
+		noPlayerWarTicks = 0,
+		targetsLeadingPlayer = false,
+		navyGoldShare = 0.15,
+		fleetShips = 5,
+	},
+	Hard = {
+		planTicks = 2,
+		attackRatio = 1.1,
+		noPlayerWarTicks = 0,
+		targetsLeadingPlayer = true,
+		navyGoldShare = 0.2,
+		fleetShips = 5,
+	},
 	Difficulty = "Normal", -- what every bot plays on (a private server's owner can pick another: Config.Private)
 	DefendRatio = 0.8,
 	MenPerProvince = 800,
@@ -642,6 +665,10 @@ Config.Bots = {
 	AttackShare = 0.3,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
+	MaxLandingChecks = 12, -- coasts weighed for one landing, nearest by sea first (keeps planning cheap)
+	MaxLandingZones = 2, -- a landing sails at most this many zones on from the port it leaves (no far colonies)
+	SeaPrepareTicks = 60, -- spare fleets keep gathering at the port of a landing being prepared this long after the
+	-- bot last worked on it (ships still to buy or to sail there)
 }
 
 -- Private servers (docs/MONETIZATION.md 3.4): what the owner may pick in the Lobby's settings sheet. The defaults
