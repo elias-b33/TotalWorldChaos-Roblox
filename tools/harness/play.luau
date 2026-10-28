@@ -532,7 +532,7 @@ function scenarios.look()
 	local pips = name:FindFirstChild("Pips")
 	H.expect(pips ~= nil and pips.Visible, "with its development pips under it")
 	local text, icon = H.badge(alice, guard.id)
-	H.expect(text == "3k" and icon == "sword", "the army's badge: a sword and 3k")
+	H.expect(text == "3k" and icon == "infantry", "the army's badge: its main troop's icon (infantry) and 3k")
 	local badge = H.mapObject(alice, "Army" .. guard.id):FindFirstChild("Strength")
 	H.expect(badge:FindFirstChildOfClass("UIStroke").Color == Theme.color.gold, "the selected army's badge is outlined in gold")
 	-- a province's status pills as "icon:text" words, sorted
@@ -1760,13 +1760,29 @@ function scenarios.shop()
 	local flagOnMap = alice.localPlayer.PlayerGui:FindFirstChild("Flag" .. A, true)
 	H.expect(flagOnMap ~= nil and flagOnMap:FindFirstChild("Flag") ~= nil, "Alice's flag stands by her capital")
 	H.expect(bob.localPlayer.PlayerGui:FindFirstChild("Flag" .. A, true) ~= nil, "Bob sees it too")
-	local skinned = false
-	for _, d in bob.localPlayer.PlayerGui:GetDescendants() do
-		if d.Name == "TokenSkin" then
-			skinned = true
+	-- (every nation's army has a sprite now, a soldier of its race by default: look at Alice's own army)
+	local aliceArmy
+	for id, a in state.armies do
+		if a.owner == A then
+			aliceArmy = id
 		end
 	end
-	H.expect(skinned, "Bob sees Alice's army with her token skin")
+	local aliceToken = bob.localPlayer.PlayerGui:FindFirstChild("Army" .. tostring(aliceArmy), true)
+	local skin = aliceToken and aliceToken:FindFirstChild("TokenSkin")
+	H.expect(
+		skin ~= nil and skin:GetAttribute("Skin") == "shield" and skin:GetAttribute("Soldier") == nil,
+		"Bob sees Alice's army with her token skin, the Shield: an equipped token wins over her race's soldier"
+	)
+	-- Bob has no token equipped: his army is a soldier of his nation's race
+	local B = H.myNation(bob)
+	local bobsArmy = require("../../src/shared/Sim/Army").spawn(state, B, state.nations[B].capital, 1000)
+	Emulator.run(1.5)
+	local bobToken = alice.localPlayer.PlayerGui:FindFirstChild("Army" .. bobsArmy.id, true)
+	local soldier = bobToken and bobToken:FindFirstChild("TokenSkin")
+	H.expect(
+		soldier ~= nil and soldier:GetAttribute("Soldier") == state.nations[B].race and soldier:GetAttribute("Skin") == nil,
+		"Alice sees Bob's army as a soldier of his race (" .. state.nations[B].race .. ")"
+	)
 
 	-- her emote over the capital, seen by Bob
 	Emulator.press(alice, "😀")
@@ -1875,8 +1891,8 @@ function scenarios.retreat()
 	Emulator.run(1)
 	H.expect(beaten.location == rock and beaten.retreating == nil, "it walked home and is a normal army again")
 	H.expect(
-		state.armies[beaten.id] ~= nil and select(2, H.badge(alice, beaten.id)) == "sword" and not H.iconText(alice, "retreat", "", "Map"),
-		"no flag once home"
+		state.armies[beaten.id] ~= nil and select(2, H.badge(alice, beaten.id)) == "infantry" and not H.iconText(alice, "retreat", "", "Map"),
+		"no flag once home: its badge shows its troops (infantry) again"
 	)
 	H.shot(alice, "home")
 end
@@ -3662,6 +3678,14 @@ function scenarios.races()
 		nation.gold == 1000 - t.Infantry.gold - t.Archers.gold - t.Cavalry.gold - t.Ironguard.gold,
 		"each at its own price"
 	)
+	-- on the map: a dwarf soldier, and a badge with its main troop's icon (four equal regiments: the dearest, and of
+	-- cavalry and ironguard at the same price, the elite); the province sheet's chips say the same, and its owner chip
+	-- shows the Dwarves
+	local sprite = H.mapObject(alice, "Army" .. army.id) and H.mapObject(alice, "Army" .. army.id):FindFirstChild("TokenSkin")
+	H.expect(sprite ~= nil and sprite:GetAttribute("Soldier") == "Dwarves", "Alice's army is a dwarf soldier on the map")
+	H.expect(select(2, H.badge(alice, army.id)) == "ironguard", "its badge shows the Ironguard: equal men, the dearest troop")
+	H.expect(H.iconIn(alice, "ArmyChip" .. army.id, "ironguard"), "so does its chip on the province sheet")
+	H.expect(H.iconIn(alice, "Owner", "dwarves"), "the owner chip shows the Dwarves' icon")
 
 	-- the army sheet shows the composition as chips
 	Emulator.press(alice, "Move")
@@ -3796,6 +3820,8 @@ function scenarios.races()
 	H.expect(nation.battlesWon == won0 + 1, "defending, the archers won")
 	H.expect(state.armies[raiders.id] == nil or raiders.retreating == true, "the infantry was beaten off")
 	H.expect(state.armies[holders.id] ~= nil and holders.men > raiders.men, "the archers kept more men")
+	Emulator.run(1)
+	H.expect(select(2, H.badge(alice, holders.id)) == "archers", "the archers' badge shows the bow once the battle is over")
 	local enemyWon0 = state.nations[enemy].battlesWon
 	local attackers = fight(away, me, enemy)
 	Emulator.run(4.5)
@@ -3813,6 +3839,85 @@ function scenarios.races()
 	H.expect(Emulator.findText(alice, "Berserkers") ~= nil and Emulator.findText(alice, "Ironguard") == nil, "Orcs recruit Berserkers")
 	H.expect(Emulator.findText(alice, "750") ~= nil, "for 750 manpower")
 	H.shot(alice, "orc_buttons")
+end
+
+-- Races on the map (docs/DESIGN.md "Map rendering"): every nation's army is a little soldier of its race, its badge
+-- shows the troop type it is mostly made of, and each race's capital is its own, at the whole-map, region and
+-- close-up zooms. Runs on any map: MAP=earth lune run tools/harness/play kingdoms. The bots hold still, so every army
+-- keeps its place and make-up for the pictures.
+function scenarios.kingdoms()
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	Emulator.run(2)
+	local Army = require("../../src/shared/Sim/Army")
+	H.server("Services.AIService").step = function() end
+	Emulator.run(1.1) -- (orders the bots gave before go through)
+	local state = H.state()
+	for id, a in state.armies do
+		if a.owner ~= 0 then
+			state.armies[id] = nil
+		end
+	end
+	-- one army per nation at its capital: two regiments of a troop its race likes (an elite, or archers for the Elves)
+	-- and one of infantry
+	local MAIN = { Humans = "Knights", Elves = "Archers", Orcs = "Berserkers", Dwarves = "Ironguard" }
+	local armies, byRace = {}, {}
+	for id, n in state.nations do
+		local army = Army.spawn(state, id, n.capital, 2000, MAIN[n.race])
+		Army.add(army, { Infantry = 1000 })
+		armies[id] = army
+		byRace[n.race] = byRace[n.race] or id
+	end
+	local MapView = H.client(alice, "MapView")
+	MapView.showWholeMap()
+	Emulator.run(1.5)
+	local wrong = {}
+	for id, n in state.nations do
+		local token = H.mapObject(alice, "Army" .. armies[id].id)
+		local sprite = token and token:FindFirstChild("TokenSkin")
+		if sprite == nil or sprite:GetAttribute("Soldier") ~= n.race then
+			table.insert(wrong, n.name)
+		end
+	end
+	H.expect(
+		#wrong == 0,
+		if #wrong == 0
+			then "every nation's army is a soldier of its race"
+			else "not a soldier of its race: " .. table.concat(wrong, ", ")
+	)
+	local me = H.myNation(alice)
+	local myMain = string.lower(MAIN[state.nations[me].race])
+	H.expect(select(2, H.badge(alice, armies[me].id)) == myMain, "zoomed out, Alice's badge shows her main troop: " .. myMain)
+	H.shot(alice, "whole_map")
+	-- each race's capital and army, at the region zoom and close up; every badge shows its army's main troop
+	for _, race in { "Humans", "Elves", "Orcs", "Dwarves" } do
+		local id = byRace[race]
+		H.expect(id ~= nil, "a nation of the " .. race)
+		local capital = state.nations[id].capital
+		MapView.showWholeMap()
+		MapView.centreOn(H.provinceMap(alice, capital), true) -- the region zoom
+		Emulator.run(2)
+		local _, icon = H.badge(alice, armies[id].id)
+		H.expect(icon == string.lower(MAIN[race]), state.nations[id].name .. "'s badge shows " .. string.lower(MAIN[race]) .. " (" .. tostring(icon) .. ")")
+		H.shot(alice, string.lower(race) .. "_region")
+		Emulator.pinch(alice, 3)
+		MapView.centreOn(H.provinceMap(alice, capital), false) -- (a pinch zooms round the screen's middle)
+		Emulator.run(2)
+		-- the building reaches 3 map pixels below the capital's centre (PixelArt): its name stands below that
+		local name = H.mapObject(alice, "P" .. capital)
+		H.expect(
+			name ~= nil and name.Position.Y.Offset >= 3 * MapView.zoom(),
+			state.nations[id].name .. "'s capital name stands below its building, close up"
+		)
+		H.shot(alice, string.lower(race) .. "_close")
+	end
+	-- the province sheet of an Orc capital: the owner chip shows the Orcs (no war, ally or truce to show), the army
+	-- chip the berserkers it is mostly made of
+	local orcs = byRace.Orcs
+	H.tapProvince(alice, state.nations[orcs].capital)
+	H.expect(H.iconIn(alice, "Owner", "orcs"), "the owner chip of an Orc capital shows the Orcs")
+	H.expect(H.iconIn(alice, "ArmyChip" .. armies[orcs].id, "berserkers"), "and its army's chip the berserkers")
+	H.shot(alice, "orc_capital_sheet")
 end
 
 local function runScenario(name: string)

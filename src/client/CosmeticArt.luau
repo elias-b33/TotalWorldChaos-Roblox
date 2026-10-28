@@ -5,7 +5,7 @@
 -- Pixels are RGBA bytes, ready for EditableImage:WritePixelsBuffer.
 --
 -- Colour codes: N the nation's colour, D its border colour, L the nation colour lightened, K outline, W white,
--- G gold, "." transparent.
+-- G gold, "." transparent. The race soldiers (SOLDIERS) add a few fixed colours of their own (SOLDIER_COLOURS).
 
 local PixelArt = require("./PixelArt")
 
@@ -479,6 +479,83 @@ CosmeticArt.TOKENS = {
 	},
 } :: { [string]: { { string } } }
 
+-- Race soldiers (docs/DESIGN.md "Races", "Map rendering"): with the default token equipped (Catalogue.DEFAULTS.Token),
+-- a nation's armies are a little soldier of its race in its colours, so the map shows at a glance whose army is
+-- whose and what people they are. An equipped token skin still wins. 12×12 like the tokens.
+CosmeticArt.SOLDIERS = {
+	Humans = { -- a footman: steel helm, kite shield with a white cross, spear
+		"....KKK...K.",
+		"...KWSSK.KSK",
+		"..KSSSSSKKSK",
+		"..KTKSKTKKbK",
+		"..KTTTTTKKbK",
+		"KKKKKNNNNKbK",
+		"KNWNKNNNNTbK",
+		"KWWWKNNNNKbK",
+		"KNWNKNNNNKbK",
+		".KNKKDDDDKbK",
+		"..K.KNKKNKbK",
+		"....KK..KKbK",
+	},
+	Elves = { -- an archer: fair hair, a pointed ear, a drawn bow
+		"....KKKKK...",
+		".BWKYYYYYK..",
+		"B.WKYYYYYKK.",
+		"B.WKTTTTTKT.",
+		"B.WKTKTKTTK.",
+		"B.WKYTTTYK..",
+		"B.TKNNNNNK..",
+		"B.WKNNNNNK..",
+		"B.WKNNNNNK..",
+		".BWKDDDDDK..",
+		"...KNNKNNK..",
+		"...KKK.KKK..",
+	},
+	Orcs = { -- a warrior: green skin, red eyes, tusks, a horned iron cap, a cleaver
+		".K........K.",
+		"KWK.KKKK.KWK",
+		"KWWKssssKWWK",
+		".KKVVVVVVKSS",
+		"..KVRVVRVKSS",
+		"..KVVVVVVKsS",
+		"..KWVKKVWKbK",
+		"KKKKVVVVKKbK",
+		"KVNNNNNNNVbK",
+		"KVKNNNNNKKbK",
+		".KKDDDDDDKbK",
+		"..KNNKKNNKbK",
+	},
+	Dwarves = { -- a stout dwarf: steel helm, a big red beard, an axe
+		"........KKK.",
+		"...KKKKKSSSK",
+		"..KWSSSSKSSK",
+		"..KsssssKKbK",
+		"..KTKTKTKKbK",
+		".KHTTTTTHKbK",
+		"KNHHHHHHHTbK",
+		"KNNHHhHHNKbK",
+		"KNNKHHHKNKbK",
+		"KDDDKHKDDKbK",
+		"KNNNNKNNNKbK",
+		".KKKK.KKKKKK",
+	},
+} :: { [string]: { string } }
+
+-- The soldiers' own colours: T skin, V an orc's skin, R an orc's eyes, S s steel and its shade, B b wood and dark
+-- wood, H h a beard and its shade, Y fair hair.
+CosmeticArt.SOLDIER_COLOURS = {
+	T = 0xf0c08a,
+	V = 0x8cb43c,
+	R = 0xff4a3a,
+	S = 0xd2d8e2,
+	s = 0x858da0,
+	B = 0xa0672f,
+	b = 0x63401f,
+	H = 0xb8582a,
+	h = 0x7a3518,
+	Y = 0xffe28a,
+} :: { [string]: number }
+
 -- Nameplate frames: the outline colour around a name (none = no outline). Centurion and Warlord are earned
 -- (an achievement, last week's top 100).
 CosmeticArt.FRAME_COLORS = {
@@ -507,7 +584,7 @@ local function colourOf(ch: string, nation: number, border: number): number
 	elseif ch == "G" then
 		return G
 	end
-	return K
+	return CosmeticArt.SOLDIER_COLOURS[ch] or K
 end
 
 -- Paint character rows; `shift(x)` moves a column down by that many pixels (waving flags).
@@ -554,6 +631,12 @@ end
 function CosmeticArt.token(skin: string, nation: number, border: number, frame: number?): (buffer, number, number)
 	local frames = CosmeticArt.TOKENS[skin] or CosmeticArt.TOKENS.square
 	local rows = frames[((frame or 0) % #frames) + 1]
+	return paint(rows, nation, border, nil)
+end
+
+-- A race soldier's pixels (CosmeticArt.SOLDIERS) in a nation's colours. Unknown races paint the square token.
+function CosmeticArt.soldier(race: string, nation: number, border: number): (buffer, number, number)
+	local rows = CosmeticArt.SOLDIERS[race] or CosmeticArt.TOKENS.square[1]
 	return paint(rows, nation, border, nil)
 end
 

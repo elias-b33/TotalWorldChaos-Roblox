@@ -98,7 +98,7 @@ Glory prices aren't changed by regional pricing. Robux prices are read live from
 | Flag | The 16×12 pixel flag on your capital, nation list and Results | Everyone | Common, Rare, Epic (animated) | 49 / 99 / 149 |
 | Border style | Pattern of your two-pixel nation border (dashes, runes, embers) | Everyone | Rare, Epic | 99 / 149 |
 | Shade set ("palette") | Three shades **of your assigned colour** used for terrain shading in your provinces. Never a different hue. | Everyone | Common, Rare | 49 / 99 |
-| Army token | The token sprite for your armies | Everyone | Rare, Epic, Legendary (animated) | 99 / 149 / 249 |
+| Army token | The token sprite for your armies (without one, the free default: a little soldier of your nation's race) | Everyone | Rare, Epic, Legendary (animated) | 99 / 149 / 249 |
 | Nation skin set | Matched flag + border + token | Everyone | Rare set, Epic set | 199 (pieces 297) / 299 (pieces 447) |
 | Map theme | Re-skin of the terrain on any map (Night, Winter and Autumn at launch, so "Night Earth", "Winter Skyshards"; Ember for Season 1). Nation colours unchanged; `tests/themes.spec.luau` is the readability check. | You (on your vote cards), and everyone when it wins the theme vote (below) | Rare | 99 |
 | Primordial-power effect | How one power looks (meteor style, plague colour, blessing rays). Same area, timing and sound cue, so it's never harder to read. | Everyone | Common (colour), Rare (new style), Epic | 49 / 99 / 149 |

@@ -3,7 +3,8 @@
 -- The 2D pixel-art map, painted pixel by pixel from the province grid in WorldBox's own colours (tile colours,
 -- tree icons, water depths, mountain bands and kingdom overlay taken from WorldBox's game data; see
 -- docs/MAPS.md "Art direction"). Owned provinces get their nation's colour as a translucent wash with a
--- 1-pixel border in the nation's darker colour, like kingdoms in WorldBox.
+-- 1-pixel border in the nation's darker colour, like kingdoms in WorldBox, and each race's capital is a building of
+-- its own (a stone castle, a tree hall, a spiked war camp, a stone hall in a mountain) flying its owner's flag.
 -- Two paintings: the whole map at one pixel per map pixel (PixelArt.new; what the zoomed-out map shows), and a
 -- close-up detail of just the part in view at DETAIL_FACTOR × DETAIL_FACTOR sub-pixels per map pixel
 -- (PixelArt.paintDetail; laid over the map when zoomed in), with WorldBox-style tile patterns, smooth coasts and
@@ -38,7 +39,7 @@ export type Art = {
 	owner: { [number]: number }, -- province id -> nation slot (0 = neutral)
 	color: { [number]: number }, -- nation slot -> colour
 	border: { [number]: number }, -- nation slot -> border colour
-	capitals: { [number]: { x: number, y: number } },
+	capitals: { [number]: { x: number, y: number, kind: string } }, -- kind: whose capital it is (capitalKind)
 	styles: { [number]: NationStyle }, -- nation slot -> its border style and shade set (cosmetics); missing = default
 	selected: number,
 	near: buffer, -- per pixel: which border checks it needs (NEAR_* bits), worked out once per map
@@ -208,8 +209,6 @@ local SPRITES: { [string]: { string } } = {
 	crystals = { ".C.", "CWC", ".D." },
 	towers = { ".C.", ".G.", "BGB", "GGG" },
 	plates = { "LLD", "LMD", "DDD" },
-	castle = { "F....", "FF...", "M.M.M", "MMMMM", "MDWDM", "MDDDM" },
-	dome = { "F....", "FF...", ".CCC.", "CWWWC", "MMMMM", "MDCDM" },
 }
 -- Drawn in this order (later ones on top), with each decoration's grid spacing and jitter.
 local DECORATIONS = { "hills", "palms", "savanna", "pines", "trees", "jungle", "plates", "crystals", "towers" }
@@ -224,6 +223,68 @@ local SPACING: { [string]: { number } } = {
 	towers = { 6, 1 },
 	plates = { 6, 1 },
 }
+
+-- Capitals (docs/MAPS.md "Capitals and armies by race"): each race builds its own, flying its owner's flag F (grey
+-- while neutral). A capital keeps the look of the nation it is the capital of; its flag follows whoever holds it. On
+-- the whole map they are 5 × 6 pixels round the capital's centre; the close-up has detailed ones (DETAIL_CAPITALS).
+-- Skyshards builds them of its sci-fi materials (SKY_CAPITAL_COLOURS), and the Humans' castle as a glowing dome.
+-- Colours: M D stone and its shade, W lit windows, C glow, G g e leaves, T t bark, H h hide, X wood, B bone,
+-- K a dark doorway, Q q k rock, S snow, O fire.
+local CAPITALS: { [string]: { string } } = {
+	Humans = { "F....", "FF...", "M.M.M", "MMMMM", "MDWDM", "MDDDM" }, -- a stone castle
+	Elves = { "F.GG.", "FFGGG", "GGGge", "egeee", ".tTt.", ".TWT." }, -- a tree hall
+	Orcs = { "F.X.X", "FFXHX", ".HHh.", "BHHhB", "XHKhX", "XHOhX" }, -- a spiked war camp
+	Dwarves = { "F.S..", "FFSq.", ".QQqk", "QQqqk", "QMKMk", "QMOMk" }, -- a stone hall in a mountain
+	dome = { "F....", "FF...", ".CCC.", "CWWWC", "MMMMM", "MDCDM" }, -- the Humans' castle on Skyshards
+}
+local CAPITAL_COLOURS: { [string]: number } = {
+	M = 0xe4ded2,
+	D = 0x5b544a,
+	W = 0xffe9a0,
+	C = 0x7cfbef,
+	G = 0xa3d35a,
+	g = 0x5f9a3a,
+	e = 0x3b6e33,
+	T = 0xe6dcc4,
+	t = 0x9a8a6c,
+	H = 0xb88c58,
+	h = 0x7a5434,
+	X = 0x5e3e22,
+	B = 0xf2ead8,
+	K = 0x2b231c,
+	Q = 0xa9adab,
+	q = 0x7a7d7e,
+	k = 0x4d5152,
+	S = 0xf4f8fb,
+	O = 0xff8a26,
+}
+-- Skyshards' materials, for every capital but the dome: steel, plating, crystal leaves, cyan and red light.
+local SKY_CAPITAL_COLOURS: { [string]: number } = {
+	M = 0xd8dee6,
+	D = 0x4b5560,
+	W = 0x7cfbef,
+	G = 0xc8fff8,
+	g = 0x64f1e2,
+	e = 0x3fb3aa,
+	T = 0xd8dee6,
+	t = 0x8fa3b3,
+	H = 0x8f97a8,
+	h = 0x5a6272,
+	X = 0x3a4250,
+	B = 0xe8edf3,
+	K = 0x10152a,
+	Q = 0x8fa3b3,
+	q = 0x597d94,
+	k = 0x2e363e,
+	S = 0x7cfbef,
+	O = 0xf55858,
+}
+
+-- The capital a race builds on a map of this texture set (MapDef.theme): its own, the castle without a race.
+local function capitalKind(theme: string, race: string?): string
+	local kind = if race and CAPITALS[race] then race else "Humans"
+	return if kind == "Humans" and theme == "sky" then "dome" else kind
+end
 
 ------------------------------------------------------------------------------------------------- colour maths
 
@@ -311,7 +372,7 @@ end
 
 -- Map themes (docs/MONETIZATION.md 3.2): a re-skin of the terrain, painted the same pixel way. A theme only
 -- recolours terrain pixels (land, sea, space), before the kingdom overlay goes on top, so nation colours, borders,
--- castles and everything drawn over the map (armies, names, effects) are untouched. Since the overlay is a fixed
+-- capitals and everything drawn over the map (armies, names, effects) are untouched. Since the overlay is a fixed
 -- mix of terrain and nation colour, two nations always differ by the same amount on any theme; only how a nation
 -- stands out from its terrain can change, and tests/themes.spec.luau checks that on all three maps.
 PixelArt.THEMES = { "night", "winter", "autumn" } :: { string }
@@ -1053,26 +1114,24 @@ local function paintProvince(art: Art, pid: number)
 	markDirty(art, box[1], box[2], box[3], box[4])
 end
 
--- Castles (domes on Skyshards) go on top of everything, after any repaint, since they overlap neighbours.
+-- Capitals (each race's own, CAPITALS) go on top of everything, after any repaint, since they overlap neighbours.
 local function drawCapitals(art: Art)
-	local sprite = SPRITES[if art.theme == "sky" then "dome" else "castle"]
-	local h, w = #sprite, #sprite[1]
 	for pid, capital in art.capitals do
+		local sprite = CAPITALS[capital.kind]
+		local h, w = #sprite, #sprite[1]
+		local sky = art.theme == "sky" and capital.kind ~= "dome"
 		local o = art.owner[pid] or 0
-		local palette: { [string]: number } = {
-			F = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0,
-			M = 0xe4ded2,
-			D = 0x5b544a,
-			W = 0xffe9a0,
-			C = 0x7cfbef,
-		}
+		local flag = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0
 		local x0, y0 = capital.x - 2, capital.y - 3
 		for j = 1, h do
 			for i = 1, w do
 				local ch = string.sub(sprite[j], i, i)
 				local x, y = x0 + i - 1, y0 + j - 1
 				if ch ~= "." and x >= 0 and y >= 0 and x < art.width and y < art.height then
-					buffer.writeu32(art.pixels, (y * art.width + x) * 4, rgba(palette[ch]))
+					local c = if ch == "F"
+						then flag
+						else (if sky then SKY_CAPITAL_COLOURS[ch] else nil) or CAPITAL_COLOURS[ch]
+					buffer.writeu32(art.pixels, (y * art.width + x) * 4, rgba(c))
 				end
 			end
 		end
@@ -1093,7 +1152,8 @@ end
 --   * dense shaded trees, bushes, rocks, flowers, cacti, crystals and towers (DETAIL_DECOS), each one deterministic
 --     per map pixel so two overlapping close-ups always agree;
 --   * a lighter kingdom wash (DETAIL_ALPHA) so the terrain shows through, with a stronger band just inside the
---     nation's border and a crisp border line, a thin line between provinces, and a white outline on the selection.
+--     nation's border and a crisp border line, a thin line between provinces, and a white outline on the selection;
+--   * each race's detailed capital on top (DETAIL_CAPITALS).
 -- Ownership changes repaint only the provinces involved (syncDetail), like the whole-map painting.
 
 local DETAIL_FACTOR = 4
@@ -1244,87 +1304,329 @@ for name, list in DETAIL_DECO_TABLE do
 	DETAIL_DECOS[BIOMES[name]] = choices
 end
 
--- The castle (a dome on Skyshards) at sub-pixel size, built from rectangles: F f the owner's flag, R r roofs in the
--- owner's colour, M m D lit, middle and shaded stone, W lit windows, p the flagpole, C c the dome's glow.
-local function buildCapital(sky: boolean): { string }
-	local w, h = 21, 22
+-- Capitals in the close-up: CAPITAL_W × CAPITAL_H sub-pixels, built from rectangles and shapes, one per race (and
+-- the dome for the Humans on Skyshards), each flying the owner's flag on a pole at x = 10. Colours: F f the owner's
+-- flag, R r roofs and banners in the owner's colour, p the flagpole, M m D lit, middle and shaded stone, W lit
+-- windows, C c the dome's glow, G g e lit, middle and shaded leaves, T t u lit, middle and shaded bark, H h hide,
+-- X x wood, B bone, K a dark doorway, Q q k lit, middle and shaded rock, S snow, O fire.
+local CAPITAL_W, CAPITAL_H = 21, 22
+
+type Sprite = {
+	put: (x: number, y: number, ch: string) -> (),
+	rect: (x0: number, y0: number, x1: number, y1: number, ch: string) -> (),
+	rows: () -> { string },
+}
+
+local function newSprite(): Sprite
 	local grid: { { string } } = {}
-	for y = 1, h do
-		grid[y] = table.create(w, ".")
+	for y = 1, CAPITAL_H do
+		grid[y] = table.create(CAPITAL_W, ".")
 	end
 	local function put(x: number, y: number, ch: string)
-		if x >= 0 and y >= 0 and x < w and y < h then
+		if x >= 0 and y >= 0 and x < CAPITAL_W and y < CAPITAL_H then
 			grid[y + 1][x + 1] = ch
 		end
 	end
-	local function rect(x0: number, y0: number, x1: number, y1: number, ch: string)
-		for y = y0, y1 do
-			for x = x0, x1 do
+	return {
+		put = put,
+		rect = function(x0: number, y0: number, x1: number, y1: number, ch: string)
+			for y = y0, y1 do
+				for x = x0, x1 do
+					put(x, y, ch)
+				end
+			end
+		end,
+		rows = function(): { string }
+			local rows: { string } = {}
+			for y = 1, CAPITAL_H do
+				rows[y] = table.concat(grid[y])
+			end
+			return rows
+		end,
+	}
+end
+
+-- The owner's flag at the top of its pole (x = 10, rows 0 to `foot`).
+local function flagOn(s: Sprite, foot: number)
+	s.rect(10, 0, 10, foot, "p")
+	s.rect(11, 0, 13, 0, "F")
+	s.rect(11, 1, 12, 1, "F")
+	s.put(14, 0, "f")
+end
+
+-- The Humans' stone castle: side towers with roofs in the owner's colour, curtain walls, the keep and its gate.
+local function buildCastle(): { string }
+	local s = newSprite()
+	local rect, put = s.rect, s.put
+	for _, x0 in { 0, 16 } do
+		rect(x0, 7, x0 + 4, 21, "m")
+		rect(x0, 7, x0, 21, "M")
+		rect(x0 + 4, 7, x0 + 4, 21, "D")
+		put(x0 + 2, 3, "R")
+		rect(x0 + 1, 4, x0 + 3, 4, "R")
+		rect(x0, 5, x0 + 4, 6, "R")
+		rect(x0 + 3, 4, x0 + 3, 4, "r")
+		rect(x0 + 3, 5, x0 + 4, 6, "r")
+		rect(x0 + 2, 10, x0 + 2, 11, "W")
+	end
+	rect(5, 12, 15, 21, "m")
+	put(5, 11, "M")
+	put(15, 11, "D")
+	rect(7, 5, 13, 21, "m")
+	rect(7, 5, 7, 21, "M")
+	rect(13, 5, 13, 21, "D")
+	for x = 7, 13, 2 do
+		put(x, 4, if x == 13 then "D" else "M")
+	end
+	rect(10, 8, 10, 9, "W")
+	rect(9, 17, 11, 21, "D")
+	put(10, 16, "D")
+	rect(0, 21, 20, 21, "D")
+	flagOn(s, 3)
+	return s.rows()
+end
+
+-- The Humans' capital on Skyshards: a glowing dome on a steel base.
+local function buildDome(): { string }
+	local s = newSprite()
+	local rect, put = s.rect, s.put
+	rect(2, 15, 18, 20, "m")
+	rect(2, 15, 2, 20, "M")
+	rect(18, 15, 18, 20, "D")
+	rect(2, 21, 18, 21, "D")
+	for y = 7, 14 do
+		for x = 3, 17 do
+			local dx, dy = x - 10, (y - 15) * 1.2
+			if dx * dx + dy * dy <= 52 then
+				put(x, y, if dx + dy < -6 then "W" elseif dx > 3 then "c" else "C")
+			end
+		end
+	end
+	rect(10, 0, 10, 7, "p")
+	rect(11, 1, 13, 1, "F")
+	rect(11, 2, 12, 2, "F")
+	put(14, 1, "f")
+	rect(6, 17, 7, 18, "W")
+	rect(13, 17, 14, 18, "W")
+	return s.rows()
+end
+
+-- The Elves' tree hall: a great pale-barked tree, its crown lit from the north-west, little halls with roofs in the
+-- owner's colour up in the leaves, lanterns, and a glowing door between the roots.
+local function buildTreeHall(): { string }
+	local s = newSprite()
+	local rect, put = s.rect, s.put
+	rect(8, 11, 12, 20, "t")
+	rect(8, 11, 8, 20, "T")
+	rect(12, 11, 12, 20, "u")
+	rect(7, 18, 13, 20, "t")
+	put(7, 18, "T")
+	put(13, 18, "u")
+	rect(6, 20, 14, 20, "t")
+	put(6, 20, "T")
+	put(14, 20, "u")
+	rect(5, 21, 15, 21, "u")
+	local crowns = { { 10, 7.5, 7.6, 5.4 }, { 4.8, 10, 4.6, 3.6 }, { 15.2, 10, 4.6, 3.6 } } -- centre, radii
+	local function leafy(x: number, y: number): boolean
+		for _, k in crowns do
+			local dx, dy = (x - k[1]) / k[3], (y - k[2]) / k[4]
+			if dx * dx + dy * dy <= 1 then
+				return true
+			end
+		end
+		return false
+	end
+	for y = 0, CAPITAL_H - 1 do
+		for x = 0, CAPITAL_W - 1 do
+			if leafy(x, y) then
+				local light = (x - 10) * 0.7 + (y - 8)
+				local clump = (x * 3 + y * 5) % 7 -- leaf clumps: a few lit and shaded leaves in the middle tone
+				put(
+					x,
+					y,
+					if not leafy(x, y + 1) or light > 3.5
+						then "e"
+						elseif light < -4.5 or (light < 1 and clump == 0) then "G"
+						elseif clump == 3 then "e"
+						else "g"
+				)
+			end
+		end
+	end
+	for _, x0 in { 3, 15 } do
+		put(x0 + 1, 8, "R")
+		rect(x0, 9, x0 + 1, 9, "R")
+		put(x0 + 2, 9, "r")
+		put(x0, 10, "T")
+		put(x0 + 1, 10, "W")
+		put(x0 + 2, 10, "u")
+		put(x0, 11, "T")
+		put(x0 + 1, 11, "t")
+		put(x0 + 2, 11, "u")
+	end
+	put(7, 5, "W")
+	put(13, 6, "W")
+	put(10, 12, "W")
+	rect(9, 14, 9, 15, "W")
+	rect(11, 14, 11, 15, "W")
+	rect(9, 18, 11, 21, "W")
+	put(10, 17, "W")
+	flagOn(s, 3)
+	return s.rows()
+end
+
+-- The Orcs' war camp: a great hide tent on crossed poles with a band in the owner's colour, a fire in its door, and a
+-- palisade of stakes with bone spikes in front.
+local function buildWarCamp(): { string }
+	local s = newSprite()
+	local rect, put = s.rect, s.put
+	local function half(y: number): number -- the tent's half width on row y
+		return (y - 4) * 0.62 + 0.5
+	end
+	for y = 4, 20 do
+		local w = math.floor(half(y))
+		for x = 10 - w, 10 + w do
+			local d = x - 10
+			local seam = d ~= 0 and math.abs(math.abs(d) - (y - 4) * 0.3) < 0.5 -- where two hides are sewn
+			local edge = math.abs(d) == w and w > 0 -- a dark edge, so the tent stands out on any land
+			put(x, y, if edge or (d > 0 and seam) then "x" elseif d < 0 then (if seam then "h" else "H") else "h")
+		end
+	end
+	for y = 10, 11 do
+		local w = math.floor(half(y))
+		rect(10 - w, y, 10, y, "R")
+		rect(11, y, 10 + w, y, "r")
+	end
+	for y = 13, 20 do
+		local w = math.floor((y - 13) * 0.5)
+		rect(10 - w, y, 10 + w, y, "K")
+	end
+	rect(9, 20, 11, 20, "O")
+	put(10, 19, "O")
+	for _, p in { { 9, 3 }, { 8, 2 }, { 11, 3 }, { 12, 2 } } do
+		put(p[1], p[2], "X") -- the tent poles, crossed over the top
+	end
+	for _, y in { 8, 14 } do -- bone spikes out of the hides
+		local w = math.floor(half(y))
+		put(9 - w, y, "B")
+		put(8 - w, y - 1, "B")
+		put(11 + w, y, "B")
+		put(12 + w, y - 1, "B")
+	end
+	for _, x in { 0, 2, 18, 20 } do -- the palisade, its stakes sharpened
+		rect(x, 16, x, 21, if x < 10 then "X" else "x")
+		put(x, 15, "B")
+	end
+	rect(0, 18, 3, 18, "x")
+	rect(17, 18, 20, 18, "x")
+	flagOn(s, 3)
+	return s.rows()
+end
+
+-- The Dwarves' stone hall: a mountain lit on its western face with snow on its peak, and carved into it a hall
+-- front of pillars and a lintel under a gable in the owner's colour, banners, and a gate glowing with a forge.
+local function buildStoneHall(): { string }
+	local s = newSprite()
+	local rect, put = s.rect, s.put
+	for y = 3, CAPITAL_H - 1 do
+		local half = (y - 3) * 0.58 + 0.5
+		local ridge = (y - 3) * 0.2 -- the ridge leans east as it falls
+		for x = 0, CAPITAL_W - 1 do
+			local d = x - 10
+			if math.abs(d) <= half then
+				local ch = if d < ridge - 1 then "Q" elseif d <= ridge then "q" else "k"
+				if y - 3 <= 3 - math.abs(d) * 0.8 then
+					ch = "S"
+				elseif (ch == "Q" and (x + 2 * y) % 7 == 0) or (ch == "k" and (x + y) % 5 == 0) then
+					ch = "q" -- cracks in the rock
+				end
 				put(x, y, ch)
 			end
 		end
 	end
-	if sky then
-		rect(2, 15, 18, 20, "m")
-		rect(2, 15, 2, 20, "M")
-		rect(18, 15, 18, 20, "D")
-		rect(2, 21, 18, 21, "D")
-		for y = 7, 14 do
-			for x = 3, 17 do
-				local dx, dy = x - 10, (y - 15) * 1.2
-				if dx * dx + dy * dy <= 52 then
-					put(x, y, if dx + dy < -6 then "W" elseif dx > 3 then "c" else "C")
-				end
-			end
-		end
-		rect(10, 0, 10, 7, "p")
-		rect(11, 1, 13, 1, "F")
-		rect(11, 2, 12, 2, "F")
-		put(14, 1, "f")
-		rect(6, 17, 7, 18, "W")
-		rect(13, 17, 14, 18, "W")
-	else
-		-- side towers with roofs in the owner's colour
-		for _, x0 in { 0, 16 } do
-			rect(x0, 7, x0 + 4, 21, "m")
-			rect(x0, 7, x0, 21, "M")
-			rect(x0 + 4, 7, x0 + 4, 21, "D")
-			put(x0 + 2, 3, "R")
-			rect(x0 + 1, 4, x0 + 3, 4, "R")
-			rect(x0, 5, x0 + 4, 6, "R")
-			rect(x0 + 3, 4, x0 + 3, 4, "r")
-			rect(x0 + 3, 5, x0 + 4, 6, "r")
-			rect(x0 + 2, 10, x0 + 2, 11, "W")
-		end
-		-- curtain walls and the keep
-		rect(5, 12, 15, 21, "m")
-		put(5, 11, "M")
-		put(15, 11, "D")
-		rect(7, 5, 13, 21, "m")
-		rect(7, 5, 7, 21, "M")
-		rect(13, 5, 13, 21, "D")
-		for x = 7, 13, 2 do
-			put(x, 4, if x == 13 then "D" else "M")
-		end
-		rect(10, 8, 10, 9, "W")
-		-- the gate
-		rect(9, 17, 11, 21, "D")
-		put(10, 16, "D")
-		rect(0, 21, 20, 21, "D")
-		-- the owner's flag
-		rect(10, 0, 10, 3, "p")
-		rect(11, 0, 13, 0, "F")
-		rect(11, 1, 12, 1, "F")
-		put(14, 0, "f")
-	end
-	local rows: { string } = {}
-	for y = 1, h do
-		rows[y] = table.concat(grid[y])
-	end
-	return rows
+	rect(9, 9, 10, 9, "R")
+	put(11, 9, "r")
+	rect(7, 10, 10, 10, "R")
+	rect(11, 10, 13, 10, "r")
+	rect(5, 11, 15, 11, "M")
+	rect(5, 12, 15, 12, "m")
+	put(15, 12, "D")
+	rect(5, 13, 5, 21, "M")
+	rect(6, 13, 6, 21, "m")
+	rect(14, 13, 14, 21, "m")
+	rect(15, 13, 15, 21, "D")
+	rect(7, 13, 7, 16, "R")
+	rect(13, 13, 13, 16, "r")
+	rect(8, 15, 12, 21, "K")
+	rect(9, 14, 11, 14, "K")
+	rect(9, 19, 11, 21, "O")
+	put(10, 18, "O")
+	put(3, 16, "W")
+	put(17, 16, "W")
+	rect(7, 7, 7, 8, "W")
+	rect(13, 7, 13, 8, "W")
+	flagOn(s, 3)
+	return s.rows()
 end
-local DETAIL_CASTLE = buildCapital(false)
-local DETAIL_DOME = buildCapital(true)
+
+local DETAIL_CAPITALS: { [string]: { string } } = {
+	Humans = buildCastle(),
+	dome = buildDome(),
+	Elves = buildTreeHall(),
+	Orcs = buildWarCamp(),
+	Dwarves = buildStoneHall(),
+}
+local DETAIL_CAPITAL_COLOURS: { [string]: number } = {
+	M = 0xf2ede4,
+	m = 0xd9d1c3,
+	D = 0x6e6558,
+	W = 0xffe9a0,
+	p = 0x3b3128,
+	C = 0x7cfbef,
+	c = 0x4fc9c0,
+	G = 0xa6d65a,
+	g = 0x6aa83c,
+	e = 0x3e7a35,
+	T = 0xece4cf,
+	t = 0xc4b79a,
+	u = 0x8a7d63,
+	H = 0xc4955c,
+	h = 0x8e6339,
+	X = 0x8a5a32,
+	x = 0x5a3a20,
+	B = 0xf3ead6,
+	K = 0x2b231c,
+	Q = 0xb4b8b6,
+	q = 0x8a8e8c,
+	k = 0x5d6160,
+	S = 0xf4f8fb,
+	O = 0xff8a26,
+}
+-- Skyshards' materials (every capital but the dome): steel and plating, crystal leaves, cyan and red light.
+local DETAIL_SKY_COLOURS: { [string]: number } = {
+	M = 0xe6ebf2,
+	m = 0xb7c0cc,
+	D = 0x4b5560,
+	W = 0x7cfbef,
+	p = 0x2e363e,
+	G = 0xc8fff8,
+	g = 0x64f1e2,
+	e = 0x3fb3aa,
+	T = 0xd8dee6,
+	t = 0xa9b2bd,
+	u = 0x5d6878,
+	H = 0x9aa2b2,
+	h = 0x5f6878,
+	X = 0x4b5560,
+	x = 0x2e363e,
+	B = 0xe8edf3,
+	K = 0x10152a,
+	Q = 0x8fa3b3,
+	q = 0x597d94,
+	k = 0x2e363e,
+	S = 0x7cfbef,
+	O = 0xf55858,
+}
 
 -- A new, empty close-up of width × height sub-pixels (factor: sub-pixels per map pixel, 1, 2, 4 or 8).
 function PixelArt.newDetail(width: number, height: number, factor: number?): Detail
@@ -2308,11 +2610,11 @@ local function detailPolitics(ctx: Ctx, cx0: number, cy0: number, cx1: number, c
 	end
 end
 
--- Castles (domes on Skyshards) in the close-up, on top of everything. Returns the sub-pixel rectangles drawn.
+-- Capitals (each race's own, DETAIL_CAPITALS) in the close-up, on top of everything. Returns the sub-pixel rectangles
+-- drawn.
 local function detailCapitals(ctx: Ctx, within: { number }?)
 	local art, d, f = ctx.art, ctx.d, ctx.f
-	local sprite = if art.theme == "sky" then DETAIL_DOME else DETAIL_CASTLE
-	local h, w = #sprite, #sprite[1]
+	local h, w = CAPITAL_H, CAPITAL_W
 	for pid, capital in art.capitals do
 		local x0 = (capital.x - d.x0) * f + f // 2 - w // 2
 		local y0 = (capital.y + 3 - d.y0) * f - h
@@ -2323,28 +2625,19 @@ local function detailCapitals(ctx: Ctx, within: { number }?)
 		if within and (x1 < within[1] or y1 < within[2] or x0 > within[3] or y0 > within[4]) then
 			continue
 		end
+		local sprite = DETAIL_CAPITALS[capital.kind]
+		local sky = art.theme == "sky" and capital.kind ~= "dome"
 		local o = art.owner[pid] or 0
 		local flag = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0
-		local palette: { [string]: number } = {
-			F = flag,
-			f = scale(flag, 0.75),
-			R = flag,
-			r = scale(flag, 0.72),
-			M = 0xf2ede4,
-			m = 0xd9d1c3,
-			D = 0x6e6558,
-			W = 0xffe9a0,
-			p = 0x3b3128,
-			C = 0x7cfbef,
-			c = 0x4fc9c0,
-		}
+		local owner: { [string]: number } = { F = flag, f = scale(flag, 0.75), R = flag, r = scale(flag, 0.72) }
 		for j = 1, h do
 			local row = sprite[j]
 			for i = 1, w do
 				local ch = string.sub(row, i, i)
 				local x, y = x0 + i - 1, y0 + j - 1
 				if ch ~= "." and x >= 0 and y >= 0 and x < d.width and y < d.height then
-					buffer.writeu32(d.pixels, (y * d.width + x) * 4, rgba(palette[ch]))
+					local c = owner[ch] or (if sky then DETAIL_SKY_COLOURS[ch] else nil) or DETAIL_CAPITAL_COLOURS[ch]
+					buffer.writeu32(d.pixels, (y * d.width + x) * 4, rgba(c))
 				end
 			end
 		end
@@ -2405,7 +2698,7 @@ function PixelArt.paintDetail(art: Art, d: Detail, x0: number, y0: number, yield
 end
 
 -- Catch the close-up up with the painting: repaint the kingdom layer of the provinces whose owner, colours, style
--- or selection changed since (only those, and their castles). Returns true if anything in the close-up changed.
+-- or selection changed since (only those, and their capitals). Returns true if anything in the close-up changed.
 function PixelArt.syncDetail(art: Art, d: Detail): boolean
 	if d.painted ~= art or next(art.changed) == nil then
 		return false
@@ -2470,6 +2763,8 @@ end
 type MapLike = {
 	theme: string,
 	provinces: { { id: number, biome: string, isCapital: boolean, center: { x: number, y: number } } },
+	-- { capital: number, race: string } each: whose capital is whose, since each race builds its own (MapDef.nations)
+	nations: { any }?,
 }
 
 -- Paint the terrain and a neutral political layer. Owners come later through setOwners. Pass `yield` to have it
@@ -2503,10 +2798,20 @@ function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?, look: string?): A
 		changed = {},
 	}
 	local biomeOf = art.biomes
+	local raceAt: { [number]: string } = {} -- capital province -> the race of the nation it is the capital of
+	for _, n in map.nations or {} do
+		if n.race then
+			raceAt[n.capital] = n.race
+		end
+	end
 	for _, p in map.provinces do
 		biomeOf[p.id] = BIOMES[p.biome] or FALLBACK
 		if p.isCapital then
-			art.capitals[p.id] = { x = math.floor(p.center.x / grid.scale), y = math.floor(p.center.y / grid.scale) }
+			art.capitals[p.id] = {
+				x = math.floor(p.center.x / grid.scale),
+				y = math.floor(p.center.y / grid.scale),
+				kind = capitalKind(map.theme, raceAt[p.id]),
+			}
 		end
 	end
 

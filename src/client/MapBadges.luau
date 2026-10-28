@@ -1,9 +1,9 @@
 --!strict
 -- What the map's badges say and where they stand (docs/DESIGN.md "Map rendering"), worked out without Roblox so it
--- runs under Lune: the pixel icon for an army's state, the short form of its size, a province's status pills (its
--- battle or siege, then Primordial-power effects with their seconds left), where armies resting in one province
--- stand and how their strength badges stack above them, and the development pips painted as a small segmented bar.
--- src/client/MapRenderer.luau puts all of it on screen.
+-- runs under Lune: the pixel icon for an army's state or its main troop type, the short form of its size, a
+-- province's status pills (its battle or siege, then Primordial-power effects with their seconds left), where armies
+-- resting in one province stand and how their strength badges stack above them, and the development pips painted as
+-- a small segmented bar. src/client/MapRenderer.luau puts all of it on screen.
 
 local IconArt = require("./IconArt")
 
@@ -14,8 +14,33 @@ export type Pill = { icon: string, text: string }
 
 MapBadges.PIP_CELL = 3 -- a development pip's inside, in pixels (each cell has a 1-pixel outline shared with the next)
 
--- The icon on an army's strength badge, the same ones the province sheet's chips use.
-function MapBadges.armyIcon(rebel: boolean, neutral: boolean, inBattle: boolean, retreating: boolean): string
+-- The troop type an army is mostly made of (docs/DESIGN.md "Troops"): the one with the most men. A tie goes to the
+-- dearer troop (`cost`: gold per regiment), then to the later one in `order` (Troops.LIST, where the elites come
+-- last). nil for an empty composition. `troops` is men per troop type (Types.Composition).
+function MapBadges.mainTroop(troops: { [string]: number }, order: { string }, cost: (string) -> number): string?
+	local best: string? = nil
+	local bestMen, bestCost = 0, -math.huge
+	for _, troop in order do
+		local men = troops[troop] or 0
+		if men > 0 then
+			local c = cost(troop)
+			if men > bestMen or (men == bestMen and c >= bestCost) then
+				best, bestMen, bestCost = troop, men, c
+			end
+		end
+	end
+	return best
+end
+
+-- The icon on an army's strength badge: Rebels, a garrison, a battle or a retreat first, else the icon of the troop
+-- type it is mostly made of (MapBadges.mainTroop; IconArt names them in lower case), or a sword without one.
+function MapBadges.armyIcon(
+	rebel: boolean,
+	neutral: boolean,
+	inBattle: boolean,
+	retreating: boolean,
+	mainTroop: string?
+): string
 	if rebel then
 		return "rebels"
 	elseif neutral then
@@ -24,6 +49,8 @@ function MapBadges.armyIcon(rebel: boolean, neutral: boolean, inBattle: boolean,
 		return "battle"
 	elseif retreating then
 		return "retreat"
+	elseif mainTroop then
+		return string.lower(mainTroop)
 	end
 	return "sword"
 end

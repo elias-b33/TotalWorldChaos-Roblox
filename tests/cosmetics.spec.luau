@@ -179,6 +179,52 @@ T.test("animated flags wave between frames; others stay still", function()
 	T.equal(c, d, "the sun doesn't")
 end)
 
+T.test("every race has a soldier: a 12×12 grid of known colour codes, outlined, in the nation's colours", function()
+	local Races = require("../src/shared/Sim/Races")
+	local codes = "NDLKWG."
+	for code in CosmeticArt.SOLDIER_COLOURS do
+		T.expect(not string.find("NDLKWG.", code, 1, true), code .. " doesn't shadow a token code")
+		codes ..= code
+	end
+	local seen: { [string]: string } = {}
+	for _, race in Races.LIST do
+		local rows = CosmeticArt.SOLDIERS[race]
+		T.expect(rows ~= nil, race .. " has a soldier")
+		T.equal(#rows, CosmeticArt.TOKEN_SIZE.h, race .. " height")
+		for _, row in rows do
+			T.equal(#row, CosmeticArt.TOKEN_SIZE.w, race .. " width")
+			T.expect(string.match(row, "^[" .. codes .. "]+$") ~= nil, race .. " codes: " .. row)
+		end
+		local px, w, h = CosmeticArt.soldier(race, 0x3cd74b, 0x47b052)
+		T.equal(w, 12)
+		T.equal(h, 12)
+		local nation, border, outline, opaque = 0, 0, 0, 0
+		for y = 0, h - 1 do
+			for x = 0, w - 1 do
+				local c, a = CosmeticArt.pixel(px, w, x, y)
+				if a > 0 then
+					opaque += 1
+					nation += if c == 0x3cd74b then 1 else 0
+					border += if c == 0x47b052 then 1 else 0
+					outline += if c == 0x1d1d24 then 1 else 0
+				end
+			end
+		end
+		T.expect(nation >= 14, race .. " wears its nation's colour (" .. nation .. " pixels)")
+		T.expect(border >= 4, race .. " has a belt in the border colour")
+		T.expect(outline >= 25, race .. " is outlined")
+		T.expect(opaque < 144, race .. " stands on the map, transparent round it")
+		local key = buffer.tostring(px)
+		T.expect(seen[key] == nil, race .. " looks different from " .. tostring(seen[key]))
+		seen[key] = race
+	end
+	local unknown = CosmeticArt.soldier("Gnomes", 0x3cd74b, 0x47b052)
+	T.expect(
+		buffer.tostring(unknown) == buffer.tostring((CosmeticArt.token("square", 0x3cd74b, 0x47b052))),
+		"no race: the square"
+	)
+end)
+
 T.test("tokens: transparent outside the sprite, animated ones have frames", function()
 	local px, w = CosmeticArt.token("shield", 0xe6194b, 0x97233d)
 	local _, alpha = CosmeticArt.pixel(px, w, 0, 0)

@@ -30,7 +30,7 @@ These are checked by the generator (`tools/mapgen/layout.py`), so a map that bre
 - **≤ 150 provinces** (the performance budget).
 - **Straits** are extra neighbour links across water or void, exactly as in the design doc. Each map draws them in its own style: dashed sea lanes on Earth, ink sea lanes on Eldmoor, rope bridges on Skyshards.
 - **Neutral garrisons** default to one regiment (1,000 men, `Config.NeutralGarrison`). A map can give a province a bigger garrison: the two map centres (the Crownlands and the Heartstone) and a few provinces set for start-position balance (see each map).
-- **Races** (docs/DESIGN.md "Races"): every nation has one of WorldBox's four races, set per nation in the generator (`RACES` in each `tools/mapgen/maps/*.py`, written into `layout.json` and `MapData` as the nation's `race`). Every map mixes all four, at least two nations of each, fitted to the land where it makes sense: Elves on the forest starts, Dwarves in the hills, Humans and Orcs elsewhere. The validator flags a nation without a race and a map missing one.
+- **Races** (docs/DESIGN.md "Races"): every nation has one of WorldBox's four races, set per nation in the generator (`RACES` in each `tools/mapgen/maps/*.py`, written into `layout.json` and `MapData` as the nation's `race`). Every map mixes all four, at least two nations of each, fitted to the land where it makes sense: Elves on the forest starts, Dwarves in the hills, Humans and Orcs elsewhere. The validator flags a nation without a race and a map missing one. The race also picks what the nation's capital looks like in the pixel art ("Capitals and armies by race").
 - **Start-position balance** is measured, not assumed: `lune run tools/harness/tournament 200 <map>` plays 200 bot matches and prints each slot's wins against its fair share. The goal (`docs/BALANCE.md` section 17) is that no slot wins more than about twice its share and none (almost) never wins. Fixes go into the generator (garrisons, passes, sea lanes, where a capital sits), never into special rules.
 
 ## Earth
@@ -139,13 +139,13 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 
 ## Art direction
 
-- **2D pixel art, like WorldBox.** One map pixel is one stud; trees, peaks, dunes and castles are little sprites a few pixels big. Painted at runtime by `src/client/PixelArt.luau`, in two paintings:
+- **2D pixel art, like WorldBox.** One map pixel is one stud; trees, peaks, dunes and capitals are little sprites a few pixels big. Painted at runtime by `src/client/PixelArt.luau`, in two paintings:
   - **The whole map**, one pixel per map pixel: what the zoomed-out and region views show.
   - **The close-up**, laid over the part of the map in view once you zoom in past about 4 screen pixels per map pixel: the same map at 4 × 4 sub-pixels per map pixel, so zooming in shows more detail instead of bigger blocks, the way WorldBox draws each tile as a little 8×8 sprite.
 - **Textures, not noise.** Each biome's ground is a small hand-made 8×8 pattern (grass tufts, dry strokes, sand ripples, snow drifts, rock facets, jungle floor, ash cracks, crystal facets, goo bubbles, metal plates), several variants of it plus their mirror images picked per block by a hash, so nothing visibly repeats. The whole map uses them at one pixel per map pixel with soft colours; the close-up at full contrast, four times finer.
 - **Height and light.** A smooth elevation field gives each biome raised patches of its darker "high" variant, with a dark lip on their south side and a lit north edge, and every slope is a little lighter or darker by the light from the north-west. Mountains keep WorldBox's rock bands; in the close-up their faces are lit and shaded and the bands blend smoothly.
 - **Water.** Three depth bands measured with a round (chamfer) distance from land, darker lips where it gets deeper, a light foam line along the shores, a shadow under south shores and gentle staggered wave dashes on rough patches of open water. In the close-up the coast is smooth (a blurred land mask, so the grid's steps round off, while 1-pixel islands and straits stay), with beaches of dry and wet sand, white surf and foam.
-- **Close-up decorations.** Dense forests of shaded trees with shadows cast to the south-east, snowy pines, jungle canopies, acacias, palms, cacti, bushes, rocks, boulders, flowers, hill mounds, glowing crystals, storm towers; crop rows and bevelled, riveted hull plating on Skyshards, with glowing rims and plated hulls under its platforms; a detailed castle (a dome on Skyshards) flying the owner's flag.
+- **Close-up decorations.** Dense forests of shaded trees with shadows cast to the south-east, snowy pines, jungle canopies, acacias, palms, cacti, bushes, rocks, boulders, flowers, hill mounds, glowing crystals, storm towers; crop rows and bevelled, riveted hull plating on Skyshards, with glowing rims and plated hulls under its platforms; each race's detailed capital flying the owner's flag ("Capitals and armies by race" below).
 - **Map colour is power.** On the whole map, owned provinces are washed with their nation's colour at 59% opacity over the terrain, WorldBox's kingdom overlay, and each nation has a 1-pixel border in its darker border colour. In the close-up the wash is lighter (48%) so the terrain shows through, with a stronger band (70%) just inside the border and a crisp border line in the darker colour; thin lines separate provinces and the selected province gets a white outline. Neutral land shows its natural colours.
 - **WorldBox's colours.** The terrain uses WorldBox's tile colours, taken from the game's data:
   - Ocean in three depth bands: shallow `#55aef0`, close `#4084e2`, deep `#3370cc`. A `#2d61af` shadow line runs just south of land.
@@ -167,9 +167,22 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 | 9 | Brown | `#9a6324` | `#7b572a` |
 | 10 | Charcoal | `#353535` | `#2d2e2b` |
 
+### Capitals and armies by race
+
+Each race builds its own capital (docs/DESIGN.md "Races"), so you see at a glance whose kingdom it is. The owner's colour is on its flag, roofs and banners, and a capital keeps its founders' look when someone else takes it: only the flag changes.
+
+| Race | Earth and Eldmoor | Skyshards (sci-fi materials) |
+| --- | --- | --- |
+| Humans | a stone castle: two towers and a keep with roofs in the owner's colour | a glowing dome on a steel base |
+| Elves | a tree hall: a great pale-barked tree, its crown lit from the north-west, little halls with the owner's roofs up in the leaves, lanterns, a glowing door between the roots | a crystal tree with cyan leaves and a steel trunk |
+| Orcs | a spiked war camp: a hide tent on crossed poles with a band in the owner's colour, bone spikes, a fire in its door, a palisade of sharpened stakes | a plated war camp with steel spikes and a red glow |
+| Dwarves | a stone hall carved into a snowy mountain: pillars, a gable and banners in the owner's colour, a gate glowing with a forge | a steel mountain with a glowing peak and a red-lit gate |
+
+On the whole map each capital is a 5 × 6 pixel sprite in the same colours (a white castle, a green crown on a pale trunk, a brown tent with white spikes, a grey peak with a lit gate); in the close-up it is a 21 × 22 sub-pixel building, and the capital's name stands below it. Armies are little soldiers of their nation's race (a footman, an elf archer, an orc warrior, a dwarf with an axe) unless it has a token skin equipped, and each army's badge shows the icon of the troop type it is mostly made of (docs/DESIGN.md "Map rendering"). `lune run tools/harness/play kingdoms` (with `MAP=earth` or `MAP=eldmoor` for the classic looks) photographs each race's capital and army at the three zooms.
+
 ### Map themes
 
-Shop cosmetics that re-skin the terrain of any map (docs/MONETIZATION.md 3.2), painted by `PixelArt` in the same pixel style: `PixelArt.themeColor` recolours each terrain pixel (on the whole map and in the close-up) before the kingdom overlay goes on, so nation colours, borders and castles never change, and armies, names and effects are drawn on top as always.
+Shop cosmetics that re-skin the terrain of any map (docs/MONETIZATION.md 3.2), painted by `PixelArt` in the same pixel style: `PixelArt.themeColor` recolours each terrain pixel (on the whole map and in the close-up) before the kingdom overlay goes on, so nation colours, borders and capitals never change, and armies, names and effects are drawn on top as always.
 
 | Theme | Land | Sea / space | Extras |
 | --- | --- | --- | --- |

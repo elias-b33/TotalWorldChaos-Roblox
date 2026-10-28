@@ -1,9 +1,10 @@
 --!strict
 -- What is drawn on the 2D map (docs/DESIGN.md "Map rendering"): the pixel-art image painted by PixelArt
--- (terrain, owners, the selected province), straits, province names with their development pips, army tokens
--- gliding from province to province with their strength badges, each province's status pills (battle, siege,
--- Primordial powers), the coalition leader's crown and route lines. Everything sits on MapView's canvas, placed in
--- map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
+-- (terrain, owners, the selected province, each race's capitals), straits, province names with their development
+-- pips, army tokens (a soldier of the nation's race, or its token skin) gliding from province to province with their
+-- strength badges (the icon of the troop type an army is mostly made of), each province's status pills (battle,
+-- siege, Primordial powers), the coalition leader's crown and route lines. Everything sits on MapView's canvas,
+-- placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
 --
 -- The overlays share the UI kit's look (UI/Theme, UI/Icons): names in Builder Sans with an ink outline, pips as a
 -- pixel bar, badges and pills as dark plates with a pixel icon and Fredoka One numbers. What they say and where they
@@ -31,6 +32,7 @@ local MapBadges = require(script.Parent.MapBadges)
 local MapView = require(script.Parent.MapView)
 local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
+local RaceInfo = require(script.Parent.RaceInfo)
 local ShopState = require(script.Parent.ShopState)
 local Theme = require(script.Parent.UI.Theme)
 local Widgets = require(script.Parent.UI.Widgets)
@@ -38,6 +40,7 @@ local Widgets = require(script.Parent.UI.Widgets)
 local NAME_MIN_PIXELS = 70 -- a province's name shows once the province is this wide on screen
 local NAME_RELAYOUT = 0.04 -- names are laid out again when the zoom changes by this share
 local NAME_OFFSET = 6 -- screen pixels between a province's centre and the top of its name
+local CAPITAL_FOOT = 3 -- map pixels from a capital's centre down to its building's foot (PixelArt); its name clears it
 local NAME_HEIGHT = 18
 local PIPS_SCALE = 2 -- screen pixels per pixel of the development pip bar (MapBadges.pips)
 local PIPS_GAP = 1 -- screen pixels between a name and its pips
@@ -99,6 +102,8 @@ type Token = {
 	row: number, -- its badge's row in the province's stack (-1 while hidden)
 	text: string, -- what its badge shows now
 	icon: string,
+	troops: string, -- its composition as last seen (ArmyRecord.troops), and the troop type it is mostly made of
+	troop: string?,
 }
 
 -- A province's status row: battle or siege, and Primordial-power effects (MapBadges.status).
@@ -124,6 +129,7 @@ local viewKey = "" -- where the view was last frame, and how long it has stayed 
 local viewStill = 0
 local layers: { [string]: Frame } = {}
 local widths: { [number]: number } = {} -- each province's width in map pixels
+local capitalAt: { [number]: boolean } = {} -- the capitals' provinces (their names stand below the building)
 local namesLaidOut = { zoom = -1, detail = false }
 local idleLaidOut: { [number]: boolean } = {} -- the idle garrisons the last layout placed (army ids)
 local roomy: { [number]: boolean } = {} -- those of them whose badge had room
@@ -358,6 +364,15 @@ local function garrisonsChanged(): boolean
 	return n ~= 0
 end
 
+-- How far below its province's centre a name stands, in screen pixels: a capital's name stands clear of its
+-- building (each race's own, painted round the centre), which grows with the zoom.
+local function nameOffset(provinceId: number, z: number): number
+	if capitalAt[provinceId] then
+		return math.max(NAME_OFFSET, math.ceil(CAPITAL_FOOT * z) + 2)
+	end
+	return NAME_OFFSET
+end
+
 -- Names of provinces wide enough on screen, minus any that would overlap a bigger province's name; then, from the
 -- region zoom inwards, each idle garrison's badge wherever it covers no name and no garrison badge placed before it
 -- (bigger provinces first; the others keep their grey token until there's room). True when it laid them out again.
@@ -367,6 +382,12 @@ local function layoutNames(z: number, detail: boolean, force: boolean?): boolean
 		return false
 	end
 	namesLaidOut = { zoom = z, detail = detail }
+	for id in capitalAt do
+		local label = labels[id]
+		if label then
+			label.name.Position = at(MapRenderer.centerOf(id)) + UDim2.fromOffset(0, nameOffset(id, z))
+		end
+	end
 	local boxes: { LabelLayout.Box } = {}
 	for id, label in labels do
 		local width = widths[id] or 0
@@ -375,7 +396,7 @@ local function layoutNames(z: number, detail: boolean, force: boolean?): boolean
 			table.insert(boxes, {
 				id = id,
 				x = c.X - label.width / 2,
-				y = c.Y + NAME_OFFSET,
+				y = c.Y + nameOffset(id, z),
 				w = label.width,
 				h = if detail then NAME_HEIGHT + PIPS_HEIGHT else NAME_HEIGHT,
 				priority = width,
@@ -964,6 +985,7 @@ local function build(map: Types.MapDef)
 	victories = {}
 	layers = {}
 	widths = {}
+	capitalAt = {}
 	namesLaidOut = { zoom = -1, detail = false }
 	idleLaidOut, roomy = {}, {}
 	detailShown = false
@@ -1029,6 +1051,9 @@ local function build(map: Types.MapDef)
 	local labelLayer = layer("Labels", canvas)
 	for _, def in map.provinces do
 		widths[def.id] = 2 * math.sqrt(def.area / (g.scale * g.scale) / math.pi)
+		if def.isCapital then
+			capitalAt[def.id] = true
+		end
 		if def.terrain ~= "Mountain" then
 			local record = ClientState.province(def.id)
 			local development = if record then record.development else def.development
@@ -1036,7 +1061,7 @@ local function build(map: Types.MapDef)
 			local name = textLabel(labelLayer, def.name)
 			name.Name = "P" .. def.id
 			name.AnchorPoint = Vector2.new(0.5, 0)
-			name.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, NAME_OFFSET)
+			name.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, nameOffset(def.id, MapView.zoom()))
 			name.Size = UDim2.fromOffset(width, NAME_HEIGHT)
 			local pips = pipsLabel(name, development)
 			labels[def.id] = { name = name, pips = pips, width = width, development = development }
@@ -1191,16 +1216,18 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	stroke.Color = if rebel then Palette.rebelEdge else Theme.color.ink
 	stroke.Thickness = Theme.stroke
 	stroke.Parent = frame
-	-- an army token skin (cosmetic): the nation's sprite instead of the plain square
+	-- a nation's sprite instead of the plain square: its token skin (cosmetic), or with the default token a soldier of
+	-- its race (garrisons and Rebels keep their squares)
 	local nation = if neutral then nil else ClientState.nation(army.owner)
-	local skin = if nation then Cosmetics.of(army.owner).token else Catalogue.DEFAULTS.Token
-	local skinned = nation ~= nil and skin ~= Catalogue.DEFAULTS.Token
-	if nation and skinned then
+	local sprite = if nation
+		then Cosmetics.armyLabel(frame, army.owner, nation.race, nation.colorIndex, UDim2.fromScale(1, 1))
+		else nil
+	local skinned = sprite ~= nil
+	if skinned then
 		px = TOKEN_SKIN_SIZE
 		frame.Size = UDim2.fromOffset(px, px)
 		frame.BackgroundTransparency = 1
 		stroke.Enabled = false
-		Cosmetics.tokenLabel(frame, skin, nation.colorIndex, UDim2.fromScale(1, 1))
 	end
 	local token: Token = {
 		frame = frame,
@@ -1219,6 +1246,8 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		row = -1,
 		text = "",
 		icon = "",
+		troops = "",
+		troop = nil,
 	}
 	token.badge.stroke.Color = edgeOf(token)
 	token.badge.label.AnchorPoint = Vector2.new(0.5, 1)
@@ -1267,7 +1296,11 @@ local function refreshArmies()
 			table.insert(list, army.id)
 			resting[army.location] = list
 		end
-		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating)
+		if t.troops ~= army.troops then
+			t.troops = army.troops
+			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon
+		end
+		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating, t.troop)
 		local text = MapBadges.shortMen(army.men)
 		if t.icon ~= icon or t.text ~= text then
 			t.icon, t.text = icon, text
