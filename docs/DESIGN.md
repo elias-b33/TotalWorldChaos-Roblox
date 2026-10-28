@@ -379,6 +379,7 @@ export type Command =
 | `RequestBuy` | client → server | itemId, "Glory" or "Robux" |
 | `RequestEquip` | client → server | itemId |
 | `RequestEmote` | client → server | emote itemId |
+| `RequestTelemetry` | client → server | a UI-only analytics step (`Loaded`, `ShopOpened`, `ItemViewed`, `OfferOpened`), optional short string; no reply, changes nothing |
 | `Shop` | server → client | your owned and equipped items, VIP, purchase history, whether Robux purchases are open, the starter-pack offer |
 
 ## UI and controls
@@ -406,7 +407,7 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - **The match:** Earth, the player as Ganges (`Config.Tutorial`), the 5 nations nearest to them as Easy bots, and the other 4 nations gone (their land neutral, with garrisons). No Lobby. The player starts with a 3-regiment army so the first prompt can start at once.
 - **Prompts:** a card under the top bar (step counter, one short line, one hint, Skip), an arrow and ring on the province to tap, and a glowing outline on the button to press. The player does every step with the normal UI. Each prompt ends when the match shows it done: owns a province it didn't start with, recruited, is besieging, is in an alliance, is at war, used a power. A step done early counts when its prompt comes up.
 - **Bots help:** every bot accepts the player's alliance offer; the ally prompt points at the nearest bot, the war prompt at the weakest bot on the player's border. When the war prompt starts, Peace ends at once (the clock jumps to 3:00); the power prompt tops the player up to 1 charge (a Blessing on their own land).
-- **Skip and done:** Skip takes two taps. Finishing or skipping saves `tutorialDone`; players who had already played a match count as done. Each tutorial server prints its funnel (started, finished, skipped) until the Analytics events arrive.
+- **Skip and done:** Skip takes two taps. Finishing or skipping saves `tutorialDone`; players who had already played a match count as done. Each prompt done is an onboarding funnel step and a skip is a `tutorial_skipped` event (`docs/LAUNCH.md` "Analytics events"); the server also prints started, finished and skipped in the Output.
 
 ### Sound and effects
 
@@ -527,7 +528,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 ### Phase 5: Soft launch
 
-- [ ] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
+- [x] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
 - [ ] Weekly balance patch from the data
 - [ ] Easy and Hard bots
 - [ ] Per-map balance from win rate by start position

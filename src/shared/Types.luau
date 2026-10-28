@@ -331,4 +331,20 @@ export type ShopView = {
 	testMode: boolean, -- some product ids are still 0: Studio grants those purchases free
 }
 
+-- Analytics (docs/LAUNCH.md 7): Sim.Telemetry builds these, Services/TelemetryService sends them to
+-- AnalyticsService. No personal data: userId only says which Player the call is made for (nil = a match-wide event,
+-- sent for any player in the server).
+export type TelemetryEvent = {
+	kind: "Custom" | "Funnel" | "Onboarding" | "Economy" | "Progression",
+	userId: number?,
+	name: string, -- custom event name, funnel name, currency or progression path ("Onboarding" for onboarding)
+	value: number, -- custom value; funnel or onboarding step number; economy amount; progression level
+	step: string?, -- funnel or onboarding step name; economy itemSku; progression level name
+	session: string?, -- funnel session id
+	flow: string?, -- economy "Source" | "Sink"; progression "Start" | "Complete"
+	transaction: string?, -- economy transaction type (Enum.AnalyticsEconomyTransactionType names)
+	balance: number?, -- economy ending balance
+	fields: { string }, -- custom fields 1-3
+}
+
 return {}

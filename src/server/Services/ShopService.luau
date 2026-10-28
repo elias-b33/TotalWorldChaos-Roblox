@@ -25,6 +25,7 @@ local Types = require(Shared.Types)
 local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local TelemetryService = require(script.Parent.TelemetryService)
 
 local ShopService = {}
 
@@ -72,11 +73,16 @@ end
 
 -- A receipt for an item or offer: grant once, save, then PurchaseGranted. Also used by test mode and the VIP pass.
 function ShopService.receipt(receipt: any, id: string): Enum.ProductPurchaseDecision
+	local fresh = false -- granted now, not a repeat of a receipt already granted
 	local decision = PlayerDataService.processReceipt(receipt, id, function(data)
 		Shop.grant(data, id)
+		fresh = true
 	end)
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	if player and decision == Enum.ProductPurchaseDecision.PurchaseGranted then
+		if fresh then
+			TelemetryService.purchased(player, id, receipt.CurrencySpent) -- analytics
+		end
 		if id == "vip" then
 			vipCache[player] = true
 			player:SetAttribute("Vip", true)
@@ -169,8 +175,7 @@ local function emote(player: Player, id: string): (boolean, string?)
 	return true, nil
 end
 
--- A shop request from CommandRouter (shape already checked). May yield (saves, prompts).
-function ShopService.apply(player: Player, intent: Types.ShopIntent): (boolean, string?)
+local function applyIntent(player: Player, intent: Types.ShopIntent): (boolean, string?)
 	local vip = ShopService.isVip(player)
 	local rule: ((Types.PlayerProfile, string, boolean) -> (boolean, string?))? = nil
 	if intent.kind == "Buy" and intent.currency == "Glory" then
@@ -192,6 +197,13 @@ function ShopService.apply(player: Player, intent: Types.ShopIntent): (boolean, 
 		return false, "NotLoaded"
 	end
 	return result.ok, result.reason
+end
+
+-- A shop request from CommandRouter (shape already checked). May yield (saves, prompts).
+function ShopService.apply(player: Player, intent: Types.ShopIntent): (boolean, string?)
+	local ok, reason = applyIntent(player, intent)
+	TelemetryService.shopIntent(player, intent, ok, reason) -- analytics
+	return ok, reason
 end
 
 -- Every loaded player's equipped cosmetics by userId, for Snapshot.cosmetics.
@@ -219,6 +231,7 @@ function ShopService.onPhase(phase: string)
 		local offer = data ~= nil and Shop.robuxOpen(phase) and Shop.shouldOfferStarter(data, offered[player] == true)
 		if offer then
 			offered[player] = true
+			TelemetryService.starterOffered(player) -- analytics
 		end
 		sendView(player, offer)
 	end

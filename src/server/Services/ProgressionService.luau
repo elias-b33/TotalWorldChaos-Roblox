@@ -16,6 +16,7 @@ local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local ShopService = require(script.Parent.ShopService)
+local TelemetryService = require(script.Parent.TelemetryService)
 
 local SECONDS_PER_DAY = 86400
 
@@ -60,6 +61,7 @@ local function pay(player: Player, state: Types.MatchState, entry: Types.PlayerM
 	end)
 	if report then
 		rewardRemote:FireClient(player, report)
+		TelemetryService.reward(player, report) -- analytics: Glory sources, AccountLevel
 	end
 	return report ~= nil
 end
@@ -113,7 +115,9 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 			return
 		end
 		Progression.leave(entry, state.tick) -- the record stays: rejoining carries on with it
-		Progression.grant(data, entry, Progression.matchReward(state, entry, options(player, data)), today())
+		local report =
+			Progression.grant(data, entry, Progression.matchReward(state, entry, options(player, data)), today())
+		TelemetryService.reward(player, report, data) -- analytics
 	end)
 end
 

@@ -19,6 +19,7 @@ local EVENTS = {
 	"RequestBuy", -- shop: itemId, "Glory" | "Robux"
 	"RequestEquip", -- shop: itemId
 	"RequestEmote", -- shop: emote itemId
+	"RequestTelemetry", -- analytics: a UI funnel signal (Sim.Telemetry.CLIENT_SIGNALS) and an optional short string
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",

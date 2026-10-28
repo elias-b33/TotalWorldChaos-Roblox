@@ -156,6 +156,15 @@ Everything goes through `AnalyticsService`, wrapped in `Services/TelemetryServic
 
 Retention, session length, playtime and Robux revenue come from Roblox's built-in dashboards, so we don't log them.
 
+How it is built:
+
+- `Shared/Sim/Telemetry.luau` holds the plan below as data and builds every payload (pure, tested); `TelemetryService` finds the Player, keeps the budget and calls `AnalyticsService`. One function per event.
+- AnalyticsService only accepts events from servers of a **published** game, never from clients or Studio. In Studio the Workspace attribute `TelemetryLog` prints each event to the Output (`docs/STUDIO.md`).
+- Budget: each server sends at most 120 + 20 × its players per minute and drops the rest (the Output says how many).
+- Every call needs a Player. Match-wide events (`nation_start`, `match_end`, `match_win`, and `player_result` for bot nations) go out for the player in the server with the lowest userId.
+- No names, chat or other personal data: userIds only where AnalyticsService needs the Player. Custom field values are strings (map ids, nation slots, buckets, item ids); match minutes have one decimal.
+- UI-only steps (`lobby_loaded`, `shop_opened`, `item_viewed`, `offer_opened`) come from the client through `RequestTelemetry`, checked and rate-limited by `CommandRouter`. They change nothing in the game.
+
 ### Onboarding funnel (`LogOnboardingFunnelStepEvent`)
 
 | Step | Name |
@@ -173,7 +182,7 @@ Retention, session length, playtime and Robux revenue come from Roblox's built-i
 | 11 | `first_match_finished` |
 | 12 | `second_match_started` |
 
-Steps 5–10 follow the tutorial prompts in DESIGN.md. Until these events exist, `TutorialService` prints `[tutorial] … started`, `finished in N s` and `skipped at prompt N` lines with the server's counts.
+Steps 5–10 are the tutorial prompts in DESIGN.md, logged as each one is done. Steps are only logged for players with fewer than 2 finished matches. `lobby_loaded` is the client saying its screens are built. Roblox counts a skipped step as done when a later one arrives, so a skipped tutorial also logs `tutorial_skipped` (custom events below). `TutorialService` still prints `[tutorial] … started`, `finished in N s` and `skipped at prompt N` in the Output.
 
 ### Funnels (`LogFunnelStepEvent`, 6 of the 10 allowed)
 
@@ -186,7 +195,11 @@ Steps 5–10 follow the tutorial prompts in DESIGN.md. Until these events exist,
 | `PrivateServer` | private server id | 1 `settings_opened`, 2 `custom_match_started` |
 | `Party` | partyId | 1 `invite_sent`, 2 `invite_accepted`, 3 `party_match_started` |
 
-`MatchFlow` answers "phase reached" from the DESIGN.md Phase 5 list.
+`MatchFlow` answers "phase reached" from the DESIGN.md Phase 5 list. Each step is logged once per player and match: `lobby` when the vote opens or they join it, `pick` when they have a nation (drafted, or seated on joining), `peace`/`war`/`cataclysm`/`results` when they are in that phase with a nation or a Primordial, and `next_match_started` on the old session when they get a nation in the following match.
+
+- `Shop`: `shop_opened` and `item_viewed` (another tab or page, once per session) come from the client; `purchase_prompted` is a buy the server accepted, `purchase_completed` a granted purchase (a Glory buy logs both at once).
+- `StarterPack`: `offer_shown` when the server sends the pop-up, `offer_opened` when the client shows it.
+- `SeasonPass` is ready (`TelemetryService.seasonPass`) for the season pass task. `PrivateServer` and `Party` wait for those features.
 
 ### Economy (`LogEconomyEvent`)
 
@@ -196,15 +209,15 @@ Steps 5–10 follow the tutorial prompts in DESIGN.md. Until these events exist,
 | `Glory` | Source | TimedReward | `login_calendar` |
 | `Glory` | Sink | Shop | catalogue item id |
 | `Glory` | Sink | Gameplay | `quest_reroll`, `clan_create` |
-| `Robux` | Sink | IAP | developer product or pass name (`vip`, `season_pass_s1`, `starter_pack`, item id) |
+| `Robux` | Sink | IAP | catalogue offer or item id (`vip`, `starter`, `set_royal`, item id; later `season_pass_s1`) |
 
-Always pass the ending balance. Add up to 3 custom fields: `level_bucket` (1–9, 10–29, 30+), `is_vip`, `is_payer`.
+Always pass the ending balance (Robux: 0, since games can't read a player's Robux balance). `match_reward` and `level_up` (level-ups and rank-ups) come from every match reward; `TelemetryService.glory` is ready for the quest, login and reroll rows. Add up to 3 custom fields: `level_bucket` (1–9, 10–29, 30+), `is_vip`, `is_payer`.
 
 ### Progression (`LogProgressionEvent` / `LogProgressionCompleteEvent`)
 
 | Path | Level | Level name |
 | --- | --- | --- |
-| `AccountLevel` | 1–100 | Rank name |
+| `AccountLevel` | 1–100 | Rank name (`Complete` for every level passed, `Start` for the new one; `Start` 1 on a new account) |
 | `SeasonTier` | 1–50 | `S1` … |
 
 ### Custom events (`LogCustomEvent`)
@@ -227,8 +240,9 @@ Always pass the ending balance. Add up to 3 custom fields: `level_bucket` (1–9
 | `emote_used` | 1 | emote_id | — | — | Cosmetic use |
 | `purchase_failed` | 1 | product | reason | — | Shop bugs |
 | `notification_opt_in` | 1 | result (accepted, declined) | — | — | Notification reach |
+| `tutorial_skipped` | prompt reached (1–6) | prompt name | — | — | Tutorial completion |
 
-That's 16 custom event names out of 100, so there's room for events and new modes.
+That's 17 custom event names out of 100, so there's room for events and new modes. `nation_start` is logged a minute into the match (or at Results, if sooner), so late joiners count as human; `player_result` is logged for every nation. The quest, reroll, ad and notification events have their `TelemetryService` functions ready for those features.
 
 **Weekly review (every Monday, 30 minutes):**
 

@@ -446,6 +446,9 @@ local function refreshButton()
 end
 
 local function setOpen(open: boolean)
+	if open and not panel.Visible then
+		Intents.signal("ShopOpened") -- analytics: a new Shop funnel session
+	end
 	panel.Visible = open
 	refreshButton()
 	if open then
@@ -494,6 +497,7 @@ local function showStarterOffer()
 		offerPanel.Visible = false
 	end)
 	offerPanel.Visible = true
+	Intents.signal("OfferOpened") -- analytics
 end
 
 -- Open the shop on a tab (e.g. from a scenario or another screen).
@@ -571,6 +575,7 @@ function ShopUI.init(showToast: (string) -> ())
 	testLabel.LayoutOrder = 4
 	local prev = Widgets.button(header, "◀", 44, Widgets.BUTTON_OFF, function()
 		page -= 1
+		Intents.signal("ItemViewed", tab) -- analytics
 		render()
 	end)
 	prev.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
@@ -581,6 +586,7 @@ function ShopUI.init(showToast: (string) -> ())
 	pageLabel.LayoutOrder = 6
 	local nextButton = Widgets.button(header, "▶", 44, Widgets.BUTTON_OFF, function()
 		page += 1
+		Intents.signal("ItemViewed", tab) -- analytics
 		render()
 	end)
 	nextButton.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
@@ -606,6 +612,7 @@ function ShopUI.init(showToast: (string) -> ())
 	for i, t in TABS do
 		local b = Widgets.button(tabRow, t.icon .. "\n" .. t.label, 0, Widgets.BUTTON_OFF, function()
 			tab, page = t.id, 1
+			Intents.signal("ItemViewed", tab) -- analytics
 			render()
 		end)
 		b.Name = "Tab_" .. t.id
