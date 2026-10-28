@@ -32,6 +32,8 @@ local Shop = require(Client.UI.Shop)
 local ShopState = require(Client.ShopState)
 local Quests = require(Client.UI.Quests)
 local QuestState = require(Client.QuestState)
+local Trophies = require(Client.UI.Trophies)
+local TrophyState = require(Client.TrophyState)
 
 local selectedArmy: number? = nil
 
@@ -158,12 +160,14 @@ end)
 Cosmetics.init()
 Shop.init(Hud.toast)
 Quests.init()
+Trophies.init()
 Emotes.init()
 Effects.init() -- after MapRenderer: draws on the canvas it builds
 Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
 ProfileState.init()
 ShopState.init()
 QuestState.init()
+TrophyState.init()
 LobbyState.init()
 ClientState.init()
 Intents.signal("Loaded") -- analytics: the screens are built (onboarding "lobby_loaded")

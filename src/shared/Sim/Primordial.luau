@@ -134,14 +134,18 @@ function Primordial.check(state: MatchState, power: Power, target: number): (num
 	return hit, at, nil
 end
 
--- The effect itself, on a target that passed check().
-local function strike(state: MatchState, power: Power, target: number, hit: number, at: number)
+-- The effect itself, on a target that passed check(). Returns the men it killed (a Meteor's), or nil.
+local function strike(state: MatchState, power: Power, target: number, hit: number, at: number): number?
 	local p = Config.Primordial.Powers
+	local killed: number? = nil
 	if power == "Meteor" then
 		local army = state.armies[target]
+		local before = army.men
 		army.men = math.floor(army.men * (1 - p.Meteor.armyLoss))
+		killed = before - army.men
 		if army.men < Config.Army.MinArmyMen then
 			state.armies[target] = nil
+			killed = before -- the remnant scatters too
 		end
 		local province = state.provinces[at]
 		local owner = province.owner
@@ -162,6 +166,7 @@ local function strike(state: MatchState, power: Power, target: number, hit: numb
 	if Primordial.HARMFUL[power] and hit ~= 0 then
 		state.nations[hit].powerImmuneUntil = state.tick + Config.Primordial.ImmunityTicks
 	end
+	return killed
 end
 
 -- Charges the caster has, or nil if they can't cast at all.
@@ -210,10 +215,10 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 	elseif caster.userId then
 		state.primordials[caster.userId].charges -= cost
 	end
-	strike(state, power, target, hit, at)
+	local killed = strike(state, power, target, hit, at)
 	-- the caster's nation (a Primordial's: the one it held) goes along, so clients show its power-effect cosmetic
 	local by = caster.nation or (if caster.userId then state.seats[caster.userId] else nil)
-	Events.push(state, "Power", Primordial.index(power), hit, at, by)
+	Events.push(state, "Power", Primordial.index(power), hit, at, by, killed)
 	return true, nil
 end
 

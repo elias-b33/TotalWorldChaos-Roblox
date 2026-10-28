@@ -84,6 +84,17 @@ PowerFx.LOOKS = {
 			rim = 0x8a6ad0,
 			pit = 0x2a1d4a,
 		}),
+		-- earned (the Meteorologist achievement): a thunderstone streaking in, storm blue with lightning yellow
+		storm = look(METEOR, {
+			style = "comet",
+			ring = 0x4a78d0,
+			core = 0x2c4f9e,
+			inner = 0xfff36a,
+			particles = { 0xfff36a, 0xc8d8ff, 0x4a78d0, 0x2c3550 },
+			debris = { 0x6f7d99, 0x4a5670, 0xfff36a },
+			rim = 0x4a5670,
+			pit = 0x1c2236,
+		}),
 	},
 	Plague = {
 		default = PLAGUE,

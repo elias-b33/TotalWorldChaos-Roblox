@@ -55,6 +55,11 @@ local function sendView(player: Player, starterOffer: boolean?)
 	shopRemote:FireClient(player, Shop.view(data, ShopService.isVip(player), open, starterOffer == true, testMode()))
 end
 
+-- Send the player their shop view again (another service changed what they own: an achievement, the Warlord frame).
+function ShopService.refresh(player: Player)
+	sendView(player)
+end
+
 -- VIP: the game pass from Roblox, or (Studio test mode only, while the pass id is 0) the saved test purchase.
 local function checkVip(player: Player, data: Types.PlayerProfile)
 	local vip = vipCache[player] == true

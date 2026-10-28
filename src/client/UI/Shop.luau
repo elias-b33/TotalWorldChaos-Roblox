@@ -243,6 +243,8 @@ local function itemCard(item: Types.CatalogueItem, order: number)
 		detail = "Free"
 	elseif item.vipOnly then
 		detail = "VIP only"
+	elseif item.earned then
+		detail ..= " · earned"
 	end
 	centred(card, detail, 12, 14, RARITY_COLORS[item.rarity]).LayoutOrder = 3
 
@@ -264,6 +266,10 @@ local function itemCard(item: Types.CatalogueItem, order: number)
 				Intents.equip(item.id)
 			end)
 		end
+		return
+	end
+	if item.earned then -- never sold: an achievement (🏆 Trophies) or the weekly top 100
+		stateButton(buttons, if item.id == "frame_warlord" then "⚔ Weekly top 100" else "🏆 Achievement")
 		return
 	end
 	if item.vipOnly then

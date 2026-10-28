@@ -167,6 +167,8 @@ function Shop.cosmeticsOf(profile: Profile, vip: boolean, nationId: number): Cos
 	end
 	c.vip = vip
 	c.flame = Login.flameTier(profile.login) -- play-streak flame (earned for good, MONETIZATION 5.6)
+	local title = Shop.equippedIn(profile, "Title", vip) -- an achievement title (none by default)
+	c.title = if title ~= Catalogue.DEFAULTS.Title then title else nil
 	return c
 end
 

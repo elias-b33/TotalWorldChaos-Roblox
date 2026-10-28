@@ -215,6 +215,147 @@ Config.Progression.Login = {
 	CoveredMissesPerWeek = 1, -- missed days a week that don't break the streak
 }
 
+-- Achievements (docs/MONETIZATION.md 5.6): one-time, checked with every match reward (Sim.Achievements). kind:
+-- Best = the best single match; Sum = matches add up; Lifetime = a profile number; Maps = maps won on. Stats are
+-- Sim.Achievements.tally's (match) and lifetime's (profile). Win-type stats never count in a private match with
+-- custom rules or too few players (like "win" quests). Rewards: Glory (50–500), a title or a cosmetic (Catalogue).
+Config.Achievements = {
+	ComebackTick = 600, -- "Comeback": in the bottom 3 (of the nations still in the match) at 10:00
+	Maps = { "earth", "eldmoor", "skyshards" }, -- "Cartographer": win on each of these
+	List = {
+		{ id = "first_blood", name = "First Blood", stat = "Battles", kind = "Best", target = 1, glory = 50 },
+		{ id = "land_grab", name = "Land Grab", stat = "PeaceNeutral", kind = "Best", target = 10, glory = 100 },
+		{
+			id = "domination",
+			name = "Domination",
+			stat = "Domination",
+			kind = "Best",
+			target = 1,
+			glory = 300,
+			title = "title_dominant",
+		},
+		{
+			id = "better_together",
+			name = "Better Together",
+			stat = "AllianceWin",
+			kind = "Best",
+			target = 1,
+			glory = 200,
+		},
+		{
+			id = "comeback",
+			name = "Comeback",
+			stat = "Comeback",
+			kind = "Best",
+			target = 1,
+			glory = 500,
+			title = "title_unbroken",
+		},
+		{ id = "kingmaker", name = "Kingmaker", stat = "Kingmaker", kind = "Best", target = 1, glory = 200 },
+		{
+			id = "meteorologist",
+			name = "Meteorologist",
+			stat = "MeteorKills",
+			kind = "Sum",
+			target = 20000,
+			glory = 0,
+			item = "fx_meteor_storm",
+		},
+		{
+			id = "cartographer",
+			name = "Cartographer",
+			stat = "MapWins",
+			kind = "Maps",
+			target = 3,
+			glory = 300,
+			title = "title_cartographer",
+		},
+		{ id = "iron_wall", name = "Iron Wall", stat = "FortHolds", kind = "Best", target = 3, glory = 200 },
+		{
+			id = "centurion",
+			name = "Centurion",
+			stat = "LifeMatches",
+			kind = "Lifetime",
+			target = 100,
+			glory = 0,
+			item = "frame_centurion",
+		},
+		{
+			id = "world_shaker",
+			name = "World Shaker",
+			stat = "Level",
+			kind = "Lifetime",
+			target = 90,
+			glory = 0,
+			item = "token_titan",
+		},
+		{ id = "victor", name = "Victor", stat = "LifeWins", kind = "Lifetime", target = 1, glory = 100 },
+		{
+			id = "champion",
+			name = "Champion",
+			stat = "LifeWins",
+			kind = "Lifetime",
+			target = 10,
+			glory = 300,
+			title = "title_champion",
+		},
+		{ id = "veteran", name = "Veteran", stat = "LifeMatches", kind = "Lifetime", target = 10, glory = 100 },
+		{ id = "seasoned", name = "Seasoned", stat = "LifeMatches", kind = "Lifetime", target = 50, glory = 200 },
+		{ id = "pathfinder", name = "Pathfinder", stat = "LifeCaptures", kind = "Lifetime", target = 100, glory = 100 },
+		{ id = "conqueror", name = "Conqueror", stat = "LifeCaptures", kind = "Lifetime", target = 500, glory = 300 },
+		{
+			id = "battle_hardened",
+			name = "Battle-Hardened",
+			stat = "LifeBattles",
+			kind = "Lifetime",
+			target = 100,
+			glory = 200,
+		},
+		{ id = "general", name = "General", stat = "Battles", kind = "Best", target = 10, glory = 150 },
+		{ id = "regicide", name = "Regicide", stat = "Capitals", kind = "Best", target = 1, glory = 100 },
+		{
+			id = "kingslayer",
+			name = "Kingslayer",
+			stat = "Capitals",
+			kind = "Best",
+			target = 3,
+			glory = 300,
+			title = "title_kingslayer",
+		},
+		{ id = "empire", name = "Empire", stat = "Held", kind = "Best", target = 40, glory = 200 },
+		{ id = "builder", name = "Builder", stat = "Buildings", kind = "Best", target = 5, glory = 50 },
+		{ id = "prosperity", name = "Prosperity", stat = "DevLevel", kind = "Best", target = 5, glory = 100 },
+		{ id = "diplomat", name = "Diplomat", stat = "Alliances", kind = "Best", target = 1, glory = 50 },
+		{ id = "risen", name = "Risen", stat = "Risen", kind = "Best", target = 1, glory = 100 },
+		{ id = "wrath", name = "Wrath of the Gods", stat = "Powers", kind = "Best", target = 5, glory = 100 },
+		{
+			id = "hand_of_fate",
+			name = "Hand of Fate",
+			stat = "LifePowers",
+			kind = "Lifetime",
+			target = 100,
+			glory = 200,
+			title = "title_fateful",
+		},
+		{ id = "drill_sergeant", name = "Drill Sergeant", stat = "Regiments", kind = "Best", target = 30, glory = 50 },
+		{ id = "podium", name = "Podium", stat = "Top3", kind = "Best", target = 1, glory = 50 },
+	},
+}
+
+-- Leaderboards (docs/MONETIZATION.md 7.3): weekly conquest points (one OrderedDataStore per week, Monday 00:00 UTC),
+-- the friends view of it and the global level board (account XP). Services/LeaderboardService keeps DataStore use
+-- inside Roblox's budgets: one batch of writes per match at Results, reads cached and refreshed on an interval.
+Config.Leaderboards = {
+	Points = { 10, 7, 5, 3, 3, 1, 1, 1, 1, 1 }, -- weekly conquest points by placement (1st..10th)
+	MinHumans = 4, -- points only in public matches with this many real players (who held a nation)
+	WarlordTop = 100, -- last week's top this many wear the Warlord frame this week
+	RefreshSeconds = 120, -- how often a server reads the boards again
+	ReadRows = 200, -- weekly rows read (the friends view is filtered from these), in pages of up to 100
+	LevelRows = 50, -- global level rows read
+	ShownRows = 50, -- rows sent to clients per board
+	MaxFriends = 200, -- friends read per player (Players:GetFriendsAsync, the player's own list only)
+}
+
 -- Shop (docs/MONETIZATION.md 3.1–3.5): prices by rarity, offers, emotes. Robux numbers are list prices: the shop
 -- shows MarketplaceService's live price once a product id is set (Shared.Catalogue), so managed pricing can test it.
 -- Glory is never sold.

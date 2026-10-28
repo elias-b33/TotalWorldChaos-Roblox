@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Achievements = require(Shared.Sim.Achievements)
 local Progression = require(Shared.Sim.Progression)
 local Remotes = require(Shared.Remotes)
 local Settings = require(Shared.Sim.Settings)
@@ -28,8 +29,9 @@ local stats: { [number]: Types.PlayerMatchStats } = {} -- by userId, for the cur
 -- Results rewards for players whose profile was still loading: paid when it loads (or dropped if they leave).
 local owed: { [number]: { state: Types.MatchState, entry: Types.PlayerMatchStats } } = {}
 local rewardRemote: RemoteEvent
--- Run inside the reward's profile update, after the match reward: quests and the login calendar (QuestService).
-type RewardHook = (Player, Types.PlayerProfile, Types.PlayerMatchStats, Types.RewardReport) -> ()
+-- Run inside the reward's profile update, after the match reward: quests and the login calendar (QuestService),
+-- achievements and leaderboard points (AchievementService, LeaderboardService). The last argument is the match.
+type RewardHook = (Player, Types.PlayerProfile, Types.PlayerMatchStats, Types.RewardReport, Types.MatchState) -> ()
 local rewardHooks: { RewardHook } = {}
 
 local function today(): number
@@ -66,7 +68,7 @@ local function grant(
 	local reward = Progression.matchReward(state, entry, options(player, data, state))
 	local report = Progression.grant(data, entry, reward, today())
 	for _, hook in rewardHooks do
-		local ok, err = pcall(hook, player, data, entry, report)
+		local ok, err = pcall(hook, player, data, entry, report, state)
 		if not ok then
 			warn("[progression] reward hook failed: " .. tostring(err))
 		end
@@ -162,6 +164,7 @@ function ProgressionService.afterTick(state: Types.MatchState)
 		return
 	end
 	Progression.observe(state, stats)
+	Achievements.observe(state, stats) -- feats only achievements need (forts held, Meteor kills...)
 	if state.result then
 		payAll(state)
 	end

@@ -357,14 +357,16 @@ end
 
 -- Economy and progression ---------------------------------------------------------------------------------------
 
--- A match reward was granted (Progression.grant's report): Glory sources (match_reward, level_up) with their ending
--- balances, and AccountLevel progression (Complete for every level passed, Start for the new one).
+-- A match reward was granted (Progression.grant's report): Glory sources (match_reward, level_up, achievement) with
+-- their ending balances, and AccountLevel progression (Complete for every level passed, Start for the new one).
 function Telemetry.reward(report: Types.RewardReport, fields: { string }, userId: number): { Event }
 	local out = {}
-	local levelGlory, matchGlory = 0, 0
+	local levelGlory, matchGlory, achievementGlory = 0, 0, 0
 	for _, line in report.reward.lines do
 		if line.kind == "LevelUp" or line.kind == "RankUp" then
 			levelGlory += line.glory
+		elseif line.kind == "Achievement" then
+			achievementGlory += line.glory -- achievements the match unlocked (Sim.Achievements)
 		else
 			matchGlory += line.glory
 		end
@@ -381,7 +383,7 @@ function Telemetry.reward(report: Types.RewardReport, fields: { string }, userId
 				"Source",
 				Telemetry.GLORY,
 				matchGlory,
-				final - levelGlory,
+				final - levelGlory - achievementGlory,
 				"Gameplay",
 				"match_reward",
 				fields,
@@ -392,7 +394,31 @@ function Telemetry.reward(report: Types.RewardReport, fields: { string }, userId
 	if levelGlory > 0 then
 		table.insert(
 			out,
-			Telemetry.economy("Source", Telemetry.GLORY, levelGlory, final, "Gameplay", "level_up", fields, userId)
+			Telemetry.economy(
+				"Source",
+				Telemetry.GLORY,
+				levelGlory,
+				final - achievementGlory,
+				"Gameplay",
+				"level_up",
+				fields,
+				userId
+			)
+		)
+	end
+	if achievementGlory > 0 then
+		table.insert(
+			out,
+			Telemetry.economy(
+				"Source",
+				Telemetry.GLORY,
+				achievementGlory,
+				final,
+				"Gameplay",
+				"achievement",
+				fields,
+				userId
+			)
 		)
 	end
 	for level = report.before.level, report.after.level - 1 do

@@ -35,6 +35,8 @@ local EVENTS = {
 	"Tutorial", -- your TutorialView in the tutorial match (nil = no prompts)
 	"Shop", -- your ShopView (on join and after every change)
 	"Quests", -- your QuestView (on join, at Results and after every change)
+	"Achievements", -- your AchievementView (on join and after every match)
+	"Boards", -- your BoardsView: weekly, friends and level boards (on join and after every refresh)
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

@@ -674,6 +674,118 @@ roblox.implementMethod("DataStoreService", "GetDataStore", function(_service, na
 end)
 roblox.implementMethod("DataStoreOptions", "SetExperimentalFeatures", function() end)
 
+-- OrderedDataStores (leaderboards): number values, sorted pages. Kept in Emulator.orderedStores[name/scope][key].
+-- Emulator.orderedCalls counts the calls by method, so a scenario can check the DataStore budget.
+Emulator.orderedStores = {} :: { [string]: { [string]: number } }
+Emulator.orderedCalls = {} :: { [string]: number }
+
+local function sortedPages(entries: { [string]: number }, ascending: boolean, pageSize: number)
+	local list = {}
+	for key, value in entries do
+		table.insert(list, { key = key, value = value })
+	end
+	table.sort(list, function(a, b)
+		if a.value ~= b.value then
+			return if ascending then a.value < b.value else a.value > b.value
+		end
+		return a.key < b.key
+	end)
+	local pages = { IsFinished = false }
+	local first = 1
+	local function update()
+		pages.IsFinished = first + pageSize > #list
+	end
+	function pages.GetCurrentPage(_self)
+		local out = {}
+		for i = first, math.min(first + pageSize - 1, #list) do
+			table.insert(out, { key = list[i].key, value = list[i].value })
+		end
+		return out
+	end
+	function pages.AdvanceToNextPageAsync(_self)
+		task.wait()
+		first += pageSize
+		update()
+	end
+	update()
+	return pages
+end
+
+local function newOrderedStore(name: string, scope: string?)
+	local id = name .. "/" .. (scope or "global")
+	local entries = Emulator.orderedStores[id] or {}
+	Emulator.orderedStores[id] = entries
+	local function count(method: string)
+		Emulator.orderedCalls[method] = (Emulator.orderedCalls[method] or 0) + 1
+		task.wait() -- a DataStore call yields
+	end
+	local store = {}
+	function store.GetAsync(_self, key)
+		count("GetAsync")
+		return entries[key]
+	end
+	function store.SetAsync(_self, key, value)
+		count("SetAsync")
+		assert(type(value) == "number" and value == math.floor(value), "OrderedDataStore values are integers")
+		entries[key] = value
+	end
+	function store.IncrementAsync(_self, key, delta)
+		count("IncrementAsync")
+		entries[key] = (entries[key] or 0) + (delta or 1)
+		return entries[key]
+	end
+	function store.RemoveAsync(_self, key)
+		count("RemoveAsync")
+		local old = entries[key]
+		entries[key] = nil
+		return old
+	end
+	function store.GetSortedAsync(_self, ascending, pageSize)
+		count("GetSortedAsync")
+		assert(pageSize >= 1 and pageSize <= 100, "GetSortedAsync pages hold 1 to 100 entries")
+		return sortedPages(entries, ascending, pageSize)
+	end
+	return store
+end
+
+roblox.implementMethod("DataStoreService", "GetOrderedDataStore", function(_service, name, scope)
+	return newOrderedStore(name, scope)
+end)
+
+-- Friends (Players:GetFriendsAsync) from Emulator.friends[userId] = { userIds }, and display names
+-- (UserService:GetUserInfosByUserIdsAsync) from Emulator.displayNames[userId] (addClient fills it in).
+Emulator.friends = {} :: { [number]: { number } }
+Emulator.displayNames = {} :: { [number]: string }
+Emulator.friendCalls = {} :: { number } -- the userId of every GetFriendsAsync call
+
+local function displayName(userId: number): string
+	return Emulator.displayNames[userId] or ("Player" .. tostring(userId))
+end
+
+roblox.implementMethod("Players", "GetFriendsAsync", function(_players, userId)
+	task.wait()
+	table.insert(Emulator.friendCalls, userId)
+	local list = {}
+	for _, id in Emulator.friends[userId] or {} do
+		table.insert(list, { Id = id, Username = displayName(id), DisplayName = displayName(id), IsOnline = false })
+	end
+	local pages = { IsFinished = true }
+	function pages.GetCurrentPage(_self)
+		return list
+	end
+	function pages.AdvanceToNextPageAsync(_self) end
+	return pages
+end)
+
+roblox.implementMethod("UserService", "GetUserInfosByUserIdsAsync", function(_service, ids)
+	task.wait()
+	local out = {}
+	for _, id in ids do
+		table.insert(out, { Id = id, Username = displayName(id), DisplayName = displayName(id), HasVerifiedBadge = false })
+	end
+	return out
+end)
+
 local subscriptions: { [string]: { any } } = {}
 
 roblox.implementMethod("MessagingService", "SubscribeAsync", function(_service, topic, callback)
@@ -1176,6 +1288,7 @@ function Emulator.addClient(name: string, viewport: any?, userId: number?): Mach
 	serverPlayer.Name = name
 	serverPlayer.DisplayName = name -- Lune has no default for it
 	serverPlayer.UserId = userId
+	Emulator.displayNames[userId] = Emulator.displayNames[userId] or name
 	local localPlayer = Instance.new("Player")
 	localPlayer.Name = name
 	localPlayer.UserId = userId

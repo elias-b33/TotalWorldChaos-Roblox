@@ -16,6 +16,8 @@ local Palette = require(Client.Palette)
 local ProfileState = require(Client.ProfileState)
 local QuestState = require(Client.QuestState)
 local Quests = require(script.Parent.Quests)
+local Trophies = require(script.Parent.Trophies)
+local TrophyState = require(Client.TrophyState)
 local Widgets = require(script.Parent.Widgets)
 
 local HOW = {
@@ -42,6 +44,7 @@ local LINE_LABELS: { [string]: string } = {
 	LevelUp = "⬆ Level up",
 	RankUp = "👑 Rank up",
 	Calendar = "🗓 Play calendar",
+	Achievement = "🏆 Achievements",
 }
 local MAX_QUEST_LINES = 3 -- quests the match moved, shown under the scores
 local GOLD = Color3.fromRGB(255, 210, 90)
@@ -178,7 +181,23 @@ local function renderQuests(hasReward: boolean): boolean
 		table.sort(moved, function(a, b)
 			return (a.progress >= a.target) and not (b.progress >= b.target)
 		end)
-		for i = 1, math.min(#moved, MAX_QUEST_LINES) do
+		-- achievements this match unlocked: one line, in place of the last quest line
+		local unlocked = {}
+		local trophies = TrophyState.achievements()
+		for _, a in if trophies then trophies.list else {} do
+			if table.find(trophies and trophies.recent or {}, a.id) then
+				table.insert(unlocked, a.name)
+			end
+		end
+		if #unlocked > 0 then
+			local l = Widgets.label(body, "🏆 Unlocked: " .. table.concat(unlocked, ", "), 14, 20)
+			l.Name = "Unlocked"
+			l.TextTruncate = Enum.TextTruncate.AtEnd
+			l.TextWrapped = false
+			l.TextColor3 = GOLD
+			l.LayoutOrder = 29
+		end
+		for i = 1, math.min(#moved, MAX_QUEST_LINES - (if #unlocked > 0 then 1 else 0)) do
 			local q = moved[i]
 			local done = q.progress >= q.target
 			local text = if done
@@ -197,11 +216,17 @@ local function renderQuests(hasReward: boolean): boolean
 	row.LayoutOrder = 30
 	row.Parent = body
 	Widgets.list(row, true, 10)
-	local b = Widgets.button(row, Quests.buttonText(), 190, Color3.fromRGB(120, 90, 40), Quests.open)
+	local b = Widgets.button(row, Quests.buttonText(), 160, Color3.fromRGB(120, 90, 40), Quests.open)
 	b.Name = "QuestsButton"
 	b.TextSize = 14
-	local next = Widgets.label(row, "⏳ Next match soon", 13, Widgets.BUTTON_HEIGHT)
-	next.Size = UDim2.new(1, -200, 1, 0)
+	local trophies = Widgets.button(row, "🏆", 64, Color3.fromRGB(150, 110, 30), function()
+		Trophies.open("Achievements")
+	end)
+	trophies.Name = "TrophiesButton"
+	trophies.TextSize = 20
+	trophies.LayoutOrder = 1
+	local next = Widgets.label(row, "⏳ Next match\nstarts soon", 12, Widgets.BUTTON_HEIGHT)
+	next.Size = UDim2.new(1, -244, 1, 0)
 	next.TextColor3 = DIM_TEXT
 	next.LayoutOrder = 2
 	return true
@@ -319,6 +344,11 @@ function Results.init(showHandler: () -> ())
 	QuestState.onChange(function()
 		if dim.Visible then
 			render() -- quest progress arrives with the reward
+		end
+	end)
+	TrophyState.onChange(function()
+		if dim.Visible then
+			render() -- achievements unlocked by the match arrive with the reward
 		end
 	end)
 end

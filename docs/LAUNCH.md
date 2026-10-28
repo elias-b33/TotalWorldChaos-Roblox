@@ -211,7 +211,7 @@ Steps 5–10 are the tutorial prompts in DESIGN.md, logged as each one is done. 
 | `Glory` | Sink | Gameplay | `quest_reroll`, `clan_create` |
 | `Robux` | Sink | IAP | catalogue offer or item id (`vip`, `starter`, `set_royal`, item id; later `season_pass_s1`) |
 
-Always pass the ending balance (Robux: 0, since games can't read a player's Robux balance). `match_reward` and `level_up` (level-ups and rank-ups) come from every match reward; `TelemetryService.glory` is ready for the quest, login and reroll rows. Add up to 3 custom fields: `level_bucket` (1–9, 10–29, 30+), `is_vip`, `is_payer`.
+Always pass the ending balance (Robux: 0, since games can't read a player's Robux balance). `match_reward`, `level_up` (level-ups and rank-ups) and `achievement` (achievements the match unlocked: the breakdown's "Achievement" line) come from every match reward; `TelemetryService.glory` is ready for the quest, login and reroll rows. Add up to 3 custom fields: `level_bucket` (1–9, 10–29, 30+), `is_vip`, `is_payer`.
 
 ### Progression (`LogProgressionEvent` / `LogProgressionCompleteEvent`)
 

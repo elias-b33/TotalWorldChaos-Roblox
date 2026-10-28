@@ -30,6 +30,8 @@ local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
 local QuestService = require(Server.Services.QuestService)
 local TelemetryService = require(Server.Services.TelemetryService)
+local AchievementService = require(Server.Services.AchievementService)
+local LeaderboardService = require(Server.Services.LeaderboardService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -139,6 +141,8 @@ ShopService.init(function(): string
 	return if state then state.phase else "Lobby"
 end, MatchService.current, MatchService.nationOf)
 QuestService.init()
+AchievementService.init() -- after QuestService: its reward hook runs after the quests'
+LeaderboardService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
 nextMatch()

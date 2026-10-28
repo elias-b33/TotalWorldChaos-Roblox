@@ -225,6 +225,30 @@ T.test("a reward with a level-up: two Glory sources with their balances, and Acc
 	T.equal(levels[3].value, 3)
 end)
 
+T.test("achievement Glory on the breakdown is its own source, not match_reward", function()
+	local profile = Progression.newProfile()
+	local reward: Types.MatchReward = {
+		xp = 10,
+		glory = 20,
+		lines = { { kind = "Finish", xp = 10, glory = 20 } },
+		placement = 4,
+		stayed = true,
+		afk = false,
+	}
+	local report = Progression.grant(profile, Progression.newStats(1, 0), reward, 1)
+	Progression.addLine(report.reward, "Achievement", 0, 50) -- AchievementService, after the grant
+	profile.glory += 50
+	report.after = Progression.summary(profile)
+	local sources = named(Telemetry.reward(report, {}, 1), Telemetry.GLORY)
+	T.equal(#sources, 2)
+	T.equal(sources[1].step, "match_reward")
+	T.equal(sources[1].value, 20)
+	T.equal(sources[1].balance, 20)
+	T.equal(sources[2].step, "achievement")
+	T.equal(sources[2].value, 50)
+	T.equal(sources[2].balance, 70)
+end)
+
 T.test("a reward without Glory or levels sends nothing", function()
 	local profile = Progression.newProfile()
 	local reward: Types.MatchReward = { xp = 0, glory = 0, lines = {}, placement = nil, stayed = false, afk = true }
