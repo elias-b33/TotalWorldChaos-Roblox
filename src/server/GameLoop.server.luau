@@ -29,6 +29,7 @@ local Replicator = require(Server.Replicator)
 local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
 local QuestService = require(Server.Services.QuestService)
+local SeasonService = require(Server.Services.SeasonService)
 local TelemetryService = require(Server.Services.TelemetryService)
 local AdRewardService = require(Server.Services.AdRewardService)
 
@@ -144,6 +145,7 @@ ShopService.init(function(): string
 end, MatchService.current, MatchService.nationOf)
 QuestService.init()
 AdRewardService.init() -- after QuestService: the quest reroll ad and the notification prompt
+SeasonService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
 nextMatch()

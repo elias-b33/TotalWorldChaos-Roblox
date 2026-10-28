@@ -38,6 +38,8 @@ local ShopState = require(Client.ShopState)
 local Quests = require(Client.UI.Quests)
 local QuestState = require(Client.QuestState)
 local Ads = require(Client.Ads)
+local Season = require(Client.UI.Season)
+local SeasonState = require(Client.SeasonState)
 
 local selectedArmy: number? = nil
 
@@ -164,6 +166,7 @@ end)
 Cosmetics.init()
 Shop.init(Hud.toast)
 Quests.init()
+Season.init(Hud.toast)
 Emotes.init()
 Effects.init() -- after MapRenderer: draws on the canvas it builds
 Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
@@ -171,6 +174,7 @@ Ads.init() -- the notification opt-in prompt after the first finished match
 ProfileState.init()
 ShopState.init()
 QuestState.init()
+SeasonState.init()
 LobbyState.init()
 ClientState.init()
 Intents.signal("Loaded") -- analytics: the screens are built (onboarding "lobby_loaded")

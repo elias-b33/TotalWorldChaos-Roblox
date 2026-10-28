@@ -310,7 +310,7 @@ function Progression.newProfile(): Profile
 		quests = { day = -1, week = -1, rerollsUsed = 0, videoRerolls = 0, daily = {}, weekly = {} },
 		login = { step = 0, lastPlayDay = -1, streak = 0, best = 0, coveredWeek = -1 },
 		achievements = {},
-		season = { id = "", xp = 0, premium = false, claimed = {} },
+		season = { id = "", xp = 0, premium = false, bundle = false, claimed = {}, bonus = 0 },
 		receipts = {},
 		purchaseHistory = {},
 		stats = { matches = 0, wins = 0, provincesTaken = 0, battlesWon = 0, powersUsed = 0 },
@@ -350,6 +350,9 @@ end
 -- Returns the level-up and rank-up Glory (already added).
 function Progression.addXp(profile: Profile, xp: number, glory: number): (number, number)
 	profile.xp += xp
+	if profile.season then
+		profile.season.xp += xp -- season XP is the account XP earned during the season (Sim.Season)
+	end
 	profile.glory += glory
 	local newLevel = Progression.levelFor(profile.xp)
 	if newLevel <= profile.level then

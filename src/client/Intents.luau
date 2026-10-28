@@ -75,6 +75,11 @@ local REASONS: { [string]: string } = {
 	AdBusy = "📺 An ad is already playing",
 	NoAdReward = "📺 No ad reroll to earn right now",
 	AdFailed = "📺 The ad didn't play to the end",
+	NotInShop = "🔄 Not in the shop today: back within 60 days",
+	NoSeason = "🎟 No season is running",
+	TierLocked = "🔒 Reach that tier first",
+	NeedPass = "🎟 That reward needs the premium pass",
+	NothingToClaim = "🎟 Nothing to claim yet",
 }
 
 local Intents = {}
@@ -174,6 +179,19 @@ function Intents.watchAd(placement: string)
 end
 
 -- The map-theme opt-out: true = always show me the classic map.
+-- Season pass: claim one tier's reward on a track, everything claimable, or tell the server the screen opened.
+function Intents.claimSeason(tier: number, track: string)
+	send("RequestSeason", "Claim", tier, track)
+end
+
+function Intents.claimAllSeason()
+	send("RequestSeason", "ClaimAll")
+end
+
+function Intents.seasonViewed()
+	send("RequestSeason", "Viewed")
+end
+
 function Intents.defaultTheme(on: boolean)
 	send("RequestDefaultTheme", on)
 end

@@ -55,6 +55,9 @@ Catalogue.PRODUCT_IDS = {
 	starter = 0,
 	set_royal = 0,
 	quest_reroll = 0, -- "Quest reroll" (Config.Ads.QuestRerollRobux): the rewarded video's reward (Sim.Ads), not a shop item
+	set_siege = 0,
+	season_pass = 0, -- the season's premium pass (Config.Season.PassRobux), sold through SeasonService
+	season_bundle = 0, -- the pass + Config.Season.BundleTiers tiers (Config.Season.BundleRobux)
 } :: { [string]: number }
 
 Catalogue.VIP_PASS_ID = 0
@@ -91,8 +94,8 @@ local function add(id: string, slot: Types.CosmeticSlot, rarity: Types.Rarity, n
 	for k, v in extra or {} do
 		(item :: any)[k] = v
 	end
-	if item.free or item.vipOnly then
-		item.glory, item.robux = nil, nil
+	if item.free or item.vipOnly or item.season then
+		item.glory, item.robux = nil, nil -- defaults, VIP items and season-pass rewards are never sold
 	end
 	table.insert(items, item)
 	byId[id] = item
@@ -102,12 +105,13 @@ local FREE = { free = true }
 local VIP = { vipOnly = true }
 local ANIMATED = { animated = true }
 
-local function emote(id: string, name: string, icon: string, animated: boolean)
+local function emote(id: string, name: string, icon: string, animated: boolean, season: string?)
 	local kind = if animated then "Animated" else "Static"
 	add(id, "Emote", if animated then "Rare" else "Common", name, icon, {
 		animated = animated,
 		glory = (S.EmoteGlory :: any)[kind],
 		robux = (S.EmoteRobux :: any)[kind],
+		season = season,
 	})
 end
 
@@ -175,7 +179,76 @@ add("theme_night", "Theme", "Rare", "Night", "night")
 add("theme_winter", "Theme", "Rare", "Winter", "winter")
 add("theme_autumn", "Theme", "Rare", "Autumn", "autumn")
 
+-- Season 1 "Rise of the Primordials" (docs/MONETIZATION.md 6): season-pass rewards, never sold. Their art is drawn by
+-- the same painters as the shop's (CosmeticArt grids and frame colours, PowerFx looks, emote and animation icons).
+local S1 = { season = "S1" }
+local S1_ANIMATED = { season = "S1", animated = true }
+local function s1Fx(power: string, animated: boolean?): { [string]: any }
+	return { season = "S1", power = power, animated = animated }
+end
+add("flag_ember_sigil", "Flag", "Common", "Ember Sigil", "ember_sigil", S1)
+add("flag_ember_banner", "Flag", "Rare", "Ember Banner", "ember_banner", S1)
+add("flag_titan_eye", "Flag", "Rare", "Titan's Eye", "titan_eye", S1)
+add("flag_storm_banner", "Flag", "Rare", "Storm Banner", "storm_banner", S1)
+add("flag_cracked_crown", "Flag", "Epic", "Cracked Crown", "cracked_crown", S1_ANIMATED)
+add("flag_storm_titan", "Flag", "Epic", "Storm Titan", "storm_titan", S1)
+add("flag_obsidian_crown", "Flag", "Legendary", "Obsidian Crown", "obsidian_crown", S1)
+add("token_ember_knight", "Token", "Epic", "Ember Knight", "ember_knight", S1)
+add("token_obsidian", "Token", "Rare", "Obsidian", "obsidian", S1)
+add("token_stone_golem", "Token", "Rare", "Stone Golem", "stone_golem", S1)
+add("token_phoenix_rider", "Token", "Epic", "Phoenix Rider", "phoenix_rider", S1)
+add("token_cinder_golem", "Token", "Epic", "Cinder Golem", "cinder_golem", S1)
+add("token_titan", "Token", "Legendary", "Titan", "titan", S1_ANIMATED)
+add("frame_ashen", "Frame", "Common", "Ashen", "ashen", S1)
+add("frame_molten", "Frame", "Rare", "Molten", "molten", S1)
+add("frame_lava_seam", "Frame", "Epic", "Lava Seam", "lava_seam", S1)
+add("frame_obsidian", "Frame", "Epic", "Obsidian", "obsidian", S1)
+add("frame_primordial_eye", "Frame", "Epic", "Primordial Eye", "primordial_eye", S1)
+add("frame_rift", "Frame", "Legendary", "Primordial Rift", "rift", S1)
+emote("emote_salute", "Salute", "✊", false, "S1")
+emote("emote_volcano_peak", "Volcano Peak", "⛰", false, "S1")
+emote("emote_skull", "Skull", "💀", false, "S1")
+emote("emote_volcano", "Volcano", "🌋", true, "S1")
+emote("emote_crown_toss", "Crown Toss", "🎉", true, "S1")
+emote("emote_eruption", "Eruption", "💥", true, "S1")
+emote("emote_roar", "Primordial Roar", "🐲", true, "S1")
+emote("emote_meteor_shower", "Meteor Shower", "☄", true, "S1")
+add("victory_eruption", "Victory", "Epic", "Eruption", "🌋 💥 🔥", S1_ANIMATED)
+add("victory_magma", "Victory", "Epic", "Magma Pulse", "🔥 🌋 🔥", S1_ANIMATED)
+add("victory_titan", "Victory", "Legendary", "Titan Rising", "🗿 ⚡ 🗿", S1_ANIMATED)
+add("fx_meteor_stone", "PowerFx", "Common", "Stone Meteor", "stone", s1Fx("Meteor"))
+add("fx_meteor_ember", "PowerFx", "Rare", "Ember Meteor", "ember", s1Fx("Meteor"))
+add("fx_meteor_firestorm", "PowerFx", "Rare", "Firestorm Meteor", "firestorm", s1Fx("Meteor"))
+add("fx_meteor_lava", "PowerFx", "Epic", "Lava Meteor", "lava", s1Fx("Meteor", true))
+add("fx_meteor_phoenix", "PowerFx", "Legendary", "Phoenix Meteor", "phoenix", s1Fx("Meteor", true))
+add("fx_plague_ember", "PowerFx", "Common", "Ember Plague", "ember", s1Fx("Plague"))
+add("fx_plague_ash", "PowerFx", "Common", "Ashfall Plague", "ash", s1Fx("Plague"))
+add("fx_plague_void", "PowerFx", "Common", "Void Plague", "void", s1Fx("Plague"))
+add("fx_plague_cinder", "PowerFx", "Common", "Cinder Plague", "cinder", s1Fx("Plague"))
+add("fx_blessing_molten", "PowerFx", "Rare", "Molten Blessing", "molten", s1Fx("Blessing"))
+add("fx_blessing_ember", "PowerFx", "Rare", "Ember Halo", "ember", s1Fx("Blessing"))
+add("fx_blessing_worldsplitter", "PowerFx", "Epic", "Worldsplitter Rays", "worldsplitter", s1Fx("Blessing", true))
+add("fx_blessing_starfall", "PowerFx", "Epic", "Starfall Blessing", "starfall", s1Fx("Blessing", true))
+add("fx_blessing_sunfire", "PowerFx", "Epic", "Sunfire Blessing", "sunfire", s1Fx("Blessing", true))
+
 Catalogue.ITEMS = items
+
+-- The core range (docs/MONETIZATION.md 3.8): always on sale, so nobody waits for basics. Every other sold item and
+-- every bundle rotates through the daily and weekly slots (Sim.ShopRotation).
+Catalogue.CORE = {
+	"flag_tricolour",
+	"flag_sun",
+	"flag_comet",
+	"border_dashes",
+	"shades_dawn",
+	"token_shield",
+	"emote_charge",
+	"emote_wave",
+	"victory_fireworks",
+	"frame_bronze",
+	"fx_meteor_ice",
+	"theme_night",
+} :: { string }
 
 Catalogue.OFFERS = {
 	{
@@ -204,6 +277,17 @@ Catalogue.OFFERS = {
 		items = { "flag_crown", "border_runes", "token_shield" },
 		robux = S.RareSetRobux,
 		oncePerAccount = false,
+		weekly = true, -- a bundle: on sale in the weeks the rotating shop features it
+	},
+	{
+		id = "set_siege",
+		kind = "Product",
+		name = "Siege Set",
+		icon = "🔥",
+		items = { "flag_comet", "border_embers", "token_tower" },
+		robux = S.EpicSetRobux,
+		oncePerAccount = false,
+		weekly = true,
 	},
 } :: { Offer }
 

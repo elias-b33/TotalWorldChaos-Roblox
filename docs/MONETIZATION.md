@@ -182,6 +182,8 @@ We don't launch with an experience subscription:
 - **Every shop item comes back within 60 days**, and the shop says so. Only season-pass premium items and event rewards are one-time, and the pass says so before you buy.
 - Glory is accepted for every Common, Rare and Epic item in the shop.
 
+**How it is built.** The core range is `Catalogue.CORE` (Tricolour, Rising Sun and Comet flags, Dashes border, Dawn shades, Shield token, Charge and Wave emotes, Fireworks, Bronze frame, Ice Meteor, Night theme). Every other sold item rotates, and so do the nation skin sets (`weekly = true` offers: Royal Set, Siege Set); VIP and the starter pack are always offered. `Sim/ShopRotation.luau` shuffles each rarity's pool once per cycle with the seeded `Rng` (seed `Config.ShopRotation.Seed`, the slot and the cycle number) and hands each day its next items, so the schedule depends only on the UTC day: every server shows the same shop, and an item is back at most two cycles later (a pool of n items with k slots a day cycles every ⌈n/k⌉ days). `tests/shoprotation.spec.luau` checks every rotating item shows in every 60-day window over a year and never twice on one day; it fails if a pool grows past what the slots can bring back in time (more than 30 Rares, for example), which is the cue to add a slot. The shop's 🔄 Today tab shows the 4 daily and 2 weekly cards with the time until each section changes ("new items in 5 h", a fact, never a ticking timer); slot tabs still list every item, and a rotating one outside its days says "🔄 Not today · Back within 60 days" (the server refuses it: `NotInShop`). Slot counts and the seed are in `Config.ShopRotation`.
+
 ### 3.9 Never sell
 
 Gold, manpower, regiments, buildings, Primordial charges or cooldowns, combat modifiers, start-position or draft-order picks, map vote weight, match information (fog, enemy plans), extra alliance slots, XP from other players, ranked rating, titles, Glory.
@@ -208,6 +210,9 @@ The catalogue is `src/shared/Catalogue.luau`; prices by rarity are in `Config.Sh
 | `starter` (Starter Pack, once per account) | 149 |
 | `set_royal` (Royal Set: Crown flag, Runes border, Shield token) | 199 |
 | `quest_reroll` ("Quest reroll": one more free daily quest reroll today; the rewarded video's reward, `Config.Ads.QuestRerollRobux`) | 10 |
+| `set_siege` (Siege Set: Comet flag, Embers border, Siege Tower token) | 299 |
+| `season_pass` (the season's premium pass) | 299 |
+| `season_bundle` (premium pass + 10 tiers) | 499 |
 
 3. **Rewarded video** (section 3.7; needs 2,000+ monthly visitors, an ID-verified owner with 2-step verification and the maturity questionnaire): Monetization → Ads → Settings → Rewarded Video → turn on **Serving enabled**, pick the "Quest reroll" product as the reward and turn on "Exclude your most likely purchasers". The product must stay on sale. While `quest_reroll` is 0, Studio grants the ad's reroll without a video and a live server shows no ad button.
 4. Opt in to managed pricing if you want: the shop reads live prices with `MarketplaceService:GetProductInfo`, and the Config numbers are only shown while an id is 0.
@@ -415,6 +420,35 @@ Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: pl
 A regular player finishes with a week to spare, and a casual player gets most of the free track. No single tier skips means nobody is pushed to pay at the end of a season.
 
 **Value:** the premium track has 40 cosmetics, a title and 2,250 Glory for 299 Robux. The free track has 10 cosmetics, a title and 2,500 Glory. Premium items are never sold later (the pass says so before purchase); a recolour may come back in a future season.
+
+**How it is built.** Seasons are data: `Config.Season.Seasons` lists each season's id, name and UTC days (`[startDay, endDay)`, Season 1 from Friday 2026-10-23 for 8 weeks; move it to the real launch date and add the next season below it), and `Config.Season.Rewards` its 50 rows `{ free, premium }` (a number is Glory, `"title:…"` a title, `"badge:…"` a season badge, any other string a catalogue item). The current season is the one today's UTC day falls in. Rules are in `Sim/Season.luau`:
+
+- Season XP is the account XP earned during the season (`Progression.addXp` adds it, so matches, quests and level-ups all count). Tier n opens at (n − 1) × 1,200 XP, so tier 1 (and the premium tier-1 token) is yours at once; the last tier's bar is full at 60,000 XP, and every 2,400 XP after that pays a 100-Glory bonus reward.
+- Rewards are claimed (one cell at a time or "Claim all"), each once. Premium cells need the pass. Buying the pass late makes every premium reward up to your tier claimable at once. The bundle adds 10 tiers, once: after either purchase neither can be bought again, and nothing else skips tiers.
+- When a season ends, whatever you earned and didn't claim is granted the next time you play, then the next season starts from zero. Items you already own stay owned (no Glory instead).
+- Titles and the badge go in the profile's `owned` list as `title:…` and `badge:…` for the title display to come; nothing shows them yet.
+- `SeasonService` keeps profiles on the current season, sends the `Season` view, answers `RequestSeason` claims and sells `season_pass` and `season_bundle` through `ShopService` (the same ProcessReceipt path and Studio test mode; Robux prompts only outside a match). Analytics: the `SeasonPass` funnel (`pass_viewed` when the screen opens, `purchase_prompted`, `purchase_completed`), `SeasonTier` progression and `season_tier` Glory sources.
+- The season screen opens from 🎟 in the Lobby, the Results screen and the shop's Offers tab: the free track above the premium one, 8 tiers a page, the days left, the pass and bundle buttons and the "only this season, never sold later" label next to them.
+
+Season 1's new items are catalogue entries marked `season = "S1"` (never sold, shown in the shop's tabs only once owned), drawn by the existing painters: new flag and token grids (`CosmeticArt`), frame colours, Meteor, Plague and Blessing looks (`PowerFx`), emote and victory icons. Rewards that need a painter that doesn't exist yet use a stand-in from the table below until that art is made; the stand-ins keep the tier, track and rarity (Plague has only colours, so Plague items are Common).
+
+| Tier | Track | Planned | Stand-in until its painter exists |
+| ---: | --- | --- | --- |
+| 9 | Premium | Cinder border (Rare) | Embers border (Epic, also in the shop) |
+| 12 | Premium | Ashfall Rebels effect (Common) | Ashfall Plague colour (Common) |
+| 15 | Premium | Lava Seam border (Epic) | Lava Seam nameplate frame (Epic) |
+| 22 | Premium | Firestorm Earthquake effect (Rare) | Firestorm Meteor (Rare, comet style) |
+| 24 | Premium | Ember Shield effect (Rare) | Ember Halo Blessing (Rare, rays) |
+| 25 | Premium | Ember Eldmoor map theme | Autumn map theme (also in the shop) |
+| 27 | Premium | Magma Pulse border (Epic) | Magma Pulse victory animation (Epic) |
+| 32, 45 | Premium, Free | Void Plague, Cinder Plague (Rare) | the same colours as Common |
+| 35 | Premium | Lava Rebels effect (Epic) | Lava Meteor (Epic, comet style) |
+| 37 | Premium | Worldsplitter Earthquake effect (Epic) | Worldsplitter Rays Blessing (Epic) |
+| 44 | Premium | Sunfire Divine Shield effect (Epic) | Sunfire Blessing (Epic, rays) |
+| 45 | Premium | Ember shade set (Rare) | Royal shades (Rare, also in the shop) |
+| 49 | Premium | Primordial Rift border (Legendary) | Primordial Rift nameplate frame (Legendary) |
+
+New border patterns, a shade set and the Ember theme need code in `PixelArt` (and the theme a pass of `tests/themes.spec.luau`); Rebels, Earthquake and Divine Shield looks need `PowerFx` styles and `Effects` support. Each is a small follow-up task; swap the row in `Config.Season.Rewards` when its art lands.
 
 ### Season 1: Rise of the Primordials
 

@@ -199,7 +199,7 @@ Steps 5–10 are the tutorial prompts in DESIGN.md, logged as each one is done. 
 
 - `Shop`: `shop_opened` and `item_viewed` (another tab or page, once per session) come from the client; `purchase_prompted` is a buy the server accepted, `purchase_completed` a granted purchase (a Glory buy logs both at once).
 - `StarterPack`: `offer_shown` when the server sends the pop-up, `offer_opened` when the client shows it.
-- `SeasonPass` is ready (`TelemetryService.seasonPass`) for the season pass task. `PrivateServer` and `Party` wait for those features.
+- `SeasonPass`: `pass_viewed` when the season screen opens, `purchase_prompted` when a pass or bundle purchase is accepted, `purchase_completed` when it is granted (`SeasonService`). `PrivateServer` and `Party` wait for those features.
 
 ### Economy (`LogEconomyEvent`)
 
@@ -209,7 +209,7 @@ Steps 5–10 are the tutorial prompts in DESIGN.md, logged as each one is done. 
 | `Glory` | Source | TimedReward | `login_calendar` |
 | `Glory` | Sink | Shop | catalogue item id |
 | `Glory` | Sink | Gameplay | `quest_reroll`, `clan_create` |
-| `Robux` | Sink | IAP | catalogue offer or item id (`vip`, `starter`, `set_royal`, item id; later `season_pass_s1`) |
+| `Robux` | Sink | IAP | catalogue offer or item id (`vip`, `starter`, `set_royal`, `set_siege`, `season_pass`, `season_bundle`, item id; the season is the `SeasonPass` funnel's session) |
 
 Always pass the ending balance (Robux: 0, since games can't read a player's Robux balance). `match_reward` and `level_up` (level-ups and rank-ups) come from every match reward; `TelemetryService.glory` is ready for the quest, login and reroll rows. Add up to 3 custom fields: `level_bucket` (1–9, 10–29, 30+), `is_vip`, `is_payer`.
 

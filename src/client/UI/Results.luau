@@ -16,6 +16,8 @@ local Palette = require(Client.Palette)
 local ProfileState = require(Client.ProfileState)
 local QuestState = require(Client.QuestState)
 local Quests = require(script.Parent.Quests)
+local Season = require(script.Parent.Season)
+local SeasonState = require(Client.SeasonState)
 local Widgets = require(script.Parent.Widgets)
 
 local HOW = {
@@ -197,13 +199,30 @@ local function renderQuests(hasReward: boolean): boolean
 	row.LayoutOrder = 30
 	row.Parent = body
 	Widgets.list(row, true, 10)
-	local b = Widgets.button(row, Quests.buttonText(), 190, Color3.fromRGB(120, 90, 40), Quests.open)
+	local seasonOn = SeasonState.active()
+	local b = Widgets.button(
+		row,
+		Quests.buttonText(),
+		if seasonOn then 160 else 190,
+		Color3.fromRGB(120, 90, 40),
+		Quests.open
+	)
 	b.Name = "QuestsButton"
 	b.TextSize = 14
-	local next = Widgets.label(row, "⏳ Next match soon", 13, Widgets.BUTTON_HEIGHT)
-	next.Size = UDim2.new(1, -200, 1, 0)
-	next.TextColor3 = DIM_TEXT
-	next.LayoutOrder = 2
+	if seasonOn then -- the season pass, next to the quests (its XP came with this match)
+		local s = Widgets.button(row, Season.buttonText(), 160, Color3.fromRGB(120, 70, 160), Season.open)
+		s.Name = "SeasonButton"
+		s.TextSize = 14
+		s.LayoutOrder = 1
+		local next = Widgets.label(body, "⏳ Next match soon", 13, 18)
+		next.TextColor3 = DIM_TEXT
+		next.LayoutOrder = 31
+	else
+		local next = Widgets.label(row, "⏳ Next match soon", 13, Widgets.BUTTON_HEIGHT)
+		next.Size = UDim2.new(1, -200, 1, 0)
+		next.TextColor3 = DIM_TEXT
+		next.LayoutOrder = 2
+	end
 	return true
 end
 
@@ -319,6 +338,11 @@ function Results.init(showHandler: () -> ())
 	QuestState.onChange(function()
 		if dim.Visible then
 			render() -- quest progress arrives with the reward
+		end
+	end)
+	SeasonState.onChange(function()
+		if dim.Visible then
+			render() -- season XP arrives with the reward
 		end
 	end)
 end

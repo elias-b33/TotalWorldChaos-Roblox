@@ -9,6 +9,9 @@
 -- pieces, no random items, no countdowns, no prompts during a match (the server refuses them).
 -- Power effects show a pixel preview of the effect, map themes a small map painted in the theme; the Themes tab
 -- also holds the opt-out ("always show me the classic map").
+-- The rotating shop (section 3.8, Sim.ShopRotation): the 🔄 Today tab shows the 4 daily and 2 weekly slots with the
+-- time until they change; a rotating item outside its days says it is back within 60 days. Season-pass rewards only
+-- show once owned; the Offers tab links to the season pass screen (UI.Season).
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -17,7 +20,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Catalogue = require(Shared.Catalogue)
+local Config = require(Shared.Config)
+local Season = require(Shared.Sim.Season)
 local Shop = require(Shared.Sim.Shop)
+local ShopRotation = require(Shared.Sim.ShopRotation)
 local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
@@ -26,6 +32,7 @@ local Cosmetics = require(Client.Cosmetics)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local ProfileState = require(Client.ProfileState)
+local SeasonState = require(Client.SeasonState)
 local ShopState = require(Client.ShopState)
 local Widgets = require(script.Parent.Widgets)
 
@@ -52,6 +59,7 @@ local RARITY_COLORS: { [string]: Color3 } = {
 type Tab = { id: string, icon: string, label: string }
 local TABS: { Tab } = {
 	{ id = "Offers", icon = "🎁", label = "Offers" },
+	{ id = "Today", icon = "🔄", label = "Today" },
 	{ id = "Flag", icon = "🏳", label = "Flags" },
 	{ id = "Border", icon = "🧱", label = "Borders" },
 	{ id = "Shades", icon = "🎨", label = "Shades" },
@@ -94,6 +102,9 @@ local tab = "Offers"
 local page = 1
 local livePrices: { [string]: number } = {} -- live Robux prices by item or offer id
 local asked: { [string]: boolean } = {}
+local rotationAt = os.clock() -- when the rotating shop's view arrived (its *Left times count from then)
+local openSeason: (() -> ())? = nil -- UI.Season's opener (set by UI.Season, which requires this module)
+local RETURN_DAYS = Config.ShopRotation.ReturnDays -- every rotating item is back within this many days
 
 local function formatNumber(n: number): string
 	local s = tostring(math.floor(n))
@@ -215,12 +226,19 @@ local function preview(parent: Instance, item: Types.CatalogueItem)
 	thing.Position = UDim2.fromScale(0.5, 0.5)
 end
 
-local function itemCard(item: Types.CatalogueItem, order: number)
+-- Is this item or offer in the shop today? Core items always are; rotating ones in their slots (Sim.ShopRotation).
+local function onSaleToday(id: string): boolean
+	local view = ShopState.view()
+	local rotation = if view then view.rotation else nil
+	return rotation == nil or ShopRotation.onSale(id, rotation.day)
+end
+
+local function itemCard(item: Types.CatalogueItem, order: number, parent: Instance?)
 	local card = Instance.new("Frame")
 	card.Name = "Card_" .. item.id
 	card.BackgroundColor3 = CARD
 	card.LayoutOrder = order
-	card.Parent = content
+	card.Parent = parent or content
 	Widgets.corner(card, 10)
 	Widgets.padding(card, 6)
 	local list = Widgets.list(card, false, 4)
@@ -273,6 +291,15 @@ local function itemCard(item: Types.CatalogueItem, order: number)
 		end)
 		return
 	end
+	if item.season then
+		stateButton(buttons, "🎟 Season pass")
+		return
+	end
+	if not onSaleToday(item.id) then
+		stateButton(buttons, "🔄 Not today")
+		centred(buttons, string.format("Back within %d days", RETURN_DAYS), 12, 36, OFF_TEXT)
+		return
+	end
 	if item.robux then
 		local price = robuxPrice(item.id, item.robux)
 		cardButton(
@@ -299,12 +326,12 @@ local function itemCard(item: Types.CatalogueItem, order: number)
 	end
 end
 
-local function offerCard(offer: Types.ShopOffer, order: number)
+local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance?)
 	local card = Instance.new("Frame")
 	card.Name = "Card_" .. offer.id
 	card.BackgroundColor3 = CARD
 	card.LayoutOrder = order
-	card.Parent = content
+	card.Parent = parent or content
 	Widgets.corner(card, 10)
 	Widgets.padding(card, 6)
 	local list = Widgets.list(card, false, 3)
@@ -359,6 +386,165 @@ local function offerCard(offer: Types.ShopOffer, order: number)
 				buyRobux(offer.id)
 			end
 		)
+	end
+end
+
+-- The Offers tab's season pass card: what the pass holds, and the way to its screen (bought there).
+local function seasonCard(order: number)
+	local view = SeasonState.view()
+	if view == nil or view.id == "" then
+		return
+	end
+	local card = Instance.new("Frame")
+	card.Name = "Card_season_pass"
+	card.BackgroundColor3 = CARD
+	card.LayoutOrder = order
+	card.Parent = content
+	Widgets.corner(card, 10)
+	Widgets.padding(card, 6)
+	local list = Widgets.list(card, false, 3)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = GOLD
+	stroke.Thickness = 1
+	stroke.Parent = card
+	centred(card, "🎟", 28, 34).LayoutOrder = 1
+	centred(card, "Season Pass", 15, 18).LayoutOrder = 2
+	-- what the premium track holds, counted from the season's reward list
+	local items, glory = 0, 0
+	local def = Season.def(view.id)
+	if def then
+		for tier = 1, #def.tiers do
+			for _, r in Season.rewards(def, tier, "Premium") do
+				items += if r.item then 1 else 0
+				glory += r.glory or 0
+			end
+		end
+	end
+	local lines = {
+		view.name,
+		string.format("%d cosmetics, a title", items),
+		string.format("%s Glory on the way", formatNumber(glory)),
+		"Only this season",
+	}
+	centred(card, table.concat(lines, "\n"), 12, 78, OFF_TEXT).LayoutOrder = 3
+	centred(card, "No tier skips\nBundle: pass + 10 tiers", 12, 30, GOLD).LayoutOrder = 4
+	local buttons = Instance.new("Frame")
+	buttons.BackgroundTransparency = 1
+	buttons.Size = UDim2.new(1, 0, 0, 40)
+	buttons.LayoutOrder = 5
+	buttons.Parent = card
+	Widgets.list(buttons, false, 4)
+	cardButton(buttons, if view.premium then "✅ See your pass" else "🎟 See the pass", Widgets.BUTTON, function()
+		if openSeason then
+			openSeason()
+		end
+	end)
+end
+
+-- The weekly bundle on the 🔄 Today tab: the offer card, narrow enough for a sixth of the screen.
+local function bundleCard(offer: Types.ShopOffer, order: number, parent: Instance)
+	local card = Instance.new("Frame")
+	card.Name = "Card_" .. offer.id
+	card.BackgroundColor3 = CARD
+	card.LayoutOrder = order
+	card.Parent = parent
+	Widgets.corner(card, 10)
+	Widgets.padding(card, 6)
+	local list = Widgets.list(card, false, 3)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = GOLD
+	stroke.Thickness = 1
+	stroke.Parent = card
+	centred(card, offer.icon, 28, 34).LayoutOrder = 1
+	centred(card, offer.name, 15, 18).LayoutOrder = 2
+	local names = {}
+	for _, id in offer.items do
+		local item = Catalogue.item(id)
+		if item then
+			table.insert(names, item.name)
+		end
+	end
+	centred(card, table.concat(names, "\n"), 12, 52, OFF_TEXT).LayoutOrder = 3
+	local sum = string.format("Separately: %s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id)))
+	centred(card, sum, 12, 16, GOLD).LayoutOrder = 4
+	local buttons = Instance.new("Frame")
+	buttons.BackgroundTransparency = 1
+	buttons.Size = UDim2.new(1, 0, 0, 40)
+	buttons.LayoutOrder = 5
+	buttons.Parent = card
+	Widgets.list(buttons, false, 4)
+	if ShopState.owns(offer.id) then
+		stateButton(buttons, "✅ Owned")
+	else
+		local price = robuxPrice(offer.id, offer.robux)
+		cardButton(
+			buttons,
+			ROBUX .. " " .. formatNumber(price),
+			if robuxOpen() then Widgets.BUTTON else Widgets.BUTTON_OFF,
+			function()
+				buyRobux(offer.id)
+			end
+		)
+	end
+end
+
+-- "5 h 12 min" / "3 d 4 h": how long until a rotating slot changes (a fact on the screen, never a ticking timer).
+local function timeLeft(seconds: number): string
+	local s = math.max(0, math.floor(seconds - (os.clock() - rotationAt)))
+	local d, h, m = s // 86400, (s % 86400) // 3600, (s % 3600) // 60
+	if d > 0 then
+		return string.format("%d d %d h", d, h)
+	elseif h > 0 then
+		return string.format("%d h %d min", h, m)
+	end
+	return string.format("%d min", math.max(1, m))
+end
+
+-- The 🔄 Today tab: the 4 daily slots and the 2 weekly ones, each section with the time until it changes.
+local function renderToday()
+	local view = ShopState.view()
+	local rotation = if view then view.rotation else nil
+	if rotation == nil then
+		Widgets.label(content, "⏳ Loading today's shop…", 15, 30)
+		return
+	end
+	local daily = Widgets.label(content, "☀ Daily · new items in " .. timeLeft(rotation.dailyLeft), 14, 20)
+	daily.Name = "DailyTitle"
+	daily.Size = UDim2.new(4 / 6, -6, 0, 20)
+	local weekly = Widgets.label(content, "📅 Weekly · new in " .. timeLeft(rotation.weeklyLeft), 14, 20)
+	weekly.Name = "WeeklyTitle"
+	weekly.Position = UDim2.fromScale(4 / 6, 0)
+	weekly.Size = UDim2.new(2 / 6, 0, 0, 20)
+	local cards = Instance.new("Frame")
+	cards.Name = "Rotation"
+	cards.BackgroundTransparency = 1
+	cards.Position = UDim2.fromOffset(0, 24)
+	cards.Size = UDim2.new(1, 0, 1, -24)
+	cards.Parent = content
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(1 / 6, -6, 1, 0)
+	grid.CellPadding = UDim2.fromOffset(6, 6)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = cards
+	local order = 0
+	for _, id in rotation.daily do
+		local item = Catalogue.item(id)
+		if item then
+			order += 1
+			itemCard(item, order, cards)
+		end
+	end
+	for _, id in rotation.weekly do
+		order += 1
+		local item = Catalogue.item(id)
+		local offer = Catalogue.offer(id)
+		if item then
+			itemCard(item, order, cards)
+		elseif offer then
+			bundleCard(offer, order, cards)
+		end
 	end
 end
 
@@ -456,14 +642,34 @@ render = function()
 	if tab == "History" then
 		pages = renderHistory()
 		footer.Text = "Purchase history: your Robux purchases, newest first"
+	elseif tab == "Today" then
+		renderToday()
+		footer.Text = string.format(
+			"The same shop for everyone, nothing random. Every item comes back within %d days.",
+			RETURN_DAYS
+		)
 	else
 		local grid = Instance.new("UIGridLayout")
 		grid.CellSize = UDim2.new(1 / PER_PAGE, -6, 1, 0)
 		grid.CellPadding = UDim2.fromOffset(6, 6)
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.Parent = content
-		local entries: { any } = if tab == "Offers" then Catalogue.OFFERS else Catalogue.ofSlot(tab)
-		pages = math.max(1, math.ceil(#entries / PER_PAGE))
+		local entries: { any } = {}
+		if tab == "Offers" then
+			for _, offer in Catalogue.OFFERS do
+				if not offer.weekly then -- bundles are in the 🔄 Today tab in their weeks
+					table.insert(entries, offer)
+				end
+			end
+		else
+			for _, item in Catalogue.ofSlot(tab) do
+				if not item.season or ShopState.owns(item.id) then -- season rewards show once you have them
+					table.insert(entries, item)
+				end
+			end
+		end
+		local extra = if tab == "Offers" and SeasonState.active() then 1 else 0
+		pages = math.max(1, math.ceil((#entries + extra) / PER_PAGE))
 		page = math.clamp(page, 1, pages)
 		for i = (page - 1) * PER_PAGE + 1, math.min(#entries, page * PER_PAGE) do
 			if tab == "Offers" then
@@ -474,6 +680,9 @@ render = function()
 		end
 		if tab == "Theme" and page == pages then
 			themeSettingCard(#entries + 1)
+		end
+		if extra > 0 and page == pages then
+			seasonCard(#entries + 1)
 		end
 		footer.Text = if robuxOpen()
 			then "No random items: you always see what you get. Glory is earned by playing, never sold."
@@ -545,6 +754,16 @@ local function showStarterOffer()
 	end)
 	offerPanel.Visible = true
 	Intents.signal("OfferOpened") -- analytics
+end
+
+-- The Robux price to show for an item, offer or product (live once its product id is set), for other screens.
+function ShopUI.robuxPrice(id: string, listPrice: number): number
+	return robuxPrice(id, listPrice)
+end
+
+-- UI.Season registers how to open the season pass screen (the Offers tab's season card).
+function ShopUI.setSeasonScreen(open: () -> ())
+	openSeason = open
 end
 
 -- Open the shop on a tab (e.g. from a scenario or another screen).
@@ -688,6 +907,7 @@ function ShopUI.init(showToast: (string) -> ())
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ShopState.onChange(function(offer: boolean)
+		rotationAt = os.clock()
 		if offer then
 			showStarterOffer()
 		elseif offerPanel.Visible and ShopState.owns("starter") then
@@ -702,6 +922,7 @@ function ShopUI.init(showToast: (string) -> ())
 	end)
 	LobbyState.onChange(refreshButton)
 	Cosmetics.onChange(render)
+	SeasonState.onChange(render)
 end
 
 return ShopUI

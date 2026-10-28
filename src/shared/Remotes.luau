@@ -25,6 +25,7 @@ local EVENTS = {
 	"RequestTelemetry", -- analytics: a UI funnel signal (Sim.Telemetry.CLIENT_SIGNALS) and an optional short string
 	"RequestDefaultTheme", -- shop: true = always show the classic map (the theme opt-out)
 	"RequestAd", -- rewarded video: the placement ("quest_reroll", Sim.Ads.PLACEMENT)
+	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
@@ -37,6 +38,7 @@ local EVENTS = {
 	"Shop", -- your ShopView (on join and after every change)
 	"Quests", -- your QuestView (on join, at Results and after every change)
 	"NotificationPrompt", -- after your first finished match: ask to turn on experience notifications (Sim.Ads)
+	"Season", -- your SeasonView (on join, at Results and after every change)
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

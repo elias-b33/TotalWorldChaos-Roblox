@@ -20,10 +20,12 @@ local Shared = ReplicatedStorage.Shared
 local Catalogue = require(Shared.Catalogue)
 local Remotes = require(Shared.Remotes)
 local Shop = require(Shared.Sim.Shop)
+local ShopRotation = require(Shared.Sim.ShopRotation)
 local Types = require(Shared.Types)
 
 local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
+local DevService = require(script.Parent.DevService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local TelemetryService = require(script.Parent.TelemetryService)
 
@@ -42,6 +44,17 @@ local emoteMatch: Types.MatchState? = nil -- the match those ticks belong to
 local VIP_WAIT_SECONDS = 15 -- how long a reward waits for a joining player's VIP check
 local PASS_CHECK_TRIES = 3 -- UserOwnsGamePassAsync attempts after a pass purchase
 local PASS_CHECK_RETRY_SECONDS = 2
+-- Developer products another service sells through the shop (the season pass): its own purchase check, list price
+-- and grant (inside the receipt's profile update, so it must not yield), plus optional analytics hooks.
+export type Product = {
+	robux: number,
+	canBuy: (Player, Types.PlayerProfile) -> (boolean, string?),
+	grant: (Types.PlayerProfile) -> (),
+	prompted: ((Player) -> ())?,
+	granted: ((Player) -> ())?,
+}
+local products: { [string]: Product } = {}
+local SECONDS_PER_DAY = 86400
 
 local function testMode(): boolean
 	return RunService:IsStudio() and Catalogue.hasPlaceholders()
@@ -75,7 +88,19 @@ local function sendView(player: Player, starterOffer: boolean?)
 		return
 	end
 	local open = Shop.robuxOpen(getPhase())
-	shopRemote:FireClient(player, Shop.view(data, ShopService.isVip(player), open, starterOffer == true, testMode()))
+	local view = Shop.view(data, ShopService.isVip(player), open, starterOffer == true, testMode())
+	view.rotation = ShopRotation.view(DevService.today(), os.time() % SECONDS_PER_DAY) -- the rotating shop
+	shopRemote:FireClient(player, view)
+end
+
+-- Send a player their shop state again (a new UTC day: the rotating shop; a season reward: owned items).
+function ShopService.refresh(player: Player)
+	sendView(player)
+end
+
+-- Sell a developer product of another service (its id is a key of Shared.Catalogue.PRODUCT_IDS).
+function ShopService.addProduct(id: string, product: Product)
+	products[id] = product
 end
 
 -- VIP: the game pass from Roblox, or (Studio test mode only, while the pass id is 0) the saved test purchase. If
@@ -106,8 +131,13 @@ end
 -- A receipt for an item or offer: grant once, save, then PurchaseGranted. Also used by test mode and the VIP pass.
 function ShopService.receipt(receipt: any, id: string): Enum.ProductPurchaseDecision
 	local fresh = false -- granted now, not a repeat of a receipt already granted
+	local product = products[id]
 	local decision = PlayerDataService.processReceipt(receipt, id, function(data)
-		Shop.grant(data, id)
+		if product then
+			product.grant(data)
+		else
+			Shop.grant(data, id)
+		end
 		fresh = true
 	end)
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
@@ -118,6 +148,9 @@ function ShopService.receipt(receipt: any, id: string): Enum.ProductPurchaseDeci
 		if id == "vip" then
 			vipCache[player] = true
 			player:SetAttribute("Vip", true)
+		end
+		if fresh and product and product.granted then
+			product.granted(player)
 		end
 		sendView(player)
 	end
@@ -161,9 +194,21 @@ local function buyRobux(player: Player, id: string): (boolean, string?)
 	if data == nil then
 		return false, "NotLoaded"
 	end
-	local ok, reason = Shop.canBuyRobux(data, id, ShopService.isVip(player))
+	local product = products[id]
+	local ok, reason
+	if product then
+		ok, reason = product.canBuy(player, data)
+	else
+		ok, reason = Shop.canBuyRobux(data, id, ShopService.isVip(player))
+	end
 	if not ok then
 		return false, reason
+	end
+	if not ShopRotation.onSale(id, DevService.today()) then
+		return false, "NotInShop" -- a rotating item outside its days (Sim.ShopRotation)
+	end
+	if product and product.prompted then
+		product.prompted(player)
 	end
 	local productId = Catalogue.productId(id)
 	if productId == 0 then
@@ -177,7 +222,11 @@ local function buyRobux(player: Player, id: string): (boolean, string?)
 			PurchaseId = "studio-" .. HttpService:GenerateGUID(false),
 			PlayerId = player.UserId,
 			ProductId = 0,
-			CurrencySpent = if item and item.robux then item.robux elseif offer then offer.robux else 0,
+			CurrencySpent = if product
+				then product.robux
+				elseif item and item.robux then item.robux
+				elseif offer then offer.robux
+				else 0,
 		}
 		local granted = ShopService.receipt(receipt, id) == Enum.ProductPurchaseDecision.PurchaseGranted
 		return granted, if granted then nil else "TryAgain"
@@ -222,6 +271,10 @@ local function applyIntent(player: Player, intent: Types.ShopIntent): (boolean, 
 	local vip = ShopService.isVip(player)
 	local rule: ((Types.PlayerProfile, string, boolean) -> (boolean, string?))? = nil
 	if intent.kind == "Buy" and intent.currency == "Glory" then
+		local item = Catalogue.item(intent.item)
+		if item and item.glory and not ShopRotation.onSale(intent.item, DevService.today()) then
+			return false, "NotInShop" -- a rotating item outside its days (Sim.ShopRotation)
+		end
 		rule = Shop.buyWithGlory
 	elseif intent.kind == "Equip" then
 		rule = Shop.equip
