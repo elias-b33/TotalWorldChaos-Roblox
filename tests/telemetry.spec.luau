@@ -192,6 +192,23 @@ T.test("diplomacy_action logs the EU4 pack's insults and answers, gifts and mili
 	T.equal(Telemetry.diplomacy(state, 101, { kind = "Develop", province = 1 }), nil)
 end)
 
+T.test("event_card says which event, the map, and whether the player picked or time ran out", function()
+	local state = seated()
+	local function logged(outcome: Types.EventOutcome?): string?
+		local e = Telemetry.eventCard(state, 101, outcome)
+		return if e then e.name .. ":" .. table.concat(e.fields, ",") else nil
+	end
+	T.equal(
+		logged({ card = 3, event = "Harvest", province = 0, choice = 2, auto = false }),
+		"event_card:Harvest,skyshards,picked_2"
+	)
+	T.equal(
+		logged({ card = 4, event = "CargoPod", province = 5, choice = 1, auto = true }),
+		"event_card:CargoPod,skyshards,timeout_1"
+	)
+	T.equal(logged(nil), nil)
+end)
+
 T.test("map_vote: one per voter with the round and the theme", function()
 	local lobby = Lobby.new(Maps.ids, nil)
 	T.expect((Lobby.vote(lobby, 202, "eldmoor")), "vote")

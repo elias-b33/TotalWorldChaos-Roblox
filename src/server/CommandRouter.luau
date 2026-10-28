@@ -162,6 +162,17 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			end)
 		end)
 
+	-- the EU4 pack's event cards: a choice (1 or 2) on your nation's open card (Sim.EventCards checks the rest)
+	Remotes.event("RequestEventChoice").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, card: unknown, choice: unknown)
+			accept(player, requestId, function()
+				if not isId(card) or not isId(choice) then
+					return nil
+				end
+				return { kind = "EventChoice", card = card :: number, choice = choice :: number }
+			end)
+		end)
+
 	Remotes.event("RequestPower").OnServerEvent
 		:Connect(function(player: Player, requestId: unknown, power: unknown, target: unknown)
 			accept(player, requestId, function()

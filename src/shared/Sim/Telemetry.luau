@@ -40,6 +40,7 @@ Telemetry.CUSTOM_EVENTS = {
 	"tutorial_skipped",
 	-- the EU4 pack (docs/DESIGN.md)
 	"diplomacy_action",
+	"event_card",
 }
 
 -- The EU4 pack's diplomatic actions diplomacy_action logs, by Command action (field 1).
@@ -365,6 +366,16 @@ function Telemetry.diplomacy(state: MatchState, userId: number, command: Types.C
 	end
 	local aimed = if target.userId ~= nil then "human" else "bot"
 	return Telemetry.custom("diplomacy_action", 1, { action, state.mapId, aimed }, userId)
+end
+
+-- A player's event card closed (the EU4 pack, Sim.EventCards): event_card with the event, the map, and how it ended
+-- ("picked_1", "picked_2", or "timeout_N" when time ran out and default choice N happened). nil without one.
+function Telemetry.eventCard(state: MatchState, userId: number, outcome: Types.EventOutcome?): Event?
+	if outcome == nil then
+		return nil
+	end
+	local how = (if outcome.auto then "timeout_" else "picked_") .. outcome.choice
+	return Telemetry.custom("event_card", 1, { outcome.event, state.mapId, how }, userId)
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

@@ -644,3 +644,40 @@ An insult only ever helps the one insulted, so it can't be farmed: two friends t
 **Balance holds.** Every race moved by about the noise of 200 seeds (±0.2×) or less, and the spread got no wider (Earth 0.77×–1.16×, Eldmoor 0.81×–1.29×, Skyshards 0.74×–1.28×). The same start slots lead and trail as in section 19 (Volga and Frostmarch on top; Saltmarsh, Ironholds and Mississippi at the bottom). Match length, wars and conquests sit in section 19's ranges. Insults are rare (about one every five minutes across the map) and decide about one war in twenty.
 
 **Watch:** Eldmoor's alliance victories rose from 37 to 50 of 200 (about 2 standard deviations); nothing in the pack points at alliances, so check it again with the next batch of seeds before acting. Players will insult far more than bots do; the soft launch's `diplomacy_action` events (`docs/LAUNCH.md`) show how much, and the grudge is small enough that it shouldn't matter.
+
+
+## 21. The EU4 pack, stage 2: event cards with choices
+
+`docs/DESIGN.md` "Events" has the rules; `Config.EventCards` has the 33 events and every number. Each living nation gets a card at 2:00 (plus 3 s per nation slot), then one 3 minutes after each card closes: about 7 a match. A choice is worth about 50 gold (100 manpower = 1 gold, a development level 60). Bots take the affordable choice worth more (`Config.Bots.EventWorth`).
+
+**How it was measured.** `lune run tools/harness/tournament 200 <map>` on each map, seeds 1–200, Normal bots, map races, with the cards on (the default) and off (`SET="Features.Events=false"`), the same code otherwise, so the two runs differ only by the cards (each seed still plays out differently once the first card is dealt). The tournament now prints the cards per match, how many ran out of time, and what they gave (30 more seeds per map for that line).
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Cards per match (all 10 bots); timed out | 68.7; 1.1 | 65.8; 1.2 | 70.7; 0.4 |
+| What they gave a nation in a match | 115 gold, 1,800 manpower, 1.1 development, 1.6 regiments, a +23% boost for 2 min | 133 gold, 2,100 manpower, 0.4 development, 2.0 regiments, +27% for 2 min | 167 gold, 2,200 manpower, 0.4 development, 1.8 regiments, +25% for 2 min |
+| Men in all armies at 25:00 (median), off → on | 165k → 201k | 145k → 167k | 174k → 222k |
+| Gold banked per nation at 25:00 (median) | 169 → 193 | 153 → 192 | 162 → 176 |
+| Provinces taken from nations per match | 42.8 → 40.8 | 54.6 → 50.3 | 38.4 → 37.1 |
+| Alliance victories of 200 (the rest score wins at 25:00, no dominations) | 38 → 22 | 54 → 29 | 16 → 5 |
+| Average match length | 23:48 → 24:13 | 23:07 → 24:01 | 24:28 → 24:55 |
+| Wars declared per match | 10.5 → 10.6 | 11.1 → 10.9 | 9.9 → 9.9 |
+| Bot commands refused | 31 → 20 of about 340k | 17 → 11 | 12 → 11 |
+
+Fairness, by the land each race ends with (average final provinces; this doesn't depend on how often alliances win):
+
+| Map | off | on |
+| --- | --- | --- |
+| Earth | Kingdom 10.8 · Empire 16.6 · Nomads 16.0 · Republic 14.8 · Clans 11.2 (best ÷ worst 1.55) | 11.1 · 16.8 · 15.2 · 15.3 · 11.1 (1.52) |
+| Eldmoor | Humans 14.9 · Elves 18.8 · Orcs 12.0 · Dwarves 11.6 · Lizardfolk 10.7 (1.75) | 15.7 · 18.2 · 11.8 · 11.9 · 10.2 (1.78) |
+| Skyshards | Marines 10.9 · Robots 11.2 · Insectoids 11.2 · Crystal folk 12.6 · Energy beings 14.1 (1.30) | 10.3 · 10.8 · 11.3 · 12.4 · 15.1 (1.46) |
+
+The start slots' land spread (best slot ÷ worst) went 1.94 → 1.81 on Earth, 2.45 → 2.26 on Eldmoor and 1.41 → 1.54 on Skyshards.
+
+**What the cards change.** Everyone gets about the same small gifts, so nobody pulls ahead: who ends with the land is the same as without them on Earth and Eldmoor, within the noise of 200 seeds (±0.3 provinces a race). What moves is the pace. The gifts end up as soldiers: an army is limited by the gold that pays its upkeep, so a little more gold and a level of development keep a regiment or two more per nation, and the armies at 25:00 are 15–28% bigger. Defenders hold a little better, about 5% fewer provinces change hands, and the 65% alliance victory (a long run of conquests) comes about half as often; the score at 25:00 decides the rest. Win shares spread out for the same reason: an alliance victory shares one win among two or three allies, a score win goes to one nation, so with fewer alliance victories the slots and races that already led win more of them (Eldmoor's Frostmarch went from 1.52× to 2.17× its fair share of wins, Skyshards' Energy beings from 1.20× to 1.67×), while their land barely moved (Frostmarch 20.0 → 19.4 provinces).
+
+Two checks on Earth (seeds 1–100) show it's the amount, not one kind of gift: with bots that never take regiments, the armies still grew as much (alliance victories 19 off, 10 on, 9 without regiments; men at 25:00 165k, 198k, 201k), and a card every 5 minutes instead of 3 (4.3 a nation) did about half as much (12 alliance victories, 186k men).
+
+**Balance holds** for who wins: no start slot or race gained land beyond the noise except Skyshards' Energy beings (+1.0 province, about 3 standard errors; their Swift passive may make more use of bigger armies), and bots refuse fewer commands than before (a bot decides its card after the plan's other orders, so a choice with a cost never fails).
+
+**Watch:** the slower pace. If the soft launch shows fewer conquests than players enjoy, lower the amounts in `Config.EventCards.Events` or raise `EveryTicks` (both scale the effect about linearly); `event_card` (`docs/LAUNCH.md`) shows what players pick and how often they let a card run out. Check Skyshards' Energy beings again with the next batch of seeds.

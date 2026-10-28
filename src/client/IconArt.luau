@@ -1685,6 +1685,25 @@ IconArt.ICONS = {
 		"....KKKKKKKK....",
 		"................",
 	},
+	-- the EU4 pack's event cards: a ship joins your fleet
+	anchor = {
+		"................",
+		"......KKKK......",
+		".....KwwwgK.....",
+		".....KwKKgK.....",
+		".....KwwwgK.....",
+		"......KwgK......",
+		"...KKKKwgKKKK...",
+		"...KwwwwggggK...",
+		"...KKKKwgKKKK...",
+		"......KwgK......",
+		".KK...KwgK...KK.",
+		"KwgK..KwgK..KwgK",
+		".KwgK.KwgK.KwgK.",
+		"..KwwgKwgKwwgK..",
+		"...KKwwwgggKK...",
+		".....KKKKKK.....",
+	},
 } :: { [string]: { string } }
 
 -- Icons made by recolouring another one: { base, { [from code] = to code } }.
@@ -1798,6 +1817,7 @@ IconArt.FALLBACK = {
 	-- the EU4 pack
 	grudge = "💢",
 	access = "🚶",
+	anchor = "⚓",
 } :: { [string]: string }
 
 -- Old emoji in text (toasts from the server, power names, relation marks) and the icon that replaces each.
@@ -1871,6 +1891,8 @@ IconArt.EMOJI = {
 	["💢"] = "grudge",
 	["😀"] = "smile",
 	["🚶"] = "access",
+	-- the EU4 pack's event cards ("📜 A Bumper Harvest: …"; "⌛ No answer: …")
+	["⚓"] = "anchor",
 } :: { [string]: string }
 
 local function rgba(c: number): number

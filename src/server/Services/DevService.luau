@@ -6,12 +6,15 @@
 --   DevCharges  number  every nation and Primordial gets this many power charges
 --   DevGold     number  every nation with a player gets this much gold
 --   DevDay      number  moves the server's UTC day this many days on (quests, login calendar, first match today)
+--   DevEvent    number  every nation's next event card comes in this many seconds (0: at once)
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 ReplicatedStorage:WaitForChild("Shared")
+local Config = require(ReplicatedStorage.Shared.Config)
+local EventCards = require(ReplicatedStorage.Shared.Sim.EventCards)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local SECONDS_PER_DAY = 86400
@@ -65,6 +68,11 @@ function DevService.step(state: Types.MatchState)
 			end
 		end
 		print(string.format("[dev] every player nation has %d gold", gold))
+	end
+	local soon = take("DevEvent")
+	if soon then
+		EventCards.soon(state, soon // Config.TickSeconds)
+		print(string.format("[dev] every nation's next event card comes in %d s", soon))
 	end
 	local days = take("DevDay")
 	if days then

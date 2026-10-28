@@ -6,6 +6,7 @@ local Battle = require("./Battle")
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
+local EventCards = require("./EventCards")
 local Match = require("./Match")
 local Movement = require("./Movement")
 local Navy = require("./Navy")
@@ -39,7 +40,8 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	end
 	Primordial.step(state, rng) -- 6: eliminations, charges, effect timers, Cataclysm disasters
 	-- 7: bots (Phase 3)
-	Diplomacy.expire(state) -- 8
+	Diplomacy.expire(state) -- 8: offers, insults' answer windows...
+	EventCards.step(state, rng) -- ...and event cards (the default choice), then new cards
 	local result = Victory.check(state)
 	if result == nil and state.phase == "Results" then
 		result = Victory.byScore(state)

@@ -26,6 +26,7 @@ local EVENTS = {
 	"RequestDefaultTheme", -- shop: true = always show the classic map (the theme opt-out)
 	"RequestAd", -- rewarded video: the placement ("quest_reroll", Sim.Ads.PLACEMENT)
 	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
+	"RequestEventChoice", -- the EU4 pack's event cards: card id, choice (1 or 2)
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
@@ -41,6 +42,7 @@ local EVENTS = {
 	"Season", -- your SeasonView (on join, at Results and after every change)
 	"Achievements", -- your AchievementView (on join and after every match)
 	"Boards", -- your BoardsView: weekly, friends and level boards (on join and after every refresh)
+	"EventCard", -- your nation's event cards (Types.EventCardView): to you alone, never in the delta
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

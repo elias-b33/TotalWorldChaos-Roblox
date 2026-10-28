@@ -87,6 +87,9 @@ local REASONS: { [string]: string } = {
 	Cooldown = "⏳ Wait a little before doing that again",
 	NoAnswer = "💢 Too late to answer that one",
 	AlreadyAccess = "🚶 You can already march through their land",
+	EventsOff = "🔒 Events are off on this server",
+	NoEvent = "📜 That event is over",
+	BadChoice = "🚫 Not one of the choices",
 }
 
 local Intents = {}
@@ -129,6 +132,11 @@ end
 -- Access | AcceptAccess (an insult carries no message)
 function Intents.diplomacy(action: string, target: number, gold: number?)
 	send("RequestDiplomacy", action, target, gold or 0)
+end
+
+-- The EU4 pack's event cards: choice 1 or 2 on your nation's open card.
+function Intents.eventChoice(card: number, choice: number)
+	send("RequestEventChoice", card, choice)
 end
 
 -- power: Meteor | Plague | Rebels | Earthquake | Blessing | Shield; target: army, nation or province id

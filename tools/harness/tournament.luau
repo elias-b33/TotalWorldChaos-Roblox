@@ -9,6 +9,7 @@
 --   lune run tools/harness/tournament 20 all Easy/Player   # Easy bots against Normal-bot stand-ins for players
 --   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
 --   SET="Features.Diplomacy=false" lune run tools/harness/tournament 200 earth   # a match feature off (true/false)
+--   SET="Features.Events=false" lune run tools/harness/tournament 200 earth      # no event cards (the EU4 pack, stage 2)
 --   lune run tools/harness/tournament 200 eldmoor     # start-position balance (docs/BALANCE.md section 16)
 --   RACES=shuffle lune run tools/harness/tournament 100   # races dealt out at random each match (the map's mix):
 --                                                         # race strength without the start positions in it
@@ -26,6 +27,7 @@ local Bot = require("../../src/shared/Sim/Bot")
 local Commands = require("../../src/shared/Sim/Commands")
 local Config = require("../../src/shared/Config")
 local Diplomacy = require("../../src/shared/Sim/Diplomacy")
+local EventCards = require("../../src/shared/Sim/EventCards")
 local Maps = require("../../src/shared/Maps")
 local Match = require("../../src/shared/Sim/Match")
 local Races = require("../../src/shared/Sim/Races")
@@ -96,6 +98,9 @@ type MatchStats = {
 	insults: number, -- the EU4 pack: insults and insults back bots sent, wars declared on a nation the declarer holds a
 	insultsBack: number, -- grudge against (it insulted them)
 	grudgeWars: number,
+	cards: number, -- the EU4 pack's event cards closed (stage 2), and how many of them ran out of time
+	cardsTimedOut: number,
+	granted: { [string]: number }, -- what the closed cards gave, by effect (gold, manpower, development, regiments...)
 	leaderChanges: number, -- minutes (from 3:00) that ended with a different nation holding the most provinces
 	armyStats: { [number]: ArmyStats }, -- at the end of minutes 15 and 25 (or the end of the match)
 	group: { [number]: string }, -- mixed mode: nation -> "A" or "B"
@@ -219,9 +224,13 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		insults = 0,
 		insultsBack = 0,
 		grudgeWars = 0,
+		cards = 0,
+		cardsTimedOut = 0,
+		granted = {},
 		leaderChanges = 0,
 		armyStats = {},
 	}
+	local lastCard: { [number]: number } = {} -- nation -> the last event card counted
 	while state.result == nil do
 		for _, order in queue do -- 1. apply queued commands
 			stats.commands += 1
@@ -277,6 +286,20 @@ local function runMatch(mapId: string, seed: number): MatchStats
 			end
 		end
 		table.clear(state.events)
+		for id, c in state.chronicles do
+			local last = c.last
+			if last and lastCard[id] ~= last.card then
+				lastCard[id] = last.card
+				stats.cards += 1
+				if last.auto then
+					stats.cardsTimedOut += 1
+				end
+				local def = EventCards.def(last.event)
+				for effect, amount in (if def then def.choices[last.choice] else {}) :: { [string]: number } do
+					stats.granted[effect] = (stats.granted[effect] or 0) + amount
+				end
+			end
+		end
 		if state.tick % 60 == 0 or state.result then
 			local best, leader = 0, 0
 			for id = 1, #state.nations do
@@ -317,6 +340,9 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		insults = stats.insults,
 		insultsBack = stats.insultsBack,
 		grudgeWars = stats.grudgeWars,
+		cards = stats.cards,
+		cardsTimedOut = stats.cardsTimedOut,
+		granted = stats.granted,
 		leaderChanges = stats.leaderChanges,
 		armyStats = stats.armyStats,
 		group = group,
@@ -376,7 +402,8 @@ for _, mapId in mapIds do
 	local lengths = {}
 	local perMinute: { { number } } = {}
 	local rejected, commands, wars, conquests, leaderChanges, powers = 0, 0, 0, 0, 0, 0
-	local insults, insultsBack, grudgeWars = 0, 0, 0
+	local insults, insultsBack, grudgeWars, cards, cardsTimedOut = 0, 0, 0, 0, 0
+	local granted: { [string]: number } = {}
 	local atMinute: { [number]: { [string]: { number } } } = {}
 	for _, m in { 15, 25 } do
 		atMinute[m] = { armies = {}, men = {}, maxMen = {}, stacked = {}, gold = {}, manpower = {} }
@@ -456,6 +483,11 @@ for _, mapId in mapIds do
 		insults += s.insults
 		insultsBack += s.insultsBack
 		grudgeWars += s.grudgeWars
+		cards += s.cards
+		cardsTimedOut += s.cardsTimedOut
+		for effect, amount in s.granted do
+			granted[effect] = (granted[effect] or 0) + amount
+		end
 		leaderChanges += s.leaderChanges
 		for k, v in s.rejectReasons do
 			reasons[k] = (reasons[k] or 0) + v
@@ -547,6 +579,23 @@ for _, mapId in mapIds do
 			grudgeWars / seeds
 		)
 	)
+	print(
+		string.format(
+			"event cards per match %.1f (%.1f per nation), timed out %.1f",
+			cards / seeds,
+			cards / seeds / 10,
+			cardsTimedOut / seeds
+		)
+	)
+	local gave = {}
+	for _, effect in { "gold", "manpower", "development", "regiments", "ships", "boost" } do
+		if granted[effect] then
+			table.insert(gave, string.format("%s %.2f", effect, granted[effect] / seeds / 10))
+		end
+	end
+	if #gave > 0 then
+		print("  event cards gave per nation per match (boost: summed bonus): " .. table.concat(gave, ", "))
+	end
 	print(
 		string.format(
 			"provinces taken from nations per match %.1f  |  leader changes per match (minute checks after 3:00) %.1f  |  powers used by bots per match %.1f",

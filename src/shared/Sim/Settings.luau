@@ -3,7 +3,7 @@
 -- the Lobby (Sim.Lobby checks who and when, this module what); the next match carries them in MatchState.setup,
 -- and every rule that depends on them reads them from there: the phase clock (Match.phaseAt), powers and disasters
 -- (Primordial), locked teams (Diplomacy), bot difficulty (AIService), rewards (Settings.fullRewards), and the EU4
--- pack's features (Settings.FEATURES: insults, gifts and military access in Diplomacy).
+-- pack's features (Settings.FEATURES: insults, gifts and military access in Diplomacy, event cards in EventCards).
 -- Public servers play the defaults. Pure: no Roblox, randomness from the seeded Rng.
 
 local Army = require("./Army")
@@ -36,14 +36,15 @@ function Settings.defaults(): MatchSettings
 		disasters = true,
 		teams = {},
 		diplomacy = Config.Features.Diplomacy,
+		events = Config.Features.Events,
 	}
 end
 
 -- The EU4 pack's features: on/off settings (MatchSettings keys), defaults in Config.Features. Those listed in
 -- Settings.CUSTOM_FEATURES make a match "custom rules" (half rewards) when changed; the others don't, because turning
 -- them off makes nothing easier to farm (insults, gifts and access: an owner may turn them off for younger players
--- and keep full rewards).
-Settings.FEATURES = { "diplomacy" } :: { string }
+-- and keep full rewards; event cards give every nation the same small gifts, so a match without them is no easier).
+Settings.FEATURES = { "diplomacy", "events" } :: { string }
 Settings.CUSTOM_FEATURES = {} :: { string }
 
 function Settings.copy(settings: MatchSettings): MatchSettings

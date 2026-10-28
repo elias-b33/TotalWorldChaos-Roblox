@@ -152,6 +152,31 @@ export type Cooldown = { kind: string, a: NationId, b: NationId, untilTick: numb
 -- Military access: the guest's armies may enter the owner's land until untilTick (a war between them ends it).
 export type Access = { owner: NationId, guest: NationId, untilTick: number }
 
+-- Event cards (the EU4 pack, stage 2; Sim.EventCards, docs/DESIGN.md "Events"). An open card waits for its nation's
+-- choice until untilTick, then its default choice happens. `event` is an id in Config.EventCards.Events; `province`
+-- is where its province effects land (development, regiments, ships), 0 when it has none.
+export type EventCard = { id: number, event: string, province: ProvinceId, untilTick: number }
+-- What a card came to: the choice made (1 or 2), and whether time ran out (auto: the default choice happened).
+export type EventOutcome = { card: number, event: string, province: ProvinceId, choice: number, auto: boolean }
+-- One nation's events: when its next card comes, the events it has had (each comes once until it has had every one
+-- it can get), its open card and the last one closed.
+export type Chronicle = { nextAt: number, seen: { string }, card: EventCard?, last: EventOutcome? }
+-- A timed income boost from an event: the nation's gold income × (1 + bonus) until untilTick (the best one counts).
+export type Boost = { nation: NationId, bonus: number, untilTick: number }
+-- What a player's client is told about its own nation's events, on its own remote, never in the delta everyone
+-- gets: the open card (card 0 = none) and the last card closed (lastCard 0 = none yet). Flat, for the network.
+export type EventCardView = {
+	card: number,
+	event: string,
+	province: number,
+	untilTick: number,
+	lastCard: number,
+	lastEvent: string,
+	lastProvince: number,
+	lastChoice: number,
+	lastAuto: boolean,
+}
+
 export type MatchResult = {
 	kind: "Domination" | "Alliance" | "Score",
 	winners: { NationId },
@@ -175,6 +200,7 @@ export type MatchSettings = {
 	teams: { { userId: number, team: number } }, -- locked teams: these players start allied; none = off
 	-- the EU4 pack's features (defaults in Config.Features)
 	diplomacy: boolean, -- insults and their answers, gifts, military access
+	events: boolean, -- event cards with choices
 }
 
 -- How a match was set up, read by Sim from MatchState (never from globals).
@@ -217,6 +243,10 @@ export type MatchState = {
 	answers: { Answer },
 	cooldowns: { Cooldown },
 	access: { Access },
+	-- the EU4 pack's event cards (Sim.EventCards): private to each nation, never in the snapshot
+	chronicles: { [NationId]: Chronicle },
+	boosts: { Boost },
+	nextCardId: number,
 }
 
 -- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside
@@ -353,6 +383,8 @@ export type Command =
 	| { kind: "Sail", fleet: FleetId, zone: ZoneId }
 	| { kind: "Land", fleet: FleetId, province: ProvinceId }
 	| { kind: "Embark", army: ArmyId, fleet: FleetId }
+	-- the EU4 pack's event cards: choice 1 or 2 on the nation's open card (Sim.EventCards)
+	| { kind: "EventChoice", card: number, choice: number }
 
 -- Progression and saves (docs/MONETIZATION.md 4–5). Profiles are saved; MatchState never is.
 

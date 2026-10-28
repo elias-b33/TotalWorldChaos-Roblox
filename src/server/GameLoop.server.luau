@@ -195,6 +195,7 @@ local function tick()
 		ShopService.onPhase(newPhase) -- after the rewards: the starter-pack offer counts finished matches
 	end
 	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
+	Replicator.sendCards(state, MatchService.nationOf) -- ...and each player their own event card, to them alone
 end
 
 -- A Lobby second: votes and picks, the clocks, then what changed to every client.

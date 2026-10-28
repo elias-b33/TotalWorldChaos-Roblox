@@ -1,11 +1,14 @@
 --!strict
 -- Sends a full snapshot to a player when they join (or a new match starts), then one delta per tick to everyone.
--- Records carry what clients need: every nation's race, every army's composition (Shared.Snapshot).
+-- Records carry what clients need: every nation's race, every army's composition (Shared.Snapshot). The EU4 pack's
+-- event cards are the one private part: each player gets their own nation's, on their own remote (sendCards).
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local EventCards = require(Shared.Sim.EventCards)
 local Lobby = require(Shared.Sim.Lobby)
 local Movement = require(Shared.Sim.Movement)
 local Remotes = require(Shared.Remotes)
@@ -22,7 +25,9 @@ local deltaRemote: RemoteEvent
 local notifyRemote: RemoteEvent
 local positionsRemote: UnreliableRemoteEvent
 local lobbyRemote: RemoteEvent
+local cardRemote: RemoteEvent
 local lastSent: Snapshot.SnapshotData? = nil
+local cardsSent: { [Player]: string } = {} -- what each player was last told about their event cards
 
 function Replicator.init()
 	snapshotRemote = Remotes.event("Snapshot")
@@ -30,6 +35,10 @@ function Replicator.init()
 	notifyRemote = Remotes.event("Notify")
 	positionsRemote = Remotes.unreliableEvent("ArmyPositions")
 	lobbyRemote = Remotes.event("Lobby")
+	cardRemote = Remotes.event("EventCard")
+	Players.PlayerRemoving:Connect(function(player: Player)
+		cardsSent[player] = nil
+	end)
 end
 
 -- Every nation's equipped cosmetics travel next to the match state (ShopService sets this).
@@ -51,6 +60,20 @@ end
 -- A new match: forget the old baseline so the next delta is computed against the new state.
 function Replicator.reset(state: Types.MatchState)
 	lastSent = full(state)
+	table.clear(cardsSent) -- card ids start again: everyone hears about their cards afresh
+end
+
+-- The EU4 pack's event cards (Sim.EventCards): each player is told about their own nation's open card and its last
+-- closed one, when that changes, and nobody else's. An event's words never travel: the client looks them up by id.
+function Replicator.sendCards(state: Types.MatchState, nationOf: (Player) -> number?)
+	for _, player in Players:GetPlayers() do
+		local view = EventCards.view(state, nationOf(player))
+		local key = view.card .. ":" .. view.lastCard
+		if cardsSent[player] ~= key then
+			cardsSent[player] = key
+			cardRemote:FireClient(player, view)
+		end
+	end
 end
 
 -- Tick order step 9: one delta with only what changed since the last tick, plus this tick's events.

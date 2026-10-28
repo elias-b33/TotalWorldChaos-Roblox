@@ -20,6 +20,7 @@ local Commands = require("./Commands")
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
+local EventCards = require("./EventCards")
 local Pathing = require("./Pathing")
 local Races = require("./Races")
 local Rng = require("./Rng")
@@ -40,12 +41,12 @@ export type Settings = {
 }
 
 -- What a bot remembers between plans: its province count when each of its wars started, when it last made each
--- kind of offer to each nation (so it doesn't repeat itself every time an offer expires), and the insults it has
--- decided whether to answer.
+-- kind of offer to each nation (so it doesn't repeat itself every time an offer expires), and the insults and event
+-- cards it has decided how to answer.
 export type Memory = {
 	warStart: { [number]: { startedAt: number, provinces: number } }, -- war id -> snapshot
 	offeredAt: { [string]: number }, -- "Ally:3" -> tick
-	answered: { [string]: boolean }, -- "insulter:window end" -> decided
+	answered: { [string]: boolean }, -- "insulter:window end" (an insult), "card:id" (an event card) -> decided
 }
 
 export type Schedule = {
@@ -1345,6 +1346,33 @@ local function social(ctx: Ctx, memory: Memory): { Command }
 	return out
 end
 
+-- 9. Event cards (the EU4 pack, stage 2): a bot answers its open card once, on its first plan after the card came,
+-- with the affordable choice worth the most gold (Sim.EventCards.worth), through the same command players use. It
+-- decides after the plan's other orders (on a copy of the world where they went through), so a choice that costs gold
+-- never fails because a recruit in the same plan spent it.
+
+local function eventChoice(ctx: Ctx, memory: Memory, planned: { Command }): Command?
+	local card = EventCards.open(ctx.state, ctx.me)
+	if card == nil then
+		return nil
+	end
+	local key = "card:" .. card.id
+	if memory.answered[key] then
+		return nil
+	end
+	memory.answered[key] = true
+	local scratch = copy(ctx.state) :: MatchState
+	for _, command in planned do
+		Commands.apply(scratch, ctx.me, command)
+	end
+	local cardId, choice = EventCards.botChoice(scratch, ctx.me)
+	if cardId == nil or choice == nil then
+		return nil
+	end
+	local answer: Command = { kind = "EventChoice", card = cardId, choice = choice }
+	return if Commands.apply(scratch, ctx.me, answer) then answer else nil
+end
+
 -- Plan ---------------------------------------------------------------------------------------------------
 
 -- The commands this bot wants this turn (usually one, sometimes none).
@@ -1374,6 +1402,14 @@ function Bot.plan(
 	local power = primordial(ctx)
 	if power then
 		table.insert(extra, power[1])
+	end
+	local planned = table.clone(commands)
+	for _, command in extra do
+		table.insert(planned, command)
+	end
+	local event = eventChoice(ctx, mem, planned)
+	if event then
+		table.insert(extra, event)
 	end
 	if #extra > 0 then
 		commands = table.clone(commands)
