@@ -2,6 +2,8 @@
 -- The map vote in the Lobby (docs/MAPS.md "Task: Map vote"): one big card per map with a pixel-art thumbnail,
 -- its title, a one-line pitch and the votes so far. Tap a card to choose it, tap it again to vote.
 -- A server locked to one map shows just that card. Full screen, above everything else.
+-- Theme vote (docs/MONETIZATION.md 3.2): your thumbnails are painted in the map theme you have equipped, and the
+-- hint says you bring it; the map that wins is painted in the theme most of its voters bring.
 
 local AssetService = game:GetService("AssetService")
 local Players = game:GetService("Players")
@@ -10,15 +12,18 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Catalogue = require(Shared.Catalogue)
 local MapGrid = require(Shared.MapGrid)
 local Maps = require(Shared.Maps)
 local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
+local Cosmetics = require(Client.Cosmetics)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local Palette = require(Client.Palette)
 local PixelArt = require(Client.PixelArt)
+local ShopState = require(Client.ShopState)
 local Widgets = require(script.Parent.Widgets)
 
 local THUMB_FACTOR = 4 -- thumbnails are the map grid at 1/4 resolution (Earth 256×128)
@@ -50,7 +55,7 @@ local row: Frame
 local cards: { [string]: Card } = {}
 local cardsFor = "" -- the map list the cards were built for
 local selected: string? = nil
-local thumbs: { [string]: EditableImage | false } = {} -- painted thumbnails by map id (false = not possible)
+local thumbs: { [string]: EditableImage | false } = {} -- painted thumbnails by map id and theme (false = not possible)
 
 local function packed(c: Color3): number
 	return math.floor(c.R * 255 + 0.5) * 65536 + math.floor(c.G * 255 + 0.5) * 256 + math.floor(c.B * 255 + 0.5)
@@ -58,7 +63,7 @@ end
 
 -- Paint a map's thumbnail (start territories in nation colours) into an EditableImage. nil if the device or the
 -- game settings don't allow EditableImage: the card then stays a plain coloured card.
-local function paintThumb(map: Types.MapDef): EditableImage?
+local function paintThumb(map: Types.MapDef, look: string): EditableImage?
 	local grid = MapGrid.downsample(MapGrid.decode(map), THUMB_FACTOR)
 	local ok, image = pcall(function()
 		return AssetService:CreateEditableImage({ Size = Vector2.new(grid.width, grid.height) })
@@ -72,7 +77,7 @@ local function paintThumb(map: Types.MapDef): EditableImage?
 			task.wait()
 			last = os.clock()
 		end
-	end)
+	end, look)
 	local owners: { [number]: number } = {}
 	for _, p in map.provinces do
 		owners[p.id] = p.startOwner or 0
@@ -98,13 +103,15 @@ local function showThumb(holder: Frame, map: Types.MapDef)
 		label.ImageContent = Content.fromObject(image)
 		label.Parent = holder
 	end
-	local cached = thumbs[map.id]
+	local look = Cosmetics.myTheme()
+	local key = map.id .. ":" .. look
+	local cached = thumbs[key]
 	if cached then
 		attach(cached)
 	elseif cached == nil then
 		task.spawn(function()
-			local image = paintThumb(map)
-			thumbs[map.id] = image or false
+			local image = paintThumb(map, look)
+			thumbs[key] = image or false
 			if image and holder.Parent then
 				attach(image)
 			end
@@ -136,7 +143,10 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	local holder = Instance.new("Frame")
 	holder.Name = "ThumbHolder"
 	holder.Size = UDim2.new(1, 0, 0, THUMB_HEIGHT)
-	holder.BackgroundColor3 = Palette.background[map.theme] or Palette.background.earth
+	local background = Palette.background[map.theme] or Palette.background.earth
+	local themed = PixelArt.themeColor(Cosmetics.myTheme(), packed(background), false, map.theme == "sky")
+	holder.BackgroundColor3 =
+		Color3.fromRGB(bit32.rshift(themed, 16), bit32.band(bit32.rshift(themed, 8), 255), bit32.band(themed, 255))
 	holder.BorderSizePixel = 0
 	holder.LayoutOrder = 1
 	holder.Parent = button
@@ -176,6 +186,13 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	return { button = button, stroke = stroke, votes = votes, status = status }
 end
 
+-- The name of the theme you bring to the vote, or nil for the classic look.
+local function myThemeName(): string?
+	local view = ShopState.view()
+	local item = if view and Cosmetics.myTheme() ~= "" then Catalogue.item(view.equipped.Theme or "") else nil
+	return if item then item.name else nil
+end
+
 function MapVote.render()
 	local view = LobbyState.view()
 	if view == nil or view.phase ~= "Lobby" then
@@ -183,7 +200,7 @@ function MapVote.render()
 		selected = nil
 		return
 	end
-	local key = table.concat(view.maps, ",")
+	local key = table.concat(view.maps, ",") .. "|" .. Cosmetics.myTheme() -- a new theme repaints the thumbnails
 	if key ~= cardsFor then
 		Widgets.clear(row)
 		cards = {}
@@ -194,6 +211,10 @@ function MapVote.render()
 	end
 	title.Text = if view.locked then "🔒 This server plays one map" else "🗳 Vote for the map"
 	hint.Text = if view.locked then "The draft starts soon" else "Tap a card, tap again to vote"
+	local bring = myThemeName()
+	if bring then
+		hint.Text ..= "  ·  🎨 You bring the " .. bring .. " theme"
+	end
 	local mine = LobbyState.myVote()
 	for i, id in view.maps do
 		local card = cards[id]
@@ -258,6 +279,9 @@ function MapVote.init()
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	LobbyState.onChange(function()
 		MapVote.render()
+	end)
+	ShopState.onChange(function()
+		MapVote.render() -- you equipped another theme: your thumbnails follow
 	end)
 	RunService.Heartbeat:Connect(updateTimer)
 end

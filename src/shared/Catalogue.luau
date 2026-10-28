@@ -49,6 +49,9 @@ Catalogue.PRODUCT_IDS = {
 	fx_plague_violet = 0,
 	fx_blessing_rays = 0,
 	fx_meteor_comet = 0,
+	theme_night = 0,
+	theme_winter = 0,
+	theme_autumn = 0,
 	starter = 0,
 	set_royal = 0,
 } :: { [string]: number }
@@ -57,7 +60,7 @@ Catalogue.VIP_PASS_ID = 0
 
 -- The equip slots shown in the shop, in tab order.
 Catalogue.SLOTS =
-	{ "Flag", "Border", "Shades", "Token", "Emote", "Victory", "Frame", "PowerFx" } :: { Types.CosmeticSlot }
+	{ "Flag", "Border", "Shades", "Token", "Emote", "Victory", "Frame", "PowerFx", "Theme" } :: { Types.CosmeticSlot }
 
 -- What every nation starts with (and what bots always show).
 Catalogue.DEFAULTS = {
@@ -67,6 +70,7 @@ Catalogue.DEFAULTS = {
 	Token = "token_square",
 	Frame = "frame_none",
 	Victory = "victory_trophy",
+	Theme = "theme_classic",
 } :: { [string]: string }
 
 local items: { Item } = {}
@@ -156,11 +160,19 @@ add("frame_bronze", "Frame", "Common", "Bronze", "bronze")
 add("frame_silver", "Frame", "Rare", "Silver", "silver")
 add("frame_gold", "Frame", "Rare", "VIP Gold", "gold", VIP)
 
--- Primordial-power effects: how one power looks. Same area, timing and sound cue as the default.
-add("fx_meteor_ice", "PowerFx", "Common", "Ice Meteor", "☄", { power = "Meteor" })
-add("fx_plague_violet", "PowerFx", "Common", "Violet Plague", "🦠", { power = "Plague" })
-add("fx_blessing_rays", "PowerFx", "Rare", "Sun Rays", "🌟", { power = "Blessing" })
-add("fx_meteor_comet", "PowerFx", "Epic", "Comet Strike", "💫", { power = "Meteor", animated = true })
+-- Primordial-power effects: how one power looks (PowerFx.LOOKS). Same area, timing and sound cue as the default.
+-- Common recolours it, Rare gives it a new style, Epic a new style with more animation.
+add("fx_meteor_ice", "PowerFx", "Common", "Ice Meteor", "ice", { power = "Meteor" })
+add("fx_plague_violet", "PowerFx", "Common", "Violet Plague", "violet", { power = "Plague" })
+add("fx_blessing_rays", "PowerFx", "Rare", "Sun Rays", "rays", { power = "Blessing" })
+add("fx_meteor_comet", "PowerFx", "Epic", "Comet Strike", "comet", { power = "Meteor", animated = true })
+
+-- Map themes: a re-skin of the terrain on any map (PixelArt.THEMES), e.g. "Night Earth". Nation colours never
+-- change. You see yours on the vote cards; everyone sees it when it wins the theme vote (Sim.Lobby.chooseTheme).
+add("theme_classic", "Theme", "Common", "Classic", "classic", FREE)
+add("theme_night", "Theme", "Rare", "Night", "night")
+add("theme_winter", "Theme", "Rare", "Winter", "winter")
+add("theme_autumn", "Theme", "Rare", "Autumn", "autumn")
 
 Catalogue.ITEMS = items
 

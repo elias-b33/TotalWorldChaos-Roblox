@@ -100,14 +100,14 @@ Glory prices aren't changed by regional pricing. Robux prices are read live from
 | Shade set ("palette") | Three shades **of your assigned colour** used for terrain shading in your provinces. Never a different hue. | Everyone | Common, Rare | 49 / 99 |
 | Army token | The token sprite for your armies | Everyone | Rare, Epic, Legendary (animated) | 99 / 149 / 249 |
 | Nation skin set | Matched flag + border + token | Everyone | Rare set, Epic set | 199 (pieces 297) / 299 (pieces 447) |
-| Map theme | Re-skin of a map's terrain (Winter Skyshards, Ember Eldmoor, Night Earth). Nation colours unchanged, readability check before release. | You, and everyone when it wins the theme vote (below) | Rare | 99 |
+| Map theme | Re-skin of the terrain on any map (Night, Winter and Autumn at launch, so "Night Earth", "Winter Skyshards"; Ember for Season 1). Nation colours unchanged; `tests/themes.spec.luau` is the readability check. | You (on your vote cards), and everyone when it wins the theme vote (below) | Rare | 99 |
 | Primordial-power effect | How one power looks (meteor style, plague colour, blessing rays). Same area, timing and sound cue, so it's never harder to read. | Everyone | Common (colour), Rare (new style), Epic | 49 / 99 / 149 |
 | Capital emote | An icon over your capital for 3 s, max one per 10 s | Everyone | Static, animated (own price, Glory 300 / 500) | 25 / 49 |
 | Victory animation | Plays over the winner's capital on the Results screen | Everyone | Epic, Legendary | 149 / 249 |
 | Nameplate frame | Frame around your name in the nation list, lobby and Results | Everyone | Common, Rare | 49 / 99 |
 | Title | Text under your name ("the Unbroken") | Everyone | — | **Not sold.** Earned from ranks, achievements and seasons only. |
 
-**Theme vote.** When a map wins the lobby vote, it uses the theme equipped by the most players who voted for it (ties go to the default theme). That shows a theme to the whole server and credits its owners on the loading card. A setting lets anyone always see the default theme.
+**Theme vote.** When a map wins the lobby vote, it uses the theme equipped by the most players who voted for it (the classic look doesn't count as a vote; ties go to the default theme). That shows a theme to the whole server and credits its owners on the draft screen ("🌙 Night Earth, brought by Alice"). A setting (Shop → Themes → "Always classic", saved in the profile) lets anyone always see the default theme, and a private server's theme setting skips the vote.
 
 Production is cheap because everything is pixel art: a flag takes about 30 minutes, a token 1–2 hours, a power effect 3–6 hours and a victory animation 1–2 days. Season 1 needs about 80 shop items plus 50 pass rewards.
 

@@ -3,10 +3,12 @@
 -- 1. Lobby: players join and vote on the map. Most votes wins; a tie (or no votes) is settled by the Rng.
 --    A map the server set (Workspace "MapId", a private server's map setting) skips the vote. On a private server
 --    the owner changes the next match's settings during the vote (Sim.Settings).
+--    Theme vote (docs/MONETIZATION.md 3.2): the winning map is painted in the theme equipped by most of its voters.
 -- 2. Pick: on the chosen map, players pick a start nation one at a time in a random draft order. A turn that runs
 --    out picks a random free nation for that player. Bots keep every nation nobody picked.
 -- Pure: takes the lobby (and the new match during the draft) plus an Rng, and changes them.
 
+local Catalogue = require("../Catalogue")
 local Config = require("../Config")
 local Match = require("./Match")
 local Rng = require("./Rng")
@@ -32,6 +34,8 @@ export type LobbyView = {
 	owner: number, -- the private server's owner (userId), 0 = none here or a public server
 	settings: Types.MatchSettings, -- the next match's settings
 	players: { { userId: number, name: string } }, -- everyone in the server (the settings sheet's team list)
+	theme: string, -- the theme the drafted map is painted in ("" until the vote is over)
+	themeBy: { string }, -- names of the voters whose equipped theme won
 }
 
 local Lobby = {}
@@ -134,6 +138,61 @@ function Lobby.vote(lobby: LobbyState, userId: number, mapId: string): (boolean,
 	return true, nil
 end
 
+-- The theme vote. The map is painted in the theme equipped by the most players who voted for it (every player in
+-- `themes` when the server locked the map and nobody voted). The classic look doesn't count as a vote; a tie, or
+-- nobody with a theme, gives the classic look. `forced` (a theme id the server set: Workspace "Theme", later the
+-- private-server setting; the classic id forces the classic look) skips the vote. `themes`: userId -> the theme
+-- each player has equipped (Sim.Shop.themeOf). Remembers and returns the theme id and the credited voters.
+function Lobby.chooseTheme(
+	lobby: LobbyState,
+	mapId: string,
+	themes: { [number]: string },
+	forced: string?
+): (string, { number })
+	local classic = Catalogue.DEFAULTS.Theme
+	local function valid(id: string?): boolean
+		local item = if id then Catalogue.item(id) else nil
+		return item ~= nil and item.slot == "Theme"
+	end
+	local everyone = lobby.locked ~= nil and next(lobby.votes) == nil
+	local function votedFor(userId: number): boolean
+		return everyone or lobby.votes[userId] == mapId
+	end
+	local chosen, credited = classic, {}
+	if forced and valid(forced) then
+		chosen = forced
+	else
+		local counts: { [string]: number } = {}
+		for userId, theme in themes do
+			if votedFor(userId) and theme ~= classic and valid(theme) then
+				counts[theme] = (counts[theme] or 0) + 1
+			end
+		end
+		local best, tied = 0, false
+		for theme, n in counts do
+			if n > best then
+				chosen, best, tied = theme, n, false
+			elseif n == best then
+				tied = true
+			end
+		end
+		if tied then
+			chosen = classic
+		end
+		if chosen ~= classic then
+			for userId, theme in themes do
+				if theme == chosen and votedFor(userId) then
+					table.insert(credited, userId)
+				end
+			end
+			table.sort(credited)
+		end
+	end
+	lobby.theme = chosen
+	lobby.themeBy = credited
+	return chosen, credited
+end
+
 local function isFree(nation: Types.Nation): boolean
 	return nation.controller == "Bot" and nation.userId == nil and not nation.eliminated
 end
@@ -173,6 +232,9 @@ function Lobby.startPick(lobby: LobbyState, match: MatchState, userIds: { number
 	lobby.turnTicksLeft = lobby.turnTicks
 	lobby.picks = {}
 	match.phase = "Pick"
+	if lobby.theme and lobby.theme ~= Catalogue.DEFAULTS.Theme then
+		match.theme = lobby.theme -- the theme vote's winner: everyone sees the map in it
+	end
 end
 
 -- Who picks now (nil once the draft is done).
@@ -341,6 +403,8 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: bo
 			owner = 0,
 			settings = Settings.defaults(),
 			players = {},
+			theme = "",
+			themeBy = {},
 		}
 	end
 	local tally = Lobby.tally(lobby)
@@ -355,6 +419,10 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: bo
 	table.sort(votes, function(a, b)
 		return a.userId < b.userId
 	end)
+	local themeBy = {}
+	for _, userId in lobby.themeBy or {} do
+		table.insert(themeBy, names[userId] or "?")
+	end
 	local order = {}
 	for _, userId in lobby.order do
 		table.insert(order, { userId = userId, name = names[userId] or "?", nation = lobby.picks[userId] or 0 })
@@ -374,6 +442,8 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: bo
 		owner = lobby.owner or 0,
 		settings = Settings.copy(lobby.settings),
 		players = playerList(names),
+		theme = lobby.theme or "",
+		themeBy = themeBy,
 	}
 end
 

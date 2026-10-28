@@ -164,4 +164,9 @@ function Intents.signal(kind: string, arg: string?)
 	Remotes.event("RequestTelemetry"):FireServer(kind, arg)
 end
 
+-- The map-theme opt-out: true = always show me the classic map.
+function Intents.defaultTheme(on: boolean)
+	send("RequestDefaultTheme", on)
+end
+
 return Intents

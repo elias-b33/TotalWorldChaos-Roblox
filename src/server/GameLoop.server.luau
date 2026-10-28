@@ -65,6 +65,9 @@ local function startMatch()
 	local tutorial = TutorialService.enabled()
 	local setup = if tutorial then nil else LobbyService.setup()
 	local state = MatchService.start(if tutorial then Config.Tutorial.Map else MatchService.chooseMap(setup), setup)
+	if not tutorial then
+		state.theme = MatchService.forcedTheme(setup) -- no vote without the Lobby: the server's theme, or classic
+	end
 	CommandRouter.clear()
 	AIService.reset(if tutorial then Config.Tutorial.Difficulty else state.setup.settings.difficulty)
 	if tutorial then
@@ -87,11 +90,15 @@ end
 
 -- Lobby, part 2: the vote is over; the draft runs on a fresh match of the winning map, shown to everyone.
 local function startPick()
-	local state = MatchService.start(LobbyService.winner(), LobbyService.setup())
+	local mapId = LobbyService.winner()
+	local setup = LobbyService.setup()
+	-- the theme vote: the theme most of the map's voters have equipped (or the server's setting)
+	LobbyService.chooseTheme(mapId, ShopService.themesByUser(), MatchService.forcedTheme(setup))
+	local state = MatchService.start(mapId, setup)
 	TelemetryService.voteOver(assert(LobbyService.state())) -- analytics: map_vote for every voter
 	CommandRouter.clear()
 	AIService.reset(state.setup.settings.difficulty)
-	LobbyService.startPick(state)
+	LobbyService.startPick(state) -- also paints the match in the chosen theme
 	Replicator.reset(state)
 	for _, player in Players:GetPlayers() do
 		Replicator.sendSnapshot(player, state, nil)

@@ -2,12 +2,20 @@
 -- The nation draft (Pick phase): the chosen map shows every nation's start territory; players pick a start
 -- nation one at a time in a random order. On your turn tap a nation in the list to take it, or tap its land on
 -- the map and confirm. A banner says whose turn it is and how long is left. Bots keep the rest.
+-- The theme vote's winner is credited at the top of the panel ("🌙 Night Earth, brought by Alice").
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+ReplicatedStorage:WaitForChild("Shared")
+local Shared = ReplicatedStorage.Shared
+local Catalogue = require(Shared.Catalogue)
+local Maps = require(Shared.Maps)
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
+local Cosmetics = require(Client.Cosmetics)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local MapRenderer = require(Client.MapRenderer)
@@ -27,6 +35,7 @@ local bannerText: TextLabel
 local timer: TextLabel
 local panel: Frame
 local orderLabel: TextLabel
+local themeLabel: TextLabel
 local grid: Frame
 local confirm: TextButton
 local buttons: { [number]: TextButton } = {} -- nation id -> its button in the list
@@ -75,6 +84,21 @@ local function render()
 		table.insert(parts, mark .. " " .. (if entry.userId == me then "You" else entry.name))
 	end
 	orderLabel.Text = if #parts > 0 then table.concat(parts, "   ") else "🤖 Bots only"
+	-- the theme vote's winner and who brought it
+	local theme = Catalogue.item(view.theme)
+	local look = Cosmetics.themeLook(view.theme)
+	themeLabel.Visible = theme ~= nil and look ~= ""
+	if theme and look ~= "" then
+		local text =
+			string.format("%s %s %s", Cosmetics.THEME_ICONS[look] or "🎨", theme.name, Maps.get(snap.mapId).title)
+		if #view.themeBy > 0 then
+			text ..= ", brought by " .. table.concat(view.themeBy, ", ")
+		end
+		if Cosmetics.classicOnly() then
+			text ..= " (you see Classic)"
+		end
+		themeLabel.Text = text
+	end
 
 	if builtFor ~= snap then
 		-- one button per nation, made once per map (rebuilding them every second could swallow a tap)
@@ -172,6 +196,12 @@ function Draft.init()
 	panel.AnchorPoint = Vector2.new(1, 0)
 	panel.Position = UDim2.new(1, -8, 0, BANNER_HEIGHT + 8)
 	Widgets.list(panel, false, 6)
+	themeLabel = Widgets.label(panel, "", 14, 36)
+	themeLabel.Name = "ThemeCredit"
+	themeLabel.TextColor3 = Color3.fromRGB(242, 193, 78)
+	themeLabel.TextWrapped = true
+	themeLabel.LayoutOrder = 0
+	themeLabel.Visible = false
 	orderLabel = Widgets.label(panel, "", 14, 40)
 	orderLabel.LayoutOrder = 1
 	grid = Instance.new("Frame")

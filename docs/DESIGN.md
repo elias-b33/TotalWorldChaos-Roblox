@@ -222,6 +222,7 @@ The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. Th
   - **Sprites:** small ones for trees, pines, palms, crystals and towers.
   - **Owners:** an owned province is washed with its nation's colour at 59%, and each nation has a 1-pixel border in its darker colour (WorldBox's kingdom look). Thin darker lines separate provinces.
   - **Capitals:** a castle, or a dome on Skyshards.
+  - **Map themes** (shop cosmetics, docs/MONETIZATION.md 3.2): `Night`, `Winter` and `Autumn` repaint the terrain colours of any map before the owners go on top (moonlit land, a navy sea and village lights; snow and frozen shallows; turning leaves). Nation colours, borders, castles and everything drawn over the map stay the same. The match's theme comes from the theme vote (`MatchState.theme`, sent in the snapshot); a player who chose "Always classic" sees the classic look. `tests/themes.spec.luau` checks on all three maps that every nation colour and border stands out from the themed terrain about as well as on the classic look.
 - **On screen:** the buffer goes into one `EditableImage`, shown by an `ImageLabel` with pixelated resampling on a canvas that `MapView` pans and zooms (from the whole map down to 10 screen pixels per map pixel). An ownership change repaints only the provinces involved and their neighbours, and the image is uploaded at most once a frame.
 - **On top:** province names and development pips (shown once a province is about 70 screen pixels wide; a name that would overlap a bigger province's name waits until there's room); army sizes show from the region zoom inwards, and zoomed out only on your own armies, Rebels and the selected army, army tokens gliding between province centres, battle and siege badges, and dotted straits and routes. All of them are GUI objects placed on the canvas.
 - **Requirement:** `EditableImage` works in Studio, but fails by default in a published game.
@@ -380,6 +381,7 @@ export type Command =
 | `RequestEquip` | client → server | itemId |
 | `RequestEmote` | client → server | emote itemId |
 | `RequestTelemetry` | client → server | a UI-only analytics step (`Loaded`, `ShopOpened`, `ItemViewed`, `OfferOpened`), optional short string; no reply, changes nothing |
+| `RequestDefaultTheme` | client → server | true = always show the classic map (the map-theme opt-out) |
 | `Shop` | server → client | your owned and equipped items, VIP, purchase history, whether Robux purchases are open, the starter-pack offer |
 
 ## UI and controls
@@ -424,6 +426,7 @@ Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): 
 | Earthquake | map shake and crack lines over the province | `Earthquake` |
 | Blessing | golden sparkles | `Blessing` |
 | Divine shield | a blue dome with a twinkling ring for as long as the shield lasts | `Shield` |
+| Power-effect cosmetics | Meteor, Plague and Blessing are drawn in the caster's equipped look (`src/client/PowerFx.luau`): Ice Meteor and Violet Plague recolour; Sun Rays adds beams of light and star sparkles; Comet Strike a glittering tail, a glowing head and a star burst. Same area (`PowerFx.AREA`), timing and sound as the default. The `Power` event names the caster (`by`) | the power's own |
 | War, Cataclysm, Results | a screen-wide flash and a short banner | `War`, `Cataclysm`, `Results` |
 | Any button | | `Tap` |
 
@@ -520,7 +523,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards
 - [x] Daily and weekly quests, login calendar, play streak
 - [x] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
-- [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote (flags, border styles, shade sets, tokens, emotes, victory animations and nameplate frames are done; power effects have their data and the `Cosmetics.powerEffect` hook for the effects task; the theme vote waits for map themes)
+- [x] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote (also shade sets and nameplate frames; map themes Night, Winter and Autumn; a private server's "Default" theme setting forces the classic look through `MatchService.forcedTheme`)
 - [x] Private server settings
 - [x] Sound and effects for battles and Primordial powers
 

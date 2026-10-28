@@ -59,6 +59,12 @@ function LobbyService.winner(): string
 	return Lobby.winner(assert(lobby, "no lobby"), rng)
 end
 
+-- The theme vote for the winning map (Sim.Lobby.chooseTheme): `themes` maps userIds to their equipped theme,
+-- `forced` is a server setting (MatchService.forcedTheme). Returns the theme id.
+function LobbyService.chooseTheme(mapId: string, themes: { [number]: string }, forced: string?): string
+	return (Lobby.chooseTheme(assert(lobby, "no lobby"), mapId, themes, forced))
+end
+
 -- The vote is over: draft the players in the server onto `newMatch`.
 function LobbyService.startPick(newMatch: Types.MatchState)
 	local userIds = {}

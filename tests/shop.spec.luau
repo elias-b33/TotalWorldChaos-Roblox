@@ -208,6 +208,31 @@ T.test("cosmetics travel in the snapshot and only change the delta when they cha
 	T.equal(#Snapshot.full(state).cosmetics, 0, "no cosmetics given: an empty list")
 end)
 
+T.test("map themes: equipped like any cosmetic; the classic look by default; the opt-out is saved", function()
+	local p = Progression.newProfile()
+	T.equal(Shop.themeOf(p, false), "theme_classic")
+	T.equal(select(2, Shop.equip(p, "theme_night", false)), "NotOwned")
+	T.expect(Shop.buyWithGlory(p, "theme_night", false) == false, "not enough Glory")
+	p.glory = S.GloryPrice.Rare
+	T.expect(Shop.buyWithGlory(p, "theme_night", false), "a Rare theme for Glory")
+	T.expect(Shop.equip(p, "theme_night", false), "equipped")
+	T.equal(p.equipped.Theme, "theme_night")
+	T.equal(Shop.themeOf(p, false), "theme_night")
+	T.equal(Shop.view(p, false, false, false, false).defaultTheme, false)
+	Shop.setDefaultTheme(p, true)
+	T.equal(p.settings.defaultTheme, true)
+	T.equal(Shop.view(p, false, false, false, false).defaultTheme, true)
+	Shop.setDefaultTheme(p, false)
+	T.equal(p.settings.defaultTheme, nil)
+end)
+
+T.test("the match's theme travels in the snapshot", function()
+	local state = Match.new(Maps.get("earth"))
+	T.equal(Snapshot.full(state).theme, "", "classic")
+	state.theme = "theme_winter"
+	T.equal(Snapshot.full(state).theme, "theme_winter")
+end)
+
 T.test("emotes: owned only, one per cooldown", function()
 	local p = Progression.newProfile()
 	T.equal(select(2, Shop.canEmote(p, "emote_wave", false, nil, 100)), "NotOwned")

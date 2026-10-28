@@ -81,9 +81,10 @@ export type Offer = {
 -- Something worth telling players about (a toast). Cleared after every tick's delta.
 -- kinds: WarDeclared(a attacks b), PeaceMade(a, b), AllianceFormed(a, b), Offer(a -> b, province = offer id),
 -- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a),
--- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province), Disaster (same fields),
--- Eliminated(a)
-export type MatchEvent = { kind: string, a: number, b: number, province: number }
+-- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province, by = the caster's nation, for a
+-- Primordial the nation it last held, so clients show the caster's power-effect cosmetic), Disaster (same fields,
+-- no caster), Eliminated(a)
+export type MatchEvent = { kind: string, a: number, b: number, province: number, by: number? }
 
 export type MatchResult = {
 	kind: "Domination" | "Alliance" | "Score",
@@ -132,6 +133,8 @@ export type MatchState = {
 	offers: { Offer },
 	events: { MatchEvent },
 	result: MatchResult?, -- set when someone has won; the phase is then Results
+	theme: string?, -- the map theme everyone sees (a Theme catalogue item id, from the theme vote); nil = classic.
+	-- Cosmetic only: no rule reads it.
 }
 
 -- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside
@@ -151,6 +154,8 @@ export type LobbyState = {
 	picks: { [number]: NationId }, -- userId -> nation
 	owner: number?, -- a private server's owner (userId): only they change the settings; nil = public server
 	settings: MatchSettings, -- the next match's settings (changed only during the vote)
+	theme: string?, -- the theme vote's result for the chosen map (Sim.Lobby.chooseTheme), once the vote is over
+	themeBy: { number }?, -- the voters whose equipped theme won (credited on the draft screen)
 }
 
 -- Lobby intents: CommandRouter checks the shape, Sim/Lobby (and Sim/Settings) the rules. A Setting names a
@@ -367,14 +372,14 @@ export type RewardReport = { reward: MatchReward, before: ProfileSummary, after:
 -- Shop and cosmetics (docs/MONETIZATION.md 3, 10). Item data is in Shared.Catalogue, the rules in Sim.Shop.
 
 export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
-export type CosmeticSlot = "Flag" | "Border" | "Shades" | "Token" | "Frame" | "Victory" | "Emote" | "PowerFx"
+export type CosmeticSlot = "Flag" | "Border" | "Shades" | "Token" | "Frame" | "Victory" | "Emote" | "PowerFx" | "Theme"
 
 export type CatalogueItem = {
 	id: string,
 	slot: CosmeticSlot,
 	rarity: Rarity,
 	name: string,
-	art: string, -- the design the client draws (CosmeticArt), or the icon of an emote, effect or animation
+	art: string, -- the design the client draws (CosmeticArt, PowerFx, PixelArt themes), or an emote's or animation's icon
 	glory: number?, -- Glory price; nil = not sold for Glory
 	robux: number?, -- list price in Robux (the shop shows MarketplaceService's live price); nil = not sold for Robux
 	free: boolean?, -- everyone owns it: the defaults
@@ -417,6 +422,7 @@ export type ShopIntent =
 	{ kind: "Buy", item: string, currency: "Glory" | "Robux" }
 	| { kind: "Equip", item: string }
 	| { kind: "Emote", item: string }
+	| { kind: "DefaultTheme", on: boolean } -- the opt-out: always see the classic map
 
 -- What a player sees of their own shop state (the Shop remote, after every change).
 export type ShopView = {
@@ -427,6 +433,7 @@ export type ShopView = {
 	robuxOpen: boolean, -- Robux purchases are open now (never during a match)
 	starterOffer: boolean, -- show the starter-pack offer now (at most once per session)
 	testMode: boolean, -- some product ids are still 0: Studio grants those purchases free
+	defaultTheme: boolean, -- the player always sees the classic map, whatever theme won the vote
 }
 
 -- Analytics (docs/LAUNCH.md 7): Sim.Telemetry builds these, Services/TelemetryService sends them to

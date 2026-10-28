@@ -75,6 +75,7 @@ export type SnapshotData = {
 	primordials: { PrimordialRecord },
 	result: Types.MatchResult?,
 	cosmetics: { Types.NationCosmetics }, -- each nation's equipped looks, next to MatchState (Sim.Shop)
+	theme: string, -- the map theme everyone sees (MatchState.theme; "" = classic). Set before the match starts.
 }
 
 export type DeltaData = {
@@ -168,6 +169,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 		primordials = Snapshot.primordials(state),
 		result = state.result,
 		cosmetics = cosmetics or {},
+		theme = state.theme or "",
 	}
 end
 

@@ -1,6 +1,6 @@
 --!nocheck
 -- Paint a map's 2D pixel art with its start owners, straight from the game's PixelArt module, into a raw RGBA file.
---   lune run tools/harness/paint <map> <out.rgba>      (then render_scene.py's helpers turn it into a PNG)
+--   lune run tools/harness/paint <map> <out.rgba> [theme]   (theme: a map theme, e.g. night; default: classic)
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local MapGrid = require("../../src/shared/MapGrid")
@@ -13,7 +13,7 @@ local BORDERS = { 0x97233d, 0x517aa8, 0xbeab23, 0x75298a, 0xb76c33, 0x145a4f, 0x
 local map = Maps.get(process.args[1])
 local t0 = os.clock()
 local grid = MapGrid.decode(map)
-local art = PixelArt.new(map, grid)
+local art = PixelArt.new(map, grid, nil, process.args[3])
 local owners, colors, borders = {}, {}, {}
 for _, p in map.provinces do
 	owners[p.id] = p.startOwner or 0
@@ -23,5 +23,5 @@ for _, n in map.nations do
 	borders[n.slot] = BORDERS[n.colorIndex]
 end
 PixelArt.setOwners(art, owners, colors, borders)
-print(string.format("%s %dx%d painted in %.2f s", map.id, grid.width, grid.height, os.clock() - t0))
+print(string.format("%s %s %dx%d painted in %.2f s", map.id, process.args[3] or "classic", grid.width, grid.height, os.clock() - t0))
 fs.writeFile(process.args[2], buffer.tostring(art.pixels))

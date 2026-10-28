@@ -23,7 +23,8 @@ export type Art = {
 	width: number,
 	height: number,
 	ids: buffer,
-	theme: string,
+	theme: string, -- the map's texture set (MapDef.theme): "earth" | "fantasy" | "sky"
+	look: string, -- the map theme it is painted in (PixelArt.THEMES; "" = the classic look)
 	terrain: buffer, -- 0xRRGGBB per pixel (u32)
 	pixels: buffer, -- RGBA per pixel
 	boxes: { [number]: { number } }, -- province id -> { x0, y0, x1, y1 }, inclusive
@@ -244,6 +245,119 @@ end
 local function brightness(c: number): number
 	local r, g, b = rgb(c)
 	return (r * 299 + g * 587 + b * 114) / 1000
+end
+
+------------------------------------------------------------------------------------------------- map themes
+
+-- Map themes (docs/MONETIZATION.md 3.2): a re-skin of the terrain, painted the same pixel way. A theme only
+-- recolours terrain pixels (land, sea, space), before the kingdom overlay goes on top, so nation colours, borders,
+-- castles and everything drawn over the map (armies, names, effects) are untouched. Since the overlay is a fixed
+-- mix of terrain and nation colour, two nations always differ by the same amount on any theme; only how a nation
+-- stands out from its terrain can change, and tests/themes.spec.luau checks that on all three maps.
+PixelArt.THEMES = { "night", "winter", "autumn" } :: { string }
+
+-- Glowing things keep their colour at night: crystal rims, crystals, lava glints, lit panel seams.
+local GLOW: { [number]: boolean } = { [0x7cfbef] = true, [0x64f1e2] = true, [0xe9290e] = true, [0xf55858] = true }
+local NIGHT_LIGHT = 0xffd27a -- village lights scattered over night land
+local NIGHT_LIGHTS = 0.9965 -- a land pixel is a light where its noise is above this
+local SNOW = 0xeef3f8
+local ICE = 0xdcebf4
+local WINTER_FLAKES = 0.985 -- fresh snow sparkles on winter land
+-- Autumn foliage by brightness: maroon shadows, scarlet, amber and gold leaves (no mid browns, so the brown
+-- nation still stands out).
+local AUTUMN_GREEN = 20 -- a pixel turns if its green beats red and blue by more than this
+local AUTUMN_RAMP: { { number } } = {
+	{ 0, 0x3c1420 },
+	{ 0.3, 0x8c2a2a },
+	{ 0.42, 0xc8502e },
+	{ 0.52, 0xe0a050 },
+	{ 0.6, 0xf0c86e },
+	{ 1, 0xfaeac0 },
+}
+
+local function ramp(stops: { { number } }, t: number): number
+	for i = 2, #stops do
+		local a, b = stops[i - 1], stops[i]
+		if t <= b[1] then
+			return mix(a[2], b[2], (t - a[1]) / (b[1] - a[1]))
+		end
+	end
+	return stops[#stops][2]
+end
+
+-- One terrain colour under a theme ("" or "classic" = unchanged). `land`: a land pixel; else sea or space.
+function PixelArt.themeColor(theme: string, c: number, land: boolean, space: boolean?): number
+	local r, g, b = rgb(c)
+	local l = brightness(c)
+	if theme == "night" then
+		if GLOW[c] or c == SPACE.star then
+			return c
+		end
+		if space then
+			return scale(c, 0.7)
+		end
+		if not land then
+			return pack(r * 0.22 + 6, g * 0.28 + 10, b * 0.42 + 24)
+		end
+		-- moonlight: mostly grey, a little of the old hue, cool and dim
+		r, g, b = r + (l - r) * 0.7, g + (l - g) * 0.7, b + (l - b) * 0.7
+		return pack(r * 0.55 + 32, g * 0.52 + 30, b * 0.48 + 40)
+	elseif theme == "winter" then
+		if space then
+			return c
+		end
+		if not land then
+			return mix(c, 0xaacde6, 0.35)
+		end
+		-- snow everywhere; dark pixels (trees, rock shadows) only frosted, so forests still show
+		return mix(c, SNOW, if l < 100 then 0.28 else 0.72)
+	elseif theme == "autumn" then
+		if space or not land then
+			return c
+		end
+		if g - math.max(r, b) > AUTUMN_GREEN then
+			return mix(ramp(AUTUMN_RAMP, l / 255), c, 0.12) -- leaves and grass turn; pines, rock and snow don't
+		end
+		return pack(r + 6, g, b - 6) -- everything else just a little warmer
+	end
+	return c
+end
+
+-- Recolour the painted terrain for a theme, plus a few per-pixel touches: village lights at night, snow
+-- sparkles and frozen shallows in winter.
+local function applyTheme(art: Art, theme: string, yield: Yield?)
+	if theme == "" or theme == "classic" then
+		return
+	end
+	local w, h = art.width, art.height
+	local sky = art.theme == "sky"
+	local cache: { { [number]: number } } = { {}, {}, {} } -- land, sea, space
+	for y = 0, h - 1 do
+		if yield and y % 64 == 63 then
+			yield()
+		end
+		for x = 0, w - 1 do
+			local i = y * w + x
+			local c = buffer.readu32(art.terrain, i * 4)
+			local land = buffer.readu8(art.ids, i) ~= 0
+			local kind = if land then 1 elseif sky then 3 else 2
+			local t = cache[kind][c]
+			if t == nil then
+				if theme == "winter" and kind == 2 and (c == SEA.shallow or c == SEA.shallowWave) then
+					t = ICE -- the shallows freeze
+				else
+					t = PixelArt.themeColor(theme, c, land, kind == 3)
+				end
+				cache[kind][c] = t
+			end
+			if land and theme == "night" and noise(x, y, 91) > NIGHT_LIGHTS then
+				t = NIGHT_LIGHT
+			elseif land and theme == "winter" and noise(x, y, 93) > WINTER_FLAKES then
+				t = 0xffffff
+			end
+			buffer.writeu32(art.terrain, i * 4, t)
+		end
+	end
 end
 
 -- Smooth noise in [0, 1): random values on a lattice every `cell` pixels, blended smoothly in between.
@@ -701,14 +815,16 @@ type MapLike = {
 }
 
 -- Paint the terrain and a neutral political layer. Owners come later through setOwners. Pass `yield` to have it
--- called every few dozen rows (a client spreads the work over frames this way); tests leave it out.
-function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?): Art
+-- called every few dozen rows (a client spreads the work over frames this way); tests leave it out. `look`: a map
+-- theme from PixelArt.THEMES (nil or "" = the classic look).
+function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?, look: string?): Art
 	local w, h = grid.width, grid.height
 	local art: Art = {
 		width = w,
 		height = h,
 		ids = grid.ids,
 		theme = map.theme,
+		look = look or "",
 		terrain = buffer.create(w * h * 4),
 		pixels = buffer.create(w * h * 4),
 		boxes = {},
@@ -778,6 +894,7 @@ function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?): Art
 	end
 
 	paintTerrain(art, biomeOf, yield)
+	applyTheme(art, art.look, yield)
 	for i = 0, w * h - 1 do
 		buffer.writeu32(art.pixels, i * 4, rgba(buffer.readu32(art.terrain, i * 4)))
 	end

@@ -138,6 +138,18 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 | 9 | Brown | `#9a6324` | `#7b572a` |
 | 10 | Charcoal | `#353535` | `#2d2e2b` |
 
+### Map themes
+
+Shop cosmetics that re-skin the terrain of any map (docs/MONETIZATION.md 3.2), painted by `PixelArt` in the same pixel style: `PixelArt.themeColor` recolours each terrain pixel before the kingdom overlay goes on, so nation colours, borders and castles never change, and armies, names and effects are drawn on top as always.
+
+| Theme | Land | Sea / space | Extras |
+| --- | --- | --- | --- |
+| Night | moonlit: mostly grey, a little of the old hue, cool | navy; space a little darker | village lights; crystal rims and lava keep glowing |
+| Winter | snow, with trees and rock only frosted so forests still show | icy blue | frozen shallows, snow sparkles |
+| Autumn | leaves and grass turn maroon, scarlet, amber and gold (no mid browns, for the brown nation); pines, rock and snow stay | unchanged | |
+
+Since the overlay mixes a fixed share of the nation colour into the terrain, two nations always differ by the same amount on any theme; a theme can only change how a nation stands out from its terrain. `tests/themes.spec.luau` measures that on all three maps (the share of land where each nation's wash and border stand out, against the classic look). `python3 tools/harness/paint_maps.py --themes` paints every theme on every map into `tools/harness/out/themes/`.
+
 ### Terrain textures
 
 These 512×512 seamless tiles are used for the previews and vote cards; the game itself draws the pixel art. `detail/` holds the greyscale version for tinting. Each look maps to one of the four terrains in the rules:

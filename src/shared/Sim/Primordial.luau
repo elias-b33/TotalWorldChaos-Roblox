@@ -211,7 +211,9 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 		state.primordials[caster.userId].charges -= cost
 	end
 	strike(state, power, target, hit, at)
-	Events.push(state, "Power", Primordial.index(power), hit, at)
+	-- the caster's nation (a Primordial's: the one it held) goes along, so clients show its power-effect cosmetic
+	local by = caster.nation or (if caster.userId then state.seats[caster.userId] else nil)
+	Events.push(state, "Power", Primordial.index(power), hit, at, by)
 	return true, nil
 end
 

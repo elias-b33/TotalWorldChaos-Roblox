@@ -7,6 +7,8 @@
 -- Rules for minors (section 10): every price shows its currency icon, Robux prices are read live from
 -- MarketplaceService (the Config list price only while a product id is unset), bundles show the real sum of their
 -- pieces, no random items, no countdowns, no prompts during a match (the server refuses them).
+-- Power effects show a pixel preview of the effect, map themes a small map painted in the theme; the Themes tab
+-- also holds the opt-out ("always show me the classic map").
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -58,6 +60,7 @@ local TABS: { Tab } = {
 	{ id = "Victory", icon = "🏆", label = "Victory" },
 	{ id = "Frame", icon = "🖼", label = "Frames" },
 	{ id = "PowerFx", icon = "✨", label = "Powers" },
+	{ id = "Theme", icon = "🗺", label = "Themes" },
 	{ id = "History", icon = "🧾", label = "History" },
 }
 
@@ -70,6 +73,7 @@ local SLOT_NAMES: { [string]: string } = {
 	Emote = "Emote",
 	Victory = "Victory",
 	PowerFx = "Effect",
+	Theme = "Theme",
 }
 
 local ShopUI = {}
@@ -183,6 +187,10 @@ local function preview(parent: Instance, item: Types.CatalogueItem)
 		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, UDim2.fromOffset(72, 48))
 	elseif item.slot == "Token" then
 		thing = Cosmetics.tokenLabel(holder, item.id, color, UDim2.fromOffset(48, 48))
+	elseif item.slot == "PowerFx" then
+		thing = Cosmetics.effectLabel(holder, item.id, UDim2.fromOffset(64, 48))
+	elseif item.slot == "Theme" then
+		thing = Cosmetics.themeLabel(holder, item.id, UDim2.fromOffset(96, 48))
 	elseif item.slot == "Frame" then
 		local l = centred(holder, Players.LocalPlayer.Name, 14, 28)
 		l.Size = UDim2.fromOffset(110, 28)
@@ -197,7 +205,7 @@ local function preview(parent: Instance, item: Types.CatalogueItem)
 		end
 		Widgets.corner(l, 6)
 		thing = l
-	else -- emotes, victory animations, power effects: their icon (the first frame)
+	else -- emotes and victory animations: their icon (the first frame)
 		local icon = string.split(item.art, " ")[1]
 		local l = centred(holder, icon, 34, 48)
 		l.Size = UDim2.fromOffset(80, 48)
@@ -227,6 +235,8 @@ local function itemCard(item: Types.CatalogueItem, order: number)
 	local detail = item.rarity
 	if item.power then
 		detail ..= " · " .. item.power
+	elseif item.slot == "Theme" and not item.free then
+		detail ..= " · any map"
 	elseif item.animated then
 		detail ..= " · animated"
 	elseif item.free then
@@ -352,6 +362,36 @@ local function offerCard(offer: Types.ShopOffer, order: number)
 	end
 end
 
+-- The Themes tab's last card: what you see when a theme wins the vote (the opt-out, saved in your profile).
+local function themeSettingCard(order: number)
+	local card = Instance.new("Frame")
+	card.Name = "Card_ThemeSetting"
+	card.BackgroundColor3 = CARD
+	card.LayoutOrder = order
+	card.Parent = content
+	Widgets.corner(card, 10)
+	Widgets.padding(card, 6)
+	local list = Widgets.list(card, false, 4)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	centred(card, "👁", 28, 40).LayoutOrder = 1
+	centred(card, "What you see", 14, 18).LayoutOrder = 2
+	local classic = Cosmetics.classicOnly()
+	-- short lines: they must fit a phone card
+	local text = if classic
+		then "Always the classic map,\nwhatever theme wins"
+		else "The theme the map's\nvoters bring wins"
+	centred(card, text, 12, 48, OFF_TEXT).LayoutOrder = 3
+	local buttons = Instance.new("Frame")
+	buttons.BackgroundTransparency = 1
+	buttons.Size = UDim2.new(1, 0, 0, 84)
+	buttons.LayoutOrder = 4
+	buttons.Parent = card
+	Widgets.list(buttons, false, 4)
+	cardButton(buttons, if classic then "Show themes" else "Always classic", Widgets.BUTTON, function()
+		Intents.defaultTheme(not classic)
+	end)
+end
+
 local function historyName(id: string?): string
 	if id == nil then
 		return "?"
@@ -431,6 +471,9 @@ render = function()
 			else
 				itemCard(entries[i], i)
 			end
+		end
+		if tab == "Theme" and page == pages then
+			themeSettingCard(#entries + 1)
 		end
 		footer.Text = if robuxOpen()
 			then "No random items: you always see what you get. Glory is earned by playing, never sold."

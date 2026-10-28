@@ -184,6 +184,14 @@ local function applyIntent(player: Player, intent: Types.ShopIntent): (boolean, 
 		rule = Shop.equip
 	elseif intent.kind == "Buy" then
 		return buyRobux(player, intent.item)
+	elseif intent.kind == "DefaultTheme" then
+		local on = intent.on
+		local saved = PlayerDataService.update(player, function(data)
+			Shop.setDefaultTheme(data, on)
+			return true
+		end)
+		sendView(player)
+		return saved ~= nil, if saved then nil else "NotLoaded"
 	else
 		return emote(player, intent.item)
 	end
@@ -213,6 +221,18 @@ function ShopService.cosmeticsByUser(): { [number]: Types.NationCosmetics }
 		local data = PlayerDataService.data(player)
 		if data then
 			out[player.UserId] = Shop.cosmeticsOf(data, ShopService.isVip(player), 0)
+		end
+	end
+	return out
+end
+
+-- Every loaded player's equipped map theme by userId, for the theme vote.
+function ShopService.themesByUser(): { [number]: string }
+	local out = {}
+	for _, player in Players:GetPlayers() do
+		local data = PlayerDataService.data(player)
+		if data then
+			out[player.UserId] = Shop.themeOf(data, ShopService.isVip(player))
 		end
 	end
 	return out

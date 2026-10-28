@@ -3,8 +3,10 @@
 -- show them: pixel-art flags and army tokens (EditableImages painted by CosmeticArt, cached and shared), border and
 -- shade swatches, nameplate frame colours. Bots and unknown nations show the defaults.
 --
--- Hook for Primordial-power effects: Cosmetics.powerEffect(nationId, power) says which effect variant a nation has
--- equipped ("" = the default look). Effects keep the default's area, timing and sound cue.
+-- Primordial-power effects: Cosmetics.powerEffect(nationId, power) says which effect variant a nation has equipped
+-- ("" = the default look); Effects draws it (PowerFx) with the default's area, timing and sound cue.
+-- Map themes: Cosmetics.matchTheme() is the look the map is painted in (the theme vote's winner, or the classic look
+-- for a player who opted out), Cosmetics.myTheme() the one you bring to the vote (shown on your vote cards).
 
 local AssetService = game:GetService("AssetService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +15,8 @@ local RunService = game:GetService("RunService")
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Catalogue = require(Shared.Catalogue)
+local MapGrid = require(Shared.MapGrid)
+local Maps = require(Shared.Maps)
 local Shop = require(Shared.Sim.Shop)
 local Types = require(Shared.Types)
 
@@ -20,8 +24,12 @@ local Client = script.Parent
 local ClientState = require(Client.ClientState)
 local CosmeticArt = require(Client.CosmeticArt)
 local Palette = require(Client.Palette)
+local PixelArt = require(Client.PixelArt)
+local PowerFx = require(Client.PowerFx)
+local ShopState = require(Client.ShopState)
 
 local FRAME_SECONDS = 0.3 -- animated flags and tokens: one frame this long
+local THEME_PREVIEW_FACTOR = 8 -- a theme's shop preview is the map at 1/8 resolution (Earth 128×64)
 
 type Animated = { label: ImageLabel, frames: { EditableImage } }
 
@@ -74,6 +82,42 @@ end
 -- Which power-effect item a nation shows for a Primordial power ("" = the default look).
 function Cosmetics.powerEffect(nationId: number, power: string): string
 	return Cosmetics.of(nationId).powerFx[power] or ""
+end
+
+-- An icon for each map theme's look (shop tab, draft credit line).
+Cosmetics.THEME_ICONS = { classic = "🗺", night = "🌙", winter = "❄", autumn = "🍂" } :: { [string]: string }
+
+-- The PixelArt look of a theme item ("" for the classic look or anything unknown).
+function Cosmetics.themeLook(themeId: string): string
+	local item = Catalogue.item(themeId)
+	if item == nil or item.slot ~= "Theme" or item.art == "classic" then
+		return ""
+	end
+	return item.art
+end
+
+-- Has this player opted out of themes ("always show the classic map")?
+function Cosmetics.classicOnly(): boolean
+	local view = ShopState.view()
+	return view ~= nil and view.defaultTheme == true
+end
+
+-- The look this match's map is painted in: the theme vote's winner, unless you opted out.
+function Cosmetics.matchTheme(): string
+	local snap = ClientState.snapshot()
+	if snap == nil or Cosmetics.classicOnly() then
+		return ""
+	end
+	return Cosmetics.themeLook(snap.theme or "")
+end
+
+-- The look of the theme you have equipped (your vote cards show it), unless you opted out.
+function Cosmetics.myTheme(): string
+	local view = ShopState.view()
+	if view == nil or Cosmetics.classicOnly() then
+		return ""
+	end
+	return Cosmetics.themeLook(view.equipped.Theme or "")
 end
 
 -- Called when any nation's cosmetics change (and on every new match).
@@ -179,6 +223,46 @@ function Cosmetics.swatchLabel(
 		return CosmeticArt.swatch(borderArt, shadesArt, nation, border)
 	end)
 	return pixelLabel(parent, { frame }, size, Palette.nation(colorIndex))
+end
+
+-- A power-effect item's preview: the effect mid-animation over a patch of grass (PowerFx.preview).
+function Cosmetics.effectLabel(parent: Instance, itemId: string, size: UDim2): GuiObject
+	local item = Catalogue.item(itemId)
+	local power = if item and item.power then item.power else ""
+	local art = if item then item.art else ""
+	local frame = image("fx:" .. power .. ":" .. art, function()
+		return PowerFx.preview(power, art)
+	end)
+	local label = pixelLabel(parent, { frame }, size, Palette.fx.gold)
+	label.Name = "EffectPreview"
+	return label
+end
+
+-- A theme item's preview: the current map (Earth before the first match) painted small in that theme, with every
+-- nation's start land in its colour, so you can see the colours stay readable.
+function Cosmetics.themeLabel(parent: Instance, themeId: string, size: UDim2): GuiObject
+	local current = ClientState.map()
+	local map = current or Maps.get("earth")
+	local look = Cosmetics.themeLook(themeId)
+	local frame = image("theme:" .. map.id .. ":" .. look, function()
+		local grid = MapGrid.downsample(MapGrid.decode(map), THEME_PREVIEW_FACTOR)
+		local art = PixelArt.new(map, grid, nil, look)
+		local owners: { [number]: number } = {}
+		for _, p in map.provinces do
+			owners[p.id] = p.startOwner or 0
+		end
+		local colors: { [number]: number } = {}
+		local borders: { [number]: number } = {}
+		for _, n in map.nations do
+			colors[n.slot] = packed(Palette.nation(n.colorIndex))
+			borders[n.slot] = packed(Palette.border(n.colorIndex))
+		end
+		PixelArt.setOwners(art, owners, colors, borders)
+		return art.pixels, art.width, art.height
+	end)
+	local label = pixelLabel(parent, { frame }, size, Palette.background[map.theme] or Palette.background.earth)
+	label.Name = "ThemePreview"
+	return label
 end
 
 -- The outline colour of a nameplate frame item, or nil for none.

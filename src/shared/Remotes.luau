@@ -23,6 +23,7 @@ local EVENTS = {
 	"RequestClaim", -- quests: quest key
 	"RequestQuestReroll", -- quests: quest key
 	"RequestTelemetry", -- analytics: a UI funnel signal (Sim.Telemetry.CLIENT_SIGNALS) and an optional short string
+	"RequestDefaultTheme", -- shop: true = always show the classic map (the theme opt-out)
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",

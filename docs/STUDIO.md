@@ -26,6 +26,7 @@ Select Workspace in the Explorer and add attributes in the Properties window.
 | --- | --- | --- |
 | `SkipLobby` | boolean | Matches start straight in Peace (no map vote or draft) and restart on the same map. Handy for solo tests. |
 | `MapId` | string | Locks the map: `earth`, `eldmoor` or `skyshards`. |
+| `Theme` | string | Forces a map theme and skips the theme vote: `theme_night`, `theme_winter`, `theme_autumn`, or `theme_classic` for the classic look (what the private-server setting will do). |
 | `Tutorial` | boolean | This server plays the tutorial match (in a live game, new players are teleported to one). |
 | `TelemetryLog` | boolean | Prints every analytics event as `[telemetry] …` in the Output. AnalyticsService only accepts events from a published game, so this is how to check them in Studio. |
 | `PrivateServerOwner` | number or boolean | Simulates a private (VIP) server: a userId is its owner, `true` makes the first player in the server the owner. The owner gets ⚙ Settings in the Lobby. In Play solo your userId is your account's; in Clients and Servers the players are -1, -2, … (or use `true`). Don't combine with `SkipLobby` (no Lobby, no settings sheet). |
@@ -53,6 +54,8 @@ Start a test from the Test tab. Use Device to pick a phone in landscape (the UI 
 | Becoming a Primordial | With 2 players at War, let one player's nation lose its capital and all but 2 provinces (or give its land away on the server). That player sees "✨ Primordial" and casts powers. |
 | Cataclysm and Results | `DevTick` = 1199, then 1499. Check the banners, the Results screen and the XP and Glory breakdown. |
 | Tutorial | Set `Tutorial`, Play solo, follow the six prompts; "⏭ Skip" takes two taps. |
+| Map themes and the theme vote | Clients and Servers, 2 players. In the Lobby each opens 🛒 → Themes and equips a theme (free in Studio test mode); the vote cards repaint in it. Both vote for the same map: the draft says "🌙 Night Earth, brought by …" and both maps are painted in it. One player taps 🛒 → Themes → "Always classic": their map goes back to the classic look. Solo: set `SkipLobby` and `Theme` = `theme_winter`. |
+| Power-effect looks | In the Lobby, 🛒 → Powers, equip Comet Strike, Violet Plague and Sun Rays. In the match set `DevCharges` = 5 and `DevTick` = 179, then cast Meteor, Plague and Blessing: both players see your looks; the area, timing and sounds are the same as the default. |
 | Shop | In the Lobby tap 🛒 (or 🛒 in the top bar during a match). While the ids are 0, Robux items are free in Studio ("Studio test mode"). Equip a flag and check it by your capital and in the 🌍 list. |
 | Sounds | Every sound id is in `src/client/Sounds.luau`. Play each one once (the client command bar: `require(game.Players.LocalPlayer.PlayerScripts.Client.Sounds).play("MeteorImpact")`) and swap any that is missing. 🔊 in the top bar mutes. |
 | Quests, calendar, streak | Lobby: tap 📜 (bottom left, next to 🛒); in a match: 🌍 → "📜 Quests". Finish a match (`DevTick` = 1499 after doing what a quest asks, e.g. recruit 5 regiments): Results lists the quests it moved and the calendar step; tap "📜 Quests · 1 to claim" → Claim. Tap "🔄 Free" on a daily quest to reroll it (the next one costs 100 Glory). Set `DevDay` = 1 and finish another match: the calendar moves to step 2 and the streak to 2; at 3 days a 🔥 appears after your nation in the 🌍 list. |

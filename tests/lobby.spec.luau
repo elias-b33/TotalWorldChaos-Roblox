@@ -229,4 +229,62 @@ T.test("the view is flat and names who picked what", function()
 	T.equal(Lobby.view(nil, {}).phase, "None")
 end)
 
+T.test("theme vote: the winning map uses the theme equipped by most of its voters", function()
+	local lobby = newLobby()
+	for userId, map in { [1] = "earth", [2] = "earth", [3] = "earth", [4] = "eldmoor", [5] = "eldmoor" } do
+		Lobby.vote(lobby, userId, map)
+	end
+	-- Earth's voters: two Night, one Winter; the Eldmoor voters' Autumn doesn't count for Earth
+	local themes = { [1] = "theme_night", [2] = "theme_night", [3] = "theme_winter", [4] = "theme_autumn" }
+	themes[5] = "theme_autumn"
+	local theme, credited = Lobby.chooseTheme(lobby, "earth", themes, nil)
+	T.equal(theme, "theme_night")
+	T.equal(#credited, 2)
+	T.equal(credited[1], 1)
+	T.equal(credited[2], 2)
+	T.equal(lobby.theme, "theme_night")
+	local match = Match.new(Maps.get("earth"))
+	T.equal(match.theme, nil)
+	Lobby.startPick(lobby, match, { 1, 2, 3, 4, 5 }, Rng.new(1))
+	T.equal(match.theme, "theme_night")
+	local view = Lobby.view(lobby, { [1] = "Alice", [2] = "Bob" })
+	T.equal(view.theme, "theme_night")
+	T.equal(view.themeBy[1], "Alice")
+	T.equal(view.themeBy[2], "Bob")
+end)
+
+T.test("theme vote: classic doesn't count, ties and nobody give the classic look", function()
+	local lobby = newLobby()
+	for userId = 1, 4 do
+		Lobby.vote(lobby, userId, "eldmoor")
+	end
+	-- three on the classic look, one Winter: Winter wins (the classic look is not a vote)
+	local theme =
+		Lobby.chooseTheme(lobby, "eldmoor", { [1] = "theme_classic", [2] = "theme_classic", [4] = "theme_winter" })
+	T.equal(theme, "theme_winter")
+	-- one Night, one Winter: a tie
+	local tied, credited = Lobby.chooseTheme(lobby, "eldmoor", { [1] = "theme_night", [2] = "theme_winter" })
+	T.equal(tied, "theme_classic")
+	T.equal(#credited, 0)
+	T.equal(Lobby.chooseTheme(lobby, "eldmoor", {}), "theme_classic")
+	-- not a theme at all
+	T.equal(Lobby.chooseTheme(lobby, "eldmoor", { [1] = "flag_sun" }), "theme_classic")
+	local match = Match.new(Maps.get("eldmoor"))
+	Lobby.startPick(lobby, match, { 1, 2, 3, 4 }, Rng.new(1))
+	T.equal(match.theme, nil) -- classic: nothing to paint differently
+end)
+
+T.test("theme vote: a server setting forces a theme, and a locked map counts everyone", function()
+	local lobby = newLobby()
+	Lobby.vote(lobby, 1, "earth")
+	local themes = { [1] = "theme_night" }
+	T.equal(Lobby.chooseTheme(lobby, "earth", themes, "theme_classic"), "theme_classic")
+	T.equal(Lobby.chooseTheme(lobby, "earth", themes, "theme_autumn"), "theme_autumn")
+	T.equal(Lobby.chooseTheme(lobby, "earth", themes, "nonsense"), "theme_night") -- an unknown setting is ignored
+	local locked = Lobby.new(Maps.ids, "skyshards")
+	local theme, credited = Lobby.chooseTheme(locked, "skyshards", { [7] = "theme_winter", [8] = "theme_winter" })
+	T.equal(theme, "theme_winter")
+	T.equal(#credited, 2)
+end)
+
 T.finish()
