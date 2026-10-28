@@ -3,7 +3,8 @@
 -- one per tick. Each round, each side kills enemy men equal to KillRatePerRound × its own strength × modifiers.
 -- A side's strength is the sum of its men × each troop's attack (attackers) or defence (defenders), with the
 -- specials' terrain and anti-garrison tricks (Troops.strength); losses split over an army's troop types in
--- proportion to their men (Army.shrinkTo). Race bonuses (Sim.Races) add to the modifier. Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at
+-- proportion to their men (Army.shrinkTo). Race bonuses (Sim.Races) and an insult's grudge (Sim.Diplomacy) add to
+-- the modifier. Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at
 -- its own speed, can't take orders, and doesn't fight, block or besiege on the way (Army.retreating). Armies under
 -- MinArmyMen are destroyed, and so is a loser with no way home.
 
@@ -132,6 +133,7 @@ function Battle.modifier(state: MatchState, provinceId: number, sides: Sides, de
 	local mine = owners(if defending then sides.defenders else sides.attackers)
 	local theirs = owners(if defending then sides.attackers else sides.defenders)
 	m += Races.battleBonus(state, province, mine, defending) -- Forest in forest, Hills defending hills, Attack
+	m += Diplomacy.grudgeBonus(state, mine, theirs) -- an insulted nation against its insulter
 	return math.max(0.1, m + Battle.bonus(state, mine, theirs, defending))
 end
 
