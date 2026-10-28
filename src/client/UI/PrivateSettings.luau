@@ -31,6 +31,18 @@ local LOBBY_BUTTONS = 4 -- the round buttons in the bottom-left corner during th
 
 type Option = { button: TextButton, key: string, value: string | number | boolean }
 
+-- On/off rules as toggles (gold = on, a tap sends the other value), several to a row with no label so the EU4 pack's
+-- features fit beside powers and disasters on a phone. A toggle's Name says what a tap sends ("Setting_powers_false"
+-- while powers are on). Each entry: the MatchSettings key, the toggle's text, and what the summary says when off.
+type Toggle = { button: TextButton, key: string }
+local TOGGLE_ROWS: { { { string } } } = {
+	{
+		{ "powers", "Powers", "powers off" },
+		{ "disasters", "Disasters", "no disasters" },
+		{ "diplomacy", "Diplomacy", "no insults, gifts or access" },
+	},
+}
+
 local PrivateSettings = {}
 
 local gui: ScreenGui
@@ -42,6 +54,7 @@ local rewardLabel: TextLabel
 local botsLabel: TextLabel
 local teamGrid: Frame
 local options: { Option } = {}
+local toggles: { Toggle } = {}
 local teamButtons: { [number]: TextButton } = {} -- userId -> button
 local teamsFor = "" -- the player list the team buttons were built for
 local open = false
@@ -62,11 +75,12 @@ function PrivateSettings.summary(s: Types.MatchSettings): string
 		string.format("%d min peace", s.peaceMinutes),
 		string.format("%d %s bots", s.bots, s.difficulty),
 	}
-	if not s.powers then
-		table.insert(parts, "powers off")
-	end
-	if not s.disasters then
-		table.insert(parts, "no disasters")
+	for _, toggleRow in TOGGLE_ROWS do
+		for _, entry in toggleRow do
+			if (s :: any)[entry[1]] == false then
+				table.insert(parts, entry[3])
+			end
+		end
 	end
 	if #s.teams > 0 then
 		table.insert(parts, "teams set")
@@ -91,6 +105,30 @@ local function row(parent: Instance, order: number, icon: string, text: string):
 	l.LayoutOrder = 0
 	Widgets.leadIcon(l, icon, Theme.size.icon)
 	return f
+end
+
+-- A row of on/off toggles sharing the column's width.
+local function toggleRow(parent: Instance, order: number, entries: { { string } })
+	local f = Instance.new("Frame")
+	f.BackgroundTransparency = 1
+	f.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
+	f.LayoutOrder = order
+	f.Parent = parent
+	Widgets.list(f, true, Theme.space.xs)
+	for i, entry in entries do
+		local key = entry[1]
+		local b = Widgets.tab(f, entry[2], OPTION_WIDTH, false, function()
+			local view = LobbyState.view()
+			if view then
+				Intents.setting(key, (view.settings :: any)[key] ~= true)
+			end
+		end)
+		b.Name = "Setting_" .. key
+		b.Size = UDim2.new(1 / #entries, -Theme.space.xs, 0, Widgets.BUTTON_HEIGHT)
+		b.TextSize = TEXT_SIZE
+		b.LayoutOrder = i
+		table.insert(toggles, { button = b, key = key })
+	end
 end
 
 local function option(parent: Frame, key: string, value: string | number | boolean, text: string)
@@ -251,12 +289,9 @@ local function buildPanel()
 		option(level, "difficulty", d, d)
 	end
 
-	local powers = row(right, 1, "sparkles", "Powers")
-	option(powers, "powers", true, "On")
-	option(powers, "powers", false, "Off")
-	local disasters = row(right, 2, "meteor", "Disasters")
-	option(disasters, "disasters", true, "On")
-	option(disasters, "disasters", false, "Off")
+	for i, entries in TOGGLE_ROWS do
+		toggleRow(right, i, entries) -- powers, disasters and the EU4 pack's features, gold while on
+	end
 	local teamsTitle = Widgets.label(right, "Teams: tap a player (same team = allies)", TEXT_SIZE, 22)
 	teamsTitle.LayoutOrder = 3
 	Widgets.leadIcon(teamsTitle, "teams", Theme.size.icon)
@@ -300,6 +335,11 @@ function PrivateSettings.render()
 	for _, o in options do
 		local current: any = (s :: any)[o.key]
 		Widgets.setTab(o.button, current == o.value)
+	end
+	for _, t in toggles do
+		local on = (s :: any)[t.key] == true
+		Widgets.setTab(t.button, on)
+		t.button.Name = "Setting_" .. t.key .. "_" .. tostring(not on) -- what a tap sends
 	end
 	botsLabel.Text = if s.bots >= Config.Private.MaxBots then string.format("%d (fill)", s.bots) else tostring(s.bots)
 	local key = playersKey(view)

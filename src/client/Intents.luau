@@ -82,6 +82,11 @@ local REASONS: { [string]: string } = {
 	TierLocked = "🔒 Reach that tier first",
 	NeedPass = "🎟 That reward needs the premium pass",
 	NothingToClaim = "🎟 Nothing to claim yet",
+	-- the EU4 pack
+	DiplomacyOff = "🔒 Insults, gifts and access are off on this server",
+	Cooldown = "⏳ Wait a little before doing that again",
+	NoComeback = "💬 Too late to answer that one",
+	AlreadyAccess = "🚶 You can already march through their land",
 }
 
 local Intents = {}
@@ -120,9 +125,10 @@ function Intents.move(armyId: number, to: number)
 	send("RequestMove", armyId, to)
 end
 
--- action: War | Ally | AcceptAlly | Peace | AcceptPeace
-function Intents.diplomacy(action: string, target: number, gold: number?)
-	send("RequestDiplomacy", action, target, gold or 0)
+-- action: War | Ally | AcceptAlly | Peace | AcceptPeace, and the EU4 pack's Insult | Comeback (line: the pre-written
+-- line's number, Shared.Flavour.Insults) | Gift | Access | AcceptAccess
+function Intents.diplomacy(action: string, target: number, gold: number?, line: number?)
+	send("RequestDiplomacy", action, target, gold or 0, line or 0)
 end
 
 -- power: Meteor | Plague | Rebels | Earthquake | Blessing | Shield; target: army, nation or province id

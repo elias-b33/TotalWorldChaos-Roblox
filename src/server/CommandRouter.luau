@@ -30,7 +30,20 @@ type LobbyPending = { player: Player, requestId: number, intent: Types.LobbyInte
 local BUILDINGS = { Farm = true, Barracks = true, Fort = true }
 local MAX_MAP_ID = 32 -- longest map id a vote may name (the map list itself is checked by Sim.Lobby)
 local MAX_SETTING = 16 -- longest setting key or string value (the values themselves are checked by Sim.Settings)
-local DIPLOMACY_ACTIONS = { War = true, Ally = true, AcceptAlly = true, Peace = true, AcceptPeace = true }
+local DIPLOMACY_ACTIONS = {
+	War = true,
+	Ally = true,
+	AcceptAlly = true,
+	Peace = true,
+	AcceptPeace = true,
+	-- the EU4 pack (Sim.Diplomacy checks the line number against the map's pool, and the match setting)
+	Insult = true,
+	Comeback = true,
+	Gift = true,
+	Access = true,
+	AcceptAccess = true,
+}
+local MAX_LINE = 100 -- highest insult or comeback line number a request may name
 
 local CommandRouter = {}
 
@@ -130,14 +143,16 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			end)
 		end)
 
-	Remotes.event("RequestDiplomacy").OnServerEvent
-		:Connect(function(player: Player, requestId: unknown, action: unknown, target: unknown, gold: unknown)
+	-- gold: a peace offer's tribute; line: an insult's or comeback's line number (0 = none)
+	Remotes.event("RequestDiplomacy").OnServerEvent:Connect(
+		function(player: Player, requestId: unknown, action: unknown, target: unknown, gold: unknown, line: unknown)
 			accept(player, requestId, function()
 				if type(action) ~= "string" or not DIPLOMACY_ACTIONS[action] or not isId(target) then
 					return nil
 				end
 				local amount = if gold == nil then 0 else gold
-				if not isAmount(amount) then
+				local number = if line == nil then 0 else line
+				if not isAmount(amount) or not isAmount(number) or (number :: number) > MAX_LINE then
 					return nil
 				end
 				return {
@@ -145,9 +160,11 @@ function CommandRouter.init(getNation: (Player) -> number?)
 					action = action :: Types.DiplomacyAction,
 					target = target :: number,
 					gold = amount :: number,
+					line = number :: number,
 				}
 			end)
-		end)
+		end
+	)
 
 	Remotes.event("RequestPower").OnServerEvent
 		:Connect(function(player: Player, requestId: unknown, power: unknown, target: unknown)

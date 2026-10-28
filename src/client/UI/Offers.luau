@@ -1,6 +1,7 @@
 --!strict
--- Alliance and peace offers made to you, as cards under the top bar with an Accept button. They expire on their own.
--- Each card: the offer with its icon, a countdown chip and the Accept button.
+-- Alliance, peace and military access offers made to you, as cards under the top bar with an Accept button. They
+-- expire on their own. Each card: the offer with its icon, a countdown chip and the Accept button. Other cards that
+-- come to you share the column (Offers.column(): the insult you may answer, above the offers).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,11 +14,20 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local WIDTH = 290
+local OFFERS_ORDER = 10 -- offers stack under the other cards in the column (their LayoutOrder is below this)
 
 local Offers = {}
 
 local column: Frame
 local shownKey = ""
+
+-- The column of cards under the top bar at the right (offers, and the cards other screens add above them), and its
+-- cards' width.
+function Offers.column(): Frame
+	return column
+end
+
+Offers.WIDTH = WIDTH
 
 local function render()
 	local me = ClientState.myNation()
@@ -32,26 +42,35 @@ local function render()
 		return
 	end
 	shownKey = key
-	Widgets.clear(column)
+	for _, child in column:GetChildren() do
+		if child.Name == "Offer" then -- only the offers: other cards share the column
+			child:Destroy()
+		end
+	end
 	for i, o in offers do
 		local from = ClientState.nation(o.from)
 		local name = if from then from.name else "?"
 		local card = Widgets.panel(column, WIDTH)
 		card.Name = "Offer"
-		card.LayoutOrder = i
+		card.LayoutOrder = OFFERS_ORDER + i
 		Widgets.list(card, false, Theme.space.s)
 		local text = if o.kind == "Ally"
 			then name .. " wants an alliance"
+			elseif o.kind == "Access" then name .. " asks to march through your land"
 			else name .. " offers peace" .. (if o.tribute > 0 then " +" .. o.tribute .. " gold" else "")
 		local line = Widgets.label(card, text, Theme.text.body, 36)
 		line.LayoutOrder = 1
-		Widgets.leadIcon(line, if o.kind == "Ally" then "handshake" else "peace", Theme.size.iconButton)
+		local icon = if o.kind == "Ally" then "handshake" elseif o.kind == "Access" then "access" else "peace"
+		Widgets.leadIcon(line, icon, Theme.size.iconButton)
 		local footer = Instance.new("Frame")
 		footer.BackgroundTransparency = 1
 		footer.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
 		footer.LayoutOrder = 2
 		footer.Parent = card
-		local action = if o.kind == "Ally" then "AcceptAlly" else "AcceptPeace"
+		local action = if o.kind == "Ally"
+			then "AcceptAlly"
+			elseif o.kind == "Access" then "AcceptAccess"
+			else "AcceptPeace"
 		local fromId = o.from
 		Widgets.iconTextButton(footer, "check", "Accept", 130, Widgets.GOOD, function()
 			Intents.diplomacy(action, fromId)

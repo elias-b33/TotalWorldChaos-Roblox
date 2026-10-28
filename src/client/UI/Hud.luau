@@ -8,6 +8,8 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Config = require(Shared.Config)
+local InsultLines = require(Shared.Flavour.Insults)
 local Remotes = require(Shared.Remotes)
 local Match = require(Shared.Sim.Match)
 local Settings = require(Shared.Sim.Settings)
@@ -191,6 +193,28 @@ local function eventText(e: Types.MatchEvent): string?
 		end
 	elseif e.kind == "Offer" and e.b == me then
 		return "📜 " .. nationName(e.a) .. " sent you an offer"
+	elseif (e.kind == "Insult" or e.kind == "Comeback") and e.b == me then
+		-- the EU4 pack: the line is a speech bubble on the map for everyone, and a toast for the one it's aimed at
+		local snap = ClientState.snapshot()
+		local kind: InsultLines.Kind = if e.kind == "Insult" then "insults" else "comebacks"
+		local text = if snap then InsultLines.line(snap.mapId, kind, e.line or 0) else nil
+		if text then
+			return string.format(
+				"💬 %s%s: “%s”",
+				nationName(e.a),
+				if e.kind == "Comeback" then " answers" else "",
+				text
+			)
+		end
+	elseif e.kind == "Gift" and e.b == me then
+		return string.format("🎁 %s sent you %d gold", nationName(e.a), Config.Diplomacy.GiftGold)
+	elseif e.kind == "AccessGranted" then
+		local minutes = Config.Diplomacy.AccessTicks * Config.TickSeconds // 60
+		if e.b == me then
+			return string.format("🚶 %s lets your armies through for %d min", nationName(e.a), minutes)
+		elseif e.a == me then
+			return string.format("🚶 %s's armies may cross your land for %d min", nationName(e.b), minutes)
+		end
 	end
 	return nil
 end

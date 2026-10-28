@@ -38,6 +38,17 @@ Telemetry.CUSTOM_EVENTS = {
 	"purchase_failed",
 	"notification_opt_in",
 	"tutorial_skipped",
+	-- the EU4 pack (docs/DESIGN.md)
+	"diplomacy_action",
+}
+
+-- The EU4 pack's diplomatic actions diplomacy_action logs, by Command action (field 1).
+local DIPLOMACY_ACTIONS: { [string]: string } = {
+	Insult = "insult",
+	Comeback = "comeback",
+	Gift = "gift",
+	Access = "access_asked",
+	AcceptAccess = "access_granted",
 }
 
 -- The one-time onboarding funnel (LogOnboardingFunnelStepEvent), in step order.
@@ -338,6 +349,21 @@ function Telemetry.powerUsed(state: MatchState, userId: number, power: string): 
 	end
 	local kind = if living then "living" else "primordial"
 	return Telemetry.custom("primordial_power_used", 1, { power, state.mapId, kind }, userId)
+end
+
+-- A player's insult, comeback, gift or military access request or grant went through: diplomacy_action with the
+-- action, the map and who it was aimed at (human, bot). nil for any other command.
+function Telemetry.diplomacy(state: MatchState, userId: number, command: Types.Command): Event?
+	if command.kind ~= "Diplomacy" then
+		return nil
+	end
+	local action = DIPLOMACY_ACTIONS[command.action]
+	local target = state.nations[command.target]
+	if action == nil or target == nil then
+		return nil
+	end
+	local aimed = if target.userId ~= nil then "human" else "bot"
+	return Telemetry.custom("diplomacy_action", 1, { action, state.mapId, aimed }, userId)
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

@@ -1,9 +1,14 @@
 --!strict
 -- War, alliances, peace and truces (docs/DESIGN.md "Diplomacy"), plus the relation checks every other rule uses.
 -- Nation 0 is "neutral" (garrisons, Rebels): hostile to everyone, friends with no one.
+-- The EU4 pack's actions (a match setting, MatchSettings.diplomacy): insults with a pre-written joke line (the
+-- insulted nation gets a short grudge, a combat bonus against the insulter, and may answer with a comeback), gifts of
+-- a little gold, and military access (asked and accepted like an alliance; the guest's armies may enter the owner's
+-- land for a while).
 
 local Config = require("../Config")
 local Events = require("./Events")
+local Insults = require("../Flavour/Insults")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -70,14 +75,28 @@ function Diplomacy.borders(state: MatchState, a: number, b: number): boolean
 	return false
 end
 
--- Armies may enter their own, allied, neutral and enemy (at war) land; never mountains or peaceful foreign land.
+-- Military access: may `guest`'s armies enter `owner`'s land right now?
+function Diplomacy.hasAccess(state: MatchState, guest: number, owner: number): boolean
+	for _, a in state.access or {} do
+		if a.guest == guest and a.owner == owner and a.untilTick > state.tick then
+			return true
+		end
+	end
+	return false
+end
+
+-- Armies may enter their own, allied, neutral and enemy (at war) land, and land they have military access to; never
+-- mountains or other peaceful foreign land.
 function Diplomacy.canEnter(state: MatchState, nationId: number, provinceId: number): boolean
 	local p = state.provinces[provinceId]
 	if p == nil or p.terrain == "Mountain" then
 		return false
 	end
 	local owner = p.owner
-	return owner == nil or Diplomacy.friendly(state, nationId, owner) or Diplomacy.atWar(state, nationId, owner)
+	return owner == nil
+		or Diplomacy.friendly(state, nationId, owner)
+		or Diplomacy.atWar(state, nationId, owner)
+		or Diplomacy.hasAccess(state, nationId, owner)
 end
 
 function Diplomacy.allianceMembers(state: MatchState, nationId: number): { number }
@@ -130,6 +149,16 @@ function Diplomacy.declareWar(state: MatchState, a: number, b: number): (boolean
 	local defenders = Diplomacy.allianceMembers(state, b)
 	local id = nextKey(state.wars)
 	state.wars[id] = { id = id, attackers = attackers, defenders = defenders, startedAt = state.tick }
+	-- military access between the two sides ends with the war (their armies may enter as enemies anyway)
+	local kept = {}
+	for _, x in state.access or {} do
+		local across = (table.find(attackers, x.owner) ~= nil and table.find(defenders, x.guest) ~= nil)
+			or (table.find(defenders, x.owner) ~= nil and table.find(attackers, x.guest) ~= nil)
+		if not across then
+			table.insert(kept, x)
+		end
+	end
+	state.access = kept
 	Events.push(state, "WarDeclared", a, b)
 	return true, nil
 end
@@ -143,18 +172,37 @@ local function findOffer(state: MatchState, kind: string, from: number, to: numb
 	return nil, nil
 end
 
--- Propose an alliance or peace. The other nation has Config.Diplomacy.OfferTicks to accept.
+-- The EU4 pack's actions (insults, gifts, military access) are a match setting.
+local function packOn(state: MatchState): boolean
+	return state.setup.settings.diplomacy == true
+end
+
+-- Propose an alliance, peace or military access (`from` asks to march through `to`'s land). The other nation has
+-- Config.Diplomacy.OfferTicks to accept.
 function Diplomacy.propose(
 	state: MatchState,
-	kind: "Ally" | "Peace",
+	kind: "Ally" | "Peace" | "Access",
 	from: number,
 	to: number,
 	tribute: number
 ): (boolean, string?)
+	if kind == "Access" and not packOn(state) then
+		return false, "DiplomacyOff"
+	end
 	if from == to or not living(state, to) then
 		return false, "BadTarget"
 	end
-	if kind == "Ally" then
+	if kind == "Access" then
+		if Diplomacy.atWar(state, from, to) then
+			return false, "AtWar"
+		end
+		if Diplomacy.allied(state, from, to) then
+			return false, "AlreadyAllied" -- allies march through each other's land anyway
+		end
+		if Diplomacy.hasAccess(state, from, to) then
+			return false, "AlreadyAccess"
+		end
+	elseif kind == "Ally" then
 		if #state.setup.settings.teams > 0 then
 			return false, "TeamsLocked" -- a private server's owner set the teams (Sim.Settings)
 		end
@@ -254,12 +302,34 @@ function Diplomacy.ally(state: MatchState, a: number, b: number): (boolean, stri
 end
 
 -- `accepter` takes the offer `from` made to them.
-function Diplomacy.accept(state: MatchState, kind: "Ally" | "Peace", accepter: number, from: number): (boolean, string?)
+function Diplomacy.accept(
+	state: MatchState,
+	kind: "Ally" | "Peace" | "Access",
+	accepter: number,
+	from: number
+): (boolean, string?)
+	if kind == "Access" and not packOn(state) then
+		return false, "DiplomacyOff"
+	end
 	local i, offer = findOffer(state, kind, from, accepter)
 	if i == nil or offer == nil then
 		return false, "NoOffer"
 	end
-	if kind == "Ally" then
+	if kind == "Access" then
+		if Diplomacy.atWar(state, from, accepter) then
+			return false, "AtWar"
+		end
+		-- the accepter lets the proposer's armies through its land for a while (a new grant refreshes the old one)
+		local kept = {}
+		for _, x in state.access do
+			if not (x.owner == accepter and x.guest == from) then
+				table.insert(kept, x)
+			end
+		end
+		table.insert(kept, { owner = accepter, guest = from, untilTick = state.tick + Config.Diplomacy.AccessTicks })
+		state.access = kept
+		Events.push(state, "AccessGranted", accepter, from)
+	elseif kind == "Ally" then
 		if Diplomacy.atWar(state, from, accepter) then
 			return false, "AtWar"
 		end
@@ -284,7 +354,154 @@ function Diplomacy.accept(state: MatchState, kind: "Ally" | "Peace", accepter: n
 	return true, nil
 end
 
--- Drop expired offers and truces (tick order step 8).
+-- Insults, comebacks and gifts ----------------------------------------------------------------------------
+
+-- Seconds (ticks) until `a` may do `kind` ("Insult" | "Gift") to `b` again; 0 = now.
+function Diplomacy.cooldownLeft(state: MatchState, kind: string, a: number, b: number): number
+	for _, c in state.cooldowns or {} do
+		if c.kind == kind and c.a == a and c.b == b and c.untilTick > state.tick then
+			return c.untilTick - state.tick
+		end
+	end
+	return 0
+end
+
+local function startCooldown(state: MatchState, kind: string, a: number, b: number, ticks: number)
+	local kept = {}
+	for _, c in state.cooldowns do
+		if not (c.kind == kind and c.a == a and c.b == b) then
+			table.insert(kept, c)
+		end
+	end
+	table.insert(kept, { kind = kind, a = a, b = b, untilTick = state.tick + ticks })
+	state.cooldowns = kept
+end
+
+-- Does `holder` hold a grudge against `against` right now?
+function Diplomacy.grudge(state: MatchState, holder: number, against: number): boolean
+	for _, g in state.grudges or {} do
+		if g.holder == holder and g.against == against and g.untilTick > state.tick then
+			return true
+		end
+	end
+	return false
+end
+
+-- The open comeback window of a nation insulted by `insulter` (nil if it can't answer, or answered already).
+function Diplomacy.comebackWindow(state: MatchState, insulted: number, insulter: number): Types.Comeback?
+	for _, w in state.comebacks or {} do
+		if w.from == insulted and w.to == insulter and w.untilTick > state.tick then
+			return w
+		end
+	end
+	return nil
+end
+
+-- `from` insults `to` with a pre-written line (its number in Shared.Flavour.Insults for this map). Never an ally,
+-- and once per Config.Diplomacy.InsultCooldownTicks per pair (each way). The insulted nation holds a grudge against
+-- the insulter for Config.Diplomacy.GrudgeTicks (a new insult starts it again) and may answer with a comeback for
+-- Config.Diplomacy.ComebackTicks.
+function Diplomacy.insult(state: MatchState, from: number, to: number, line: number): (boolean, string?)
+	if not packOn(state) then
+		return false, "DiplomacyOff"
+	end
+	if from == to or not living(state, to) then
+		return false, "BadTarget"
+	end
+	if Diplomacy.allied(state, from, to) then
+		return false, "Allied"
+	end
+	if not Insults.valid(state.mapId, "insults", line) then
+		return false, "BadRequest"
+	end
+	if Diplomacy.cooldownLeft(state, "Insult", from, to) > 0 then
+		return false, "Cooldown"
+	end
+	local d = Config.Diplomacy
+	startCooldown(state, "Insult", from, to, d.InsultCooldownTicks)
+	local grudges = {}
+	for _, g in state.grudges do
+		if not (g.holder == to and g.against == from) then
+			table.insert(grudges, g)
+		end
+	end
+	table.insert(grudges, { holder = to, against = from, untilTick = state.tick + d.GrudgeTicks })
+	state.grudges = grudges
+	local windows = {}
+	for _, w in state.comebacks do
+		if not (w.from == to and w.to == from) then
+			table.insert(windows, w)
+		end
+	end
+	table.insert(windows, { from = to, to = from, line = line, untilTick = state.tick + d.ComebackTicks })
+	state.comebacks = windows
+	Events.push(state, "Insult", from, to, 0, nil, nil, line)
+	return true, nil
+end
+
+-- `from` answers `to`'s insult with a pre-written comeback, while its window is open (once per insult). Flavour only:
+-- the grudge stays as it was.
+function Diplomacy.comeback(state: MatchState, from: number, to: number, line: number): (boolean, string?)
+	if not packOn(state) then
+		return false, "DiplomacyOff"
+	end
+	if not Insults.valid(state.mapId, "comebacks", line) then
+		return false, "BadRequest"
+	end
+	local window = Diplomacy.comebackWindow(state, from, to)
+	if window == nil then
+		return false, "NoComeback"
+	end
+	local windows = {}
+	for _, w in state.comebacks do
+		if w ~= window then
+			table.insert(windows, w)
+		end
+	end
+	state.comebacks = windows
+	Events.push(state, "Comeback", from, to, 0, nil, nil, line)
+	return true, nil
+end
+
+-- `from` sends `to` Config.Diplomacy.GiftGold gold: not while they are at war, once per GiftCooldownTicks per pair.
+function Diplomacy.gift(state: MatchState, from: number, to: number): (boolean, string?)
+	if not packOn(state) then
+		return false, "DiplomacyOff"
+	end
+	if from == to or not living(state, to) then
+		return false, "BadTarget"
+	end
+	if Diplomacy.atWar(state, from, to) then
+		return false, "AtWar"
+	end
+	if Diplomacy.cooldownLeft(state, "Gift", from, to) > 0 then
+		return false, "Cooldown"
+	end
+	local gold = Config.Diplomacy.GiftGold
+	local giver = state.nations[from]
+	if giver.gold < gold then
+		return false, "NotEnoughGold"
+	end
+	giver.gold -= gold
+	state.nations[to].gold += gold
+	startCooldown(state, "Gift", from, to, Config.Diplomacy.GiftCooldownTicks)
+	Events.push(state, "Gift", from, to)
+	return true, nil
+end
+
+-- Battle.modifier: Config.Diplomacy.GrudgeBonus for a side if one of its nations holds a grudge against one of the
+-- nations it fights (the whole side shares it, like the race and catch-up bonuses; it doesn't stack).
+function Diplomacy.grudgeBonus(state: MatchState, mine: { number }, theirs: { number }): number
+	for _, g in state.grudges or {} do
+		if g.untilTick > state.tick and table.find(mine, g.holder) and table.find(theirs, g.against) then
+			return Config.Diplomacy.GrudgeBonus
+		end
+	end
+	return 0
+end
+
+-- Drop expired offers, truces, grudges, comeback windows, waits and military access (tick order step 8), and
+-- whatever involves an eliminated nation.
 function Diplomacy.expire(state: MatchState)
 	local offers = {}
 	for _, o in state.offers do
@@ -300,6 +517,19 @@ function Diplomacy.expire(state: MatchState)
 		end
 	end
 	state.truces = truces
+	local function live(list: { any }, a: string, b: string): { any }
+		local out = {}
+		for _, x in list do
+			if x.untilTick > state.tick and living(state, x[a]) and living(state, x[b]) then
+				table.insert(out, x)
+			end
+		end
+		return out
+	end
+	state.grudges = live(state.grudges, "holder", "against")
+	state.comebacks = live(state.comebacks, "from", "to")
+	state.cooldowns = live(state.cooldowns, "a", "b")
+	state.access = live(state.access, "owner", "guest")
 end
 
 return Diplomacy

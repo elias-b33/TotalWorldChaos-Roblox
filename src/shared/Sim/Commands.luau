@@ -141,6 +141,16 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 			return Diplomacy.accept(state, "Ally", nationId, command.target)
 		elseif action == "AcceptPeace" then
 			return Diplomacy.accept(state, "Peace", nationId, command.target)
+		elseif action == "Insult" then
+			return Diplomacy.insult(state, nationId, command.target, command.line or 0)
+		elseif action == "Comeback" then
+			return Diplomacy.comeback(state, nationId, command.target, command.line or 0)
+		elseif action == "Gift" then
+			return Diplomacy.gift(state, nationId, command.target)
+		elseif action == "Access" then
+			return Diplomacy.propose(state, "Access", nationId, command.target, 0)
+		elseif action == "AcceptAccess" then
+			return Diplomacy.accept(state, "Access", nationId, command.target)
 		end
 	end
 	return false, "UnknownCommand"

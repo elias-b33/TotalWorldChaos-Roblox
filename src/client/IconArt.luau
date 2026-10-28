@@ -1212,6 +1212,43 @@ IconArt.ICONS = {
 		".....KKgggKK....",
 		".......KKK......",
 	},
+	-- the EU4 pack: an insult's or comeback's speech bubble, and military access (a signpost)
+	speech = {
+		"................",
+		"................",
+		"..KKKKKKKKKKKK..",
+		".KWWWWWWWWWWWWK.",
+		".KWWWWWWWWWWWWK.",
+		".KWbbWWbbWWbbWK.",
+		".KWbbWWbbWWbbWK.",
+		".KWWWWWWWWWWWWK.",
+		".KwwwwwwwwwwwwK.",
+		"..KKKwwKKKKKKK..",
+		"...KwwK.........",
+		"...KwK..........",
+		"...KK...........",
+		"................",
+		"................",
+		"................",
+	},
+	access = {
+		"................",
+		"......KKKK......",
+		"..KKKKKKKKKKK...",
+		"..KSSSSSSSoSSK..",
+		"..KSooooooooSSK.",
+		"..KSSSSSSSoSSK..",
+		"..KKKKKKKKKKK...",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"....KKKttKKK....",
+		"....KnnnnnnK....",
+		"....KKKKKKKK....",
+		"................",
+	},
 } :: { [string]: { string } }
 
 -- Icons made by recolouring another one: { base, { [from code] = to code } }.
@@ -1297,6 +1334,9 @@ IconArt.FALLBACK = {
 	rangers = "🌿",
 	berserkers = "🪓",
 	ironguard = "🔨",
+	-- the EU4 pack
+	speech = "💬",
+	access = "🚶",
 } :: { [string]: string }
 
 -- Old emoji in text (toasts from the server, power names, relation marks) and the icon that replaces each.
@@ -1366,6 +1406,10 @@ IconArt.EMOJI = {
 	["📺"] = "video",
 	["🧱"] = "border",
 	["🖼"] = "frame",
+	-- the EU4 pack (toasts: "💬 Rhine: «…»", "🚶 Rhine lets your armies through")
+	["💬"] = "speech",
+	["🗨"] = "speech",
+	["🚶"] = "access",
 } :: { [string]: string }
 
 local function rgba(c: number): number

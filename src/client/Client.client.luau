@@ -16,6 +16,7 @@ local ClientState = require(Client.ClientState)
 local Draft = require(Client.UI.Draft)
 local Effects = require(Client.Effects)
 local Hud = require(Client.UI.Hud)
+local Insults = require(Client.UI.Insults)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local MapRenderer = require(Client.MapRenderer)
@@ -54,6 +55,9 @@ end
 
 local function selectProvince(id: number?)
 	clearArmy()
+	if Insults.isOpen() then
+		Insults.close()
+	end
 	MapRenderer.select(id)
 	ProvinceSheet.show(id)
 end
@@ -131,6 +135,27 @@ local function centreOnCapital()
 	end
 end
 
+-- A nation's row in the drawer: close the drawer and show that nation's capital (or, once it lost it, one of its
+-- provinces) with its province sheet, whose diplomacy buttons are the nation's.
+local function showNation(nationId: number)
+	local snap = ClientState.snapshot()
+	local nation = ClientState.nation(nationId)
+	if snap == nil or nation == nil then
+		return
+	end
+	local where: number? = nil
+	for _, record in snap.provinces do
+		if record.owner == nationId and (where == nil or record.id == nation.capital) then
+			where = record.id
+		end
+	end
+	if where then
+		Nations.toggle()
+		MapView.centreOn(MapRenderer.centerOf(where), true)
+		selectProvince(where)
+	end
+end
+
 -- Listeners first (in draw order), then start listening to the server.
 MapRenderer.init()
 Hud.init(centreOnCapital, Nations.toggle, function()
@@ -145,10 +170,13 @@ ArmySheet.init(function(armyId: number, dest: number)
 	clearArmy()
 end, clearArmy)
 Offers.init()
+Insults.init(function()
+	selectProvince(nil) -- the insult picker replaces the province sheet it was opened from
+end)
 Powers.init(Hud.toast, function()
 	selectProvince(nil) -- the power picker replaces any open sheet
 end)
-Nations.init(Quests.open, Quests.shortButtonText)
+Nations.init(Quests.open, Quests.shortButtonText, showNation)
 Tutorial.init(function()
 	return selectedArmy
 end)

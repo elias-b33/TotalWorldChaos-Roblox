@@ -20,6 +20,7 @@ local Shared = ReplicatedStorage.Shared
 local Catalogue = require(Shared.Catalogue)
 local CatchUp = require(Shared.Sim.CatchUp)
 local Config = require(Shared.Config)
+local InsultLines = require(Shared.Flavour.Insults)
 local MapGrid = require(Shared.MapGrid)
 local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
@@ -76,6 +77,8 @@ local FLAG_WIDTH, FLAG_HEIGHT = 24, 18 -- a capital's 16×12 flag, screen pixels
 local FLAG_RIGHT, FLAG_BOTTOM = -10, 8 -- the flag's pole stands left of the capital's centre: its bottom right corner
 local POLE = 3 -- the pole's width plus the gap before the flag
 local EMOTE_SIZE = 26 -- capital emote icon, screen pixels
+local BUBBLE_WIDTH = 200 -- an insult's speech bubble, screen pixels (it grows downwards to fit its line)
+local BUBBLE_LIFT = 58 -- screen pixels from the speaker's capital up to the bubble's foot (where emotes show)
 local VICTORY_SIZE = 32 -- victory animation over a winner's capital
 local VICTORY_FRAME_SECONDS = 0.4
 local _, PIP_BAR_W, PIP_BAR_H = MapBadges.pips(0, Config.Economy.MaxDevelopment) -- the pip bar's size in pixels
@@ -146,6 +149,7 @@ local stackShown: { [number]: number } = {} -- strength badges shown in each pro
 local stackHalf: { [number]: number } = {} -- half the biggest token in each province's stack
 local detailShown = false -- garrisons, pips and every army's size show (the region zoom inwards)
 local flags: { [number]: { frame: Frame, key: string } } = {}
+local bubbles: { [number]: TextLabel } = {} -- speaker nation -> its speech bubble (an insult or a comeback)
 local victories: { { label: TextLabel, frames: { string } } } = {}
 local victoryClock = 0
 local selectedArmy: number? = nil
@@ -896,6 +900,67 @@ local function showEmote(e: Types.MatchEvent)
 	end)
 end
 
+-- An insult's or comeback's speech bubble (MatchEvent "Insult" / "Comeback": a = the speaker, line = its line in
+-- Shared.Flavour.Insults) over the speaker's capital, or its first province once the capital is lost, for
+-- Config.Diplomacy.BubbleSeconds. Everyone sees it; a newer line from the same nation replaces it.
+local function showBubble(e: Types.MatchEvent)
+	local bubbleLayer = layers.Emotes
+	local snapshot = ClientState.snapshot()
+	local nation = ClientState.nation(e.a)
+	local kind: InsultLines.Kind = if e.kind == "Insult" then "insults" else "comebacks"
+	local text = if snapshot then InsultLines.line(snapshot.mapId, kind, e.line or 0) else nil
+	if bubbleLayer == nil or snapshot == nil or nation == nil or text == nil then
+		return
+	end
+	local where = nation.capital
+	local capital = ClientState.province(nation.capital)
+	if capital == nil or capital.owner ~= nation.id then
+		for _, record in snapshot.provinces do
+			if record.owner == nation.id then
+				where = record.id
+				break
+			end
+		end
+	end
+	local old = bubbles[e.a]
+	if old then
+		old:Destroy()
+	end
+	local label = textLabel(bubbleLayer, "“" .. text .. "”")
+	label.Name = "Bubble" .. e.a
+	label.AnchorPoint = Vector2.new(0.5, 1)
+	label.Position = at(MapRenderer.centerOf(where)) + UDim2.fromOffset(0, -BUBBLE_LIFT)
+	label.Size = UDim2.fromOffset(BUBBLE_WIDTH, 0)
+	label.AutomaticSize = Enum.AutomaticSize.Y
+	label.TextWrapped = true
+	label.TextColor3 = Theme.color.textDark
+	label.TextStrokeTransparency = 1
+	label.BackgroundColor3 = Theme.color.text -- a comic speech bubble: warm white, ink outline, dark words
+	label.BackgroundTransparency = 0
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, Theme.radius.l)
+	corner.Parent = label
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Theme.color.ink
+	stroke.Thickness = Theme.stroke
+	stroke.Parent = label
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, Theme.space.m)
+	pad.PaddingRight = UDim.new(0, Theme.space.m)
+	pad.PaddingTop = UDim.new(0, Theme.space.xs)
+	pad.PaddingBottom = UDim.new(0, Theme.space.xs)
+	pad.Parent = label
+	bubbles[e.a] = label
+	local myGeneration = generation
+	task.delay(Config.Diplomacy.BubbleSeconds, function()
+		if generation == myGeneration and bubbles[e.a] == label then
+			bubbles[e.a] = nil
+			label:Destroy()
+		end
+	end)
+end
+
 -- The winners' victory animations over their capitals while Results shows (frames of the item's art, cycled).
 local function refreshVictory()
 	local snapshot = ClientState.snapshot()
@@ -982,6 +1047,7 @@ local function build(map: Types.MapDef)
 	groups = {}
 	stackShown, stackHalf = {}, {}
 	flags = {}
+	bubbles = {}
 	victories = {}
 	layers = {}
 	widths = {}
@@ -1470,6 +1536,8 @@ function MapRenderer.init()
 		for _, e in delta.events do
 			if e.kind == "Emote" then
 				showEmote(e)
+			elseif e.kind == "Insult" or e.kind == "Comeback" then
+				showBubble(e)
 			end
 		end
 	end)

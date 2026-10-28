@@ -25,6 +25,8 @@ LOBBY_SCENARIOS.leaderboards = true -- the 🏆 button is in the Lobby
 LOBBY_SCENARIOS.races = true -- the draft shows every nation's race
 local PRIVATE_OWNER = 5001 -- the private scenario's server owner (Workspace "PrivateServerOwner")
 local TUTORIAL_SCENARIOS = { tutorial = true } -- these boot a tutorial server (Workspace "Tutorial")
+-- scenarios that need a map (MAP overrides): Earth's nations border each other from the start
+local SCENARIO_MAPS: { [string]: string } = { diplomacy = "earth" }
 local scenarioName = process.args[1] or "smoke"
 local shotCount = 0
 local shotDir = OUT .. "/" .. scenarioName
@@ -241,6 +243,25 @@ end
 
 function H.state()
 	return H.server("Services.MatchService").state()
+end
+
+-- The server's copy of a shared module (ReplicatedStorage.Shared), e.g. H.shared("Config") to change a number for a
+-- test on the running server.
+function H.shared(path: string)
+	local node = Emulator.server.dm:GetService("ReplicatedStorage").Shared
+	for _, name in string.split(path, ".") do
+		node = node:FindFirstChild(name)
+	end
+	return Emulator.server.modules[node]
+end
+
+-- Wait (game time) until a client shows a text containing `text` (toasts queue up one after another).
+function H.waitText(client, text: string, seconds: number?): boolean
+	local deadline = Emulator.now() + (seconds or 12)
+	while Emulator.findText(client, text) == nil and Emulator.now() < deadline do
+		Emulator.run(0.25)
+	end
+	return Emulator.findText(client, text) ~= nil
 end
 
 function H.myNation(client)
@@ -3920,6 +3941,178 @@ function scenarios.kingdoms()
 	H.shot(alice, "orc_capital_sheet")
 end
 
+-- The GUI object named `name` anywhere on the client's screen, when it is shown (nil otherwise).
+function H.find(client, name: string)
+	local obj = client.localPlayer.PlayerGui:FindFirstChild(name, true)
+	return if obj and shown(obj) then obj else nil
+end
+
+-- A visible button whose Name is `name` or whose text contains it.
+function H.hasButton(client, name: string): boolean
+	for _, b in Emulator.buttons(client) do
+		if b.button.Name == name or string.find(b.text, name, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+-- The EU4 pack's diplomacy (docs/DESIGN.md "Diplomacy"), on Earth: Alice insults Bob from the province sheet's picker
+-- (a speech bubble over her capital, a toast and a comeback card for Bob, a grudge for Volga), Bob answers back, Alice
+-- sends a gift and asks for military access, Bob grants it from the offer card and Alice's army marches into his land.
+-- The nations drawer's rows open a nation's sheet. Bots insult now and then and answer back. With the setting off the
+-- buttons are gone and the server refuses.
+function scenarios.diplomacy()
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	local bob = Emulator.addClient("Bob")
+	Emulator.run(2)
+	local state = H.state()
+	local A, B = H.myNation(alice), H.myNation(bob)
+	H.expect(A == 1 and B == 2 and state.mapId == "earth", "Alice is Rhine, Bob is Volga, on Earth")
+	local Army = require("../../src/shared/Sim/Army")
+	local Diplomacy = require("../../src/shared/Sim/Diplomacy")
+	local InsultLines = require("../../src/shared/Flavour/Insults")
+	local AIService = H.server("Services.AIService")
+	local botStep = AIService.step
+	AIService.step = function() end -- the bots hold still while the players talk
+	local target: number? = nil
+	for id, p in state.provinces do
+		if p.owner == B and not p.isCapital and (target == nil or id < target) then
+			target = id
+		end
+	end
+	local volga = target :: number
+
+	-- the province sheet of one of Bob's provinces: insult, gift and ask for access beside war and ally
+	H.tapProvince(alice, volga)
+	for _, name in { "Declare war", "Ally", "Insult", "Gift", "Ask access" } do
+		H.expect(H.hasButton(alice, name), "the sheet has " .. name)
+	end
+	H.shot(alice, "foreign_sheet")
+
+	-- the picker: four of the map's lines at a time, "Others" shows the next four
+	Emulator.press(alice, "Insult")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Insult Volga") ~= nil, "the insult picker opens for Volga")
+	local lines = InsultLines.lines("earth", "insults")
+	H.expect(Emulator.findText(alice, lines[1]) ~= nil, "it shows the map's first lines")
+	H.shot(alice, "insult_picker")
+	Emulator.press(alice, "InsultOthers")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(alice, lines[5]) ~= nil, "Others shows the next ones")
+	Emulator.press(alice, "Insult_6")
+	Emulator.run(1.5)
+	H.expect(Diplomacy.grudge(state, B, A), "Volga holds a grudge against Rhine")
+	H.expect(Diplomacy.comebackWindow(state, B, A) ~= nil, "and may answer back")
+	H.expect(H.waitText(bob, lines[6]), "Bob gets the insult as a toast")
+	H.expect(H.mapObject(bob, "Bubble" .. A) ~= nil, "a speech bubble over Rhine's capital")
+	H.expect(H.find(bob, "Comeback") ~= nil, "Bob gets the comeback card")
+	H.expect(Emulator.findText(bob, "Grudge: +10%") ~= nil, "which tells him about his grudge")
+	H.client(bob, "MapView").centreOn(H.provinceMap(bob, state.nations[A].capital), true)
+	Emulator.run(1)
+	H.shot(bob, "insulted")
+
+	-- Bob answers back from the card; Alice gets it as a toast and sees his bubble
+	local index: number? = nil
+	for _, d in H.find(bob, "Comeback"):GetDescendants() do
+		local n = if d:IsA("TextButton") then string.match(d.Name, "^Comeback_(%d+)$") else nil
+		if n and index == nil then
+			index = tonumber(n)
+		end
+	end
+	H.expect(index ~= nil and InsultLines.line("earth", "comebacks", index) ~= nil, "a comeback of the map's pool")
+	Emulator.press(bob, "Comeback_" .. index)
+	Emulator.run(1.5)
+	H.expect(H.waitText(alice, "Volga answers"), "Alice hears Volga's comeback")
+	H.expect(H.mapObject(alice, "Bubble" .. B) ~= nil, "over Volga's capital")
+	H.expect(Diplomacy.comebackWindow(state, B, A) == nil, "one comeback per insult")
+	H.expect(H.find(bob, "Comeback") == nil, "Bob's card is gone")
+	H.client(alice, "MapView").centreOn(H.provinceMap(alice, state.nations[B].capital), true)
+	Emulator.run(0.5)
+	H.shot(alice, "comeback")
+
+	-- the insult waits; a gift goes through
+	H.tapProvince(alice, volga)
+	H.expect(H.within(alice, "Insult", " s"), "the Insult button counts its wait down")
+	local bobGold = state.nations[B].gold
+	state.nations[A].gold = 200
+	Emulator.run(1.1)
+	Emulator.press(alice, "Gift")
+	Emulator.run(1.5)
+	H.expect(state.nations[B].gold == bobGold + 25, "Bob got 25 gold")
+	H.expect(H.waitText(bob, "sent you 25 gold"), "and a toast")
+
+	-- military access: Alice asks, Bob accepts from the offer card, Alice's army marches into Volga's land
+	local home = state.nations[A].capital
+	local army = Army.spawn(state, A, home, 3000)
+	H.expect(H.client(alice, "Relations").path(A, home, volga) == nil, "no route into Volga at peace")
+	H.tapProvince(alice, volga)
+	Emulator.press(alice, "Ask access")
+	Emulator.run(1.5)
+	H.expect(H.waitText(bob, "asks to march through your land"), "Bob sees Alice's request")
+	H.shot(bob, "access_offer")
+	Emulator.press(bob, "Accept")
+	Emulator.run(1.5)
+	H.expect(Diplomacy.hasAccess(state, A, B), "Rhine has military access to Volga")
+	H.expect(H.waitText(alice, "lets your armies through"), "Alice is told")
+	Emulator.press(alice, "Capital") -- her capital's sheet: Move picks up the army standing there
+	Emulator.run(1.5)
+	Emulator.press(alice, "Move")
+	Emulator.run(0.3)
+	H.tapProvince(alice, volga)
+	H.expect(Emulator.findText(alice, "s march") ~= nil, "the route into Volga's land is open")
+	H.shot(alice, "access_route")
+	Emulator.press(alice, "Go")
+	Emulator.run(1.5)
+	H.expect(#army.path > 0, "the server accepted the march")
+
+	-- the nations drawer: Volga's row shows the access mark; a tap shows its capital with the same buttons
+	Emulator.press(alice, "NationsButton")
+	Emulator.run(0.5)
+	H.expect(H.iconIn(alice, "Nation" .. B, "access"), "Volga's row shows the access mark")
+	H.shot(alice, "drawer")
+	Emulator.press(alice, "Nation" .. B)
+	Emulator.run(2)
+	local capitalName = state.provinces[state.nations[B].capital].name
+	H.expect(Emulator.findText(alice, capitalName) ~= nil, "the sheet of Volga's capital opens")
+	H.expect(H.hasButton(alice, "Gift") and not H.hasButton(alice, "Ask access"), "with its diplomacy buttons")
+	Emulator.press(alice, "✕")
+
+	-- bots: they insult now and then, and answer back
+	local Config = H.shared("Config")
+	local chance, answer = Config.Bots.InsultChance, Config.Bots.ComebackChance
+	Config.Bots.InsultChance, Config.Bots.ComebackChance = 1, 1
+	AIService.step = botStep
+	local bot = 3 -- Tigris
+	H.client(alice, "Intents").diplomacy("Insult", bot, 0, 2)
+	local deadline = Emulator.now() + 20
+	local botInsults = 0
+	repeat
+		Emulator.run(1)
+		botInsults = 0
+		for _, c in state.cooldowns do
+			if c.kind == "Insult" and state.nations[c.a].controller == "Bot" then
+				botInsults += 1
+			end
+		end
+	until (botInsults > 0 and Diplomacy.comebackWindow(state, bot, A) == nil) or Emulator.now() > deadline
+	Config.Bots.InsultChance, Config.Bots.ComebackChance = chance, answer
+	H.expect(botInsults > 0, "bots insult their rivals now and then (" .. botInsults .. " so far)")
+	H.expect(Diplomacy.grudge(state, bot, A), "Tigris holds a grudge against Rhine")
+	H.expect(Diplomacy.comebackWindow(state, bot, A) == nil, "and answered Alice back")
+	H.expect(H.waitText(alice, "Tigris answers"), "Alice hears it")
+
+	-- the setting off (a private server's choice; the client learns it from the snapshot)
+	state.setup.settings.diplomacy = false
+	H.server("Replicator").sendSnapshot(alice.serverPlayer, state, A)
+	Emulator.run(2)
+	H.tapProvince(alice, volga)
+	H.expect(not H.hasButton(alice, "Gift") and not H.hasButton(alice, "Insult"), "no insult or gift buttons")
+	H.client(alice, "Intents").diplomacy("Gift", B)
+	H.expect(H.waitText(alice, "are off on this server"), "and the server says why")
+end
+
 local function runScenario(name: string)
 	print(string.format("\n== scenario: %s ==", name))
 	shotCount = 0
@@ -3937,7 +4130,8 @@ local function runScenario(name: string)
 	if name == "private" then
 		attributes.PrivateServerOwner = PRIVATE_OWNER
 	end
-	Emulator.boot(fs.readFile("build/game.rbxlx"), if withLobby then nil else process.env.MAP, attributes)
+	local mapId = process.env.MAP or SCENARIO_MAPS[name]
+	Emulator.boot(fs.readFile("build/game.rbxlx"), if withLobby then nil else mapId, attributes)
 	scenarios[name]()
 	Emulator.assertClean(name)
 	print(string.format("== %s passed (%.0f s of game time) ==", name, Emulator.now()))

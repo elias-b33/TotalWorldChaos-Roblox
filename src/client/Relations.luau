@@ -59,7 +59,68 @@ function Relations.truce(a: number, b: number): boolean
 	return false
 end
 
--- "⚔" at war, "🤝" allied, "🕊" truce, "" otherwise.
+-- Military access (the EU4 pack): may `guest`'s armies march through `owner`'s land right now?
+function Relations.hasAccess(guest: number, owner: number): boolean
+	local d = diplomacy()
+	if d == nil then
+		return false
+	end
+	local tick = ClientState.tick()
+	for _, x in d.access or {} do
+		if x.guest == guest and x.owner == owner and x.untilTick > tick then
+			return true
+		end
+	end
+	return false
+end
+
+-- Seconds until `a` may do `kind` ("Insult" | "Gift") to `b` again (0 = now).
+function Relations.cooldown(kind: string, a: number, b: number): number
+	local d = diplomacy()
+	if d == nil then
+		return 0
+	end
+	local tick = ClientState.tick()
+	for _, c in d.cooldowns or {} do
+		if c.kind == kind and c.a == a and c.b == b and c.untilTick > tick then
+			return c.untilTick - tick
+		end
+	end
+	return 0
+end
+
+-- Seconds left on `holder`'s grudge against `against` (an insult's combat bonus), 0 = none.
+function Relations.grudge(holder: number, against: number): number
+	local d = diplomacy()
+	if d == nil then
+		return 0
+	end
+	local tick = ClientState.tick()
+	for _, g in d.grudges or {} do
+		if g.holder == holder and g.against == against and g.untilTick > tick then
+			return g.untilTick - tick
+		end
+	end
+	return 0
+end
+
+-- The insult `nationId` may still answer with a comeback (the newest open window), or nil.
+function Relations.comebackFor(nationId: number): Types.Comeback?
+	local d = diplomacy()
+	if d == nil or nationId == 0 then
+		return nil
+	end
+	local tick = ClientState.tick()
+	local best: Types.Comeback? = nil
+	for _, w in d.comebacks or {} do
+		if w.from == nationId and w.untilTick > tick and (best == nil or w.untilTick > best.untilTick) then
+			best = w
+		end
+	end
+	return best
+end
+
+-- "⚔" at war, "🤝" allied, "🕊" truce, "🚶" military access (either way), "" otherwise.
 function Relations.icon(a: number, b: number): string
 	if Relations.atWar(a, b) then
 		return "⚔"
@@ -67,6 +128,8 @@ function Relations.icon(a: number, b: number): string
 		return "🤝"
 	elseif Relations.truce(a, b) then
 		return "🕊"
+	elseif Relations.hasAccess(a, b) or Relations.hasAccess(b, a) then
+		return "🚶"
 	end
 	return ""
 end
@@ -95,7 +158,11 @@ function Relations.canEnter(nationId: number, provinceId: number): boolean
 		return false
 	end
 	local owner = record.owner
-	return owner == 0 or owner == nationId or Relations.allied(nationId, owner) or Relations.atWar(nationId, owner)
+	return owner == 0
+		or owner == nationId
+		or Relations.allied(nationId, owner)
+		or Relations.atWar(nationId, owner)
+		or Relations.hasAccess(nationId, owner)
 end
 
 -- The route an army of `nationId` would take, or nil if it can't get there.

@@ -2,7 +2,8 @@
 -- Private server settings (docs/MONETIZATION.md 3.4; allowed values in Config.Private). The owner changes them in
 -- the Lobby (Sim.Lobby checks who and when, this module what); the next match carries them in MatchState.setup,
 -- and every rule that depends on them reads them from there: the phase clock (Match.phaseAt), powers and disasters
--- (Primordial), locked teams (Diplomacy), bot difficulty (AIService), rewards (Settings.fullRewards).
+-- (Primordial), locked teams (Diplomacy), bot difficulty (AIService), rewards (Settings.fullRewards), and the EU4
+-- pack's features (Settings.FEATURES: insults, gifts and military access in Diplomacy).
 -- Public servers play the defaults. Pure: no Roblox, randomness from the seeded Rng.
 
 local Army = require("./Army")
@@ -34,8 +35,12 @@ function Settings.defaults(): MatchSettings
 		powers = true,
 		disasters = true,
 		teams = {},
+		diplomacy = Config.Features.Diplomacy,
 	}
 end
+
+-- The EU4 pack's features: on/off settings (MatchSettings keys), defaults in Config.Features.
+Settings.FEATURES = { "diplomacy" } :: { string }
 
 function Settings.copy(settings: MatchSettings): MatchSettings
 	local out = table.clone(settings)
@@ -160,15 +165,26 @@ function Settings.set(
 		else
 			settings.disasters = value :: boolean
 		end
+	elseif table.find(Settings.FEATURES, key) then
+		if type(value) ~= "boolean" then
+			return false, "BadSetting"
+		end
+		(settings :: any)[key] = value
 	else
 		return false, "BadRequest"
 	end
 	return true, nil
 end
 
--- Default rules? The map and the theme only change how a match looks, so they don't count; everything else does.
+-- Default rules? The map and the theme only change how a match looks, so they don't count; everything else does,
+-- the EU4 pack's features included.
 function Settings.isStandard(settings: MatchSettings): boolean
 	local d = Settings.defaults()
+	for _, key in Settings.FEATURES do
+		if (settings :: any)[key] ~= (d :: any)[key] then
+			return false
+		end
+	end
 	return settings.minutes == d.minutes
 		and settings.peaceMinutes == d.peaceMinutes
 		and settings.bots == d.bots
