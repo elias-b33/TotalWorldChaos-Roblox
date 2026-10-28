@@ -26,6 +26,7 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	end
 	local before = state.phase
 	state.phase = Match.phaseAt(state.tick, state.setup)
+	Movement.endAccess(state) -- 2: military access that ended sends the guests' armies home first
 	Movement.step(state) -- 2
 	Battle.step(state, rng) -- 3
 	Siege.step(state) -- 4

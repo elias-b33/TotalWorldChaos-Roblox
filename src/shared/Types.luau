@@ -78,10 +78,10 @@ export type Battle = {
 	defenderRoll: number,
 }
 
--- An alliance or peace proposal waiting for the other nation to accept.
+-- An alliance, peace or military access proposal waiting for the other nation to accept.
 export type Offer = {
 	id: number,
-	kind: "Ally" | "Peace",
+	kind: "Ally" | "Peace" | "Access",
 	from: NationId,
 	to: NationId,
 	tribute: number, -- gold the proposer pays when peace is accepted
@@ -93,8 +93,20 @@ export type Offer = {
 -- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a),
 -- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province, by = the caster's nation, for a
 -- Primordial the nation it last held, so clients show the caster's power-effect cosmetic; men = the men a Meteor
--- killed, for achievements), Disaster (same fields, no caster), Eliminated(a)
+-- killed, for achievements), Disaster (same fields, no caster), Eliminated(a),
+-- Insult(a insults b), InsultBack(a answers b's insult in kind), LaughedOff(a laughs off b's insult), Gift(a sends b
+-- gold), AccessGranted(a lets b's armies through its land). Insults carry no text (docs/DESIGN.md "Diplomacy").
 export type MatchEvent = { kind: string, a: number, b: number, province: number, by: number?, men: number? }
+
+-- Insults (docs/DESIGN.md "Diplomacy"): the insulted nation (holder) fights its insulter (against) better for a while.
+-- against = 0: high spirits, from laughing an insult off (a smaller bonus in every battle).
+export type Grudge = { holder: NationId, against: NationId, untilTick: number }
+-- `from` was insulted by `to` and may answer (insult back or laugh it off) until untilTick.
+export type Answer = { from: NationId, to: NationId, untilTick: number }
+-- A wait: `a` may do `kind` again from untilTick: "Insult" to `b`, "Gift" to anyone (b = 0).
+export type Cooldown = { kind: string, a: NationId, b: NationId, untilTick: number }
+-- Military access: the guest's armies may enter the owner's land until untilTick (a war between them ends it).
+export type Access = { owner: NationId, guest: NationId, untilTick: number }
 
 export type MatchResult = {
 	kind: "Domination" | "Alliance" | "Score",
@@ -117,6 +129,8 @@ export type MatchSettings = {
 	powers: boolean, -- Primordial powers (nations and Primordials)
 	disasters: boolean, -- the Cataclysm's disasters
 	teams: { { userId: number, team: number } }, -- locked teams: these players start allied; none = off
+	-- the EU4 pack's features (defaults in Config.Features)
+	diplomacy: boolean, -- insults and their answers, gifts, military access
 }
 
 -- How a match was set up, read by Sim from MatchState (never from globals).
@@ -146,6 +160,11 @@ export type MatchState = {
 	result: MatchResult?, -- set when someone has won; the phase is then Results
 	theme: string?, -- the map theme everyone sees (a Theme catalogue item id, from the theme vote); nil = classic.
 	-- Cosmetic only: no rule reads it.
+	-- the EU4 pack's diplomacy (Sim.Diplomacy): insults' grudges and answer windows, waits, military access
+	grudges: { Grudge },
+	answers: { Answer },
+	cooldowns: { Cooldown },
+	access: { Access },
 }
 
 -- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside
@@ -237,7 +256,20 @@ export type MapDef = {
 
 -- Intents: what a player or bot asks for. CommandRouter checks the shape, Sim/Commands checks the rules.
 
-export type DiplomacyAction = "War" | "Ally" | "AcceptAlly" | "Peace" | "AcceptPeace"
+-- The EU4 pack: Insult (no message: docs/DESIGN.md "Diplomacy"), InsultBack and LaughOff answer an insult, Gift sends
+-- Config.Diplomacy.GiftGold, Access asks for military access, AcceptAccess grants it.
+export type DiplomacyAction =
+	"War"
+	| "Ally"
+	| "AcceptAlly"
+	| "Peace"
+	| "AcceptPeace"
+	| "Insult"
+	| "InsultBack"
+	| "LaughOff"
+	| "Gift"
+	| "Access"
+	| "AcceptAccess"
 
 export type Command =
 	{ kind: "Develop", province: ProvinceId }

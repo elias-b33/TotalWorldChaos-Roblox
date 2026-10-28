@@ -33,7 +33,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 
 **Phases**
 
-1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, teams, map and theme.
+1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, insults (see Diplomacy), teams, map and theme.
 2. **Pick (up to 30 s):** the chosen map shows every nation's start territory, and players pick a start nation one at a time in a random draft order, by tapping its land (then confirming) or its name in the list. Each turn lasts 30 s ÷ players (3–8 s); a turn that runs out picks a random free nation. Someone who joins during the draft goes to the end of the order. Bots take the rest. The match clock starts at 0:00 when the draft ends.
 3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
 4. **Open war (3–20 min):** everything unlocked.
@@ -181,8 +181,8 @@ One elite per race (Knights are both the Kingdom's and the Humans'):
 - An army is a stack of regiments of any troop types (its composition, see Troops) shown as one token on the map: a nation's armies that stand still in the same province (not marching, fighting or retreating) merge into one, and their compositions add up.
 - Movement: one province per 5 s on plains, 8 s on forest and hills; 3 s and 6 s for fast troops (cavalry, knights, horse archers, raptor riders, drones, storm wisps). An army moves at its slowest troop's speed; a Forest race crosses forest at plains speed and a Swift race marches 20% faster. Paths follow province neighbours (BFS).
 - A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers. Strength = the sum of its men × each troop's attack (attackers) or defence (defenders); losses split over troop types in proportion to their men.
-- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, a Forest race in a forest +10%, a Hills race defending in hills +25%, an Attack race attacking +10%, random ±10% per battle.
-- After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at its own speed (its slowest troop's), under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home.
+- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, a Forest race in a forest +10%, a Hills race defending in hills +25%, an Attack race attacking +10%, a grudge against an insulter +10% or high spirits +5% (see Diplomacy), random ±10% per battle.
+- After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at its own speed (its slowest troop's), under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege, and it walks on even if its way closes (a peace, military access ending); it is a normal army again when it arrives. Armies under 500 men are destroyed, and so is a loser with no way home.
 
 ### Sieges
 
@@ -197,6 +197,24 @@ One elite per race (Knights are both the Kingdom's and the Humans'):
 - **Alliance:** request and accept; max 3 nations per alliance.
 - **Peace:** white peace, or peace plus a gold tribute. A 3-minute truce follows.
 - **Coalition:** a nation holding 20%+ of the ownable provinces gets a crown on the map, and every other nation gets +30% combat strength against it.
+
+**Insults, gifts and military access** (the EU4 pack, stage 1). A match setting, `diplomacy`, on by default (`Config.Features.Diplomacy`); a private server's owner can turn it off (the "Insults" row), and so can a later sandbox mode. Off, the buttons are gone and the server refuses with `DiplomacyOff`; it isn't a custom rule (full rewards), since it makes nothing easier. War, alliances and peace are always on. All of it works in Peace too. Rules: `Sim/Diplomacy.luau`; flavour lines: `Shared/Flavour/Insults.luau`; numbers: `Config.Diplomacy`.
+
+**No preset messages between players (a Roblox rule).** Roblox's preset-text rules (DevForum, 26 March 2026, enforced from 26 April 2026) say "Preset systems cannot be used for social communication": pre-written messages that players send each other may only coordinate gameplay, and experiences that break the rule can be sequestered. Player-chosen joke insults shown to the target, with pre-written comebacks, are exactly that kind of system, so the first draft of this stage was redesigned before it shipped:
+
+- An insult is a diplomatic action with **no message attached**: the player taps Insult and picks nothing. The target sees a neutral system line describing a game action ("Rhine insulted you!"), of the same kind as "Rhine declared war on you!"; everyone sees a small marker. Nothing a player chooses is ever shown to another player.
+- The answers are actions too (Insult back, Laugh it off), with no text.
+- The humour stays private: after you act, your own client shows you alone a game-written flavour line about your own side. It is never sent anywhere, so it isn't communication between players.
+- Later work must not bring back preset messages, chat phrases, taunts or quick-chat that players send each other. Gifts and military access are game actions with neutral system lines, so they are fine.
+
+The rules:
+
+- **Insult:** a tap on another living nation that isn't your ally. The target gets a toast "💢 Rhine insulted you!" and an answer card; everyone sees an anger-mark marker over the target's capital for 5 s (no text); other nations get no toast. One insult per pair every 90 s, each way on its own clock.
+- **Grudge:** the insulted nation holds a grudge against the insulter for 3 minutes: +10% combat strength for its side in battles against the insulter's side, attacking or defending (like the other side bonuses, it doesn't stack). A new insult starts the 3 minutes again.
+- **Answers:** for 30 s the insulted nation may answer once, from its card (top right, with the timer and the grudge). **Insult back:** the insulter now holds the same grudge against it (3 minutes), so in their own fights neither side has the edge; it doesn't wait for its own insult wait, but starts it, and the exchange ends there (no answer to an answer). **Laugh it off:** its grudge ends and it is in high spirits instead: +5% combat strength in every battle (against anyone, garrisons too) for 1 minute; a grudge and high spirits don't stack (the best counts). Doing nothing keeps the grudge. The other side gets a toast ("Volga insulted you back!", "Volga laughed off your insult"); an insult back also puts the marker over the first insulter's capital.
+- **Gift:** 25 gold to a nation you're not at war with. One gift a minute, whoever it goes to, so gifts stay small.
+- **Military access:** ask to march through a nation's land; it's an offer like an alliance (30 s to accept, shown in the offers column). Accepted, the guest's armies may enter the owner's land for 3 minutes; they don't fight or besiege there (the two are at peace). Not between nations at war or allies (allies may enter anyway). Access ends when it runs out, when a war starts between the two (either side declaring), or when one of them is gone. When it ends, the guest's armies in that land walk home under the white flag, like a beaten army (no orders, no fights, no sieges on the way), so access can't be used to park an army deep in a neighbour's land before a war.
+- **Flavour lines (private):** after you insult or insult back, your own client shows you a toast with a game-written line from the map's pool (8 per map), about what your own side did: "Your court jesters wrote a ballad about Volga's catapults." After laughing one off, one of 4 laugh lines. The game picks the line (from the tick and the other nation, no randomness on the server); the server never sends it and no other player ever sees it. Earth's lines are down to earth (jesters, scribes, catapults, maps), Eldmoor's fantasy (bards, wizards, trolls, dragons), Skyshards' sci-fi in space (ship's computer, holograms, lasers). Silly, never mean: they poke at castles, banners and gadgets, never at real peoples, countries, religions, appearance, family or identity, never at one of the map's races (any nation may be any race); no profanity; Earth's lines never name its rivers (the other nation's name is filled in). A Lune test checks the length (64 characters with the map's longest name), that each line is about "Your" side, the banned words and the river names.
 
 ### Primordial powers
 
@@ -281,7 +299,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 ### Tick order
 
 1. Apply queued commands.
-2. Move armies (retreating armies walk home too), then merge a nation's armies standing in the same province.
+2. Military access that ended sends the guests' armies home; move armies (retreating armies walk home too), then merge a nation's armies standing in the same province.
 3. Resolve battles.
 4. Advance sieges and flip provinces.
 5. Every 10th tick: pay income and upkeep.
@@ -421,6 +439,11 @@ export type MatchState = {
     primordials: { [number]: Primordial }, -- keyed by userId
     seats: { [number]: NationId }, -- userId -> the nation that player last held (rejoins)
     nextArmyId: ArmyId,        -- army ids count up and are never reused
+    -- the EU4 pack's diplomacy (Sim/Diplomacy.luau), each entry with an untilTick
+    grudges: { Grudge },       -- { holder, against }: the insulted fights the insulter better; against = 0: high spirits
+    answers: { Answer },       -- { from, to }: the insulted may answer this insult (insult back, laugh it off)
+    cooldowns: { Cooldown },   -- { kind, a, b }: a may Insult b again later; a Gift's wait has b = 0 (anyone)
+    access: { Access },        -- { owner, guest }: the guest's armies may enter the owner's land
 }
 ```
 
@@ -475,7 +498,7 @@ export type Command =
 | `RequestRecruit` | client → server | provinceId, regiments, troop type (the nation's race must be allowed it) |
 | `RequestBuild` | client → server | provinceId, building |
 | `RequestDevelop` | client → server | provinceId |
-| `RequestDiplomacy` | client → server | action (War, Ally, AcceptAlly, Peace, AcceptPeace), targetNation, gold? |
+| `RequestDiplomacy` | client → server | action (War, Ally, AcceptAlly, Peace, AcceptPeace, and the EU4 pack's Insult, InsultBack, LaughOff, Gift, Access, AcceptAccess; an insult carries no message), targetNation, gold? |
 | `RequestPower` | client → server | power, target province or nation |
 | `CommandResult` | server → client | requestId, ok, reason |
 | `Snapshot` | server → client | full match state, sent on join (every nation's race, every army's composition) |
@@ -497,8 +520,9 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 
 - **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
 - **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank, and a mute button (see "Sound and effects").
-- **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce).
-- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit (one button per troop your race recruits, each with its price), or Declare war and Ally on foreign provinces.
+- **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce, military access). A tap on another nation's row closes the drawer and shows that nation's capital with its bottom sheet, so its diplomacy buttons are one tap from the list.
+- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit (one button per troop your race recruits, each with its price), or Declare war and Ally (Peace with its tributes at war) on foreign provinces. With the `diplomacy` setting on, also Insult (it opens a picker with 4 of the map's lines at a time and "Others"; greyed with the seconds left while the pair's wait runs), Gift (its price, or the wait) and Ask access.
+- **Insults on screen:** no message, ever (see Diplomacy). The target gets a neutral toast and an answer card in the top-right column (where offers show, under the toast line) with its timer, the grudge and two buttons, Insult back and Laugh it off (with its +5% and 1:00); everyone sees an anger mark in a round badge over the target's capital for 5 s; the one who acted gets a private flavour toast.
 - **Moving armies:** tap the army, tap the destination, see the path with arrival time (at the army's own speed), tap Confirm. The army sheet shows the composition as chips (troop icon and men).
 - **Primordial powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
 - **Map modes:** Political (default), Diplomacy (allies green, enemies red), Terrain.
@@ -584,6 +608,9 @@ Each bot checks a short priority list every few seconds and does the first actio
 5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders (Hills races pay half), then develop; with everything built, spare gold buys regiments (the Recruit step's troop).
 6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
 7. **Primordial power:** with 2 charges, Meteor the biggest army of a nation I'm at war with that isn't immune right now. This rides along with whatever else the plan does, so charges don't pile up.
+8. **Insults and access** (with the `diplomacy` setting on; they ride along too): accept a nation's military access request unless I'm at war with it or hold a grudge against it; when insulted, insult back half the time (decided once per insult), otherwise keep the grudge (bots never laugh one off); and now and then (0.2% of plans, about one insult per bot in a match) insult a rival: a nation I'm at war with, else a neighbour that isn't my ally.
+
+**Grudges:** an insulted bot leans towards war with its insulter. In the Attack step a neighbour that insulted me is the first war target, and my stack needs only 0.85× my usual attack ratio against it, never under 1× (an even fight). It doesn't change how strong my whole side must be.
 
 | Difficulty | Plans every | Attack ratio | Behaviour |
 | --- | --- | --- | --- |
@@ -673,6 +700,12 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] A cast of five peoples for every map, data-driven (`Config.Races`, `Config.Casts`): human civilisations on Earth, the fantasy peoples and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards with troopers, gunners and hover bikes; seven passive kinds; an elite, a soldier, a capital and icons for each (evidence: `docs/BALANCE.md` section 19)
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
+
+### EU4 pack
+
+The owner's "diplomacy like insulting" and more EU4 flavour, in stages. Later stages: events with choices, generals, missions, fog of war.
+
+- [x] Stage 1: insults as a diplomatic action with no message (Roblox's preset-text rule) and their answers (insult back, laugh it off), grudges, private flavour lines, gifts and military access, a match setting to turn them off, bots that insult, insult back and lean towards war with an insulter (harness scenario `diplomacy`; evidence: `docs/BALANCE.md` section 20)
 
 ### Phase 5: Soft launch
 

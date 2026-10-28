@@ -608,3 +608,39 @@ Every map now has its own five peoples, two nations each (`docs/DESIGN.md` "Race
 - Spread the start positions over the peoples (one strong and one weak start each) before tuning their numbers: the Clans and the Lizardfolk first.
 - The Manpower passive (Orcs, Insectoids) does little for bots (section 18); their elites carry them.
 - The Elves' two wildwoods are strong starts (1.42× with +10% in forests, 1.06× with +5%).
+
+## 20. The EU4 pack, stage 1: insults, grudges, gifts and military access
+
+`docs/DESIGN.md` "Diplomacy" has the rules (and why insults carry no message). What could move balance, and how much:
+
+| Effect | Size | Who gets it | Worth in men (section 5: +50% ≈ 15%, +30% ≈ 8%) |
+| --- | --- | --- | --- |
+| Grudge | +10% combat strength, 3 min | the insulted side, only against the insulter's side | about 3% |
+| Insult back | the same grudge for the first insulter | evens out the two sides' fights | 0 between them |
+| High spirits (laugh it off) | +5% in every battle, 1 min, instead of the grudge | the insulted side | about 1.5% |
+| Gift | 25 gold, one a minute per giver, never to an enemy | anyone (bots never send one) | zero-sum: at most 25 gold a minute moves, a fifth or less of a mid-game nation's income |
+| Military access | 3 min of marching through a neighbour's land | players who ask (bots grant, never ask) | none in bot play; no surprise attacks (the guest's armies walk home when it ends, wars included) |
+
+An insult only ever helps the one insulted, so it can't be farmed: two friends trading insults and laughs give each other a few percent for a minute, and the bonuses don't stack. The bot side is the bigger lever: an insulted bot puts its insulter first among its war targets at 0.85× its attack ratio (never under an even fight, `Bot.grudgeFactor`).
+
+**How it was measured.** `lune run tools/harness/tournament 200 <map>` on each map, seeds 1–200, Normal bots, map races, with the pack on (the default). The tournament now also prints insults, insults back and wars declared on an insulter per match, and `SET` takes `true`/`false` (`SET="Features.Diplomacy=false"` turns the pack off). The baseline is section 19's first pass (same Config, same seeds). The two aren't paired match by match: the bots' insult roll uses the bot random stream, and retreating armies now walk on through land that closed to them (`docs/DESIGN.md` "Armies and combat"), so each match plays out differently.
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Insults per match (all 10 bots) | 5.2 | 5.2 | 5.4 |
+| Insults back per match | 2.7 | 2.5 | 2.8 |
+| Wars declared on an insulter per match | 0.5 of 9.9 | 0.5 of 10.9 | 0.3 of 9.8 |
+| Alliance victories of 200 (section 19); the rest are score wins at 25:00, no dominations | 42 (41) | 50 (37) | 17 (17) |
+| Provinces taken from nations per match | 42.9 | 55.0 | 38.6 |
+| Men in all armies at 25:00 | 162k | 141k | 175k |
+| Start slots, lowest to highest share | 0.56×–1.72× | 0.46×–1.59× | 0.60×–1.45× |
+
+| Map | Race: wins (share); section 19's first pass in brackets |
+| --- | --- |
+| Earth | Kingdom 49 (0.86×; 0.80×) · Empire 61 (1.07×; 1.37×) · Nomads 65 (1.14×; 1.13×) · Republic 66 (1.16×; 1.10×) · Clans 44 (0.77×; 0.60×) |
+| Eldmoor | Humans 78 (1.29×; 1.25×) · Elves 68 (1.13×; 1.42×) · Orcs 51 (0.84×; 0.87×) · Dwarves 56 (0.93×; 0.82×) · Lizardfolk 49 (0.81×; 0.64×) |
+| Skyshards | Marines 38 (0.81×; 0.74×) · Robots 60 (1.28×; 1.06×) · Insectoids 35 (0.74×; 0.79×) · Crystal folk 44 (0.94×; 1.11×) · Energy beings 58 (1.23×; 1.30×) |
+
+**Balance holds.** Every race moved by about the noise of 200 seeds (±0.2×) or less, and the spread got no wider (Earth 0.77×–1.16×, Eldmoor 0.81×–1.29×, Skyshards 0.74×–1.28×). The same start slots lead and trail as in section 19 (Volga and Frostmarch on top; Saltmarsh, Ironholds and Mississippi at the bottom). Match length, wars and conquests sit in section 19's ranges. Insults are rare (about one every five minutes across the map) and decide about one war in twenty.
+
+**Watch:** Eldmoor's alliance victories rose from 37 to 50 of 200 (about 2 standard deviations); nothing in the pack points at alliances, so check it again with the next batch of seeds before acting. Players will insult far more than bots do; the soft launch's `diplomacy_action` events (`docs/LAUNCH.md`) show how much, and the grudge is small enough that it shouldn't matter.

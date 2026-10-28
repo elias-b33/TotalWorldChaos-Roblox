@@ -4,6 +4,10 @@
 -- Troops: infantry is the base; a threatened province raises archers (while they are under Config.Bots.ArcherShare
 -- of my men); at war, a bot that can pay for them and keep its upkeep reserve recruits its race's elite or cavalry
 -- instead (see pickTroop), while the two are under Config.Bots.AttackShare of my men.
+-- The EU4 pack's diplomacy rides along with the plan like the power does (see social): a bot lets a nation it has
+-- nothing against through its land, insults back now and then, and now and then insults a rival. An insulted
+-- bot leans towards war with its insulter: that nation is its first war target, at Config.Bots.GrudgeAttackRatio of
+-- its usual attack ratio.
 -- Bots send the same commands players do, through CommandRouter, and every command is dry-run against
 -- Sim/Commands first, so a bot almost never sends one the server refuses. No cheating: bots read the same state
 -- any player could see and pay full price for everything.
@@ -35,11 +39,13 @@ export type Settings = {
 	targetsLeadingPlayer: boolean,
 }
 
--- What a bot remembers between plans: its province count when each of its wars started, and when it last made
--- each kind of offer to each nation (so it doesn't repeat itself every time an offer expires).
+-- What a bot remembers between plans: its province count when each of its wars started, when it last made each
+-- kind of offer to each nation (so it doesn't repeat itself every time an offer expires), and the insults it has
+-- decided whether to answer.
 export type Memory = {
 	warStart: { [number]: { startedAt: number, provinces: number } }, -- war id -> snapshot
 	offeredAt: { [string]: number }, -- "Ally:3" -> tick
+	answered: { [string]: boolean }, -- "insulter:window end" -> decided
 }
 
 export type Schedule = {
@@ -63,7 +69,7 @@ function Bot.settings(difficulty: Difficulty): Settings
 end
 
 function Bot.newMemory(): Memory
-	return { warStart = {}, offeredAt = {} }
+	return { warStart = {}, offeredAt = {}, answered = {} }
 end
 
 function Bot.newSchedule(): Schedule
@@ -116,6 +122,7 @@ type Ctx = {
 	upkeep: number, -- what my armies cost a month
 	isEnemy: { [number]: boolean }, -- nations at war with me
 	enemies: { number },
+	grudge: { [number]: boolean }, -- nations that insulted me (I hold a grudge against them)
 	targeted: { [number]: boolean }, -- provinces my armies stand in (abroad) or are marching to
 	reserved: { [number]: number }, -- army id -> where the threat it guards against stands
 }
@@ -145,13 +152,14 @@ local function context(state: MatchState, me: number, rng: Rng.Rng, settings: Se
 			isMine[id] = true
 		end
 	end
-	local isEnemy, enemies, mayEnter = {}, {}, {}
+	local isEnemy, enemies, mayEnter, grudge = {}, {}, {}, {}
 	for _, id in sortedKeys(state.nations) do
 		if Diplomacy.atWar(state, me, id) then
 			isEnemy[id] = true
 			table.insert(enemies, id)
 		end
-		mayEnter[id] = isEnemy[id] == true or Diplomacy.friendly(state, me, id)
+		mayEnter[id] = isEnemy[id] == true or Diplomacy.friendly(state, me, id) or Diplomacy.hasAccess(state, me, id)
+		grudge[id] = Diplomacy.grudge(state, me, id) or nil
 	end
 	local armiesAt: { [number]: { Army } } = {}
 	local hostile: { [number]: { Army } } = {}
@@ -208,6 +216,7 @@ local function context(state: MatchState, me: number, rng: Rng.Rng, settings: Se
 		upkeep = Economy.upkeep(state, me),
 		isEnemy = isEnemy,
 		enemies = enemies,
+		grudge = grudge,
 		targeted = targeted,
 		reserved = {},
 	}
@@ -293,15 +302,16 @@ local function canBeat(ctx: Ctx, provinceId: number, armies: { Army }): boolean
 	return wouldWin(menOf(armies), myRate, menOf(theirs), theirRate)
 end
 
--- Are these armies strong enough (by the difficulty's attack ratio) to attack `theirs` in a province?
-local function aboveRatio(ctx: Ctx, provinceId: number, armies: { Army }, theirs: { Army }): boolean
+-- Are these armies strong enough (by the difficulty's attack ratio, times `factor` if given) to attack `theirs` in
+-- a province?
+local function aboveRatio(ctx: Ctx, provinceId: number, armies: { Army }, theirs: { Army }, factor: number?): boolean
 	if menOf(armies) < Config.Army.MinArmyMen then
 		return false
 	elseif #theirs == 0 then
 		return true
 	end
 	local my, their = strengths(ctx, provinceId, armies, theirs, false, 0, 0)
-	return my >= ctx.settings.attackRatio * their
+	return my >= ctx.settings.attackRatio * (factor or 1) * their
 end
 
 -- The route an army would take (the same BFS as Movement.order), if it doesn't fight anyone before arriving.
@@ -796,9 +806,16 @@ local function localDefence(ctx: Ctx, provinceId: number, members: { number }): 
 	return out
 end
 
+-- Against a nation that insulted me, my attack ratio is multiplied by this: Config.Bots.GrudgeAttackRatio, but never
+-- so far that I'd attack with less than Config.Bots.GrudgeMinRatio of the defenders' strength (an even fight).
+function Bot.grudgeFactor(attackRatio: number): number
+	return math.max(Config.Bots.GrudgeAttackRatio, Config.Bots.GrudgeMinRatio / attackRatio)
+end
+
 -- At peace with everyone: declare war on my weakest neighbour (Hard: the leading player first) if I am not
 -- weaker overall and one of my free stacks beats, by the attack ratio, everything guarding one of its border
--- provinces.
+-- provinces. A neighbour that insulted me comes first, and my stack needs only Config.Bots.GrudgeAttackRatio of the
+-- usual attack ratio against it (never under Config.Bots.GrudgeMinRatio, an even fight).
 local function declareWar(ctx: Ctx): { Command }?
 	local state = ctx.state
 	if state.phase == "Peace" then
@@ -844,6 +861,10 @@ local function declareWar(ctx: Ctx): { Command }?
 	end
 	local leader = if ctx.settings.targetsLeadingPlayer then leadingPlayer(ctx) else nil
 	table.sort(candidates, function(a, b)
+		local ga, gb = ctx.grudge[a.id] == true, ctx.grudge[b.id] == true
+		if ga ~= gb then
+			return ga -- an insult is remembered
+		end
 		if (a.id == leader) ~= (b.id == leader) then
 			return a.id == leader
 		end
@@ -859,6 +880,7 @@ local function declareWar(ctx: Ctx): { Command }?
 		distances[i] = dist
 	end
 	for _, c in candidates do
+		local factor = if ctx.grudge[c.id] then Bot.grudgeFactor(ctx.settings.attackRatio) else 1
 		if mySide >= c.men then
 			local members = Diplomacy.allianceMembers(state, c.id)
 			for i, stack in stacks do
@@ -868,7 +890,7 @@ local function declareWar(ctx: Ctx): { Command }?
 					for _, n in state.provinces[p].neighbors do
 						near = near or n == stack.location or (dist[n] ~= nil and ctx.isMine[n] == true)
 					end
-					if near and aboveRatio(ctx, p, stack.armies, localDefence(ctx, p, members)) then
+					if near and aboveRatio(ctx, p, stack.armies, localDefence(ctx, p, members), factor) then
 						return try(ctx, { kind = "Diplomacy", action = "War", target = c.id, gold = 0 })
 					end
 				end
@@ -1254,6 +1276,74 @@ local function primordial(ctx: Ctx): { Command }?
 	return try(ctx, { kind = "Power", power = "Meteor", target = best.id })
 end
 
+-- 8. Insults and military access (the EU4 pack) -----------------------------------------------------------------
+-- They ride along with the plan's other commands too. A bot lets a nation through its land when it asks, unless they
+-- are at war or the bot holds a grudge against it; insults back (Config.Bots.InsultBackChance, decided once per
+-- insult; otherwise it keeps its grudge, and never laughs one off); and now and then (Config.Bots.InsultChance per
+-- plan) insults a rival: a nation it is at war with, else a neighbour that isn't its ally.
+
+local function social(ctx: Ctx, memory: Memory): { Command }
+	local state = ctx.state
+	local out: { Command } = {}
+	if state.setup.settings.diplomacy ~= true then
+		return out
+	end
+	local me = ctx.me
+	for _, o in state.offers do
+		if o.kind == "Access" and o.to == me and o.expiresAt > state.tick and not ctx.isEnemy[o.from] then
+			if not ctx.grudge[o.from] then
+				local accept = try(ctx, { kind = "Diplomacy", action = "AcceptAccess", target = o.from, gold = 0 })
+				if accept then
+					table.insert(out, accept[1])
+					break
+				end
+			end
+		end
+	end
+	for _, w in state.answers do
+		local key = w.to .. ":" .. w.untilTick
+		if w.from == me and w.untilTick > state.tick and not memory.answered[key] then
+			memory.answered[key] = true
+			if Rng.next(ctx.rng) < Config.Bots.InsultBackChance then
+				local answer = try(ctx, { kind = "Diplomacy", action = "InsultBack", target = w.to, gold = 0 })
+				if answer then
+					table.insert(out, answer[1])
+				end
+			end
+		end
+	end
+	if Rng.next(ctx.rng) < Config.Bots.InsultChance then
+		local rivals: { number } = {}
+		if #ctx.enemies > 0 then
+			rivals = table.clone(ctx.enemies)
+		else
+			for _, id in ctx.mine do
+				for _, n in state.provinces[id].neighbors do
+					local owner = state.provinces[n].owner
+					if owner and owner ~= me and table.find(rivals, owner) == nil then
+						table.insert(rivals, owner)
+					end
+				end
+			end
+			table.sort(rivals)
+		end
+		local options: { number } = {}
+		for _, id in rivals do
+			if not Diplomacy.allied(state, me, id) and Diplomacy.cooldownLeft(state, "Insult", me, id) == 0 then
+				table.insert(options, id)
+			end
+		end
+		if #options > 0 then
+			local target = options[Rng.int(ctx.rng, 1, #options)]
+			local insult = try(ctx, { kind = "Diplomacy", action = "Insult", target = target, gold = 0 })
+			if insult then
+				table.insert(out, insult[1])
+			end
+		end
+	end
+	return out
+end
+
 -- Plan ---------------------------------------------------------------------------------------------------
 
 -- The commands this bot wants this turn (usually one, sometimes none).
@@ -1279,10 +1369,16 @@ function Bot.plan(
 		or build(ctx)
 		or diplomacy(ctx, mem)
 		or {}
+	local extra = social(ctx, mem)
 	local power = primordial(ctx)
 	if power then
+		table.insert(extra, power[1])
+	end
+	if #extra > 0 then
 		commands = table.clone(commands)
-		table.insert(commands, power[1])
+		for _, command in extra do
+			table.insert(commands, command)
+		end
 	end
 	return commands
 end

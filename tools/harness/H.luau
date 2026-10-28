@@ -239,6 +239,41 @@ function H.state()
 	return H.server("Services.MatchService").state()
 end
 
+-- The server's copy of a shared module (ReplicatedStorage.Shared), e.g. H.shared("Config") to change a number for a
+-- test on the running server.
+function H.shared(path: string)
+	local node = Emulator.server.dm:GetService("ReplicatedStorage").Shared
+	for _, name in string.split(path, ".") do
+		node = node:FindFirstChild(name)
+	end
+	return Emulator.server.modules[node]
+end
+
+-- Wait (game time) until a client shows a text containing `text` (toasts queue up one after another).
+function H.waitText(client, text: string, seconds: number?): boolean
+	local deadline = Emulator.now() + (seconds or 12)
+	while Emulator.findText(client, text) == nil and Emulator.now() < deadline do
+		Emulator.run(0.25)
+	end
+	return Emulator.findText(client, text) ~= nil
+end
+
+-- The GUI object named `name` anywhere on the client's screen, when it is shown (nil otherwise).
+function H.find(client, name: string)
+	local obj = client.localPlayer.PlayerGui:FindFirstChild(name, true)
+	return if obj and shown(obj) then obj else nil
+end
+
+-- A visible button whose Name is `name` or whose text contains it.
+function H.hasButton(client, name: string): boolean
+	for _, b in Emulator.buttons(client) do
+		if b.button.Name == name or string.find(b.text, name, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 function H.myNation(client)
 	return H.client(client, "ClientState").myNation()
 end
@@ -283,7 +318,6 @@ end
 H.OUT = OUT
 H.PRIVATE_OWNER = PRIVATE_OWNER
 H.shown = shown
-H.within = within
 H.hasIcon = hasIcon
 
 return H
