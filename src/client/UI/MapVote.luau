@@ -2,6 +2,8 @@
 -- The map vote in the Lobby (docs/MAPS.md "Task: Map vote"): one big card per map with a pixel-art thumbnail,
 -- its title, a one-line pitch and the votes so far. Tap a card to choose it, tap it again to vote.
 -- A server locked to one map shows just that card. Full screen, above everything else.
+-- A server's first match has a first pick instead (docs/DESIGN.md "Match structure"): the same cards, but only the
+-- first player who chose Play online picks (tap a card, tap again); everyone else sees who is picking.
 -- Theme vote (docs/MONETIZATION.md 3.2): your thumbnails are painted in the map theme you have equipped, and the
 -- hint says you bring it; the map that wins is painted in the theme most of its voters bring.
 
@@ -122,6 +124,17 @@ local function showThumb(holder: Frame, map: Types.MapDef)
 	end
 end
 
+-- Fill `holder` with a map's thumbnail in your theme: its sea colour at once, the painted map when it's ready (or
+-- just the colour without EditableImage). The start menu's Singleplayer cards use it too.
+function MapVote.thumbnail(holder: Frame, mapId: string)
+	local map = Maps.get(mapId)
+	local background = Palette.background[map.theme] or Palette.background.earth
+	local themed = PixelArt.themeColor(Cosmetics.myTheme(), packed(background), false, map.theme == "sky")
+	holder.BackgroundColor3 =
+		Color3.fromRGB(bit32.rshift(themed, 16), bit32.band(bit32.rshift(themed, 8), 255), bit32.band(themed, 255))
+	showThumb(holder, map)
+end
+
 local function buildCard(mapId: string, index: number, count: number): Card
 	local map = Maps.get(mapId)
 	local button = Instance.new("ImageButton")
@@ -144,16 +157,12 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	local holder = Instance.new("Frame")
 	holder.Name = "ThumbHolder"
 	holder.Size = UDim2.new(1, 0, 0, THUMB_HEIGHT)
-	local background = Palette.background[map.theme] or Palette.background.earth
-	local themed = PixelArt.themeColor(Cosmetics.myTheme(), packed(background), false, map.theme == "sky")
-	holder.BackgroundColor3 =
-		Color3.fromRGB(bit32.rshift(themed, 16), bit32.band(bit32.rshift(themed, 8), 255), bit32.band(themed, 255))
 	holder.BorderSizePixel = 0
 	holder.LayoutOrder = 1
 	holder.Parent = button
 	Widgets.corner(holder, Theme.radius.m)
 	Widgets.stroke(holder)
-	showThumb(holder, map)
+	MapVote.thumbnail(holder, mapId)
 
 	local name = Widgets.title(button, map.title, Theme.text.heading, 24)
 	name.LayoutOrder = 2
@@ -181,6 +190,9 @@ local function buildCard(mapId: string, index: number, count: number): Card
 		local view = LobbyState.view()
 		if view == nil or view.locked or view.phase ~= "Lobby" then
 			return
+		end
+		if view.first and view.chooser ~= Players.LocalPlayer.UserId then
+			return -- someone else picks the map
 		end
 		if selected == mapId then
 			Intents.vote(mapId)
@@ -216,11 +228,21 @@ function MapVote.render()
 			cards[id] = buildCard(id, i, #view.maps)
 		end
 	end
-	title.Text = if view.locked then "This server plays one map" else "Vote for the map"
-	Icons.set(titleIcon, if view.locked then "lock" else "ballot")
-	hint.Text = if view.locked then "The draft starts soon" else "Tap a card, tap again to vote"
+	local picking = view.first and view.chooser == Players.LocalPlayer.UserId
+	if view.first then
+		title.Text = if picking or view.chooser == 0 then "Pick the map" else view.chooserName .. " is picking the map"
+		hint.Text = if picking
+			then "Tap a card, tap again to play"
+			elseif view.chooser == 0 then "The first to tap Play online picks it"
+			else "The match starts once it's picked"
+	else
+		title.Text = if view.locked then "This server plays one map" else "Vote for the map"
+		hint.Text = if view.locked then "The draft starts soon" else "Tap a card, tap again to vote"
+	end
+	Icons.set(titleIcon, if view.first then "map" elseif view.locked then "lock" else "ballot")
+	timer.Visible = not view.first or view.chooser ~= 0
 	local bring = myThemeName()
-	if bring then
+	if bring and (picking or not view.first) then
 		hint.Text ..= "  ·  You bring the " .. bring .. " theme"
 	end
 	local mine = LobbyState.myVote()
@@ -230,11 +252,11 @@ function MapVote.render()
 			continue
 		end
 		card.votes.Text = tostring(view.counts[i] or 0)
-		card.votes.Visible = not view.locked
+		card.votes.Visible = not view.locked and not view.first
 		if view.locked then
 			Widgets.setIconText(card.status, "🔒 Locked", "lock")
 		elseif mine == id then
-			Widgets.setIconText(card.status, "✅ Your vote", "check")
+			Widgets.setIconText(card.status, if view.first then "✅ Your pick" else "✅ Your vote", "check")
 		elseif selected == id then
 			Widgets.setIconText(card.status, "👆 Tap again", "arrow")
 		else

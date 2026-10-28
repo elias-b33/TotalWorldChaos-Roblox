@@ -8,7 +8,9 @@
 --
 -- Every scenario is its own file, tools/harness/scenarios/<name>.luau, returning { run = function } plus its boot
 -- options: lobby = true (it runs the Lobby; the rest boot with SkipLobby), tutorial = true (a tutorial server),
--- map = "earth" (the map it needs; MAP still overrides it) and attributes (extra Workspace attributes). Shared helpers
+-- map = "earth" (the map it needs; MAP still overrides it) and attributes (extra Workspace attributes). Every
+-- scenario boots with the start menu off (Workspace "Menu" = false: players join on arrival and the first match
+-- votes); one that tests the menu sets attributes = { Menu = true }. Shared helpers
 -- live in tools/harness/H.luau. Adding a scenario is adding a file: nothing else lists them.
 -- Screenshots go to tools/harness/out/<scenario>/NN_name.png (rendered by render_scene.py).
 -- A scenario fails on any script error, any warn(), any table Roblox would mangle over the network,
@@ -40,7 +42,7 @@ local function runScenario(name: string)
 	local scenario = require("./scenarios/" .. name)
 	H.begin(name)
 	-- scenarios start straight in Peace (Workspace "SkipLobby") unless they test the Lobby itself
-	local attributes = { SkipLobby = not scenario.lobby }
+	local attributes = { SkipLobby = not scenario.lobby, Menu = false }
 	if scenario.tutorial then
 		attributes.Tutorial = true
 	end

@@ -1,6 +1,7 @@
 --!strict
--- Owns the lobby between matches: the map vote, then the nation draft on the new match (docs/DESIGN.md
--- "Match structure"). Thin wrapper: the rules are in Shared.Sim.Lobby; GameLoop drives it once a second.
+-- Owns the lobby between matches: the map vote (or, for a server's first match, the first pick), then the nation
+-- draft on the new match (docs/DESIGN.md "Match structure"). Thin wrapper: the rules are in Shared.Sim.Lobby;
+-- GameLoop drives it once a second.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,10 +29,12 @@ function LobbyService.skipped(): boolean
 end
 
 -- Open the map vote. `lockedMap` (Workspace "MapId") skips the vote itself, and so does a private server's map
--- setting. On a private server the owner changes the settings here (Sim.Lobby.setting).
-function LobbyService.open(lockedMap: string?)
+-- setting. On a private server the owner changes the settings here (Sim.Lobby.setting). `first`: the server's first
+-- lobby with the start menu on: a first pick instead of the vote (not on a private server or with a locked map).
+function LobbyService.open(lockedMap: string?, first: boolean?)
 	local owner = MatchService.privateOwner()
-	lobby = Lobby.new(Maps.ids, lockedMap, owner, if owner or MatchService.isPrivate() then settings else nil)
+	local private = owner ~= nil or MatchService.isPrivate()
+	lobby = Lobby.new(Maps.ids, lockedMap, owner, if private then settings else nil, first == true and not private)
 	match = nil
 	rng = Rng.new(os.time()) -- the vote's tie-break and the draft order; Sim never calls math.random
 end
@@ -65,10 +68,11 @@ function LobbyService.chooseTheme(mapId: string, themes: { [number]: string }, f
 	return (Lobby.chooseTheme(assert(lobby, "no lobby"), mapId, themes, forced))
 end
 
--- The vote is over: draft the players in the server onto `newMatch`.
-function LobbyService.startPick(newMatch: Types.MatchState)
+-- The vote (or the first pick) is over: draft these players (everyone in the server who chose Play online) onto
+-- `newMatch`.
+function LobbyService.startPick(newMatch: Types.MatchState, players: { Player })
 	local userIds = {}
-	for _, player in Players:GetPlayers() do
+	for _, player in players do
 		table.insert(userIds, player.UserId)
 	end
 	match = newMatch
@@ -106,6 +110,7 @@ function LobbyService.finish()
 	match = nil
 end
 
+-- A player joins the matches here: the first pick's line, the end of the draft order, or nothing while voting.
 function LobbyService.join(player: Player)
 	if lobby then
 		Lobby.join(lobby, match, player.UserId)

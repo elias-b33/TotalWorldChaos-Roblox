@@ -153,6 +153,12 @@ function Intents.tutorial(action: string)
 	send("RequestTutorial", action)
 end
 
+-- The start menu's Play online: join this server's matches (the first pick, the vote, the draft or a bot's nation).
+-- The server closes the menu (the Menu remote).
+function Intents.playOnline()
+	send("RequestMenu", "Online")
+end
+
 -- Singleplayer: off to a sandbox world of your own on `mapId` (nil = the default map; the player can make a new
 -- world on another map there). The start menu's Singleplayer button calls this. On a sandbox server it starts a new
 -- world instead. In Studio teleports can't run: set the Workspace attribute "Sandbox" (docs/STUDIO.md).

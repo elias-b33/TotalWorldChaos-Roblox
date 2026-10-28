@@ -7,6 +7,7 @@ local Lobby = require("../src/shared/Sim/Lobby")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
 local Progression = require("../src/shared/Sim/Progression")
+local Rng = require("../src/shared/Sim/Rng")
 local T = require("./TestKit")
 local Telemetry = require("../src/shared/Sim/Telemetry")
 local Tutorial = require("../src/shared/Sim/Tutorial")
@@ -186,6 +187,52 @@ T.test("map_vote: one per voter with the round and the theme", function()
 	T.equal(events[1].userId, 201)
 	T.equal(table.concat(events[1].fields, ","), "earth,next,earth")
 	T.equal(table.concat(events[2].fields, ","), "eldmoor,next,fantasy")
+end)
+
+T.test("the start menu: menu_shown and menu_choice say what the server was doing", function()
+	local first = Lobby.new(Maps.ids, nil, nil, nil, true)
+	T.equal(Telemetry.menuWhere(first, nil), "first")
+	T.equal(Telemetry.menuWhere(Lobby.new(Maps.ids, nil), "Results"), "lobby", "the lobby wins over the old match")
+	T.equal(Telemetry.menuWhere(nil, "War"), "match")
+	T.equal(Telemetry.menuWhere(nil, "Results"), "results")
+	local drafting = Lobby.new(Maps.ids, nil)
+	Lobby.startPick(drafting, Match.new(Maps.get("earth")), { 1 }, Rng.new(1))
+	T.equal(Telemetry.menuWhere(drafting, "Pick"), "pick")
+	local shown = Telemetry.menuShown("first", false, 301)
+	T.equal(shown.name, "menu_shown")
+	T.equal(shown.userId, 301)
+	T.equal(table.concat(shown.fields, ","), "first,public")
+	T.equal(table.concat(Telemetry.menuShown("match", true, 301).fields, ","), "match,private")
+	for choice in Telemetry.MENU_CHOICES do
+		T.equal(table.concat(Telemetry.menuChoice(choice, "lobby", 301).fields, ","), choice .. ",lobby")
+	end
+	T.expect(not pcall(Telemetry.menuChoice, "chat", "lobby", 301), "only the menu's own choices")
+	T.equal(Telemetry.CLIENT_SIGNALS.MenuChoice, true, "Singleplayer and How to play come from the client")
+end)
+
+T.test("first_pick: the seconds the chooser took, the map, picked or timeout", function()
+	local lobby = Lobby.new(Maps.ids, nil, nil, nil, true)
+	T.equal(Telemetry.firstPick(lobby, "earth"), nil, "nobody in line")
+	Lobby.join(lobby, nil, 401)
+	local rng = Rng.new(1)
+	for _ = 1, 4 do
+		Lobby.step(lobby, nil, rng)
+	end
+	Lobby.vote(lobby, 401, "eldmoor")
+	local e = Telemetry.firstPick(lobby, "eldmoor") :: Types.TelemetryEvent
+	T.equal(e.name, "first_pick")
+	T.equal(e.userId, 401)
+	T.equal(e.value, 4)
+	T.equal(table.concat(e.fields, ","), "eldmoor,picked")
+	local late = Lobby.new(Maps.ids, nil, nil, nil, true)
+	Lobby.join(late, nil, 402)
+	for _ = 1, Config.Phases.FirstPickTicks do
+		Lobby.step(late, nil, rng)
+	end
+	local timeout = Telemetry.firstPick(late, "earth") :: Types.TelemetryEvent
+	T.equal(timeout.value, Config.Phases.FirstPickTicks)
+	T.equal(table.concat(timeout.fields, ","), "earth,timeout")
+	T.equal(Telemetry.firstPick(Lobby.new(Maps.ids, nil), "earth"), nil, "a vote logs map_vote instead")
 end)
 
 -- Economy and progression --------------------------------------------------------------------------------------------

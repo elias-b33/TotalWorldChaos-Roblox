@@ -27,8 +27,10 @@ local EVENTS = {
 	"RequestAd", -- rewarded video: the placement ("quest_reroll", Sim.Ads.PLACEMENT)
 	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
 	"RequestSandbox", -- sandbox: "Enter" map | "Leave" | "Speed" n | "Play" nation | "Disasters" on | "NewWorld" map
+	"RequestMenu", -- the start menu: "Online" (join this server's matches) | "Tutorial" (off to a tutorial)
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
+	"Menu", -- show (true) or close (false) your start menu
 	"CommandResult",
 	"Snapshot",
 	"Delta",

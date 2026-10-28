@@ -12,7 +12,7 @@
 --   SeasonPass funnel  ready (TelemetryService.seasonPass), unused until the season pass exists
 --   Economy            Glory sources (match_reward, level_up) and sinks (shop items); Robux IAP sinks
 --   Progression        AccountLevel (Complete for each level passed, Start for the new one); SeasonTier ready
---   Custom events      the 18 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
+--   Custom events      the 21 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
 --                      sandbox_started and the economy
 --
 -- AnalyticsService only accepts events from servers of a published game: in Studio the calls go nowhere. Set a
@@ -202,6 +202,37 @@ end
 -- A sandbox world started for this player ("first" on arrival, "new_world" for another one).
 function TelemetryService.sandboxStarted(player: Player, mapId: string, start: string)
 	TelemetryService.send(Telemetry.sandboxStarted(mapId, start, player.UserId), player)
+end
+
+-- The start menu -----------------------------------------------------------------------------------------------
+
+-- What the server is doing now, for the menu events: first, lobby, pick, match or results.
+local function menuWhere(): string
+	local state = MatchService.current()
+	return Telemetry.menuWhere(LobbyService.state(), if state then state.phase else nil)
+end
+
+-- The start menu opened for a player arriving here.
+function TelemetryService.menuShown(player: Player)
+	TelemetryService.send(Telemetry.menuShown(menuWhere(), MatchService.isPrivate(), player.UserId), player)
+end
+
+-- A start-menu choice: "online" (the server acted on it), "singleplayer" or "guide" (the client's MenuChoice).
+function TelemetryService.menuChoice(player: Player, choice: string)
+	TelemetryService.send(Telemetry.menuChoice(choice, menuWhere(), player.UserId), player)
+end
+
+-- The first pick is over (before the draft starts): first_pick for the chooser, and their onboarding map_voted
+-- when they picked it themselves.
+function TelemetryService.firstPick(lobby: Types.LobbyState, mapId: string)
+	local e = Telemetry.firstPick(lobby, mapId)
+	local player = if e then Players:GetPlayerByUserId(e.userId or 0) else nil
+	if e and player then
+		TelemetryService.send(e, player)
+		if e.fields[2] == "picked" then
+			onboard(player, "map_voted")
+		end
+	end
 end
 
 -- MatchFlow -----------------------------------------------------------------------------------------------------
@@ -474,6 +505,8 @@ local function onSignal(player: Player, kind: string, arg: string?)
 		end
 	elseif kind == "OfferOpened" then
 		shopStep(player, STARTER, "offer_opened")
+	elseif kind == "MenuChoice" and (arg == "singleplayer" or arg == "guide") then
+		TelemetryService.menuChoice(player, arg :: string)
 	elseif kind == "NotificationPrompt" and (arg == "shown" or arg == "ineligible") and not notified[player] then
 		notified[player] = true -- once a session: the server asks a client at most once
 		TelemetryService.notificationOptIn(player, arg :: string)
