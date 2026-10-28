@@ -28,6 +28,7 @@ The full spec is `docs/DESIGN.md`; the three maps, textures and map data pipelin
 | Install missing tools | `bash scripts/cloud-setup.sh` |
 | Regenerate maps and textures | `python3 tools/mapgen/generate.py` (or `--only earth`, `--only tiles`, …) |
 | Play the game headlessly | `lune run tools/harness/play all` after `rojo build` (screenshots in `tools/harness/out/`; `MAP=earth` for another map) |
+| Play a whole match with bots | `lune run tools/harness/soak` after `rojo build` (25 minutes in about 20 s; errors, GUI budget, armies per minute) |
 | Repaint the docs' map pictures | `python3 tools/harness/paint_maps.py` |
 
 The cloud environment's setup script normally installs the tools. If one is missing when a session starts, the SessionStart hook is already installing it in the background: wait until `/tmp/cloud-setup.log` says `cloud-setup: done` instead of starting a second install.
