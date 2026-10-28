@@ -49,12 +49,14 @@ export type Army = {
 	path: { ProvinceId }, -- remaining route
 	moveProgress: number, -- ticks spent toward next province
 	inBattle: boolean,
+	rebel: boolean?, -- true for the neutral army a Rebels power raised (clients draw it apart from garrisons)
 }
 
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
 export type Alliance = { id: number, members: { NationId } }
 export type Truce = { a: NationId, b: NationId, untilTick: number }
-export type Primordial = { userId: number, charges: number }
+-- chargeTicks: progress towards the next charge (its own clock, started when the Primordial rose)
+export type Primordial = { userId: number, charges: number, chargeTicks: number }
 
 -- A fight in one province. It lasts Config.Battle.Rounds rounds, one per tick.
 export type Battle = {
@@ -99,6 +101,8 @@ export type MatchState = {
 	alliances: { [number]: Alliance },
 	truces: { Truce },
 	primordials: { [number]: Primordial }, -- keyed by userId
+	seats: { [number]: NationId }, -- userId -> the nation that player last held (a rejoining player gets it back)
+	nextArmyId: ArmyId, -- army ids are never reused (clients and queued commands refer to armies by id)
 	battles: { [ProvinceId]: Battle },
 	offers: { Offer },
 	events: { MatchEvent },

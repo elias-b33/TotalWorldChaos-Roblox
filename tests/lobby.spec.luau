@@ -134,6 +134,10 @@ T.test("players pick in turn; out-of-turn and taken nations are refused", functi
 	T.equal(reason, "BadTarget")
 	T.expect(Lobby.apply(lobby, match, second, { kind = "Pick", nation = 9 }))
 	T.equal(Match.nationOf(match, second), 9)
+	T.equal(match.seats[first], 4, "the match remembers each pick, for a rejoin")
+	-- a drafted player who leaves mid-match and rejoins gets the nation they picked, not the lowest free one
+	Match.unseatPlayer(match, second)
+	T.equal(Match.seatPlayer(match, second), 9)
 end)
 
 T.test("a turn that runs out picks a random free nation; the draft then ends", function()
@@ -195,6 +199,7 @@ T.test("leaving during the draft frees your nation and keeps the turn on the rig
 	Lobby.pick(lobby, match, a, 2)
 	Lobby.leave(lobby, match, a)
 	T.equal(match.nations[2].controller, "Bot", "a's nation goes back to a bot")
+	T.equal(match.seats[a], nil, "and isn't held for a")
 	T.equal(Lobby.current(lobby), b)
 	Lobby.leave(lobby, match, b) -- it was b's turn: c is next, with a full turn
 	T.equal(Lobby.current(lobby), c)

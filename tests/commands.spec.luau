@@ -120,7 +120,7 @@ T.test("nothing happens during Results or for an eliminated nation", function()
 	state.phase = "Results"
 	local ok, err = Commands.apply(state, 1, { kind = "Develop", province = capital.id })
 	T.expect(not ok)
-	T.equal(err, "WrongPhase")
+	T.equal(err, "MatchOver")
 	state.phase = "War"
 	nation.eliminated = true
 	local ok2, err2 = Commands.apply(state, 1, { kind = "Develop", province = capital.id })
@@ -137,3 +137,68 @@ T.test("debt blocks spending", function()
 end)
 
 T.finish()
+
+-- Who acts (Commands.applyFor, used by CommandRouter) ------------------------------------------------
+
+local ALICE, BOB, EVE = 1001, 1002, 1003
+
+T.test("applyFor: a player acts for their living nation, and only their own", function()
+	local state, nation, capital = fresh()
+	Match.assign(state, 1, ALICE)
+	nation.gold = 1000
+	local ok, err = Commands.applyFor(state, ALICE, 1, { kind = "Develop", province = capital.id })
+	T.expect(ok, err)
+	-- naming a nation that isn't theirs does nothing
+	local other = state.provinces[state.nations[2].capital]
+	state.nations[2].gold = 1000
+	local ok2, err2 = Commands.applyFor(state, ALICE, 2, { kind = "Develop", province = other.id })
+	T.expect(not ok2)
+	T.equal(err2, "NoNation")
+	T.equal(state.nations[2].gold, 1000)
+end)
+
+T.test("applyFor: an eliminated player acts as their Primordial, with powers only", function()
+	local state, nation = fresh()
+	Match.assign(state, 1, BOB)
+	nation.eliminated = true
+	state.primordials[BOB] = { userId = BOB, charges = 2, chargeTicks = 0 }
+	state.phase = "War"
+	local ok, err = Commands.applyFor(state, BOB, 1, { kind = "Power", power = "Plague", target = 3 })
+	T.expect(ok, err)
+	T.equal(state.primordials[BOB].charges, 0, "paid from the Primordial's charges")
+	T.expect(state.nations[3].plagueUntil ~= nil, "the Plague struck")
+	local ok2, err2 = Commands.applyFor(state, BOB, 1, { kind = "Develop", province = state.nations[2].capital })
+	T.expect(not ok2)
+	T.equal(err2, "Primordial")
+end)
+
+T.test("applyFor: a spectator (no nation, no Primordial) is refused", function()
+	local state = fresh()
+	state.phase = "War"
+	state.nations[1].charges = 5
+	local ok, err = Commands.applyFor(state, EVE, nil, { kind = "Power", power = "Plague", target = 2 })
+	T.expect(not ok)
+	T.equal(err, "NoNation")
+	T.equal(state.nations[2].plagueUntil, nil)
+end)
+
+T.test("applyFor: a bot acts for its nation until a player takes it over", function()
+	local state, nation, capital = fresh()
+	nation.gold = 1000
+	local ok, err = Commands.applyFor(state, nil, 1, { kind = "Develop", province = capital.id })
+	T.expect(ok, err)
+	local gold = nation.gold
+	-- a player joined between the bot's plan and the next tick: the bot's queued command is stale
+	T.equal(Match.seatPlayer(state, ALICE), 1)
+	local ok2, err2 = Commands.applyFor(state, nil, 1, { kind = "Develop", province = capital.id })
+	T.expect(not ok2)
+	T.equal(err2, "NoNation")
+	T.equal(nation.gold, gold)
+	local ok4 = Commands.applyFor(state, nil, 1, { kind = "Recruit", province = capital.id, regiments = 1 })
+	T.expect(not ok4, "nor a queued Recruit")
+	T.equal(nation.gold, gold, "the player's gold is untouched")
+	Match.unseatPlayer(state, ALICE)
+	nation.eliminated = true
+	local ok3 = Commands.applyFor(state, nil, 1, { kind = "Develop", province = capital.id })
+	T.expect(not ok3, "an eliminated bot nation gives no orders")
+end)

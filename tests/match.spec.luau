@@ -1,7 +1,9 @@
 --!strict
+local Army = require("../src/shared/Sim/Army")
 local Config = require("../src/shared/Config")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
+local Primordial = require("../src/shared/Sim/Primordial")
 local T = require("./TestKit")
 
 T.test("a new match copies the map's start territories and capitals", function()
@@ -49,7 +51,66 @@ T.test("players take the lowest free nation and bots take it back when they leav
 	Match.unseatPlayer(state, 111)
 	T.equal(state.nations[1].controller, "Bot")
 	T.equal(state.nations[1].userId, nil)
-	T.equal(Match.seatPlayer(state, 333), 1, "the freed seat is reused")
+	T.equal(Match.seatPlayer(state, 333), 3, "a newcomer takes a nation no absent player held")
+	T.equal(Match.seatPlayer(state, 111), 1, "the leaver gets their nation back")
+end)
+
+T.test("a rejoining player gets their own nation back, not a healthier one", function()
+	local state = Match.new(Maps.get("eldmoor"))
+	T.equal(Match.seatPlayer(state, 111), 1)
+	T.equal(Match.seatPlayer(state, 222), 2)
+	Match.unseatPlayer(state, 222)
+	Match.unseatPlayer(state, 111)
+	T.equal(Match.seatPlayer(state, 222), 2, "not the lower-numbered nation 1")
+	T.equal(Match.seatPlayer(state, 111), 1)
+	T.equal(state.seats[111], 1)
+end)
+
+T.test("a held nation goes to a newcomer only when nothing else is free", function()
+	local state = Match.new(Maps.get("skyshards"))
+	for i = 1, 10 do
+		Match.seatPlayer(state, i)
+	end
+	Match.unseatPlayer(state, 4)
+	T.equal(Match.seatPlayer(state, 99), 4, "the only seat left")
+	T.equal(Match.seatPlayer(state, 4), nil, "taken meanwhile: the leaver watches")
+end)
+
+T.test("a player whose nation was eliminated while away rejoins as its Primordial", function()
+	local state = Match.new(Maps.get("eldmoor"))
+	T.equal(Match.seatPlayer(state, 111), 1)
+	Match.unseatPlayer(state, 111)
+	-- the bot that took over loses the nation: a bot simply ends, no Primordial yet
+	Primordial.eliminate(state, 1)
+	T.equal(state.primordials[111], nil)
+	T.equal(Match.seatPlayer(state, 111), 1, "back on the eliminated nation, not a living one")
+	T.equal(state.nations[1].userId, 111)
+	local p = state.primordials[111]
+	T.expect(p ~= nil and p.charges == 0, "a Primordial with no charges yet")
+	T.equal(Match.nationOf(state, 111), 1)
+end)
+
+T.test("during Results a newcomer isn't seated, but a returning player gets their nation back", function()
+	local state = Match.new(Maps.get("eldmoor"))
+	T.equal(Match.seatPlayer(state, 111), 1)
+	Match.unseatPlayer(state, 111)
+	state.result = { kind = "Score", winners = { 2 }, scores = {}, endedAt = state.tick }
+	state.phase = "Results"
+	T.equal(Match.seatPlayer(state, 555), nil, "the newcomer watches the Results")
+	T.equal(state.nations[3].controller, "Bot")
+	T.equal(Match.seatPlayer(state, 111), 1, "the player who played it sees their own result")
+end)
+
+T.test("army ids are never reused, even after the newest army dies", function()
+	local state = Match.new(Maps.get("eldmoor"))
+	local first = Army.spawn(state, 1, state.nations[1].capital, 1000)
+	state.armies[first.id] = nil
+	local second = Army.spawn(state, 1, state.nations[1].capital, 1000)
+	T.expect(second.id > first.id, "a new id")
+	T.equal(state.nextArmyId, second.id + 1)
+	for id in state.armies do
+		T.expect(id < state.nextArmyId, "every id is below the counter")
+	end
 end)
 
 T.test("seats run out after ten players", function()

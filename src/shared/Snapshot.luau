@@ -31,6 +31,7 @@ export type NationRecord = {
 	manpower: number,
 	charges: number,
 	plagueUntil: number, -- tick a Plague ends; 0 = none
+	powerImmuneUntil: number, -- tick its immunity to harmful powers ends (the power picker greys it out until then)
 	eliminated: boolean,
 	allianceId: number, -- 0 = none
 	battlesWon: number,
@@ -44,6 +45,7 @@ export type ArmyRecord = {
 	next: number, -- next province on its route, 0 = standing still
 	dest: number, -- end of its route, 0 = standing still
 	inBattle: boolean,
+	rebel: boolean, -- an owner-0 army raised by the Rebels power (else owner 0 is a neutral garrison)
 }
 
 -- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes.
@@ -128,6 +130,7 @@ function Snapshot.full(state: MatchState): SnapshotData
 			manpower = n.manpower,
 			charges = n.charges,
 			plagueUntil = n.plagueUntil or 0,
+			powerImmuneUntil = n.powerImmuneUntil,
 			eliminated = n.eliminated,
 			allianceId = n.allianceId or 0,
 			battlesWon = n.battlesWon,
@@ -144,6 +147,7 @@ function Snapshot.full(state: MatchState): SnapshotData
 			next = a.path[1] or 0,
 			dest = a.path[#a.path] or 0,
 			inBattle = a.inBattle,
+			rebel = a.rebel == true,
 		})
 	end
 	return {

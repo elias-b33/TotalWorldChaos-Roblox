@@ -93,8 +93,9 @@ local function statusLine(provinceId: number, record: Snapshot.ProvinceRecord): 
 				local owner = ClientState.nation(a.owner)
 				table.insert(
 					parts,
-					if a.owner == 0
-						then "🛡 " .. shortMen(a.men) .. " garrison"
+					if a.rebel
+						then "🏴 " .. shortMen(a.men) .. " Rebels"
+						elseif a.owner == 0 then "🛡 " .. shortMen(a.men) .. " garrison"
 						else "⚔ " .. shortMen(a.men) .. " " .. (if owner then owner.name else "?")
 				)
 			end

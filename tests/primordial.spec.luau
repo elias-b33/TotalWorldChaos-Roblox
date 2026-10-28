@@ -113,6 +113,29 @@ T.test("Meteor kills half an army and costs a development level in its province"
 	T.equal(e.province, where)
 end)
 
+T.test("Meteor's development loss respects the province owner's immunity, and doesn't start it", function()
+	local state = fresh()
+	state.nations[A].charges = 5
+	local where = plainProvince(state, C)
+	local dev = state.provinces[where].development
+	T.expect(dev > 1, "room to lose a level")
+	-- B's army stands in C's province (allies, or passing through); C was hit by a power a moment ago
+	state.nations[C].powerImmuneUntil = state.tick + 10
+	local army = Army.spawn(state, B, where, 4000)
+	local ok, err = cast(state, A, "Meteor", army.id)
+	T.expect(ok, err)
+	T.equal(army.men, 2000, "the army is hit")
+	T.equal(state.provinces[where].development, dev, "immune C keeps its development")
+	T.equal(state.nations[B].powerImmuneUntil, state.tick + Config.Primordial.ImmunityTicks, "B is immune now")
+	T.equal(state.nations[C].powerImmuneUntil, state.tick + 10, "C's immunity is unchanged")
+	-- once C's immunity is over the province loses a level, and C does not become immune
+	state.tick += 10
+	state.nations[B].powerImmuneUntil = 0
+	T.expect((cast(state, A, "Meteor", army.id)))
+	T.equal(state.provinces[where].development, dev - 1)
+	T.expect(state.nations[C].powerImmuneUntil <= state.tick, "C is still fair game")
+end)
+
 T.test("Meteor destroys an army left under the minimum, and never takes development below 1", function()
 	local state = fresh()
 	state.nations[A].charges = 2
@@ -151,6 +174,27 @@ T.test("Rebels spawn a 3,000-man neutral army that besieges the province and tur
 		Siege.step(state)
 	end
 	T.equal(state.provinces[where].owner, nil, "the rebels took it")
+end)
+
+T.test("Rebels are marked as Rebels, in the state and in snapshots; garrisons are not", function()
+	local state = fresh()
+	state.nations[A].charges = 2
+	local where = plainProvince(state, B)
+	T.expect((cast(state, A, "Rebels", where)))
+	local rebels = Army.idleAt(state, 0, where)
+	T.expect(rebels ~= nil and rebels.rebel == true, "a rebel army")
+	local snap = Snapshot.full(state)
+	local sawRebel, sawGarrison = false, false
+	for _, a in snap.armies do
+		if a.id == (rebels :: any).id then
+			sawRebel = a.rebel
+		elseif a.owner == 0 then
+			sawGarrison = true
+			T.equal(a.rebel, false, "a garrison isn't a rebel")
+		end
+	end
+	T.expect(sawRebel, "the snapshot marks the Rebels")
+	T.expect(sawGarrison, "garrisons are in the snapshot too")
 end)
 
 T.test("Rebels fight the owner's army in the province", function()
@@ -249,6 +293,19 @@ T.test("no powers in Peace", function()
 	T.equal(err, "NoPowersYet")
 end)
 
+T.test("after the match a power says the match is over, not that powers unlock at 3:00", function()
+	local state = fresh()
+	state.phase = "Results"
+	state.nations[A].charges = 5
+	state.nations[B].eliminated = true
+	state.primordials[BOB] = { userId = BOB, charges = 5, chargeTicks = 0 }
+	local _, err = cast(state, A, "Plague", C)
+	T.equal(err, "MatchOver")
+	local _, err2 = Commands.applyPrimordial(state, BOB, { kind = "Power", power = "Plague", target = C })
+	T.equal(err2, "MatchOver")
+	T.equal(state.primordials[BOB].charges, 5)
+end)
+
 -- Immunity -------------------------------------------------------------------------------------------
 
 T.test("a nation is hit by a harmful power at most once per 30 s; gifts ignore it", function()
@@ -274,7 +331,7 @@ end)
 
 T.test("nations earn a charge every 4 minutes, Primordials every minute", function()
 	local state = fresh()
-	state.primordials[BOB] = { userId = BOB, charges = 0 }
+	state.primordials[BOB] = { userId = BOB, charges = 0, chargeTicks = 0 }
 	state.tick = 0
 	for _ = 1, Config.Primordial.NationChargeTicks do
 		state.tick += 1
@@ -290,7 +347,7 @@ end)
 
 T.test("charges come twice as fast in the Cataclysm", function()
 	local state = fresh()
-	state.primordials[BOB] = { userId = BOB, charges = 0 }
+	state.primordials[BOB] = { userId = BOB, charges = 0, chargeTicks = 0 }
 	state.tick = Config.Phases.WarEndTick
 	state.phase = "Cataclysm"
 	for _ = 1, Config.Primordial.NationChargeTicks do
@@ -299,6 +356,49 @@ T.test("charges come twice as fast in the Cataclysm", function()
 	end
 	T.equal(state.nations[A].charges, 2)
 	T.equal(state.primordials[BOB].charges, Config.Primordial.MaxCharges, "8 earned, capped")
+end)
+
+T.test("each Primordial runs its own charge clock from the tick it rose", function()
+	local state = fresh()
+	local every = Config.Primordial.PrimordialChargeTicks
+	state.tick = 10 * every - 1 -- one tick before the old shared boundary
+	local bob = state.nations[B]
+	bob.controller = "Player"
+	bob.userId = BOB
+	strip(state, B, A, 0)
+	Primordial.step(state, Rng.new(1)) -- Bob rises on this tick
+	T.expect(state.primordials[BOB] ~= nil, "Bob rose")
+	T.equal(state.primordials[BOB].charges, 0)
+	state.tick += 1 -- the shared clock's boundary: no free charge a second after rising
+	Primordial.charge(state)
+	T.equal(state.primordials[BOB].charges, 0, "no charge one second after rising")
+	for _ = 3, every do
+		state.tick += 1
+		Primordial.charge(state)
+	end
+	T.equal(state.primordials[BOB].charges, 0, "still none one tick before a full interval")
+	state.tick += 1
+	Primordial.charge(state)
+	T.equal(state.primordials[BOB].charges, 1, "the first charge a full interval after rising")
+	-- a Primordial rising later keeps its own clock
+	state.primordials[3003] = { userId = 3003, charges = 0, chargeTicks = 0 }
+	for _ = 1, every / 2 do
+		state.tick += 1
+		Primordial.charge(state)
+	end
+	T.equal(state.primordials[3003].charges, 0)
+	T.equal(state.primordials[BOB].charges, 1)
+end)
+
+T.test("a Primordial's clock runs twice as fast in the Cataclysm", function()
+	local state = fresh()
+	state.phase = "Cataclysm"
+	state.primordials[BOB] = { userId = BOB, charges = 0, chargeTicks = 0 }
+	for _ = 1, Config.Primordial.PrimordialChargeTicks / Config.Primordial.CataclysmChargeMultiplier do
+		state.tick += 1
+		Primordial.charge(state)
+	end
+	T.equal(state.primordials[BOB].charges, 1)
 end)
 
 T.test("charges stop at the cap; eliminated nations earn none", function()
@@ -402,7 +502,7 @@ end)
 T.test("a Primordial earns charges and casts powers, and can do nothing else", function()
 	local state = fresh()
 	state.nations[B].eliminated = true
-	state.primordials[BOB] = { userId = BOB, charges = 0 }
+	state.primordials[BOB] = { userId = BOB, charges = 0, chargeTicks = 0 }
 	state.tick = 10 * Config.Primordial.PrimordialChargeTicks -- War, on a charge boundary
 	for _ = 1, 2 * Config.Primordial.PrimordialChargeTicks do
 		state.tick += 1
@@ -500,7 +600,7 @@ T.test("snapshots carry charges, Primordials and effect timers; deltas only when
 	state.nations[A].charges = 2
 	local before = Snapshot.full(state)
 	T.expect((cast(state, A, "Plague", B)))
-	state.primordials[BOB] = { userId = BOB, charges = 3 }
+	state.primordials[BOB] = { userId = BOB, charges = 3, chargeTicks = 0 }
 	state.provinces[5].buffs.Blessing = state.tick + 60
 	state.provinces[6].shieldUntil = state.tick + 30
 	local after = Snapshot.full(state)
@@ -515,6 +615,8 @@ T.test("snapshots carry charges, Primordials and effect timers; deltas only when
 	T.equal(client.provinces[5].blessedUntil, state.tick + 60)
 	T.equal(client.provinces[6].shieldUntil, state.tick + 30)
 	T.equal(client.primordials[1].userId, BOB)
+	T.equal(client.nations[B].powerImmuneUntil, state.tick + Config.Primordial.ImmunityTicks, "immunity is sent")
+	T.equal(client.nations[C].powerImmuneUntil, 0)
 	local again = Snapshot.diff(after, Snapshot.full(state), nil)
 	T.equal(again, nil, "nothing changed, nothing sent")
 end)

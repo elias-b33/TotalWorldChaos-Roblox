@@ -415,16 +415,80 @@ function scenarios.primordial()
 	H.shot(alice, "meteor_alice")
 	H.shot(bob, "meteor_bob")
 
-	-- the 30 s immunity: a second harmful power on Aurora is refused at once
+	-- the 30 s immunity: the picker shows Aurora as unavailable instead of sending a power the server refuses
 	state.primordials[bobId].charges = 3
 	Emulator.run(1.5)
 	Emulator.press(bob, "⚡3")
 	Emulator.press(bob, "Plague")
 	tapProvince(bob, capital)
+	H.expect(Emulator.findText(bob, "Aurora is immune for") ~= nil, "the target step says Aurora is immune")
+	H.expect(Emulator.findText(bob, "Confirm") == nil, "and offers no Confirm")
+	H.shot(bob, "immune_target")
+	Emulator.press(bob, "Cancel")
+	H.expect(state.nations[A].plagueUntil == nil, "Aurora is not plagued")
+
+	-- Rebels: a black 🏴 token that shows even zoomed out, unlike the neutral garrisons
+	local rebelTarget
+	for id, p in state.provinces do
+		if p.owner == 4 and not p.isCapital and p.terrain ~= "Mountain" and (rebelTarget == nil or id < rebelTarget) then
+			rebelTarget = id
+		end
+	end
+	Emulator.press(bob, "⚡3")
+	Emulator.press(bob, "Rebels")
+	tapProvince(bob, rebelTarget)
 	Emulator.press(bob, "Confirm")
 	Emulator.run(1.5)
-	H.expect(state.nations[A].plagueUntil == nil, "Aurora is immune for 30 s")
-	H.expect(Emulator.findText(bob, "less than 30 s ago") ~= nil, "Bob is told why")
+	local rebels
+	for _, a in state.armies do
+		if a.rebel then
+			rebels = a
+		end
+	end
+	H.expect(rebels ~= nil and rebels.location == rebelTarget, "Rebels rose in " .. state.provinces[rebelTarget].name)
+	H.client(alice, "MapView").showWholeMap()
+	Emulator.run(1.5)
+	local token = Emulator.findText(alice, "🏴 3k")
+	H.expect(token ~= nil, "Alice sees the 🏴 Rebels token zoomed out")
+	H.expect(Emulator.findText(alice, "🛡 ") == nil, "while garrisons stay hidden at that zoom")
+	H.shot(alice, "rebels")
+	H.client(alice, "MapView").centreOn(H.provinceMap(alice, rebelTarget), true)
+	Emulator.run(1.5)
+	H.shot(alice, "rebels_close")
+
+	-- rejoining: Bob leaves and comes back as himself, still the Primordial of Zephyr
+	Emulator.removeClient(bob)
+	Emulator.run(2)
+	bob = Emulator.addClient("Bob", nil, bobId)
+	Emulator.run(2)
+	H.expect(H.myNation(bob) == B, "Bob rejoins on Zephyr")
+	H.expect(Emulator.findText(bob, "✨ Primordial") ~= nil, "still a Primordial")
+
+	-- Carol takes a nation, leaves, and it is eliminated while a bot runs it: she rejoins as its Primordial
+	local carol = Emulator.addClient("Carol")
+	Emulator.run(2)
+	local carolId = carol.serverPlayer.UserId
+	local C = H.myNation(carol)
+	H.expect(C == 3, "Carol takes the lowest free nation, " .. state.nations[3].name)
+	Emulator.removeClient(carol)
+	Emulator.run(2)
+	H.expect(state.nations[C].controller == "Bot", "a bot runs it after she leaves")
+	local dave = Emulator.addClient("Dave")
+	Emulator.run(2)
+	H.expect(H.myNation(dave) ~= C, "a newcomer doesn't take the nation Carol held")
+	for _, p in state.provinces do
+		if p.owner == C then
+			p.owner = A
+		end
+	end
+	Emulator.run(2)
+	H.expect(state.nations[C].eliminated, state.nations[C].name .. " was eliminated under the bot")
+	carol = Emulator.addClient("Carol", nil, carolId)
+	Emulator.run(2)
+	H.expect(H.myNation(carol) == C, "Carol rejoins on her eliminated nation, not a healthy one")
+	H.expect(state.primordials[carolId] ~= nil, "and is its Primordial")
+	H.expect(Emulator.findText(carol, "✨ Primordial") ~= nil, "her top bar says Primordial")
+	H.shot(carol, "rejoined_primordial")
 end
 
 -- Phase 3: Alice and nine bots for six game minutes on Skyshards. The bots expand in Peace and go to war after

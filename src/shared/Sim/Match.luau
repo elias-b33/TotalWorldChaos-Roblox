@@ -58,6 +58,8 @@ function Match.new(map: MapDef): MatchState
 		alliances = {},
 		truces = {},
 		primordials = {},
+		seats = {},
+		nextArmyId = 1,
 		battles = {},
 		offers = {},
 		events = {},
@@ -91,28 +93,61 @@ function Match.isOver(state: MatchState): boolean
 	return result ~= nil and state.tick >= result.endedAt + Config.Phases.ResultsTicks
 end
 
--- Give a joining player the lowest-numbered nation a bot is playing. Returns nil if every seat is taken.
+-- Hand a nation to a player, and remember it was theirs (Match.seatPlayer gives it back if they rejoin).
+function Match.assign(state: MatchState, nationId: number, userId: number)
+	local nation = state.nations[nationId]
+	nation.controller = "Player"
+	nation.userId = userId
+	state.seats[userId] = nationId
+end
+
+-- Seat a joining player. A player who held a nation earlier in this match gets it back while a bot runs it, or
+-- rises as its Primordial if it was eliminated while they were away, so leaving never swaps a dying nation for a
+-- healthy one. Anyone else gets the lowest-numbered bot nation, preferring ones no absent player held. Returns
+-- nil if every seat is taken, or for a newcomer once the match has a result.
 function Match.seatPlayer(state: MatchState, userId: number): number?
 	for id, nation in state.nations do
 		if nation.userId == userId then
 			return id
 		end
 	end
+	local held = state.seats[userId]
+	local mine = if held then state.nations[held] else nil
+	if held and mine and mine.userId == nil then
+		Match.assign(state, held, userId)
+		if mine.eliminated and state.primordials[userId] == nil then
+			state.primordials[userId] = { userId = userId, charges = 0, chargeTicks = 0 }
+		end
+		return held
+	end
+	if state.result ~= nil then
+		return nil -- the match is over: a newcomer watches the Results and gets a nation in the next match
+	end
+	local reserved: { [number]: boolean } = {}
+	for other, id in state.seats do
+		if other ~= userId then
+			reserved[id] = true
+		end
+	end
 	local best: number? = nil
 	for id, nation in state.nations do
-		if nation.controller == "Bot" and not nation.eliminated and (best == nil or id < best) then
-			best = id
+		if nation.controller == "Bot" and not nation.eliminated then
+			local better = best == nil
+				or (reserved[best] and not reserved[id])
+				or (reserved[best] == reserved[id] and id < best)
+			if better then
+				best = id
+			end
 		end
 	end
 	if best then
-		local nation = state.nations[best]
-		nation.controller = "Player"
-		nation.userId = userId
+		Match.assign(state, best, userId)
 	end
 	return best
 end
 
 -- A player who leaves is replaced by a bot instantly. An eliminated nation stays theirs (they rejoin as a Primordial).
+-- Match.seats still remembers the nation, so a rejoining player gets it back.
 function Match.unseatPlayer(state: MatchState, userId: number)
 	for _, nation in state.nations do
 		if nation.userId == userId and not nation.eliminated then

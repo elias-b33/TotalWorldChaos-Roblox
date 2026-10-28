@@ -54,6 +54,7 @@ Joining mid-match takes over a bot's nation. For Studio solo tests (and the harn
 - Eliminated players rise as **Primordials**: they stay in the server, see the whole map and use Primordial powers. Nobody sits out a match.
 - An eliminated nation's armies disband and its last provinces turn neutral, each with a fresh garrison unless another army stands there. It leaves its wars, alliance (a one-nation alliance dissolves) and offers. A player keeps the nation's unspent charges as a Primordial; an eliminated bot simply ends.
 - A player who leaves is replaced by a bot instantly, so the map never has dead nations.
+- The match remembers which nation each player held. A player who rejoins gets that nation back while a bot still runs it, or rises as its Primordial if it was eliminated meanwhile, so leaving never trades a dying nation for a healthy one. Newcomers take a nation nobody held before; a held nation goes to a newcomer only when no other is free. Someone joining during Results isn't seated (they watch and get a nation in the next match); a bot's order still queued for a nation a player has just taken is dropped.
 
 ## Core systems
 
@@ -103,7 +104,7 @@ Income is paid every month (10 s).
 
 ### Primordial powers
 
-Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s. A nation can be hit by a Primordial power at most once per 30 s.
+Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s, counted from the moment they rose (each Primordial has its own clock; nations share the match clock because they all start at 0:00). A nation can be hit by a Primordial power at most once per 30 s.
 
 | Power | Effect | Charges |
 | --- | --- | --- |
@@ -117,7 +118,9 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 - Targets: Meteor an army; Plague a nation; Rebels, Blessing and Divine shield a nation's province; Earthquake a province with a building. Mountains are never a target.
 - Powers work in War and Cataclysm, not in Peace. Charges stop at `Config.Primordial.MaxCharges` (5).
 - The 30 s limit applies to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Divine shield are gifts and ignore it.
-- Rebels besiege the province they rise in; when the siege ends it turns neutral.
+- Meteor's limit is checked for the army's owner, who then becomes immune. The province it stands in loses its development level only if that province's owner isn't immune, and that loss doesn't make the owner immune.
+- The power picker shows an immune nation as unavailable (with the seconds left) instead of sending a power the server would refuse.
+- Rebels besiege the province they rise in; when the siege ends it turns neutral. On the map they are a black 🏴 token that always shows, unlike neutral garrisons.
 - A Primordial may target anyone, including the nation that eliminated them.
 - Cataclysm disasters are a random harmful power on a random valid nation target (seeded), every 60 s from 21:00.
 
@@ -286,12 +289,13 @@ export type Army = {
     path: { ProvinceId },      -- remaining route
     moveProgress: number,      -- ticks spent toward next province
     inBattle: boolean,
+    rebel: boolean?,           -- raised by the Rebels power (drawn apart from garrisons)
 }
 
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
 export type Alliance = { id: number, members: { NationId } }
 export type Truce = { a: NationId, b: NationId, untilTick: number }
-export type Primordial = { userId: number, charges: number }
+export type Primordial = { userId: number, charges: number, chargeTicks: number } -- chargeTicks: its own clock
 
 export type MatchState = {
     mapId: string,             -- which MapDef this match is played on
@@ -304,6 +308,8 @@ export type MatchState = {
     alliances: { [number]: Alliance },
     truces: { Truce },
     primordials: { [number]: Primordial }, -- keyed by userId
+    seats: { [number]: NationId }, -- userId -> the nation that player last held (rejoins)
+    nextArmyId: ArmyId,        -- army ids count up and are never reused
 }
 ```
 
