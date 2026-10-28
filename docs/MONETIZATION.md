@@ -20,7 +20,8 @@ Platform facts were checked against Roblox's Creator Hub and newsroom in October
 10. [Compliance and ethics for minors](#10-compliance-and-ethics-for-minors)
 11. [Implementation plan: Phase 4 and 5 task cards](#11-implementation-plan-phase-4-and-5-task-cards)
 12. [Decisions for the owner](#12-decisions-for-the-owner)
-13. [Sources](#13-sources)
+13. [Plan update after the content wave](#13-plan-update-after-the-content-wave)
+14. [Sources](#14-sources)
 
 ## 1. Principles
 
@@ -889,8 +890,64 @@ Done when: Studio shows the button only when an ad is available; build and lint 
 | 8 | Rewarded video only for quest rerolls | Yes |
 | 9 | Titles are earned, never sold | Yes |
 | 10 | Clans at month 4, ranked beta at month 5–6 behind a 1,500 peak CCU gate | Yes |
+| 11 | Sell troop skins, capital skins, people sets and ship skins (section 13.2; looks only) | Yes |
+| 12 | A Sandbox Pass (199 Robux): extra tools that only work in your own singleplayer world (section 13.2) | Yes if you're comfortable with a pass that isn't purely cosmetic; it never touches a match |
+| 13 | A flag and banner art pass before the soft launch (section 13.3) | Yes (owner's call) |
 
-## 13. Sources
+## 13. Plan update after the content wave
+
+The catalogue above was planned before the peoples, navies, event cards, the sandbox and the start menu existed. This update says what each new system can sell (looks only, principle 1), what to fix before launch, and in what order to build it. No price on the ladder changes.
+
+### 13.1 What is built and what isn't
+
+| Built and tested | Not built yet |
+| --- | --- |
+| Glory, XP, ranks, quests, the login calendar, achievements and leaderboards; the shop with the rarity ladder and the Slate & Brass cards; flags, borders, shade sets, army tokens, map themes, power effects, emotes, victory animations and nameplates; VIP; private servers with their settings; the starter pack; the season pass and the rotating shop; rewarded video for quest rerolls; purchase history; analytics | The Roblox ids (owner, section 3.10); the art for Season 1's ~80 shop items and 50 pass rewards; good flags (13.3); the new categories in 13.2 |
+
+### 13.2 New categories from the new content
+
+| From | Cosmetic | What it changes | Rarities and Robux | Notes |
+| --- | --- | --- | --- | --- |
+| Peoples (55 troops) | Troop skin | One troop's soldier sprite on your army tokens ("Gilded Knights") | Rare 99, Epic 149 (animated) | The free default stays the people's own soldier. A skin shows whenever your army's main troop is that troop |
+| Peoples | Capital skin | Your capital's building on the map, drawn for your people | Rare 99 | Same footprint and outline, so a capital is still easy to spot |
+| Peoples | People set | A matched flag, border, troop skin and capital skin for one people | Epic set 299 (pieces about 450) | One per people, 15 over time: the buy for players who love one race |
+| Navies | Ship skin | Your fleets' ship sprite (a galleon, dragonship or starship look) | Common sails 49, Rare hull 99, Epic animated wake 149 | Same size and badge, so a fleet reads the same |
+| Event cards | Card frame | The frame of your own event cards | Season pass only | Only you see it, so it isn't worth a price |
+| Start menu | Menu backdrop | The map scene behind your start menu | Season pass only | Free-track filler |
+| Sandbox | Sandbox Pass (game pass) | Extra tools in your own singleplayer world only, for example armies and fleets placed anywhere, powers and disasters without charges, more saved worlds | 199 | Never in a match, so it buys no strength over anyone. Decision 12 |
+
+Never sold, as before: a people, a troop, a race pick, ships, event outcomes, missions, vision under fog of war, generals, or anything else that changes a match. Music isn't sold either (we don't own its rights).
+
+### 13.3 Fix before launch: flags and banners
+
+The owner's call after GUI step 5: the flags and banners need a lot of work. They are the most-seen cosmetic (top bar, nation list, capitals, Results and the shop's first tab) and the cheapest to make, so their quality sets how the whole shop feels. One art stage, after the gameplay and GUI stages and before the soft launch:
+
+- a flag style guide: heraldic divisions, charges and people motifs, readable at 16 × 12 on the map and handsome at the shop's display size;
+- about 40 launch flags (12 free or earned, the rest from Common to Epic), redrawn, with animated Epic flags;
+- banner art for the people sets and the season pass.
+
+### 13.4 Order of work
+
+After the gameplay stages, so nothing in flight slows down:
+
+1. The flag and banner art pass (one stage).
+2. Troop skins, capital skins and people sets: `Cosmetics` and `CosmeticArt` gain the slots, and the shop gains a "Peoples" tab (one stage).
+3. Ship skins (half a stage).
+4. The Sandbox Pass, if the owner takes it (one stage: the tools and the pass).
+5. Season 1 refresh: troop and ship skins in the premium track's Epic and Legendary tiers, card frames and menu backdrops on the free track.
+
+### 13.5 Owner checklist (no code)
+
+1. Create the products and passes (section 3.10), the Sandbox Pass too if you take it, and paste their ids.
+2. After two weeks live, let managed pricing test the pass prices (prices are read live, section 3.1).
+3. Make or commission the Season 1 art (section 3.2 has the time per item).
+4. The store page, icon and thumbnails (docs/LAUNCH.md).
+
+### 13.6 What it should add
+
+The new categories mostly give players who already pay more to buy (people sets, troop and ship skins), rather than adding payers. A fair guess is 10–20% more revenue per paying player than the scenarios in section 9.2, once Season 1 carries them. The Sandbox Pass may add payers among younger players who love the singleplayer world; give it its own analytics event and judge it on that.
+
+## 14. Sources
 
 Roblox (official):
 
