@@ -1,9 +1,9 @@
 --!strict
 -- Battles (tick order step 3): when hostile armies share a province they fight Config.Battle.Rounds rounds,
 -- one per tick. Each round, each side kills enemy men equal to KillRatePerRound × its own strength × modifiers.
--- A side's strength is the sum of its men × each troop's attack (attackers) or defence (defenders); losses split
--- over an army's troop types in proportion to their men (Army.shrinkTo). Race bonuses (Sim.Races) add to the
--- modifier. Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at
+-- A side's strength is the sum of its men × each troop's attack (attackers) or defence (defenders), with the
+-- specials' terrain and anti-garrison tricks (Troops.strength); losses split over an army's troop types in
+-- proportion to their men (Army.shrinkTo). Race bonuses (Sim.Races) add to the modifier. Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at
 -- its own speed, can't take orders, and doesn't fight, block or besiege on the way (Army.retreating). Armies under
 -- MinArmyMen are destroyed, and so is a loser with no way home.
 
@@ -73,13 +73,24 @@ local function men(side: { Army }): number
 	return n
 end
 
--- A side's combat strength before modifiers: each troop's men × its defence (defenders) or attack (attackers).
-function Battle.strength(side: { Army }, defending: boolean): number
+-- A side's combat strength before modifiers: each troop's men × its defence (defenders) or attack (attackers), with
+-- the specials' tricks for a battle in `terrain` (and against neutral armies: `vsNeutral`).
+function Battle.strength(side: { Army }, defending: boolean, terrain: Types.Terrain?, vsNeutral: boolean?): number
 	local s = 0
 	for _, a in side do
-		s += Troops.strength(a.troops, defending)
+		s += Troops.strength(a.troops, defending, terrain, vsNeutral)
 	end
 	return s
+end
+
+-- Is every army on this side neutral (garrisons and Rebels)?
+local function allNeutral(side: { Army }): boolean
+	for _, a in side do
+		if a.owner ~= 0 then
+			return false
+		end
+	end
+	return true
 end
 
 local function owners(side: { Army }): { number }
@@ -205,10 +216,11 @@ function Battle.step(state: MatchState, rng: Rng.Rng)
 			for _, a in sides.attackers do
 				a.inBattle = true
 			end
-			local defKills = Battle.strength(sides.defenders, true)
+			local terrain = state.provinces[provinceId].terrain
+			local defKills = Battle.strength(sides.defenders, true, terrain, allNeutral(sides.attackers))
 				* Config.Battle.KillRatePerRound
 				* Battle.modifier(state, provinceId, sides, true, battle.defenderRoll)
-			local attKills = Battle.strength(sides.attackers, false)
+			local attKills = Battle.strength(sides.attackers, false, terrain, allNeutral(sides.defenders))
 				* Config.Battle.KillRatePerRound
 				* Battle.modifier(state, provinceId, sides, false, battle.attackerRoll)
 			takeLosses(sides.attackers, defKills)

@@ -128,51 +128,143 @@ T.test("Earth is human civilisations, Eldmoor the fantasy peoples, Skyshards the
 	T.equal(Races.name(nil), "")
 end)
 
-T.test("each race has one passive of the known kinds and one elite, and every kind is used", function()
+T.test("each race has one passive of the known kinds and a roster of five, one troop per role", function()
 	local kinds: { [string]: number } = {}
 	for _, race in Races.LIST do
 		local def = assert(Races.def(race), race)
 		T.expect(table.find(Races.PASSIVES, def.passive) ~= nil, race .. "'s passive " .. def.passive)
 		kinds[def.passive] = (kinds[def.passive] or 0) + 1
-		local elite = Troops.elite(race)
-		T.expect(elite ~= nil and Troops.isTroop(elite), race .. " has an elite troop")
-		T.expect(not Troops.isShared(elite :: Types.Troop), race .. "'s elite isn't a shared role")
 		T.expect(Races.bonusText(race) ~= "", race .. " describes its passive")
+		local roster = Troops.roster(race)
+		T.equal(#roster, 5, race .. " recruits five troops")
+		for i, role in Troops.ROLES do
+			T.equal(Troops.role(roster[i]), role, race .. "'s troop " .. i)
+			T.equal(Troops.ofRole(race, role), roster[i])
+		end
 	end
 	for _, kind in Races.PASSIVES do
 		T.expect((kinds[kind] or 0) >= 1, "some race has the " .. kind .. " passive")
 	end
-	-- every elite belongs to a race (Knights to two: Earth's Kingdom and Eldmoor's Humans)
+	T.equal(#Troops.roster(nil), 0, "no race, no roster")
+	T.equal(Troops.ofRole(nil, "line"), nil)
+	-- every troop in Config.Troops is in some race's roster
 	for _, troop in Troops.LIST do
-		if not Troops.isShared(troop) then
-			local owners = 0
-			for _, race in Races.LIST do
-				owners += if Troops.elite(race) == troop then 1 else 0
-			end
-			T.expect(owners >= 1, troop .. " is some race's elite")
+		local owners = 0
+		for _, race in Races.LIST do
+			owners += if table.find(Troops.roster(race), troop) then 1 else 0
 		end
+		T.expect(owners >= 1, troop .. " is some race's")
 	end
 end)
 
-T.test("a nation recruits infantry, archers, cavalry and its own elite, never another race's", function()
+T.test(
+	"Earth's cultures share four human troops and each adds its own elite; elsewhere every race's five are its own",
+	function()
+		local earth = Races.forMap("earth")
+		local elites: { [string]: boolean } = {}
+		for _, race in earth do
+			for _, role in { "line", "ranged", "fast", "special" } :: { Types.TroopRole } do
+				T.equal(
+					Troops.ofRole(race, role),
+					Troops.ofRole(earth[1], role),
+					race .. " shares Earth's " .. role .. " troop"
+				)
+			end
+			local elite = assert(Troops.ofRole(race, "elite"))
+			T.expect(not elites[elite], race .. "'s elite is its own")
+			elites[elite] = true
+		end
+		T.equal(Troops.ofRole("Kingdom", "line"), Troops.BASE, "Earth's line troop is the garrisons' Infantry")
+		T.equal(Troops.ofRole("Clans", "special"), "Catapults")
+		for _, mapId in { "eldmoor", "skyshards" } do
+			local seen: { [string]: string } = {}
+			for _, race in Races.forMap(mapId) do
+				for _, troop in Troops.roster(race) do
+					T.expect(
+						seen[troop] == nil,
+						mapId .. ": " .. troop .. " is both " .. tostring(seen[troop]) .. "'s and " .. race .. "'s"
+					)
+					seen[troop] = race
+				end
+			end
+		end
+	end
+)
+
+T.test(
+	"every troop has its own name and job: fast troops march fast, each special has one trick, the rest none",
+	function()
+		local names: { [string]: string } = {}
+		local tricks = { "siegeSpeed", "terrain", "pathfinder", "vsNeutral" }
+		for _, troop in Troops.LIST do
+			local t = Troops.stats(troop)
+			T.expect(names[t.name] == nil, troop .. " and " .. tostring(names[t.name]) .. " share the name " .. t.name)
+			names[t.name] = troop
+			T.expect(string.match(troop, "^%a+$") ~= nil, troop .. ": ids are letters only (the network encoding)")
+			T.expect(t.gold > 0 and t.manpower > 0 and t.upkeep > 0, troop .. " costs something")
+			T.expect(t.attack > 0 and t.defence > 0, troop .. " fights")
+			if t.role == "fast" then
+				T.expect(t.fast == true, troop .. " is a fast troop")
+			elseif t.role ~= "elite" then
+				T.expect(not t.fast, troop .. " marches at the normal pace")
+			end
+			local count = 0
+			for _, trick in tricks do
+				count += if (t :: any)[trick] ~= nil then 1 else 0
+			end
+			T.equal(count, if t.role == "special" then 1 else 0, troop .. "'s tricks")
+			T.equal(Troops.trickText(troop) ~= "", t.role == "special", troop .. "'s trick text")
+			if t.terrain then
+				T.expect((t.terrainBonus or 0) > 0, troop .. " has a terrain bonus")
+			end
+		end
+		T.equal(
+			Troops.trickText("Catapults"),
+			string.format("Besieges %gx as fast", Config.Troops.Catapults.siegeSpeed)
+		)
+		T.equal(
+			Troops.trickText("Treants"),
+			string.format("+%d%% in forest battles", math.floor(Config.Troops.Treants.terrainBonus * 100 + 0.5))
+		)
+		T.equal(Troops.trickText("SwampStalkers"), "Forest and hills at plains speed")
+		T.equal(
+			Troops.trickText("Battlemages"),
+			string.format(
+				"+%d%% against garrisons and Rebels",
+				math.floor(Config.Troops.Battlemages.vsNeutral * 100 + 0.5)
+			)
+		)
+		T.equal(Troops.trickText("Dragons"), "")
+		T.equal(Troops.name("ElkRiders"), "Elk riders")
+		T.equal(Troops.name("Dragons"), "Dragons")
+		T.equal(Troops.icon("HorseArchers"), "horsearchers", "a troop's icon is its id in lower case")
+		-- a fixed order: sorted by id
+		for i = 1, #Troops.LIST - 1 do
+			T.expect(Troops.LIST[i] < Troops.LIST[i + 1], "LIST is sorted")
+		end
+	end
+)
+
+T.test("a nation recruits its race's five troops and nothing else: the server refuses any other", function()
 	local state = fresh()
 	local nation = state.nations[AURORA]
 	for _, race in Races.LIST do
 		nation.race = race
-		local elite = Troops.elite(race)
-		T.expect(elite ~= nil, race .. " has an elite")
-		T.equal(#Troops.available(race), 4)
+		local roster = Troops.roster(race)
+		T.equal(#roster, 5)
 		for _, troop in Troops.LIST do
 			nation.gold, nation.manpower = 10000, 100000
 			local ok, err = recruit(state, AURORA, troop)
-			local mayRecruit = troop == "Infantry" or troop == "Archers" or troop == "Cavalry" or troop == elite
+			local mayRecruit = table.find(roster, troop) ~= nil
 			T.equal(ok, mayRecruit, race .. " recruiting " .. troop)
+			T.equal(Troops.canRecruit(race, troop), mayRecruit)
 			if not mayRecruit then
 				T.equal(err, "WrongRace")
 				T.equal(nation.gold, 10000, "a refused recruit costs nothing")
 			end
 		end
 	end
+	T.expect(not Troops.canRecruit(nil, "Infantry"), "no race recruits nothing")
 	local ok, err = Commands.apply(
 		state,
 		AURORA,
@@ -187,15 +279,15 @@ T.test("each troop costs its own gold and manpower, and recruits join the army s
 	local nation = state.nations[AURORA]
 	nation.race = "Humans"
 	nation.gold, nation.manpower = 1000, 20000
-	T.expect((recruit(state, AURORA, "Infantry", 2)))
-	T.expect((recruit(state, AURORA, "Archers", 1)))
+	T.expect((recruit(state, AURORA, "Footmen", 2)))
+	T.expect((recruit(state, AURORA, "Longbowmen", 1)))
 	T.expect((recruit(state, AURORA, "Knights", 1)))
 	local t = Config.Troops
-	T.equal(nation.gold, 1000 - 2 * t.Infantry.gold - t.Archers.gold - t.Knights.gold)
-	T.equal(nation.manpower, 20000 - 2 * t.Infantry.manpower - t.Archers.manpower - t.Knights.manpower)
+	T.equal(nation.gold, 1000 - 2 * t.Footmen.gold - t.Longbowmen.gold - t.Knights.gold)
+	T.equal(nation.manpower, 20000 - 2 * t.Footmen.manpower - t.Longbowmen.manpower - t.Knights.manpower)
 	local army = assert(Army.idleAt(state, AURORA, nation.capital))
-	T.equal(army.troops.Infantry, 2000)
-	T.equal(army.troops.Archers, 1000)
+	T.equal(army.troops.Footmen, 2000)
+	T.equal(army.troops.Longbowmen, 1000)
 	T.equal(army.troops.Knights, 1000)
 	T.equal(army.men, 4000)
 	local g, m = Economy.recruitCost(3, "Berserkers")
@@ -398,27 +490,21 @@ T.test("each passive's one line for the UI follows Config", function()
 	T.equal(Races.bonusText(nil), "")
 end)
 
-T.test("a map names its shared troops (Skyshards: troopers, gunners, hover bikes), the stats are the same", function()
-	T.equal(Troops.name("skyshards", "Infantry"), "Troopers")
-	T.equal(Troops.name("skyshards", "Archers"), "Gunners")
-	T.equal(Troops.name("skyshards", "Cavalry"), "Hover bikes")
-	T.equal(Troops.name("earth", "Infantry"), "Infantry")
-	T.equal(Troops.name("eldmoor", "Cavalry"), "Cavalry")
-	T.equal(Troops.name("earth", "HorseArchers"), "Horse archers", "an elite's own name")
-	T.equal(Troops.name(nil, "Mechs"), "Mechs")
-	-- the shared roles are the same troops everywhere: one entry each in Config.Troops
-	T.equal(Troops.SHARED[1], "Infantry")
-	T.equal(Troops.SHARED[2], "Archers")
-	T.equal(Troops.SHARED[3], "Cavalry")
-	for _, troop in Troops.SHARED do
-		T.expect(Troops.isShared(troop) and Troops.canRecruit("Robots", troop), troop .. " is for everyone")
+T.test("one race per match: a nation's race comes from the map data and recruiting never changes it", function()
+	local state = Match.new(Maps.get("earth"))
+	for _, nation in state.nations do
+		T.expect(table.find(Races.forMap("earth"), nation.race) ~= nil, nation.name .. " is one of Earth's cultures")
+		T.equal(Troops.ofRole(nation.race, "line"), "Infantry", "everyone on Earth is human")
 	end
-	T.expect(not Troops.canRecruit("Robots", "Dragons"), "an unknown troop is never recruited")
-	T.expect(not Troops.isTroop("Dragons"))
-	-- the list keeps a fixed order: the shared roles, then every elite, sorted
-	for i = 4, #Troops.LIST - 1 do
-		T.expect(Troops.LIST[i] < Troops.LIST[i + 1], "elites sorted")
+	local nation = state.nations[1]
+	local race = nation.race
+	nation.gold, nation.manpower = 5000, 50000
+	for _, troop in Troops.roster(race) do
+		T.expect(
+			(Commands.apply(state, 1, { kind = "Recruit", province = nation.capital, regiments = 1, troop = troop }))
+		)
 	end
+	T.equal(nation.race, race)
 end)
 
 -- Battles -----------------------------------------------------------------------------------------------
@@ -426,7 +512,7 @@ end)
 T.test("a side's strength is its men × attack (attackers) or × defence (defenders)", function()
 	local state = fresh()
 	local archers = Army.spawn(state, AURORA, PLAINS, 2000, "Archers")
-	local mixed = Army.spawn(state, ZEPHYR, PLAINS, 3000)
+	local mixed = Army.spawn(state, ZEPHYR, PLAINS, 3000, "Infantry")
 	Army.add(mixed, { Knights = 1000 })
 	local t = Config.Troops
 	T.near(Battle.strength({ archers }, true), 2000 * t.Archers.defence, 1e-9)
@@ -459,25 +545,25 @@ end)
 
 T.test("losses split over the troop types in proportion to their men", function()
 	local state = fresh()
-	local army = Army.spawn(state, AURORA, PLAINS, 3000)
+	local army = Army.spawn(state, AURORA, PLAINS, 3000, "Infantry")
 	Army.add(army, { Cavalry = 1000 })
 	Army.shrinkTo(army, 3000)
 	T.equal(army.troops.Infantry, 2250)
 	T.equal(army.troops.Cavalry, 750)
 	T.equal(army.men, 3000)
-	-- whole men that always add up: leftovers go to the biggest remainders, ties to the earlier type
+	-- whole men that always add up: leftovers go to the biggest remainders, ties to the earlier type in LIST (by id)
 	local parts = Troops.split({ Infantry = 1, Archers = 1, Cavalry = 1 }, 2)
-	T.equal(parts.Infantry, 1)
 	T.equal(parts.Archers, 1)
-	T.equal(parts.Cavalry or 0, 0)
+	T.equal(parts.Cavalry, 1)
+	T.equal(parts.Infantry or 0, 0)
 	local odd = Troops.split({ Infantry = 2333, Archers = 1001, Berserkers = 999 }, 2718)
 	T.equal(sumOf(odd), 2718)
 	-- in a real battle the mix keeps its shares
 	war(state, PLAINS)
 	clear(state, PLAINS)
-	local mixed = Army.spawn(state, AURORA, PLAINS, 3000)
+	local mixed = Army.spawn(state, AURORA, PLAINS, 3000, "Infantry")
 	Army.add(mixed, { Archers = 1000 })
-	Army.spawn(state, ZEPHYR, PLAINS, 4000)
+	Army.spawn(state, ZEPHYR, PLAINS, 4000, "Infantry")
 	run(state, 1)
 	T.expect(mixed.men < 4000, "took losses")
 	T.equal(sumOf(mixed.troops), mixed.men)
@@ -487,7 +573,7 @@ end)
 T.test("merging stacks adds their compositions", function()
 	local state = fresh()
 	local where = id("Aurora Fields")
-	local a = Army.spawn(state, AURORA, where, 2000)
+	local a = Army.spawn(state, AURORA, where, 2000, "Infantry")
 	local b = Army.spawn(state, AURORA, where, 1000, "Archers")
 	Army.add(b, { Cavalry = 1000 })
 	Movement.mergeStacks(state)
@@ -520,7 +606,7 @@ end)
 
 -- Sieges ------------------------------------------------------------------------------------------------
 
-T.test("an army with Ironguard besieges faster (Ironguard siegeSpeed)", function()
+T.test("an army with a siege troop besieges faster (Catapults, Sappers, Artillery: siegeSpeed)", function()
 	local function siegeTicks(troops: Types.Composition): number
 		local state = fresh()
 		local rock = id("Cinder Rock")
@@ -536,18 +622,116 @@ T.test("an army with Ironguard besieges faster (Ironguard siegeSpeed)", function
 		return ticks
 	end
 	local required = Config.Siege.TicksPerDevelopment * map.provinces[id("Cinder Rock")].development
-	local speed = Config.Troops.Ironguard.siegeSpeed :: number
-	T.equal(siegeTicks({ Infantry = 3000 }), required)
-	T.equal(siegeTicks({ Ironguard = 1000 }), math.ceil(required / speed))
+	local speed = Config.Troops.Artillery.siegeSpeed :: number
+	T.equal(siegeTicks({ Troopers = 3000 }), required)
+	T.equal(siegeTicks({ Artillery = 1000 }), math.ceil(required / speed))
 	T.equal(
-		siegeTicks({ Infantry = 5000, Ironguard = 1000 }),
+		siegeTicks({ Troopers = 5000, Artillery = 1000 }),
 		math.ceil(required / speed),
-		"any Ironguard sets the pace"
+		"any Artillery sets the pace"
 	)
-	-- the Empire's Legionaries are siege troops too
-	local legion = Config.Troops.Legionaries.siegeSpeed :: number
-	T.equal(siegeTicks({ Infantry = 2000, Legionaries = 1000 }), math.ceil(required / legion), "Legionaries")
-	T.equal(Troops.siegeSpeed({ Pikemen = 3000 }), 1, "Pikemen besiege at the normal pace")
+	local catapults = Config.Troops.Catapults.siegeSpeed :: number
+	T.equal(siegeTicks({ Infantry = 2000, Catapults = 1000 }), math.ceil(required / catapults), "Catapults")
+	T.equal(Troops.siegeSpeed({ Sappers = 1000 }), Config.Troops.Sappers.siegeSpeed)
+	T.equal(Troops.siegeSpeed({ Ironguard = 3000, Pikemen = 3000 }), 1, "the elites besiege at the normal pace")
+end)
+
+-- Specials' tricks ---------------------------------------------------------------------------------------
+
+T.test("a terrain special fights harder in its terrain only (Treants in forest, Trolls in hills)", function()
+	local t = Config.Troops
+	local treants = { Treants = 2000, Wardens = 1000 }
+	T.near(Troops.strength(treants, true), 2000 * t.Treants.defence + 1000 * t.Wardens.defence, 1e-9)
+	T.near(
+		Troops.strength(treants, true, "Forest"),
+		2000 * t.Treants.defence * (1 + (t.Treants.terrainBonus :: number)) + 1000 * t.Wardens.defence,
+		1e-9,
+		"only the Treants' men get it"
+	)
+	T.near(Troops.strength(treants, false, "Hills"), 2000 * t.Treants.attack + 1000 * t.Wardens.attack, 1e-9)
+	T.near(
+		Troops.strength({ Trolls = 1000 }, false, "Hills"),
+		1000 * t.Trolls.attack * (1 + (t.Trolls.terrainBonus :: number)),
+		1e-9,
+		"attacking too"
+	)
+	-- in a real battle: Treants holding a forest kill more than the same Treants on plains
+	local function kills(where: number): number
+		local state = fresh()
+		war(state, where)
+		state.nations[AURORA].race, state.nations[ZEPHYR].race = "Marines", "Marines" -- no passive in play
+		Army.spawn(state, ZEPHYR, where, 2000, "Treants")
+		local raiders = Army.spawn(state, AURORA, where, 4000, "Troopers")
+		run(state, 1)
+		return 4000 - raiders.men
+	end
+	local terrain = Config.Battle.TerrainDefenceBonus
+	local inForest, onPlains = kills(FOREST), kills(PLAINS)
+	local rate = Config.Battle.KillRatePerRound
+	T.equal(onPlains, math.floor(rate * 2000 * t.Treants.defence + 0.5))
+	T.equal(
+		inForest,
+		math.floor(rate * 2000 * t.Treants.defence * (1 + (t.Treants.terrainBonus :: number)) * (1 + terrain) + 0.5)
+	)
+end)
+
+T.test(
+	"a pathfinder special marches through forest and hills at plains speed; slower troops still set the pace",
+	function()
+		local state = fresh()
+		state.nations[AURORA].race = "Lizardfolk"
+		local plains = Config.Army.MoveTicks.Plains
+		local stalkers = Army.spawn(state, AURORA, id("Aurora Meadows"), 1000, "SwampStalkers")
+		T.equal(Movement.moveTicks(state, stalkers, FOREST), plains)
+		T.equal(Movement.moveTicks(state, stalkers, HILLS), plains)
+		T.equal(Movement.moveTicks(state, stalkers, id("Aurora Landing")), plains)
+		Army.add(stalkers, { Scaleguards = 1000 })
+		T.equal(
+			Movement.moveTicks(state, stalkers, HILLS),
+			Config.Army.MoveTicks.Hills,
+			"the line troop slows it in hills"
+		)
+		local burrowers = Army.spawn(state, AURORA, id("Aurora Fields"), 1000, "Burrowers")
+		Army.add(burrowers, { Wasps = 1000 })
+		T.equal(
+			Movement.moveTicks(state, burrowers, FOREST),
+			math.max(plains, Config.Army.FastMoveTicks.Forest),
+			"with fast troops: the slower of the two"
+		)
+	end
+)
+
+T.test("an anti-garrison special fights harder against neutral garrisons and Rebels, not against nations", function()
+	local t = Config.Troops
+	local mages = { Battlemages = 1000, Footmen = 1000 }
+	T.near(
+		Troops.strength(mages, false, nil, true),
+		1000 * t.Battlemages.attack * (1 + (t.Battlemages.vsNeutral :: number)) + 1000 * t.Footmen.attack,
+		1e-9
+	)
+	T.near(Troops.strength(mages, false, nil, false), 1000 * t.Battlemages.attack + 1000 * t.Footmen.attack, 1e-9)
+	-- in a real battle: the same mages kill more of a garrison than of a nation's army
+	local function kills(neutral: boolean): number
+		local state = fresh()
+		local where = PLAINS
+		if neutral then
+			clear(state, where)
+		else
+			war(state, where)
+		end
+		state.nations[AURORA].race = "Marines"
+		state.nations[ZEPHYR].race = "Marines"
+		local holders = Army.spawn(state, if neutral then 0 else ZEPHYR, where, 4000)
+		Army.spawn(state, AURORA, where, 1000, "Battlemages")
+		run(state, 1)
+		return 4000 - holders.men
+	end
+	local rate = Config.Battle.KillRatePerRound
+	local function lost(losses: number): number -- the holders' men round as Battle rounds them
+		return 4000 - math.floor(4000 - losses + 0.5)
+	end
+	T.equal(kills(false), lost(rate * 1000 * t.Battlemages.attack))
+	T.equal(kills(true), lost(rate * 1000 * t.Battlemages.attack * (1 + (t.Battlemages.vsNeutral :: number))))
 end)
 
 -- Powers, garrisons, network, quests --------------------------------------------------------------------
@@ -557,7 +741,7 @@ T.test("a Meteor kills half of every troop type", function()
 	state.tick = Config.Phases.PeaceEndTick
 	state.phase = "War"
 	state.nations[ZEPHYR].charges = 2
-	local army = Army.spawn(state, AURORA, id("Aurora Fields"), 3000)
+	local army = Army.spawn(state, AURORA, id("Aurora Fields"), 3000, "Infantry")
 	Army.add(army, { Archers = 1000 })
 	T.expect((Primordial.use(state, { nation = ZEPHYR }, "Meteor", army.id)))
 	T.equal(army.troops.Infantry, 1500)
@@ -584,11 +768,15 @@ T.test("neutral garrisons and Rebels are infantry, and have no race", function()
 		end
 	end
 	T.expect(rebels ~= nil and rebels.troops.Infantry == Config.Primordial.Powers.Rebels.men, "infantry Rebels")
+	-- a nation's new army with no troop type given is its race's line troop
+	local mine = Army.spawn(state, AURORA, id("Aurora Fields"), 2000)
+	T.equal(mine.troops[Troops.ofRole(state.nations[AURORA].race, "line") :: Types.Troop], 2000)
+	T.equal(Army.spawn(state, 0, id("Aurora Fields"), 1000).troops.Infantry, 1000)
 end)
 
 T.test("the network carries every nation's race and every army's composition", function()
 	local state = fresh()
-	local army = Army.spawn(state, AURORA, id("Aurora Fields"), 2000)
+	local army = Army.spawn(state, AURORA, id("Aurora Fields"), 2000, "Infantry")
 	Army.add(army, { Archers = 1000 })
 	local snap = Snapshot.full(state)
 	for _, n in snap.nations do
@@ -601,7 +789,7 @@ T.test("the network carries every nation's race and every army's composition", f
 		end
 	end
 	assert(record, "the army is in the snapshot")
-	T.equal(record.troops, "Infantry:2000,Archers:1000")
+	T.equal(record.troops, "Archers:1000,Infantry:2000", "LIST order: by id")
 	local back = Troops.decode(record.troops)
 	T.equal(back.Infantry, 2000)
 	T.equal(back.Archers, 1000)
@@ -610,7 +798,7 @@ T.test("the network carries every nation's race and every army's composition", f
 	Army.setTroops(army, { Infantry = 1000, Archers = 2000 })
 	local delta = assert(Snapshot.diff(before, Snapshot.full(state)))
 	T.equal(#delta.armies, 1)
-	T.equal(delta.armies[1].troops, "Infantry:1000,Archers:2000")
+	T.equal(delta.armies[1].troops, "Archers:2000,Infantry:1000")
 end)
 
 T.test("quests and achievements count every troop as a regiment", function()
@@ -651,54 +839,75 @@ local function recruitOf(commands: { Types.Command }): Types.Command?
 	return nil
 end
 
-T.test("bots: a threatened province raises archers", function()
+T.test("bots: a threatened province raises the race's ranged troop", function()
 	local state = borderWar(1000, 3000)
 	local c = recruitOf(Bot.plan(state, AURORA, Rng.new(1), "Normal"))
 	assert(c and c.kind == "Recruit", "the bot recruits")
 	T.equal(c.province, id("Cinder Rock"))
-	T.equal(c.troop, "Archers")
+	T.equal(c.troop, Troops.ofRole(state.nations[AURORA].race, "ranged"))
+	T.equal(c.troop, "Gunners", "the Marines' ranged troop")
 end)
 
-T.test("bots: infantry in peace; cavalry or their elite at war when they can afford it", function()
-	local state = fresh()
-	local c = recruitOf(Bot.plan(state, AURORA, Rng.new(1), "Normal"))
-	assert(c and c.kind == "Recruit", "the bot recruits")
-	T.equal(c.troop, "Infantry")
-	-- at war with Zephyr far away (no threat), rich: the attack troops
-	local rich = borderWar(0, 1000)
-	clear(rich, id("Cinder Reach"))
-	rich.nations[AURORA].gold = 2000
-	local d = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
-	assert(d and d.kind == "Recruit", "the bot recruits")
-	T.expect(d.troop == "Cavalry" or d.troop == Troops.elite(rich.nations[AURORA].race), "attack troop: " .. d.troop)
-	-- poor at war: infantry
-	rich.nations[AURORA].gold = Config.Troops.Infantry.gold
-	local e = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
-	assert(e and e.kind == "Recruit", "the bot recruits")
-	T.equal(e.troop, "Infantry")
-end)
+T.test(
+	"bots: the line troop in peace; at war the special, the elite and the fast troop when they can afford them",
+	function()
+		local state = fresh()
+		local race = state.nations[AURORA].race
+		local c = recruitOf(Bot.plan(state, AURORA, Rng.new(1), "Normal"))
+		assert(c and c.kind == "Recruit", "the bot recruits")
+		T.equal(c.troop, Troops.ofRole(race, "line"))
+		-- at war with Zephyr far away (no threat), rich: the special first (under SpecialShare)
+		local rich = borderWar(0, 1000)
+		clear(rich, id("Cinder Reach"))
+		rich.nations[AURORA].gold = 2000
+		local capital = rich.nations[AURORA].capital
+		Army.spawn(rich, AURORA, capital, 3000, Troops.ofRole(race, "line"))
+		local d = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
+		assert(d and d.kind == "Recruit", "the bot recruits")
+		T.equal(d.troop, Troops.ofRole(race, "special"))
+		-- with its special's share filled: the elite and the fast troop, the one furthest below its share first
+		-- (EliteShare, FastShare; none of either yet: the elite)
+		Army.add(assert(Army.idleAt(rich, AURORA, capital)), { [Troops.ofRole(race, "special") :: Types.Troop] = 1000 })
+		local f = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
+		assert(f and f.kind == "Recruit", "the bot recruits")
+		T.equal(f.troop, Troops.ofRole(race, "elite"))
+		Army.add(assert(Army.idleAt(rich, AURORA, capital)), { [Troops.ofRole(race, "elite") :: Types.Troop] = 1000 })
+		local g = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
+		assert(g and g.kind == "Recruit", "the bot recruits")
+		T.equal(g.troop, Troops.ofRole(race, "fast"))
+		-- poor at war: the line troop
+		local line = Troops.ofRole(race, "line") :: Types.Troop
+		rich.nations[AURORA].gold = Config.Troops[line].gold
+		local e = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
+		assert(e and e.kind == "Recruit", "the bot recruits")
+		T.equal(e.troop, line)
+	end
+)
 
-T.test("bots: infantry stays the base (archers and attack troops stop at their share of the army)", function()
+T.test("bots: the line troop stays the base (the other roles stop at their share of the army)", function()
 	local state = borderWar(1000, 3000)
+	local race = state.nations[AURORA].race
 	for _, a in state.armies do
 		if a.owner == AURORA then
-			Army.setTroops(a, { Archers = a.men }) -- all archers already: well past ArcherShare
+			Army.setTroops(a, { [Troops.ofRole(race, "ranged") :: Types.Troop] = a.men }) -- well past RangedShare
 		end
 	end
 	local c = recruitOf(Bot.plan(state, AURORA, Rng.new(1), "Normal"))
 	assert(c and c.kind == "Recruit", "the bot recruits")
 	T.equal(c.province, id("Cinder Rock"))
-	T.equal(c.troop, "Infantry")
+	T.equal(c.troop, Troops.ofRole(race, "line"))
 	local rich = borderWar(0, 1000)
 	clear(rich, id("Cinder Reach"))
 	rich.nations[AURORA].gold = 2000
-	Army.spawn(rich, AURORA, rich.nations[AURORA].capital, 2000, "Cavalry") -- past AttackShare
+	local army = Army.spawn(rich, AURORA, rich.nations[AURORA].capital, 1000, Troops.ofRole(race, "special"))
+	Army.add(army, { [Troops.ofRole(race, "fast") :: Types.Troop] = 1000 })
+	Army.add(army, { [Troops.ofRole(race, "elite") :: Types.Troop] = 1000 }) -- past every share
 	local d = recruitOf(Bot.plan(rich, AURORA, Rng.new(1), "Normal"))
 	assert(d and d.kind == "Recruit", "the bot recruits")
-	T.equal(d.troop, "Infantry")
+	T.equal(d.troop, Troops.ofRole(race, "line"))
 end)
 
-T.test("bots never ask for another race's elite", function()
+T.test("bots only ever ask for their own race's troops", function()
 	for _, mapId in Maps.ids do
 		local state = Match.new(Maps.get(mapId))
 		for nationId, nation in state.nations do

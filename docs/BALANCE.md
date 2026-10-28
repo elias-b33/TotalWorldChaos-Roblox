@@ -608,3 +608,56 @@ Every map now has its own five peoples, two nations each (`docs/DESIGN.md` "Race
 - Spread the start positions over the peoples (one strong and one weak start each) before tuning their numbers: the Clans and the Lizardfolk first.
 - The Manpower passive (Orcs, Insectoids) does little for bots (section 18); their elites carry them.
 - The Elves' two wildwoods are strong starts (1.42× with +10% in forests, 1.06× with +5%).
+
+### Five troops per race (stage 1b)
+
+Every race now recruits five troops, one per role: a line troop, a ranged troop, a fast troop, an elite and a special with one trick (`docs/DESIGN.md` "Troops" has the rosters). Earth's five human cultures share Infantry, Archers, Cavalry and Catapults and keep their own elite; on Eldmoor and Skyshards every race's five are its own. The specials' tricks are small hooks in `Sim/Troops.luau`: siege speed (Catapults, Sappers, Artillery: 2×), +50% in battles in a terrain (Treants and Resonators in forest, Trolls and Crawlers in hills), pathfinding (Swamp stalkers, Burrowers: forest and hills at plains speed) and more combat strength against garrisons and Rebels (Battlemages +30%, Ion storms +40%). Ironguard and Legionaries lost their faster sieges (the Dwarves' Sappers and Earth's Catapults have them now). `lune run tools/balance/rosters` prints every troop's strength per gold of upkeep against Infantry and each race's army as bots raise it.
+
+**Bots by role.** Bots pick troops by role, never by name (`Sim/Bot.luau` `pickTroop`, `Config.Bots`): the line troop is the base, a threatened province raises the ranged troop (`RangedShare` 30%, was `ArcherShare`), and at war a bot that can pay buys its special while it is under 10% of its men (`SpecialShare`), then its elite (up to 20%, `EliteShare`) and its fast troop (up to 10%, `FastShare`), the one furthest below its share first. The first draft bought the fast troop before the elite: fast troops are the dearest per man, and elites, the races' signature, made up 1–3% of what bots raised.
+
+**How it was measured.** As above: `lune run tools/harness/tournament 100 <map>` and `FIRST_SEED=101 lune run tools/harness/tournament 100 <map>` on each map (seeds 1–200, map races), added up. A two-nation race's share moves by about ±0.2 between batches of 200 seeds.
+
+**Tuning steps** (map races; shares on seeds 1–200 per map unless noted; each step keeps the ones before)
+
+| Step | What changed | Earth: Kingdom / Empire / Nomads / Republic / Clans | Eldmoor: Humans / Elves / Orcs / Dwarves / Lizardfolk | Skyshards: Marines / Robots / Insectoids / Crystal folk / Energy beings |
+| --- | --- | --- | --- | --- |
+| 0 | The rosters as first drawn; bots bought the special, then the fast troop, then the elite (20 seeds only) | 0.83 / 1.04 / 0.83 / 2.08 / 0.21 | 1.45 / 1.05 / 0.66 / 0.66 / 1.18 | 0.42 / 0.62 / 2.71 / 0.00 / 1.25 |
+| 1 | Bots: the elite and the fast troop by share (`EliteShare` 20%, `FastShare` 10%, the one furthest below first); Swarmlings 9 gold and upkeep 1.4 (8, 1.3), Hive warriors upkeep 1.75 (1.5); Shardlings attack 1.0 (0.9), Golems 1.5 (1.25); Mechs 35 gold, upkeep 3.5 (40, 4); Pikemen attack 1.5 (1.25) | 0.95 / 1.33 / 1.03 / 1.12 / 0.58 | 1.25 / 1.43 / 0.63 / 0.76 / 0.92 | 0.67 / 0.56 / 2.24 / 0.54 / 0.99 |
+| 2 | Empire +5% attacking (10%); Clans +40% defending hills, Pikemen 14 gold, upkeep 1.5, attack 1.6; Elves +5% in forests (10%); Grunts defence 1.0 (0.9), Spear throwers 1.4 (1.25); Axemen upkeep 1.5 (1.6), Ironguard attack 1.75 (1.5); Swarmlings upkeep 1.5, Acid spitters and Burrowers 2 (1.75), Hive warriors 16 gold, upkeep 2.25; Shardlings 10 gold, Prism casters attack 0.8 (0.75), Resonators 18 gold (20); Juggernauts 30 gold, upkeep 3 (35, 3.5); Drones and Artillery upkeep 2 (2.25) | 1.09 / 1.09 / 1.24 / 1.04 / 0.54 | 1.23 / 1.23 / 0.65 / 0.89 / 1.01 | 0.68 / 0.84 / 1.66 / 0.70 / 1.11 |
+| 3 | The Clans' step 2 undone (it moved nothing; Pikemen 15 gold, upkeep 1.75, attack 1.5); Berserkers attack 2.0 (1.75), Trolls upkeep 2.25 (2.5), Battlemages +40% (50%); Swarmlings and Acid spitters 1,000 manpower (750); Marines +15% gold (10%); Crystal folk +15% in forests (10%), Golems 22 gold (25), Resonators upkeep 2 | 0.99 / 1.34 / 1.15 / 1.05 / 0.48 | 1.27 / 1.17 / 0.80 / 0.86 / 0.90 | 1.22 / 0.74 / 0.66 / 1.09 / 1.30 |
+| 4 | Acid spitters 750 manpower again; Ion storms +40% (50%), Battlemages +30%; Laserbots attack 0.85 (0.8), Crawlers 18 gold (20); Marines +12% gold (Earth unchanged: seeds 201–400) | 1.03 / 0.96 / 1.47 / 1.01 / 0.53 | 1.26 / 1.16 / 0.80 / 0.87 / 0.90 | 0.97 / 0.82 / 0.67 / 1.15 / 1.39 |
+| 5 | Swift races 15% faster (Nomads, Energy beings: 20%); Swarmlings upkeep 1.4, Hive warriors 14 gold, upkeep 2; Humans +8% gold (10%) | **1.04 / 1.23 / 1.06 / 1.04 / 0.62** | **1.22 / 1.20 / 0.87 / 0.95 / 0.77** | **0.91 / 0.84 / 0.95 / 1.11 / 1.19** |
+
+What the steps showed:
+
+- **Noise is the first thing to read.** Earth's numbers did not change between steps 3 and 4, yet the Empire went from 1.34× (seeds 1–200) to 0.96× (seeds 201–400) and the Nomads from 1.15× to 1.47×: a two-nation race moves by ±0.2–0.3 between batches of 200 seeds. Over all 400 seeds Earth was Kingdom 1.01×, Empire 1.14×, Nomads 1.31×, Republic 1.03×, Clans 0.50×.
+- **The Insectoids' line troop's manpower decides their match.** With 750-manpower Swarmlings they won 1.66–2.71× however their upkeep and their elite were cut; at 1,000 manpower, 0.66×, and 0.95× once their upkeep and their elite came back part of the way (step 5). A nation starts with 3,000 manpower, so cheap line regiments mean a fourth regiment in the Peace phase's land grab, and the +20% manpower passive adds to it. (The Orcs' troops cost 750 manpower too, yet they were below 1× throughout: the swing is a Skyshards one, where every start is the same.)
+- **Elites before fast troops.** Step 0's bots filled their fast troop's share before buying the elite: fast troops are the dearest regiments per man and the elites, each race's signature, were 4–7% of what bots raised. Buying whichever of the two is further below its share (the elite's is twice the fast troop's) put elites at 6–8% and fast troops at 3–5%, so a race's elite can carry it, as section 18 found for the Orcs' Berserkers.
+- **The Clans' numbers do not move their share.** +40% defending in hills and cheaper, stronger Pikemen (step 2) left them at 0.54×, and 0.48–0.53× after the step was undone. Their two nations, Tigris and Yangtze, are Earth's two weakest starts (section 19: 0.70× and 0.40×): their share is where they start. Fixing it with numbers would need a Clans race far stronger than the others wherever it starts; the fix is in the map data (below, Still to do).
+- **Swift is strong.** The Nomads and the Energy beings, both Swift, led their maps at 20% faster marching.
+
+**Final** (step 5; `Config.Troops`, `Config.Races`, `Config.Bots` as committed; seeds 1–200 per map)
+
+| Map | Race: wins (share), average provinces at the end |
+| --- | --- |
+| Earth | Kingdom 60 (1.04×) 11.3 · Empire 71 (1.23×) 16.9 · Nomads 61 (1.06×) 15.4 · Republic 60 (1.04×) 15.8 · Clans 36 (0.62×) 9.8 |
+| Eldmoor | Humans 73 (1.22×) 14.7 · Elves 72 (1.20×) 19.4 · Orcs 52 (0.87×) 10.8 · Dwarves 57 (0.95×) 12.6 · Lizardfolk 46 (0.77×) 10.7 |
+| Skyshards | Marines 44 (0.91×) 11.4 · Robots 41 (0.84×) 9.9 · Insectoids 46 (0.95×) 10.9 · Crystal folk 54 (1.11×) 13.3 · Energy beings 58 (1.19×) 14.2 |
+
+Every race is within 0.8–1.25× except two: the Clans (0.62×, their starts, above) and the Lizardfolk (0.77×; 0.90× on steps 3 and 4 with the same numbers, so within the noise of the target).
+
+**Troops bots recruit** (final, regiments per match, all ten nations): every troop is recruited on its map. By role: line 54–58%, ranged 23–27%, special 6–7%, elite 6–8%, fast 3–5%.
+
+| Map | Line | Ranged | Fast | Elite | Special |
+| --- | --- | --- | --- | --- | --- |
+| Earth | Infantry 446 | Archers 185 | Cavalry 40 | Legionaries 22, Crossbowmen 17, Knights 11, Horse archers 9, Pikemen 8 | Catapults 57 |
+| Eldmoor | Scaleguards 121, Footmen 111, Grunts 103, Wardens 94, Axemen 87 | Blowgunners 62, Longbowmen 49, Spear throwers 47, Firelocks 42, Elven archers 34 | Elk riders 9, Lancers 8, Wolf riders 5, Raptor riders 5, Ram riders 5 | Rangers 15, Knights 12, Berserkers 9, Ironguard 8, Crocodile guard 7 | Treants 14, Battlemages 13, Sappers 8, Swamp stalkers 8, Trolls 7 |
+| Skyshards | Sparks 129, Troopers 113, Shardlings 103, Swarmlings 102, Automatons 93 | Arc casters 63, Gunners 55, Prism casters 54, Acid spitters 54, Laserbots 54 | Shard gliders 11, Hover bikes 11, Drones 11, Wasps 10, Storm wisps 10 | Golems 18, Hive warriors 18, Mechs 15, Juggernauts 14, Stormlords 14 | Ion storms 16, Burrowers 14, Resonators 14, Artillery 14, Crawlers 12 |
+
+**Match feel** (final): no domination victories, alliance victories in 43 / 50 / 21 of 200 matches on Earth / Eldmoor / Skyshards and the rest decided on score at 25:00, 9.5–11.2 wars per match, 37–58 provinces taken from nations per match, 140k–162k men in all armies at 25:00 (section 19's first pass: 144k–181k).
+
+**Still to do**
+
+- **The Clans' starts.** Tigris and Yangtze are Earth's two weakest starts; with one strong start in place of one of them (say Volga's or Zambezi's, swapped with that nation's race in `tools/mapgen/maps/earth.py` `RACES`), the Clans would get a fair share without being made the strongest race. That is a map-data change (regenerate the maps; `docs/MAPS.md`'s tables and the harness scenarios that name nations' races follow), so it is left for its own task.
+- The Lizardfolk sit at the bottom of the target (0.77–0.90×); watch them in the next run before touching their numbers.
+- Every share above is from bots. Players will lean on the specials' tricks and on fast troops more than bots do (bots never route by terrain and keep their fast troops under 10% of their men); watch the analytics once players play.

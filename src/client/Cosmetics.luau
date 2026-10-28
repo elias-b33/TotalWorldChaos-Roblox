@@ -2,7 +2,7 @@
 -- Every nation's equipped cosmetics, as replicated next to the match (Snapshot.cosmetics), and the GUI pieces that
 -- show them: pixel-art flags and army tokens (EditableImages painted by CosmeticArt, cached and shared), border and
 -- shade swatches, nameplate frame colours. Bots and unknown nations show the defaults; with the default token, a
--- nation's armies are a soldier of its race (Cosmetics.armyLabel).
+-- nation's army is a soldier of the troop it is mostly made of (Cosmetics.armyLabel).
 --
 -- Primordial-power effects: Cosmetics.powerEffect(nationId, power) says which effect variant a nation has equipped
 -- ("" = the default look); Effects draws it (PowerFx) with the default's area, timing and sound cue.
@@ -213,12 +213,12 @@ function Cosmetics.tokenLabel(parent: Instance, tokenId: string, colorIndex: num
 end
 
 -- A nation's army on the map (docs/DESIGN.md "Map rendering"): its equipped token skin, or, with the default token,
--- a little soldier of its race (CosmeticArt.SOLDIERS). nil means the plain square: a race without a soldier, or a
--- device that can't paint one.
+-- a little soldier of the troop it is mostly made of (CosmeticArt.SOLDIERS). nil means the plain square: a troop
+-- without a soldier, or a device that can't paint one.
 function Cosmetics.armyLabel(
 	parent: Instance,
 	nationId: number,
-	race: string,
+	troop: string,
 	colorIndex: number,
 	size: UDim2
 ): GuiObject?
@@ -226,19 +226,19 @@ function Cosmetics.armyLabel(
 	if token ~= Catalogue.DEFAULTS.Token then
 		return Cosmetics.tokenLabel(parent, token, colorIndex, size)
 	end
-	if CosmeticArt.SOLDIERS[race] == nil then
+	if CosmeticArt.SOLDIERS[troop] == nil then
 		return nil
 	end
 	local nation, border = colours(colorIndex)
-	local frame = image(string.format("soldier:%s:%d", race, colorIndex), function()
-		return CosmeticArt.soldier(race, nation, border)
+	local frame = image(string.format("soldier:%s:%d", troop, colorIndex), function()
+		return CosmeticArt.soldier(troop, nation, border)
 	end)
 	if frame == nil then
 		return nil
 	end
 	local label = pixelLabel(parent, { frame }, size, Palette.nation(colorIndex))
 	label.Name = "TokenSkin"
-	label:SetAttribute("Soldier", race)
+	label:SetAttribute("Soldier", troop)
 	return label
 end
 

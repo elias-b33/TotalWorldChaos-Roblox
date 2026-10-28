@@ -1,8 +1,8 @@
 --!strict
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
--- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each troop
--- your race can raise, under the names and icons the map gives them, move an army) and diplomacy on foreign ones
--- (war, ally, peace). Every button shows its price; the server decides. On an owned coast, "Ships" opens the choice of
+-- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each of
+-- the five troops of your race's roster, move an army) and diplomacy on foreign ones (war, ally, peace). Every
+-- button shows its price; the server decides. On an owned coast, "Ships" opens the choice of
 -- how many of the map's ships to launch (docs/DESIGN.md "Navies"); a blockaded coast's tile is greyed with an anchor.
 -- Built from the UI kit (docs/UI_DIRECTION.md 7.10): the province's name on a title plate, a row of chips (icon +
 -- value, the development as the map's pip bar) and rows of slot tiles, five to a row: routine actions on calm slate
@@ -39,6 +39,8 @@ local GAP = Theme.space.s -- between tiles
 local CHIP_HEIGHT = Theme.size.chip
 local CHIP_GAP = Theme.space.s
 local PIP_SCALE = 2 -- the pip bar at the map's scale, in a well 10 px wider each side
+local LONG_CAPTION = 12 -- characters that fit a tile's caption at the kit's size; longer ones (troop names like
+-- "Crocodile guard") are set a size or two smaller
 
 local TERRAIN_ICONS: { [string]: string } = { Plains = "farm", Forest = "tree", Hills = "hills", Mountain = "mountain" }
 local BUILDING_ICONS: { [string]: string } = { Farm = "farm", Barracks = "sword", Fort = "castle" }
@@ -84,6 +86,9 @@ local function action(
 	local size = Vector2.new(grids[1].CellSize.X.Offset, Widgets.TILE_HEIGHT)
 	local b = Widgets.slotTile(row, icon, caption, costs, size, style, onPress, name)
 	b.LayoutOrder = #row:GetChildren()
+	if #caption > LONG_CAPTION then
+		b.TextSize = if #caption > LONG_CAPTION + 1 then Theme.text.small - 2 else Theme.text.small - 1
+	end
 	if not enabled then
 		Widgets.setEnabled(b, false)
 	end
@@ -359,9 +364,8 @@ local function render()
 				"Ships"
 			)
 		end
-		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite, as the map
-		-- names them (Skyshards: troopers, gunners, hover bikes). The infantry button keeps the name "Regiment" (the
-		-- tutorial and the harness look for it), the others "Recruit_<troop id>"
+		-- one regiment of each troop of your race's roster: line, ranged, fast, elite and special, each button named
+		-- "Recruit_<troop id>" (the tutorial and the harness look for them)
 		for _, troop in RaceInfo.troops(me.race) do
 			local recruitGold, recruitManpower = Economy.recruitCost(1, troop)
 			local manpowerText = if recruitManpower % 1000 == 0
@@ -380,7 +384,7 @@ local function render()
 				function()
 					Intents.recruit(provinceId, 1, troop)
 				end,
-				if troop == "Infantry" then "Regiment" else "Recruit_" .. troop
+				"Recruit_" .. troop
 			)
 		end
 	end

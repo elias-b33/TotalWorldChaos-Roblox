@@ -109,7 +109,7 @@ local function run()
 	nation.gold, nation.manpower = 300, 20000
 	Emulator.press(alice, "Capital")
 	Emulator.run(1)
-	Emulator.press(alice, "Regiment")
+	Emulator.press(alice, H.lineButton(alice))
 	Emulator.run(1.2)
 	local total, given = 0, 0
 	for _, p in state.provinces do

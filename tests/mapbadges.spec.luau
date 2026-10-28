@@ -53,17 +53,14 @@ T.test(
 		T.equal(MapBadges.armyIcon(false, false, false, true, "archers"), "retreat", "then the retreat flag")
 		T.equal(MapBadges.armyIcon(true, false, false, false, "infantry"), "rebels", "Rebels keep their flag")
 		T.equal(MapBadges.armyIcon(false, true, false, false, "infantry"), "shield", "garrisons keep their shield")
-		-- every troop's icon as each map draws it (Skyshards' troopers, gunners and hover bikes) is a painted icon
-		local Maps = require("../src/shared/Maps")
-		for _, mapId in Maps.ids do
-			for _, troop in Troops.LIST do
-				local icon = MapBadges.armyIcon(false, false, false, false, Troops.icon(mapId, troop))
-				T.expect(IconArt.rows(icon) ~= nil, mapId .. ": " .. troop .. "'s badge icon " .. icon .. " is painted")
-			end
+		-- every troop's icon is a painted icon
+		for _, troop in Troops.LIST do
+			local icon = MapBadges.armyIcon(false, false, false, false, Troops.icon(troop))
+			T.expect(IconArt.rows(icon) ~= nil, troop .. "'s badge icon " .. icon .. " is painted")
 		end
-		T.equal(Troops.icon("skyshards", "Infantry"), "troopers", "Skyshards draws its infantry as troopers")
-		T.equal(Troops.icon("earth", "Infantry"), "infantry")
-		T.equal(Troops.icon("earth", "HorseArchers"), "horsearchers", "an elite's icon is its id in lower case")
+		T.equal(Troops.icon("Troopers"), "troopers")
+		T.equal(Troops.icon("Infantry"), "infantry")
+		T.equal(Troops.icon("HorseArchers"), "horsearchers", "a troop's icon is its id in lower case")
 	end
 )
 

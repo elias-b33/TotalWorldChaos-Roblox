@@ -87,7 +87,7 @@ A world of your own, WorldBox style: the ten nations of a map play as bots while
 
 ## Core systems
 
-Two resources (gold and manpower), a cast of five races on every map (fifteen in all), three shared troop roles plus one elite per race, and one siege rule carry the whole game. Every number below is a starting value for playtests and lives in one `Config` module.
+Two resources (gold and manpower), a cast of five races on every map (fifteen in all), five troops per race (one per role), and one siege rule carry the whole game. Every number below is a starting value for playtests and lives in one `Config` module.
 
 ### Map and provinces
 
@@ -99,49 +99,49 @@ Two resources (gold and manpower), a cast of five races on every map (fifteen in
 
 ### Races
 
-Every map has its own cast of five peoples, two nations each, set per nation in the map data (`docs/MAPS.md`), so picking a nation picks its race: realistic civilisations on Earth, WorldBox's four classic races and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards. Neutral garrisons and Rebels have none. Each race has one passive and one elite troop (see Troops). Races and troops are data: `Config.Races` (each race's name, passive kind and numbers, elite), `Config.Troops` and `Config.Casts` (each map's five races, and its own names and icons for the shared troop roles).
+Every map has its own cast of five peoples, two nations each, set per nation in the map data (`docs/MAPS.md`), so picking a nation picks its race: realistic civilisations on Earth, WorldBox's four classic races and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards. Neutral garrisons and Rebels have none. A player is one race for the whole match: everyone on Earth is human (five cultures), and on Eldmoor and Skyshards each nation is one people. Each race has one passive and recruits five troops, one per role, its elite the signature one (see Troops). Races and troops are data: `Config.Races` (each race's name, passive kind and numbers, roster), `Config.Troops` (each troop's role, numbers and trick) and `Config.Casts` (each map's five races).
 
-**Passive kinds.** Every race takes one of seven, with its own numbers in `Config.Races`:
+**Passive kinds.** Every race takes one of seven, with its own numbers in `Config.Races` (the race tables below show each race's):
 
 | Kind | Effect |
 | --- | --- |
-| Gold | +10% gold income (gross: provinces and capital, before upkeep) |
-| Manpower | +20% manpower income |
-| Forest | Cross forest at plains speed; +10% combat strength in battles in forest provinces |
-| Hills | +25% combat strength when defending in hills; forts cost half |
-| Upkeep | Armies cost 15% less upkeep |
-| Swift | Armies march 20% faster (every step's time × 0.8, rounded, at least 1 s) |
-| Attack | +10% combat strength when attacking |
+| Gold | More gold income (gross: provinces and capital, before upkeep) |
+| Manpower | More manpower income |
+| Forest | Cross forest at plains speed; more combat strength in battles in forest provinces |
+| Hills | More combat strength when defending in hills; cheaper forts |
+| Upkeep | Armies cost less upkeep |
+| Swift | Armies march faster (every step's time × the race's multiplier, rounded, at least 1 s) |
+| Attack | More combat strength when attacking |
 
 **Earth: realistic.** Human civilisations only, archetypes a history strategy game uses, never a real people or present-day nation; they go to nations by terrain and balance (the nations keep their river names).
 
 | Race | Passive | Elite | Nations |
 | --- | --- | --- | --- |
-| Kingdom | Gold | Knights | Rhine, Niger |
-| Empire | Attack | Legionaries | Zambezi, Amazon |
-| Nomads | Swift | Horse archers | Volga, Mississippi |
-| Republic | Upkeep | Crossbowmen | Ganges, Mekong |
-| Clans | Hills | Pikemen | Tigris, Yangtze |
+| Kingdom | Gold: +10% gold | Knights | Rhine, Niger |
+| Empire | Attack: +5% attacking | Legionaries | Zambezi, Amazon |
+| Nomads | Swift: Armies march 15% faster | Horse archers | Volga, Mississippi |
+| Republic | Upkeep: Armies cost 15% less upkeep | Crossbowmen | Ganges, Mekong |
+| Clans | Hills: +25% defending hills, forts -50% | Pikemen | Tigris, Yangtze |
 
 **Eldmoor: fantasy.**
 
 | Race | Passive | Elite | Nations |
 | --- | --- | --- | --- |
-| Humans | Gold | Knights | Frostmarch, Corsairs |
-| Elves | Forest | Rangers | Mistborn, Elderwood |
-| Orcs | Manpower | Berserkers | Greenvale, Ashen Dominion |
-| Dwarves | Hills | Ironguard | Ironholds, Wyrmcoast |
-| Lizardfolk | Attack | Raptor riders | Saltmarsh, Sunscorch |
+| Humans | Gold: +8% gold | Knights | Frostmarch, Corsairs |
+| Elves | Forest: Fast in forests, +5% in forest battles | Rangers | Mistborn, Elderwood |
+| Orcs | Manpower: +20% manpower | Berserkers | Greenvale, Ashen Dominion |
+| Dwarves | Hills: +25% defending hills, forts -50% | Ironguard | Ironholds, Wyrmcoast |
+| Lizardfolk | Attack: +10% attacking | Crocodile guard | Saltmarsh, Sunscorch |
 
-**Skyshards: sci-fi in space.** Its shared troops are troopers, gunners and hover bikes (the same roles and numbers as infantry, archers and cavalry).
+**Skyshards: sci-fi in space.**
 
 | Race | Passive | Elite | Nations |
 | --- | --- | --- | --- |
-| Marines | Gold | Mechs | Aurora, Solace |
-| Robots | Upkeep | Drones | Tempest, Verdance |
-| Insectoids | Manpower | Hive warriors | Zephyr, Ember |
-| Crystal folk | Forest (crystal groves are forest) | Golems | Nimbus, Rime |
-| Energy beings | Swift | Storm wisps | Halo, Umbra |
+| Marines | Gold: +12% gold | Mechs | Aurora, Solace |
+| Robots | Upkeep: Armies cost 15% less upkeep | Juggernauts | Tempest, Verdance |
+| Insectoids | Manpower: +20% manpower | Hive warriors | Zephyr, Ember |
+| Crystal folk | Forest: Fast in forests, +15% in forest battles (crystal groves are forest) | Golems | Nimbus, Rime |
+| Energy beings | Swift: Armies march 15% faster | Stormlords | Halo, Umbra |
 
 - Combat bonuses add to the battle modifier like the terrain, fort and catch-up bonuses, for the whole side: an ally fighting beside an Elven army in a forest shares the Elves' bonus (as with the underdog bonus). A side counts each passive once.
 - Each map's races are fitted to the land where it makes sense (Forest races in forests, Hills races in hills) and spread so every race gets strong and weak start positions; on symmetric Skyshards each race holds two opposite shards.
@@ -157,8 +157,8 @@ Income is paid every month (10 s). A nation starts with 100 gold and 3,000 manpo
 | --- | --- | --- |
 | Province income | — | +1 gold and +100 manpower per development level |
 | Capital | — | +5 gold per month |
-| Race passive | — | Gold races +10% gold (gross, before upkeep), Manpower races +20% manpower, Upkeep races −15% upkeep |
-| Regiment (1,000 men of one troop type) | Infantry 10 gold + 1,000 manpower; the other troops in Troops | Upkeep per month: infantry 1.5 gold, the others in Troops (Upkeep races pay 15% less) |
+| Race passive | — | Gold races more gold (gross, before upkeep), Manpower races more manpower, Upkeep races less upkeep (each race's numbers: see Races) |
+| Regiment (1,000 men of one troop type) | Each troop's price (Troops: Earth's Infantry 10 gold + 1,000 manpower) | Upkeep per month: each troop's (Infantry 1.5 gold; Upkeep races pay less) |
 | Develop province | 30 gold × current level | +1 development (max 5) |
 | Farm | 50 gold | +50% gold from this province |
 | Barracks | 40 gold | +50% manpower from this province |
@@ -167,55 +167,166 @@ Income is paid every month (10 s). A nation starts with 100 gold and 3,000 manpo
 
 ### Troops
 
-The regiment (1,000 men) is a troop type now. An army is still one token and one stack, with a composition: how many men of each troop type it holds. `Army.men` stays the total; one helper (`Army.setTroops`) changes it and the composition together, so they always agree.
+The regiment (1,000 men) is a troop type. An army is still one token and one stack, with a composition: how many men of each troop type it holds. `Army.men` stays the total; one helper (`Army.setTroops`) changes it and the composition together, so they always agree.
 
-Three shared roles every nation recruits, on every map; Skyshards calls them troopers, gunners and hover bikes (same numbers, sci-fi icons):
+**Five troops per race, one per role.** A player is one race for the whole match (picking a nation picks it) and recruits only that race's five troops; the server refuses any other (`WrongRace`). Every troop has a role, and every race has one troop of each:
 
-| Troop | Skyshards | Cost | Upkeep | Attack | Defence | Speed |
+| Role | Its job |
+| --- | --- |
+| line | The base of every army: cheap, as good attacking as defending |
+| ranged | The defenders: strong holding a province, weak attacking |
+| fast | Marches fast (3 s a plains province, 6 s forest and hills): raids and quick reinforcements |
+| elite | The race's signature and its strongest regiment in battle |
+| special | One trick, a small hook in the rules (below) |
+
+**Specials: one trick each** (its numbers in `Config.Troops`; the army sheet names it):
+
+| Trick | What it does | Specials |
+| --- | --- | --- |
+| Siege (`siegeSpeed`) | An army with them in it besieges this many times as fast | Catapults (Earth), Sappers (Dwarves), Artillery (Marines) |
+| Terrain (`terrain`, `terrainBonus`) | These men fight with more combat strength in battles in their terrain, attacking or defending | Treants (Elves) and Resonators (Crystal folk) in forest, Trolls (Orcs) and Crawlers (Robots) in hills |
+| Pathfinder (`pathfinder`) | They march through forest and hills at plains speed (an army still keeps its slowest troop's pace) | Swamp stalkers (Lizardfolk), Burrowers (Insectoids) |
+| Anti-garrison (`vsNeutral`) | These men fight with more combat strength against neutral garrisons and Rebels | Battlemages (Humans), Ion storms (Energy beings) |
+
+**Earth: everyone is human.** The five cultures share four human troops (Infantry, Archers, Cavalry, Catapults) and each adds its signature elite (Knights, Legionaries, Horse archers, Crossbowmen, Pikemen), so every Earth nation recruits five. On Eldmoor and Skyshards every race's five are its own: no troop is shared between two races of a map (Eldmoor's Humans keep Earth's Knights as their elite). Each troop has its own name, pixel icon and soldier token (`IconArt`, `CosmeticArt.SOLDIERS`; `lune run tools/harness/troop_sheet` paints them all).
+
+The rosters (`Config.Troops`, `Config.Races`; `lune run tools/balance/rosters md` prints these tables):
+
+**Earth: every culture**
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
 | --- | --- | --- | --- | --- | --- | --- |
-| Infantry (the old regiment) | Troopers | 10 gold + 1,000 manpower | 1.5 | 1.0 | 1.0 | normal |
-| Archers | Gunners | 15 gold + 1,000 manpower | 2 | 0.75 | 1.5 | normal |
-| Cavalry | Hover bikes | 25 gold + 1,000 manpower | 3 | 1.5 | 1.0 | fast |
+| line | Infantry | 10 gold + 1,000 manpower | 1.5 | 1 | 1 | normal |
+| ranged | Archers | 15 gold + 1,000 manpower | 2 | 0.75 | 1.5 | normal |
+| fast | Cavalry | 25 gold + 1,000 manpower | 3 | 1.5 | 1 | fast |
+| elite (Kingdom) | Knights | 35 gold + 1,000 manpower | 4 | 2 | 1.25 | fast |
+| elite (Empire) | Legionaries | 25 gold + 1,000 manpower | 2 | 1.5 | 1.75 | normal |
+| elite (Nomads) | Horse archers | 25 gold + 1,000 manpower | 2.5 | 1.5 | 1.25 | fast |
+| elite (Republic) | Crossbowmen | 20 gold + 1,000 manpower | 2.5 | 1.5 | 1.5 | normal |
+| elite (Clans) | Pikemen | 15 gold + 1,000 manpower | 1.75 | 1.5 | 2 | normal |
+| special | Catapults | 20 gold + 750 manpower | 2 | 0.5 | 0.5 | normal; besieges 2x as fast |
 
-One elite per race (Knights are both the Kingdom's and the Humans'):
+**Humans** (+8% gold)
 
-| Elite | Race (map) | Cost | Upkeep | Attack | Defence | Speed |
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
 | --- | --- | --- | --- | --- | --- | --- |
-| Knights | Kingdom (Earth), Humans (Eldmoor) | 35 gold + 1,000 manpower | 4 | 2.0 | 1.25 | fast |
-| Legionaries | Empire (Earth) | 25 gold + 1,000 manpower | 2 | 1.5 | 1.75 | normal; an army with Legionaries besieges 1.5× as fast |
-| Horse archers | Nomads (Earth) | 25 gold + 1,000 manpower | 2.5 | 1.5 | 1.25 | fast |
-| Crossbowmen | Republic (Earth) | 20 gold + 1,000 manpower | 2.5 | 1.5 | 1.5 | normal |
-| Pikemen | Clans (Earth) | 15 gold + 1,000 manpower | 1.75 | 1.25 | 2.0 | normal |
-| Rangers | Elves (Eldmoor) | 20 gold + 1,000 manpower | 2.5 | 1.25 | 1.75 | normal |
-| Berserkers | Orcs (Eldmoor) | 12 gold + 750 manpower | 1.5 | 1.75 | 0.75 | normal |
-| Ironguard | Dwarves (Eldmoor) | 25 gold + 1,000 manpower | 2 | 1.5 | 2.0 | normal; an army with Ironguard besieges 1.5× as fast |
-| Raptor riders | Lizardfolk (Eldmoor) | 20 gold + 750 manpower | 2.5 | 1.75 | 1.0 | fast |
-| Mechs | Marines (Skyshards) | 40 gold + 1,000 manpower | 4 | 2.25 | 2.0 | normal |
-| Drones | Robots (Skyshards) | 15 gold + 750 manpower | 2 | 1.25 | 0.75 | fast |
-| Hive warriors | Insectoids (Skyshards) | 12 gold + 750 manpower | 1.5 | 1.75 | 0.75 | normal |
-| Golems | Crystal folk (Skyshards) | 25 gold + 1,000 manpower | 2 | 1.25 | 2.25 | normal |
-| Storm wisps | Energy beings (Skyshards) | 30 gold + 1,000 manpower | 3 | 2.0 | 1.0 | fast |
+| line | Footmen | 10 gold + 1,000 manpower | 1.5 | 1 | 1 | normal |
+| ranged | Longbowmen | 15 gold + 1,000 manpower | 2 | 0.8 | 1.45 | normal |
+| fast | Lancers | 25 gold + 1,000 manpower | 3 | 1.6 | 0.9 | fast |
+| elite | Knights | 35 gold + 1,000 manpower | 4 | 2 | 1.25 | fast |
+| special | Battlemages | 20 gold + 750 manpower | 2 | 1.25 | 0.75 | normal; +30% against garrisons and Rebels |
+
+**Elves** (Fast in forests, +5% in forest battles)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Wardens | 11 gold + 1,000 manpower | 1.5 | 0.95 | 1.1 | normal |
+| ranged | Elven archers | 16 gold + 1,000 manpower | 2 | 0.85 | 1.5 | normal |
+| fast | Elk riders | 24 gold + 1,000 manpower | 2.75 | 1.4 | 1.1 | fast |
+| elite | Rangers | 20 gold + 1,000 manpower | 2.5 | 1.25 | 1.75 | normal |
+| special | Treants | 22 gold + 1,000 manpower | 2.25 | 1 | 1.5 | normal; +50% in forest battles |
+
+**Orcs** (+20% manpower)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Grunts | 9 gold + 750 manpower | 1.5 | 1.1 | 1 | normal |
+| ranged | Spear throwers | 13 gold + 750 manpower | 1.75 | 0.9 | 1.4 | normal |
+| fast | Wolf riders | 20 gold + 750 manpower | 2.5 | 1.5 | 0.8 | fast |
+| elite | Berserkers | 12 gold + 750 manpower | 1.5 | 2 | 0.75 | normal |
+| special | Trolls | 24 gold + 1,000 manpower | 2.25 | 1.5 | 1.25 | normal; +50% in hills battles |
+
+**Dwarves** (+25% defending hills, forts -50%)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Axemen | 12 gold + 1,000 manpower | 1.5 | 1.05 | 1.1 | normal |
+| ranged | Firelocks | 18 gold + 1,000 manpower | 2.25 | 0.9 | 1.6 | normal |
+| fast | Ram riders | 26 gold + 1,000 manpower | 3 | 1.4 | 1.2 | fast |
+| elite | Ironguard | 25 gold + 1,000 manpower | 2 | 1.75 | 2 | normal |
+| special | Sappers | 18 gold + 1,000 manpower | 2 | 0.75 | 1 | normal; besieges 2x as fast |
+
+**Lizardfolk** (+10% attacking)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Scaleguards | 10 gold + 1,000 manpower | 1.5 | 1.1 | 0.9 | normal |
+| ranged | Blowgunners | 14 gold + 1,000 manpower | 2 | 0.8 | 1.4 | normal |
+| fast | Raptor riders | 22 gold + 750 manpower | 2.75 | 1.6 | 0.9 | fast |
+| elite | Crocodile guard | 25 gold + 1,000 manpower | 2.5 | 1.75 | 1.75 | normal |
+| special | Swamp stalkers | 16 gold + 750 manpower | 1.75 | 1.2 | 0.8 | normal; forest and hills at plains speed |
+
+**Marines** (+12% gold)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Troopers | 10 gold + 1,000 manpower | 1.5 | 1 | 1 | normal |
+| ranged | Gunners | 15 gold + 1,000 manpower | 2 | 0.75 | 1.5 | normal |
+| fast | Hover bikes | 25 gold + 1,000 manpower | 3 | 1.5 | 1 | fast |
+| elite | Mechs | 35 gold + 1,000 manpower | 3.5 | 2.25 | 2 | normal |
+| special | Artillery | 22 gold + 750 manpower | 2 | 0.6 | 0.5 | normal; besieges 2x as fast |
+
+**Robots** (Armies cost 15% less upkeep)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Automatons | 10 gold + 1,000 manpower | 1.5 | 1 | 1 | normal |
+| ranged | Laserbots | 15 gold + 1,000 manpower | 2 | 0.85 | 1.45 | normal |
+| fast | Drones | 18 gold + 750 manpower | 2 | 1.3 | 0.8 | fast |
+| elite | Juggernauts | 30 gold + 1,000 manpower | 3 | 1.75 | 2.25 | normal |
+| special | Crawlers | 18 gold + 1,000 manpower | 2.25 | 1.25 | 1.25 | normal; +50% in hills battles |
+
+**Insectoids** (+20% manpower)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Swarmlings | 9 gold + 1,000 manpower | 1.4 | 0.95 | 0.85 | normal |
+| ranged | Acid spitters | 13 gold + 750 manpower | 2 | 0.8 | 1.3 | normal |
+| fast | Wasps | 20 gold + 750 manpower | 2.5 | 1.5 | 0.8 | fast |
+| elite | Hive warriors | 14 gold + 750 manpower | 2 | 1.75 | 0.75 | normal |
+| special | Burrowers | 14 gold + 750 manpower | 2 | 1.2 | 0.9 | normal; forest and hills at plains speed |
+
+**Crystal folk** (Fast in forests, +15% in forest battles)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Shardlings | 10 gold + 1,000 manpower | 1.5 | 1 | 1.15 | normal |
+| ranged | Prism casters | 16 gold + 1,000 manpower | 2 | 0.8 | 1.6 | normal |
+| fast | Shard gliders | 25 gold + 1,000 manpower | 3 | 1.4 | 1.1 | fast |
+| elite | Golems | 22 gold + 1,000 manpower | 2 | 1.5 | 2.25 | normal |
+| special | Resonators | 18 gold + 1,000 manpower | 2 | 1 | 1.4 | normal; +50% in forest battles |
+
+**Energy beings** (Armies march 15% faster)
+
+| Role | Troop | Cost | Upkeep | Attack | Defence | Speed and trick |
+| --- | --- | --- | --- | --- | --- | --- |
+| line | Sparks | 10 gold + 1,000 manpower | 1.5 | 1.1 | 0.9 | normal |
+| ranged | Arc casters | 15 gold + 1,000 manpower | 2 | 0.85 | 1.4 | normal |
+| fast | Storm wisps | 25 gold + 1,000 manpower | 3 | 1.6 | 0.9 | fast |
+| elite | Stormlords | 35 gold + 1,000 manpower | 3.5 | 2 | 1.5 | normal |
+| special | Ion storms | 18 gold + 750 manpower | 2 | 1.3 | 0.7 | normal; +40% against garrisons and Rebels |
 
 - Upkeep is gold per regiment (1,000 men) per month. Normal speed: 5 s per plains province, 8 s forest and hills; fast: 3 s and 6 s.
-- The first numbers were tuned with bot tournaments (`docs/BALANCE.md` section 18): Berserkers' upkeep 2 → 1.5, Ironguard 30 → 25 gold, upkeep 3 → 2, attack 1.25 → 1.5 and sieges 1.25× → 1.5×, the Elves' forest bonus 25% → 10%. The other casts' first numbers and their first measurements are in section 19.
-- Recruit buys whole regiments of one type into the army standing in the province (or a new one). A nation recruits its map's three shared roles and its race's elite; the server refuses any other elite.
-- Battles: a side's strength is the sum of its men × each troop's attack (attacking side) or defence (defending side), times the modifiers. Losses split over an army's troop types in proportion to their men. Merging stacks adds the compositions.
+- The numbers were tuned with bot tournaments: `docs/BALANCE.md` sections 18 and 19.
+- Recruit buys whole regiments of one type into the army standing in the province (or a new one).
+- Battles: a side's strength is the sum of its men × each troop's attack (attacking side) or defence (defending side), with the specials' terrain and anti-garrison bonuses on their own men, times the modifiers. Losses split over an army's troop types in proportion to their men. Merging stacks adds the compositions.
 - An army moves at its slowest troop's speed (retreating too).
-- A Meteor's 50% applies to every troop type. Neutral garrisons and Rebels are infantry. Every rule that counts men (retreats under 500, the bots' army sizes, the HUD) counts the total; quests, achievements, telemetry and the tutorial count every troop as a regiment.
-- An army's main troop type is the one with the most men; a tie goes to the dearer troop (gold per regiment), then to the later one in `Troops.LIST` (the shared roles first, then the elites, sorted). Its badge on the map and its chip on the province sheet show that troop's icon as the map draws it, so an archer-heavy army shows a bow (a heavy gun on Skyshards) (`MapBadges.mainTroop`, `Troops.icon`).
-- Rules: `Sim/Troops.luau`, `Sim/Army.luau`; numbers: `Config.Troops`; balance: `docs/BALANCE.md` sections 18 and 19.
+- A Meteor's 50% applies to every troop type. Neutral garrisons and Rebels are Earth's line infantry, on every map. A nation's army made without naming a troop (the tutorial's ready army) is its race's line troop. Every rule that counts men (retreats under 500, the bots' army sizes, the HUD) counts the total; quests, achievements, telemetry and the tutorial count every troop as a regiment.
+- Bots, quests, telemetry, the HUD and the tutorial go by role, never by a troop's name: bots raise their race's line, ranged, fast, elite and special troops (see "Bot AI"), and the tutorial's recruit step points at the player's line troop.
+- An army's main troop type is the one with the most men; a tie goes to the dearer troop (gold per regiment), then to the later one in `Troops.LIST` (sorted by id). Its soldier token and its badge on the map and its chip on the province sheet show that troop (`MapBadges.mainTroop`, `Troops.icon`), so an army of archers shows a bowman and a bow.
+- Rules: `Sim/Troops.luau`, `Sim/Army.luau`; numbers: `Config.Troops`, `Config.Races` (rosters); balance: `docs/BALANCE.md` sections 18 and 19.
 
 ### Armies and combat
 
 - An army is a stack of regiments of any troop types (its composition, see Troops) shown as one token on the map: a nation's armies that stand still in the same province (not marching, fighting or retreating) merge into one, and their compositions add up.
-- Movement: one province per 5 s on plains, 8 s on forest and hills; 3 s and 6 s for fast troops (cavalry, knights, horse archers, raptor riders, drones, storm wisps). An army moves at its slowest troop's speed; a Forest race crosses forest at plains speed and a Swift race marches 20% faster. Paths follow province neighbours (BFS).
+- Movement: one province per 5 s on plains, 8 s on forest and hills; 3 s and 6 s for fast troops (every race's fast troop, and two elites: Knights and Horse archers). An army moves at its slowest troop's speed; a Forest race crosses forest at plains speed and a Swift race marches 15% faster. Paths follow province neighbours (BFS).
 - A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers. Strength = the sum of its men × each troop's attack (attackers) or defence (defenders); losses split over troop types in proportion to their men.
-- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, a Forest race in a forest +10%, a Hills race defending in hills +25%, an Attack race attacking +10%, random ±10% per battle.
+- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, a Forest race in a forest, a Hills race defending in hills, an Attack race attacking (each race's own numbers, see Races), random ±10% per battle; a special's terrain or anti-garrison bonus counts for its own men only (see Troops).
 - After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at its own speed (its slowest troop's), under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home.
 
 ### Sieges
 
-- An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital. Army size doesn't matter, but an army with siege troops in it (Ironguard or Legionaries; the holder's or an ally's) besieges 1.5× as fast (a third less time).
+- An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital. Army size doesn't matter, but an army with siege troops in it (Catapults, Sappers or Artillery; the holder's or an ally's) besieges 2× as fast (half the time; `Config.Troops` siegeSpeed).
 - One siege per province. Whoever started it keeps it while one of its (or an ally's) armies stands there; another besieger at peace with it waits instead of blocking, and takes over (from zero) once the first one leaves.
 - An interrupted siege (a battle there, a defending army, the besieger stepping out) keeps its progress for 10 s, then resets. Peace with the owner, or the province changing hands, ends it at once.
 - A province the besieger's side blockades from the sea (see Navies) falls 1.25× as fast, on top of siege troops.
@@ -376,7 +487,7 @@ The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. Th
 - **Close-up detail:** zoomed in past about 4 screen pixels per map pixel (more on big screens, so the view always fits), `MapRenderer` lays a second `EditableImage` over the map: just the part in view (with room to pan), painted by `PixelArt.paintDetail` at 4 × 4 sub-pixels per map pixel (docs/MAPS.md "Art direction"): the biome patterns at full resolution, smooth coasts and province edges, beaches and surf, dense shaded trees and other decorations, lit mountain faces, a lighter kingdom wash (48%) with a stronger band inside each nation's border, the border line, the selection's white outline and each race's detailed capital. It repaints when the view settles somewhere it doesn't cover (a few milliseconds per frame, the old one staying up meanwhile), catches up with ownership, cosmetic and selection changes by repainting only those provinces, and follows the map theme. Zoomed out again, its image is destroyed so phones get the memory back. It isn't used with the half-size fallback image, or if the device refuses the second image.
 - **On top:** GUI objects placed on the canvas, in the UI kit's look ("UI style"); `MapBadges` (pure, tested) decides what they say and where they stack.
   - **Names and pips:** province names in Builder Sans with a solid ink outline (gold while the province is selected), shown once a province is about 70 screen pixels wide; a name that would overlap a bigger province's name waits until there's room. A capital's name stands below its building, lower the closer you zoom, so the building stays in sight. From the region zoom inwards a development bar hangs under the name: one pixel cell per level, gold when reached (one small `EditableImage` per level, shared; text pips without `EditableImage`).
-  - **Armies:** tokens glide from province to province a little above the centres (the names are below), and armies resting in one province stand side by side. A nation's token is a little soldier of its race in its colours (`CosmeticArt.SOLDIERS`, 12 × 12 like the token skins: on Eldmoor a footman with a kite shield and spear, an elf archer, a green orc warrior with horns, tusks and a cleaver, a red-bearded dwarf with an axe, a crested lizard warrior; on Earth a man-at-arms in a great helm, a legionary with a crested helmet, a horse archer in a fur cap, a crossbowman in a kettle hat, a bearded pikeman; on Skyshards a marine in power armour, a robot, an insect warrior, a crystal being, an energy being), or its equipped token skin; neutral garrisons keep their small grey square and Rebels their black one. Each has a strength badge: a dark pill with a pixel icon (the icon of the troop type the army is mostly made of, see "Troops"; burst in battle; white flag retreating; black flag for Rebels; shield for neutral garrisons) and its size in Fredoka One, outlined in its nation's colour (gold while selected). The badges of armies in one province stack in a column above them, so none covers another at any zoom. Sizes show from the region zoom inwards; zoomed out, only on your own armies, Rebels and the selected army. An idle neutral garrison's badge is laid out after the names: it shows only where it covers no name and no other garrison's badge (bigger provinces first), and the others keep their grey token until the player zooms in.
+  - **Armies:** tokens glide from province to province a little above the centres (the names are below), and armies resting in one province stand side by side. A nation's token is a little soldier of the troop type the army is mostly made of, in its colours (`CosmeticArt.SOLDIERS`, one for each of the 55 troops, 12 × 12 like the token skins: on Earth a spearman, a hooded bowman, a horseman, a catapult and each culture's elite; on Eldmoor e.g. a footman with a kite shield, an elf on an elk, an orc on a wolf, a dwarf with a powder keg, a crocodile-headed guard; on Skyshards e.g. a marine in power armour, a walking mech, a spider robot, a giant wasp, a storm cloud), so the map shows whose army it is and what it is made of, and the soldier changes when recruits or losses change its main troop; or its equipped token skin; neutral garrisons keep their small grey square and Rebels their black one. Each has a strength badge: a dark pill with a pixel icon (the icon of the troop type the army is mostly made of, see "Troops"; burst in battle; white flag retreating; black flag for Rebels; shield for neutral garrisons) and its size in Fredoka One, outlined in its nation's colour (gold while selected). The badges of armies in one province stack in a column above them, so none covers another at any zoom. Sizes show from the region zoom inwards; zoomed out, only on your own armies, Rebels and the selected army. An idle neutral garrison's badge is laid out after the names: it shows only where it covers no name and no other garrison's badge (bigger provinces first), and the others keep their grey token until the player zooms in.
   - **Status row:** on top of the badges, the province's battle (burst, red edge) or siege (hourglass and percent, gold edge), a blockade (an anchor, blue edge; see "Navies"), then Primordial-power effects with their seconds left (shield, blessing, plague, or a strike's icon; purple edge). Zoomed out, the pills show only their icons unless it is your province or your siege.
   - **Fleets and sea zones:** ships at the zones' centres with their badges, and the zones' names zoomed out (see "Navies").
   - **Capitals:** each nation's flag on a pole left of its capital while it holds it; the coalition leader's pixel crown sits on top of the pole.
@@ -416,7 +527,8 @@ export type Building = "None" | "Farm" | "Barracks" | "Fort"
 export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
 export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
 export type Race = string                 -- a key of Config.Races (each map's cast: Config.Casts)
-export type Troop = string                -- a key of Config.Troops (the three shared roles and the elites)
+export type Troop = string                -- a key of Config.Troops (55: every race's roster)
+export type TroopRole = "line" | "ranged" | "fast" | "elite" | "special" -- every race has one troop of each
 export type Composition = { [Troop]: number } -- men per troop type; adds up to Army.men
 
 export type Province = {
@@ -567,7 +679,7 @@ export type Command =
 | Remote | Direction | Payload |
 | --- | --- | --- |
 | `RequestMove` | client → server | armyId, targetProvince |
-| `RequestRecruit` | client → server | provinceId, regiments, troop type (the nation's race must be allowed it) |
+| `RequestRecruit` | client → server | provinceId, regiments, troop type (one of the five of the nation's race) |
 | `RequestBuild` | client → server | provinceId, building |
 | `RequestDevelop` | client → server | provinceId |
 | `RequestDiplomacy` | client → server | action (War, Ally, AcceptAlly, Peace, AcceptPeace), targetNation, gold? |
@@ -600,8 +712,8 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
 - **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank, and a mute button (see "Sound and effects").
 - **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce).
-- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit (one button per troop your race recruits, each with its price) and, on a coast, Ships, or Declare war and Ally on foreign provinces.
-- **Moving armies:** tap the army, tap the destination, see the path with arrival time (at the army's own speed), tap Confirm. The army sheet shows the composition as chips (troop icon and men). Fleets work the same way (see "Navies").
+- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit (five buttons, one per troop of your race's roster in role order, each Named `Recruit_<troop>` and showing its price) and, on a coast, Ships, or Declare war and Ally on foreign provinces.
+- **Moving armies:** tap the army, tap the destination, see the path with arrival time (at the army's own speed), tap Confirm. The army sheet shows the composition as chips (troop icon and men, and the troop's name while there are three types or fewer) and, with a special in the army, its trick ("Sappers: besieges 2x as fast"). Fleets work the same way (see "Navies").
 - **Primordial powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
 - **Map modes:** Political (default), Diplomacy (allies green, enemies red), Terrain.
 - **Feedback:** toasts for war declared, province lost and battle won; a short screen shake for a meteor.
@@ -679,8 +791,8 @@ Each bot checks a short priority list every few seconds and does the first actio
 
 **Priority list** (bots are staggered so 1–2 plan per tick)
 
-1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there: archers (the best defenders) if I can pay for them and they make up at most 30% of my men, else infantry.
-2. **Recruit:** total army is below provinces × 800 men and manpower is available. Infantry is the base; at war, my race's elite or cavalry if I can pay for it and still keep 2 months of upkeep, while the two make up at most 30% of my men (the elite first when it costs no more upkeep than cavalry, else whichever I have fewer men of).
+1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there: my race's ranged troop (the best defenders) if I can pay for it and it makes up at most 30% of my men, else my line troop.
+2. **Recruit:** total army is below provinces × 800 men and manpower is available. My race's line troop is the base; at war, if I can pay for it and still keep 2 months of upkeep: my special while it makes up at most 10% of my men, else my elite (up to 20%) and my fast troop (up to 10%), the one furthest below its share first (`Config.Bots`: RangedShare, SpecialShare, EliteShare, FastShare). Bots pick troops by role, so every race's bots work the same way.
 3. **Expand:** a neutral neighbour whose garrison I can beat → attack it.
 4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
 5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders (Hills races pay half), then develop; with everything built, spare gold buys regiments (the Recruit step's troop).
@@ -777,6 +889,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] "Slate & Brass" GUI step 3: the top bar as plates in Roblox's own top-bar row (`GuiService.TopbarInset`, with a fallback row under it), a scrim, counters with riding icons, the clock in a phase medallion, the `fitBar` order on small phones, one `Hud.contentTop()` for everything under the bar; on tablets the whole UI scales up with the screen's short side (`Theme.uiScale`, phones stay at 1)
 - [x] "Slate & Brass" GUI step 4: the province sheet's actions as slot tiles five to a row (`Widgets.slotTile`: build bronze, recruit green, diplomacy in full colour; gold costs, red when short, greyed when not possible), a coast's Ships tile in the build row (six to a row when they fit), the development as the map's pip bar in a well, status chips on the info row when they fit; army and fleet composition as icon + men chips and a route line; the power button as a royal medallion with the picker docked beside it; your row raised in the nations drawer; offers on plates with a counter, under the toasts' line
 - [x] A cast of five peoples for every map, data-driven (`Config.Races`, `Config.Casts`): human civilisations on Earth, the fantasy peoples and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards with troopers, gunners and hover bikes; seven passive kinds; an elite, a soldier, a capital and icons for each (evidence: `docs/BALANCE.md` section 19)
+- [x] Five troops per race (`Config.Races[race].roster`): a line, a ranged, a fast, an elite and a special troop with one trick (siege, terrain, pathfinder or anti-garrison), each with its own name, icon and soldier token; Earth's five human cultures share four troops and add their own elite; one race per player per match (the server refuses any other troop); bots, the tutorial and the HUD go by role; the province sheet's five recruit buttons (evidence: `docs/BALANCE.md` section 19, harness scenarios `races` and `kingdoms`)
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 

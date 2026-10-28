@@ -1,9 +1,10 @@
 --!nocheck
--- Races on the map (docs/DESIGN.md "Map rendering"): every nation's army is a little soldier of its race, its badge
--- shows the troop type it is mostly made of (as this map draws it), and each of the map's five races builds its own
--- capital, at the whole-map, region and close-up zooms; the province sheet's recruit buttons carry the map's names
--- for its troops. Runs on any map: MAP=earth lune run tools/harness/play kingdoms (Skyshards by default). The bots
--- hold still, so every army keeps its place and make-up for the pictures.
+-- Races on the map (docs/DESIGN.md "Map rendering"): every nation's army is a little soldier of the troop it is mostly
+-- made of, its badge shows that troop's icon, and each of the map's five races builds its own capital, at the
+-- whole-map, region and close-up zooms; the province sheet's recruit buttons are the five troops of the player's race,
+-- and the soldier follows when recruits change an army's main troop. Runs on any map: MAP=earth lune run
+-- tools/harness/play kingdoms (Skyshards by default). The bots hold still, so every army keeps its place and make-up
+-- for the pictures.
 
 local Emulator = require("../Emulator")
 local H = require("../H")
@@ -26,9 +27,8 @@ local function run()
 			state.armies[id] = nil
 		end
 	end
-	-- one army per nation at its capital: two regiments of its race's elite and one of infantry; the second nation of
-	-- the first race with two nations here raises archers instead, so a shared role's icon (as this map draws it)
-	-- shows too
+	-- one army per nation at its capital: two regiments of its race's elite and one of its line troop; the second
+	-- nation of the first race with two nations here raises its ranged troop instead, so a ranged troop shows too
 	local main, armies, byRace = {}, {}, {}
 	local ids = {} -- (a match with fewer players than nations keeps nine bots: one nation may be gone)
 	local count: { [string]: number } = {}
@@ -45,12 +45,12 @@ local function run()
 	end
 	for _, id in ids do
 		local n = state.nations[id]
-		main[id] = Troops.elite(n.race)
+		main[id] = Troops.ofRole(n.race, "elite")
 		if byRace[n.race] ~= nil and n.race == archerRace then
-			main[id] = "Archers"
+			main[id] = Troops.ofRole(n.race, "ranged")
 		end
 		local army = Army.spawn(state, id, n.capital, 2000, main[id])
-		Army.add(army, { Infantry = 1000 })
+		Army.add(army, { [Troops.ofRole(n.race, "line")] = 1000 })
 		armies[id] = army
 		byRace[n.race] = byRace[n.race] or id
 	end
@@ -61,19 +61,22 @@ local function run()
 	for id, n in state.nations do
 		local token = H.mapObject(alice, "Army" .. armies[id].id)
 		local sprite = token and token:FindFirstChild("TokenSkin")
-		if sprite == nil or sprite:GetAttribute("Soldier") ~= n.race then
+		if sprite == nil or sprite:GetAttribute("Soldier") ~= main[id] then
 			table.insert(wrong, n.name)
 		end
 	end
 	H.expect(
 		#wrong == 0,
 		if #wrong == 0
-			then "every nation's army is a soldier of its race"
-			else "not a soldier of its race: " .. table.concat(wrong, ", ")
+			then "every nation's army is a soldier of its main troop"
+			else "not a soldier of its main troop: " .. table.concat(wrong, ", ")
 	)
 	local me = H.myNation(alice)
-	local myMain = Troops.icon(mapId, main[me])
-	H.expect(select(2, H.badge(alice, armies[me].id)) == myMain, "zoomed out, Alice's badge shows her main troop: " .. myMain)
+	local myMain = Troops.icon(main[me])
+	H.expect(
+		select(2, H.badge(alice, armies[me].id)) == myMain,
+		"zoomed out, Alice's badge shows her main troop: " .. myMain
+	)
 	H.shot(alice, "whole_map")
 	-- each race's capital and army, at the region zoom and close up; every badge shows its army's main troop
 	for _, race in cast do
@@ -84,7 +87,7 @@ local function run()
 		MapView.centreOn(H.provinceMap(alice, capital), true) -- the region zoom
 		Emulator.run(2)
 		local _, icon = H.badge(alice, armies[id].id)
-		local wanted = Troops.icon(mapId, main[id])
+		local wanted = Troops.icon(main[id])
 		H.expect(icon == wanted, state.nations[id].name .. "'s badge shows " .. wanted .. " (" .. tostring(icon) .. ")")
 		H.shot(alice, string.lower(race) .. "_region")
 		Emulator.pinch(alice, 3)
@@ -98,19 +101,22 @@ local function run()
 		)
 		H.shot(alice, string.lower(race) .. "_close")
 	end
-	-- the second nation of the first race: archers, under the map's own icon for them
+	-- the second nation of the first race: its ranged troop
 	local archers
 	for _, id in ids do
-		if main[id] == "Archers" then
+		if main[id] == Troops.ofRole(state.nations[id].race, "ranged") then
 			archers = id
 		end
 	end
-	H.expect(archers ~= nil and select(2, H.badge(alice, armies[archers].id)) ~= nil, "an army of archers on the map")
+	H.expect(
+		archers ~= nil and select(2, H.badge(alice, armies[archers].id)) ~= nil,
+		"an army of ranged troops on the map"
+	)
 	MapView.centreOn(H.provinceMap(alice, state.nations[archers].capital), true)
 	Emulator.run(2)
 	H.expect(
-		select(2, H.badge(alice, armies[archers].id)) == Troops.icon(mapId, "Archers"),
-		"its badge shows the map's archers: " .. Troops.icon(mapId, "Archers")
+		select(2, H.badge(alice, armies[archers].id)) == Troops.icon(main[archers]),
+		"its badge shows its ranged troop: " .. Troops.icon(main[archers])
 	)
 	-- the province sheet of another race's capital: the owner chip shows its race (no war, ally or truce to show),
 	-- the army chip its elite
@@ -122,31 +128,40 @@ local function run()
 	end
 	local otherRace = state.nations[other].race
 	H.tapProvince(alice, state.nations[other].capital)
-	H.expect(H.iconIn(alice, "Owner", string.lower(otherRace)), "the owner chip of a " .. otherRace .. " capital shows its race")
 	H.expect(
-		H.iconIn(alice, "ArmyChip" .. armies[other].id, Troops.icon(mapId, main[other])),
+		H.iconIn(alice, "Owner", string.lower(otherRace)),
+		"the owner chip of a " .. otherRace .. " capital shows its race"
+	)
+	H.expect(
+		H.iconIn(alice, "ArmyChip" .. armies[other].id, Troops.icon(main[other])),
 		"and its army's chip its elite: " .. main[other]
 	)
 	H.shot(alice, string.lower(otherRace) .. "_capital_sheet")
-	-- Alice's own capital: one recruit button per troop her race raises, under this map's names
+	-- Alice's own capital: one recruit button per troop of her race's roster, under its own name
 	Emulator.press(alice, "✕")
+	local myRace = state.nations[me].race
 	state.nations[me].gold, state.nations[me].manpower = 1000, 20000
 	Emulator.press(alice, "Capital")
 	Emulator.run(1)
-	for _, troop in Troops.available(state.nations[me].race) do
-		local label = Troops.name(mapId, troop)
-		H.expect(Emulator.findText(alice, label) ~= nil, "a recruit button says " .. label)
+	for _, troop in Troops.roster(myRace) do
+		H.expect(H.button(alice, "Recruit_" .. troop) ~= nil, "a recruit button for " .. troop)
+		H.expect(Emulator.findText(alice, Troops.name(troop)) ~= nil, "it says " .. Troops.name(troop))
 	end
-	if mapId == "skyshards" then
-		for _, label in { "Troopers", "Gunners", "Hover bikes" } do
-			H.expect(Emulator.findText(alice, label) ~= nil, "Skyshards' shared troops: " .. label)
+	if mapId ~= "earth" then
+		for _, label in { "Infantry", "Archers", "Cavalry", "Catapults" } do
+			H.expect(Emulator.findText(alice, label) == nil, "no Earth troop here: " .. label)
 		end
-		H.expect(Emulator.findText(alice, "Infantry") == nil, "no infantry by that name on Skyshards")
 	end
-	Emulator.press(alice, "Recruit_Archers")
-	Emulator.press(alice, "Recruit_Archers")
+	-- three regiments of her ranged troop outnumber her elite: the army's soldier and badge follow
+	local ranged = Troops.ofRole(myRace, "ranged")
+	for _ = 1, 3 do
+		Emulator.press(alice, "Recruit_" .. ranged)
+	end
 	Emulator.run(1.5)
-	H.expect(armies[me].troops.Archers == 2000, "two regiments of the map's archers joined Alice's army")
+	H.expect(armies[me].troops[ranged] == 3000, "three regiments of " .. ranged .. " joined Alice's army")
+	local sprite = H.mapObject(alice, "Army" .. armies[me].id):FindFirstChild("TokenSkin")
+	H.expect(sprite ~= nil and sprite:GetAttribute("Soldier") == ranged, "its soldier is now one of her " .. ranged)
+	H.expect(select(2, H.badge(alice, armies[me].id)) == Troops.icon(ranged), "and so is its badge")
 	H.shot(alice, "recruit_buttons")
 end
 

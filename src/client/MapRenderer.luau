@@ -1,7 +1,7 @@
 --!strict
 -- What is drawn on the 2D map (docs/DESIGN.md "Map rendering"): the pixel-art image painted by PixelArt
 -- (terrain, owners, the selected province, each race's capitals), straits, province names with their development
--- pips, army tokens (a soldier of the nation's race, or its token skin) gliding from province to province with their
+-- pips, army tokens (a soldier of its main troop, or its token skin) gliding from province to province with their
 -- strength badges (the icon of the troop type an army is mostly made of), each province's status pills (battle,
 -- siege, Primordial powers, blockades), the coalition leader's crown and route lines. Everything sits on MapView's
 -- canvas, placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
@@ -1415,6 +1415,24 @@ local function edgeOf(token: Token): Color3
 	return nationColor(token.owner)
 end
 
+-- A nation's army whose main troop changed (it recruited or lost men): its soldier follows (an equipped token skin
+-- stays as it is).
+local function resoldier(token: Token)
+	local sprite = token.frame:FindFirstChild("TokenSkin")
+	local troop = token.troop
+	local nation = ClientState.nation(token.owner)
+	if sprite == nil or troop == nil or nation == nil then
+		return
+	end
+	local soldier = sprite:GetAttribute("Soldier")
+	if soldier == nil or soldier == troop then
+		return
+	end
+	if Cosmetics.armyLabel(token.frame, token.owner, troop, nation.colorIndex, UDim2.fromScale(1, 1)) then
+		sprite:Destroy()
+	end
+end
+
 local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	local rebel = army.rebel
 	local neutral = army.owner == 0 and not rebel
@@ -1431,10 +1449,11 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	stroke.Thickness = Theme.stroke
 	stroke.Parent = frame
 	-- a nation's sprite instead of the plain square: its token skin (cosmetic), or with the default token a soldier of
-	-- its race (garrisons and Rebels keep their squares)
+	-- the troop it is mostly made of (garrisons and Rebels keep their squares)
 	local nation = if neutral then nil else ClientState.nation(army.owner)
+	local troop = RaceInfo.mainTroop(army.troops) or RaceInfo.lineTroop(if nation then nation.race else nil)
 	local sprite = if nation
-		then Cosmetics.armyLabel(frame, army.owner, nation.race, nation.colorIndex, UDim2.fromScale(1, 1))
+		then Cosmetics.armyLabel(frame, army.owner, troop, nation.colorIndex, UDim2.fromScale(1, 1))
 		else nil
 	local skinned = sprite ~= nil
 	if skinned then
@@ -1512,9 +1531,10 @@ local function refreshArmies()
 		end
 		if t.troops ~= army.troops then
 			t.troops = army.troops
-			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon
+			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon, its token its soldier
+			resoldier(t)
 		end
-		local troopIcon = if t.troop then RaceInfo.troopIcon(t.troop) else nil -- as this map draws it
+		local troopIcon = if t.troop then RaceInfo.troopIcon(t.troop) else nil
 		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating, troopIcon)
 		local text = MapBadges.shortMen(army.men)
 		if t.icon ~= icon or t.text ~= text then

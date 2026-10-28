@@ -213,6 +213,7 @@ local function attackSetup(zephyrMen: number): MatchState
 	local state = Match.new(map)
 	zephyrTakesTheWorld(state)
 	state.nations[AURORA].gold = 0 -- nothing to buy, so only movement and diplomacy are left
+	state.nations[ZEPHYR].race = state.nations[AURORA].race -- the same line troop on both sides: men against men
 	Army.spawn(state, AURORA, id("Aurora Windward"), 8000)
 	Army.spawn(state, ZEPHYR, id("Cinder Rock"), zephyrMen)
 	return state
