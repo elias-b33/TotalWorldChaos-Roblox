@@ -10,22 +10,28 @@ local Shared = ReplicatedStorage.Shared
 local Lobby = require(Shared.Sim.Lobby)
 local Maps = require(Shared.Maps)
 local Rng = require(Shared.Sim.Rng)
+local Settings = require(Shared.Sim.Settings)
 local Types = require(Shared.Types)
+
+local MatchService = require(script.Parent.MatchService)
 
 local LobbyService = {}
 
 local lobby: Types.LobbyState? = nil
 local match: Types.MatchState? = nil -- the new match, during the draft
 local rng = Rng.new(1)
+local settings = Settings.defaults() -- a private server's settings: kept from one lobby to the next
 
 -- Set a "SkipLobby" attribute on Workspace (Studio solo tests, the harness) to start matches straight away.
 function LobbyService.skipped(): boolean
 	return workspace:GetAttribute("SkipLobby") == true
 end
 
--- Open the map vote. `lockedMap` (Workspace "MapId", later private servers) skips the vote itself.
+-- Open the map vote. `lockedMap` (Workspace "MapId") skips the vote itself, and so does a private server's map
+-- setting. On a private server the owner changes the settings here (Sim.Lobby.setting).
 function LobbyService.open(lockedMap: string?)
-	lobby = Lobby.new(Maps.ids, lockedMap)
+	local owner = MatchService.privateOwner()
+	lobby = Lobby.new(Maps.ids, lockedMap, owner, if owner or MatchService.isPrivate() then settings else nil)
 	match = nil
 	rng = Rng.new(os.time()) -- the vote's tie-break and the draft order; Sim never calls math.random
 end
@@ -74,7 +80,15 @@ end
 
 -- One second. Returns true when the current phase (vote or draft) is over.
 function LobbyService.step(): boolean
-	return Lobby.step(assert(lobby, "no lobby"), match, rng)
+	local l = assert(lobby, "no lobby")
+	l.owner = MatchService.privateOwner() -- with the Studio switch set to true, the first player in the server
+	return Lobby.step(l, match, rng)
+end
+
+-- The setup the next match plays: this private server's settings, or a public server's defaults.
+function LobbyService.setup(): Types.MatchSetup
+	local private = MatchService.isPrivate()
+	return Settings.setup(private, if private then settings else nil)
 end
 
 -- The draft is over: the match starts and the lobby closes.
@@ -104,7 +118,7 @@ function LobbyService.view(): Lobby.LobbyView
 	for _, player in Players:GetPlayers() do
 		names[player.UserId] = if player.DisplayName ~= "" then player.DisplayName else player.Name
 	end
-	return Lobby.view(lobby, names)
+	return Lobby.view(lobby, names, MatchService.isPrivate())
 end
 
 return LobbyService

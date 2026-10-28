@@ -28,8 +28,9 @@ Select Workspace in the Explorer and add attributes in the Properties window.
 | `MapId` | string | Locks the map: `earth`, `eldmoor` or `skyshards`. |
 | `Tutorial` | boolean | This server plays the tutorial match (in a live game, new players are teleported to one). |
 | `TelemetryLog` | boolean | Prints every analytics event as `[telemetry] …` in the Output. AnalyticsService only accepts events from a published game, so this is how to check them in Studio. |
+| `PrivateServerOwner` | number or boolean | Simulates a private (VIP) server: a userId is its owner, `true` makes the first player in the server the owner. The owner gets ⚙ Settings in the Lobby. In Play solo your userId is your account's; in Clients and Servers the players are -1, -2, … (or use `true`). Don't combine with `SkipLobby` (no Lobby, no settings sheet). |
 
-These four are Studio-only. Set them during a test run on the **server's** Workspace (in Clients and Servers, the Server window). Each is applied once on the next game second and then removed:
+The test switches below are Studio-only. Set them during a test run on the **server's** Workspace (in Clients and Servers, the Server window). Each is applied once on the next game second and then removed:
 
 | Attribute | Type | Effect |
 | --- | --- | --- |
@@ -46,6 +47,7 @@ Start a test from the Test tab. Use Device to pick a phone in landscape (the UI 
 | --- | --- |
 | A solo match | Set `SkipLobby`. Play: you and 9 bots. Tap a province, press Develop or +1 Regiment; tap your army, Move, tap a target, Go. |
 | Map vote and draft | Clients and Servers, 3 players. Tap a card twice to vote; when it's your turn, tap a nation's land and press "✔ Pick …". |
+| Private server settings | Set `PrivateServerOwner` = `true`, Clients and Servers, 2 players. Player1 taps ⚙ Settings (bottom right), picks 15 min, Hard, Powers Off, taps Player1 and Player2 under Teams (both "👥1"), then ✔ Done. Player2 has no ⚙ and sees the summary line under the cards. When the match starts: the clock shows 15:00, no ✨ button, both players are allies. `DevTick` = 599 starts the Cataclysm (10:00), 899 ends the match at 15:00. To see the reward line ("🔒 Private server: half") jump in steps under 300 (250, 500, 750, 899) and give an order after each: 5 minutes without an order counts as AFK and pays nothing. |
 | War and battles | `DevTick` = 179. Tap a neighbour, Declare war, march an army in. Watch the dust, the crossed swords and the capture rings. |
 | Primordial powers | `DevCharges` = 5. Press ✨, pick a power, tap a target, Confirm. Meteor shakes the screen; a second harmful power on the same nation within 30 s is refused ("immune"). |
 | Becoming a Primordial | With 2 players at War, let one player's nation lose its capital and all but 2 provinces (or give its land away on the server). That player sees "✨ Primordial" and casts powers. |

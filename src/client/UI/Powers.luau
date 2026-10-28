@@ -88,7 +88,8 @@ local function closeAll()
 end
 
 local function refreshButton()
-	local charges = ClientState.myCharges()
+	local snap = ClientState.snapshot()
+	local charges = if snap and not snap.setup.settings.powers then nil else ClientState.myCharges() -- off: no button
 	powerButton.Visible = charges ~= nil
 	powerButton.Text = "✨\n⚡" .. tostring(charges or 0)
 	if charges == nil then

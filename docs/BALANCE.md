@@ -339,3 +339,19 @@ The first version of this document recommended five Config changes without apply
 - Armies at 15:00 are about the same; at 25:00 there are a third as many men and the biggest nation holds 39k–54k instead of 156k–185k, so a 3,000-man Rebels or a Meteor (−50% of one army) matters again. Bots now use Meteor about 22–25 times per match (all nations together).
 - Standing armies sharing a province with another of the same owner: 62–77 tokens at 25:00 before, none now (the merge rule). Army counts at 25:00 fell from 102–125 to 31–40.
 - No slot wins most matches on any map (most: 7–9 of 20).
+
+## 16. Bot difficulties
+
+`lune run tools/harness/tournament 20 all A/B` plays mixed matches: half the nations on difficulty A, half on B, swapped every seed so each start position plays both (20 seeds × 3 maps = 60 matches, 300 nations per side). `Player` stands in for players: nations marked as players and planned by the Normal bot every 3 s, so Easy's and Hard's player rules apply to them.
+
+| Matchup (A / B) | Wins A / B | Avg final provinces A / B | Ended with no land A / B | A took from B before 8:00 / whole match |
+| --- | --- | --- | --- | --- |
+| Hard / Normal | 56% / 44% | 13.7 / 12.3 | 73 / 89 | 485 / 1010 |
+| Easy / Normal | 31% / 69% | 12.0 / 13.9 | 72 / 52 | 309 / 686 |
+| Easy / Player | 24% / 76% | 10.1 / 15.9 | 87 / 28 | **3** / 369 |
+| Hard / Player | 38% / 62% | 12.7 / 13.3 | 56 / 55 | 195 / 636 |
+
+- Hard beats Normal and Easy loses to it, as the spec says.
+- Easy leaves players alone early: 0 wars declared on players before 8:00, and 3 provinces taken from them (armies already marching on a neutral province a player took first). Until 8:00 an Easy bot doesn't march into a player's land or use a power on one even in a war the player started; it only defends. Before that rule it took 24 provinces from players before 8:00 in 30 matches.
+- Hard is the hardest on players: they end with 13.3 provinces against Hard and 15.9 against Easy, and twice as many of them lose all their land (55 against 28). Hard wins fewer matches against players than against Normal bots because every Hard bot goes after the leading player instead of the easiest land; that's the point of Hard.
+- `Config.Bots.BotsPlanningPerTick` (2) caps how often bots really plan: with 9 bots each plans about every 4.5 s, so Hard's 2 s and Normal's 3 s only show with fewer bots. Raising the cap costs server time; it wasn't needed for the ranking above.

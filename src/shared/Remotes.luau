@@ -15,6 +15,7 @@ local EVENTS = {
 	"RequestPower",
 	"RequestVote", -- lobby: mapId
 	"RequestPick", -- lobby: nationId
+	"RequestSetting", -- lobby, private server owner: key, value, extra (Sim.Settings.set)
 	"RequestTutorial", -- tutorial: "Skip" | "Leave"
 	"RequestBuy", -- shop: itemId, "Glory" | "Robux"
 	"RequestEquip", -- shop: itemId

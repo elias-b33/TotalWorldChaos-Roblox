@@ -13,6 +13,7 @@ local Army = require("./Army")
 local Config = require("../Config")
 local Events = require("./Events")
 local Rng = require("./Rng")
+local Settings = require("./Settings")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -183,6 +184,9 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 	if Primordial.TARGETS[power] == nil then
 		return false, "BadRequest"
 	end
+	if not state.setup.settings.powers then
+		return false, "PowersOff" -- a private server's setting
+	end
 	if state.phase == "Peace" then
 		return false, "NoPowersYet"
 	elseif state.phase == "Results" then
@@ -351,6 +355,9 @@ end
 -- own clock (chargeTicks) from the tick it rose: its first charge comes one full interval later, whatever the
 -- match clock says.
 function Primordial.charge(state: MatchState)
+	if not state.setup.settings.powers then
+		return -- a private server turned powers off: no charges to show
+	end
 	local cap = Config.Primordial.MaxCharges
 	if state.tick % interval(state, Config.Primordial.NationChargeTicks) == 0 then
 		for _, nation in state.nations do
@@ -405,10 +412,14 @@ function Primordial.targets(state: MatchState, power: Power): { number }
 	return out
 end
 
--- True on the ticks a Cataclysm disaster strikes: every CataclysmDisasterTicks after the Cataclysm begins.
+-- True on the ticks a Cataclysm disaster strikes: every CataclysmDisasterTicks after the Cataclysm begins (never
+-- when a private server turned disasters off).
 function Primordial.disasterDue(state: MatchState): boolean
-	local since = state.tick - Config.Phases.WarEndTick
-	return state.phase == "Cataclysm" and since > 0 and since % Config.Primordial.CataclysmDisasterTicks == 0
+	local since = state.tick - Settings.timing(state.setup).warEnd
+	return state.setup.settings.disasters
+		and state.phase == "Cataclysm"
+		and since > 0
+		and since % Config.Primordial.CataclysmDisasterTicks == 0
 end
 
 -- A random harmful power on a random valid target, chosen with the seeded Rng. Returns the power, or nil if

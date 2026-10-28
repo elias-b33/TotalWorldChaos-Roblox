@@ -155,6 +155,9 @@ function Diplomacy.propose(
 		return false, "BadTarget"
 	end
 	if kind == "Ally" then
+		if #state.setup.settings.teams > 0 then
+			return false, "TeamsLocked" -- a private server's owner set the teams (Sim.Settings)
+		end
 		if Diplomacy.allied(state, from, to) then
 			return false, "AlreadyAllied"
 		end
@@ -240,6 +243,14 @@ local function joinAlliance(state: MatchState, a: number, b: number): (boolean, 
 	end
 	Events.push(state, "AllianceFormed", a, b)
 	return true, nil
+end
+
+-- Ally two nations straight away (a private server's locked teams at match start; Sim.Settings.prepare).
+function Diplomacy.ally(state: MatchState, a: number, b: number): (boolean, string?)
+	if a == b or not living(state, a) or not living(state, b) then
+		return false, "BadTarget"
+	end
+	return joinAlliance(state, a, b)
 end
 
 -- `accepter` takes the offer `from` made to them.

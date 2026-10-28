@@ -5,6 +5,8 @@
 --   lune run tools/harness/tournament                 # 20 seeds × every map, Normal bots
 --   lune run tools/harness/tournament 5 skyshards     # 5 seeds on one map
 --   lune run tools/harness/tournament 20 all Hard     # another difficulty
+--   lune run tools/harness/tournament 20 all Hard/Normal   # mixed: half the nations on each, swapped every seed
+--   lune run tools/harness/tournament 20 all Easy/Player   # Easy bots against Normal-bot stand-ins for players
 --   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
 
 local process = require("@lune/process")
@@ -20,7 +22,11 @@ local Types = require("../../src/shared/Types")
 
 local seeds = tonumber(process.args[1]) or 20
 local mapArg = process.args[2] or "all"
-local difficulty = (process.args[3] or "Normal") :: Bot.Difficulty
+local difficultyArg = process.args[3] or "Normal"
+local groupA, groupB = string.match(difficultyArg, "^(%a+)/(%a+)$")
+local mixed = groupA ~= nil
+local difficulty = (if mixed then groupA else difficultyArg) :: Bot.Difficulty
+local STAND_IN_PLAN_TICKS = Config.Bots.Normal.planTicks -- "Player" stand-ins plan like Normal bots
 local mapIds = if mapArg == "all" then Maps.ids else { mapArg }
 
 local overrides = process.env.SET
@@ -53,6 +59,10 @@ type MatchStats = {
 	powers: number, -- Primordial powers bots used
 	leaderChanges: number, -- minutes (from 3:00) that ended with a different nation holding the most provinces
 	armyStats: { [number]: ArmyStats }, -- at the end of minutes 15 and 25 (or the end of the match)
+	group: { [number]: string }, -- mixed mode: nation -> "A" or "B"
+	earlyWars: { [string]: number }, -- mixed mode: "AB" = wars A declared on B before Easy's no-player-war time
+	earlyTaken: { [string]: number }, -- mixed mode: "AB" = provinces A took from B before that time
+	taken: { [string]: number }, -- mixed mode: "AB" = provinces A took from B in the whole match
 }
 
 -- Nations' armies at one moment: how many, how many men, the biggest nation's men, and standing armies that share
@@ -91,6 +101,27 @@ local function runMatch(mapId: string, seed: number): MatchStats
 	local botRng = Rng.new(seed * 7919 + 13)
 	local schedule = Bot.newSchedule()
 	local queue: { Bot.Order } = {}
+	-- mixed mode: alternate slots between the two groups, swapped on every other seed so each slot plays both
+	local group: { [number]: string } = {}
+	local levels: { [number]: Bot.Difficulty } = {}
+	local standIns: { [number]: Bot.Memory } = {}
+	if mixed then
+		for id in state.nations do
+			local g = if (id + seed) % 2 == 0 then "A" else "B"
+			group[id] = g
+			local level = if g == "A" then groupA else groupB
+			if level == "Player" then
+				state.nations[id].controller = "Player"
+				state.nations[id].userId = 100000 + id
+				standIns[id] = Bot.newMemory()
+			else
+				levels[id] = level :: Bot.Difficulty
+			end
+		end
+	end
+	local earlyWars: { [string]: number } = {}
+	local earlyTaken: { [string]: number } = {}
+	local taken: { [string]: number } = {}
 	local lastLeader = 0
 	local stats = {
 		leaderByMinute = {},
@@ -118,12 +149,32 @@ local function runMatch(mapId: string, seed: number): MatchStats
 			end
 		end
 		Tick.advance(state, battleRng) -- 2-8
-		queue = Bot.step(schedule, state, botRng, difficulty) -- 7
+		queue = Bot.step(schedule, state, botRng, difficulty, levels) -- 7
+		for id, memory in standIns do
+			local nation = state.nations[id]
+			if not nation.eliminated and (state.tick + id) % STAND_IN_PLAN_TICKS == 0 then
+				for _, command in Bot.plan(state, id, botRng, "Normal", memory) do
+					table.insert(queue, { nation = id, command = command })
+				end
+			end
+		end
+		local early = state.tick < Config.Bots.Easy.noPlayerWarTicks
 		for _, e in state.events do
 			if e.kind == "WarDeclared" then
 				stats.wars += 1
+				if mixed and early then
+					local key = group[e.a] .. group[e.b]
+					earlyWars[key] = (earlyWars[key] or 0) + 1
+				end
 			elseif e.kind == "ProvinceTaken" and e.a ~= 0 and e.b ~= 0 then
 				stats.conquests += 1
+				if mixed and group[e.a] and group[e.b] then
+					local key = group[e.a] .. group[e.b]
+					taken[key] = (taken[key] or 0) + 1
+					if early then
+						earlyTaken[key] = (earlyTaken[key] or 0) + 1
+					end
+				end
 			end
 		end
 		table.clear(state.events)
@@ -166,6 +217,10 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		powers = stats.powers,
 		leaderChanges = stats.leaderChanges,
 		armyStats = stats.armyStats,
+		group = group,
+		earlyWars = earlyWars,
+		earlyTaken = earlyTaken,
+		taken = taken,
 	}
 end
 
@@ -188,7 +243,18 @@ end
 
 local started = os.clock()
 local grandRejected, grandCommands = 0, 0
-print(string.format("Bot tournament: %d seeds × %d maps, %s bots", seeds, #mapIds, difficulty))
+print(string.format("Bot tournament: %d seeds × %d maps, %s bots", seeds, #mapIds, difficultyArg))
+-- mixed mode, every map together: wins and final provinces by group
+local mixedTotals = {
+	wins = { A = 0, B = 0 },
+	matches = 0,
+	provinces = { A = 0, B = 0 },
+	nations = { A = 0, B = 0 },
+	eliminated = { A = 0, B = 0 },
+	earlyWars = {} :: { [string]: number },
+	earlyTaken = {} :: { [string]: number },
+	taken = {} :: { [string]: number },
+}
 for _, mapId in mapIds do
 	local map = Maps.get(mapId)
 	local mapStart = os.clock()
@@ -210,6 +276,28 @@ for _, mapId in mapIds do
 		local s = runMatch(mapId, seed)
 		for _, w in s.result.winners do
 			wins[w] = (wins[w] or 0) + 1
+		end
+		if mixed then
+			mixedTotals.matches += 1
+			for _, w in s.result.winners do
+				mixedTotals.wins[s.group[w]] += 1 / #s.result.winners
+			end
+			for id, n in s.finalProvinces do
+				local g = s.group[id]
+				mixedTotals.provinces[g] += n
+				mixedTotals.nations[g] += 1
+				if n == 0 then
+					mixedTotals.eliminated[g] += 1
+				end
+			end
+			for _, pair in { { s.earlyWars, mixedTotals.earlyWars }, { s.earlyTaken, mixedTotals.earlyTaken } } do
+				for k, v in pair[1] do
+					pair[2][k] = (pair[2][k] or 0) + v
+				end
+			end
+			for k, v in s.taken do
+				mixedTotals.taken[k] = (mixedTotals.taken[k] or 0) + v
+			end
 		end
 		for id, n in s.finalProvinces do
 			provincesSum[id] = (provincesSum[id] or 0) + n
@@ -340,6 +428,39 @@ for _, mapId in mapIds do
 		print(string.format("  rejected %s × %d", k, v))
 	end
 	print(string.format("(%.1f s)", os.clock() - mapStart))
+end
+if mixed then
+	local m = mixedTotals
+	print(string.format("\n== mixed: A = %s, B = %s (%d matches, every map) ==", groupA, groupB, m.matches))
+	for _, g in { "A", "B" } do
+		print(
+			string.format(
+				"%s %-7s wins %5.1f (%3.0f%%)  avg final provinces %5.1f  ended with no land %d of %d",
+				g,
+				if g == "A" then groupA else groupB,
+				m.wins[g],
+				100 * m.wins[g] / math.max(1, m.matches),
+				m.provinces[g] / math.max(1, m.nations[g]),
+				m.eliminated[g],
+				m.nations[g]
+			)
+		)
+	end
+	local minutes = Config.Bots.Easy.noPlayerWarTicks // 60
+	for _, key in { "AB", "BA", "AA", "BB" } do
+		print(
+			string.format(
+				"%s on %s: wars before %d:00 %d, provinces taken before %d:00 %d, in the whole match %d",
+				key:sub(1, 1),
+				key:sub(2, 2),
+				minutes,
+				m.earlyWars[key] or 0,
+				minutes,
+				m.earlyTaken[key] or 0,
+				m.taken[key] or 0
+			)
+		)
+	end
 end
 print(
 	string.format(

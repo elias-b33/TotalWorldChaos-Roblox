@@ -28,7 +28,7 @@ local REASONS: { [string]: string } = {
 	Retreating = "🏳 It's retreating home",
 	NoPath = "🚫 Can't get there",
 	BadTarget = "🚫 Not possible",
-	PeaceTime = "🕊 No wars until 3:00",
+	PeaceTime = "🕊 No wars until Peace ends",
 	Allied = "🤝 You're allies",
 	AlreadyAtWar = "⚔ Already at war",
 	Truce = "🕊 Truce still running",
@@ -42,7 +42,7 @@ local REASONS: { [string]: string } = {
 	Immune = "🛡 Hit by a power less than 30 s ago",
 	NoBuilding = "🏚 No building there",
 	OwnTarget = "🚫 Not on yourself",
-	NoPowersYet = "⏳ Powers unlock at 3:00",
+	NoPowersYet = "⏳ Powers unlock when Peace ends",
 	MatchOver = "🏁 The match is over",
 	Primordial = "✨ Primordials only use powers",
 	Locked = "🔒 This server's map is set",
@@ -66,6 +66,11 @@ local REASONS: { [string]: string } = {
 	NotDaily = "📜 Only daily quests can be rerolled",
 	Done = "✅ That quest is finished",
 	NoOther = "📜 No other quest to swap in",
+	NotOwner = "🔒 Only the server's owner can change that",
+	BadSetting = "🚫 Not an option",
+	TeamFull = "👥 That team is full (3)",
+	PowersOff = "✨ Powers are off on this server",
+	TeamsLocked = "🔒 Teams are set on this server",
 }
 
 local Intents = {}
@@ -120,6 +125,11 @@ end
 
 function Intents.pick(nationId: number)
 	send("RequestPick", nationId)
+end
+
+-- Lobby, private server owner: change a setting (Sim.Settings.set); "team" puts player `value` in team `extra`.
+function Intents.setting(key: string, value: string | number | boolean, extra: number?)
+	send("RequestSetting", key, value, extra or 0)
 end
 
 -- Tutorial: "Skip" it, or "Leave" for a public server once it is over.

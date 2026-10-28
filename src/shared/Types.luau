@@ -92,8 +92,31 @@ export type MatchResult = {
 	endedAt: number, -- tick
 }
 
+export type Difficulty = "Easy" | "Normal" | "Hard"
+
+-- A private server owner's match settings (docs/MONETIZATION.md 3.4; allowed values in Config.Private). Public
+-- servers play the defaults (Sim.Settings.defaults). Flat lists only, so it survives the network.
+export type MatchSettings = {
+	map: string, -- a map id, or "" = the Lobby's map vote
+	theme: string, -- "Vote" = the theme vote (the winning map's voters' theme), "Default" = always the default theme
+	minutes: number, -- match length: Results at minutes × 60
+	peaceMinutes: number, -- no wars or powers before this
+	bots: number, -- most bot nations (0–9); nations nobody plays beyond this are taken off the map (land neutral)
+	difficulty: Difficulty, -- every bot's difficulty
+	powers: boolean, -- Primordial powers (nations and Primordials)
+	disasters: boolean, -- the Cataclysm's disasters
+	teams: { { userId: number, team: number } }, -- locked teams: these players start allied; none = off
+}
+
+-- How a match was set up, read by Sim from MatchState (never from globals).
+export type MatchSetup = {
+	private: boolean, -- a private server: rewards depend on the rules and the number of players (Sim.Settings)
+	settings: MatchSettings,
+}
+
 export type MatchState = {
 	mapId: string,
+	setup: MatchSetup, -- the private server's settings (the defaults on a public server)
 	tick: number,
 	phase: Phase,
 	provinces: { [ProvinceId]: Province },
@@ -117,7 +140,8 @@ export type LobbyState = {
 	phase: "Lobby" | "Pick",
 	ticksLeft: number, -- until this phase ends
 	maps: { string }, -- the map ids on the vote cards
-	locked: string?, -- a map the server set (Workspace "MapId", later private servers): no vote
+	pool: { string }, -- every map the server can play (the cards when no map is locked)
+	locked: string?, -- a map the server set (Workspace "MapId", a private server's map setting): no vote
 	votes: { [number]: string }, -- userId -> map id (kept per voter, so a theme vote can look at the winners' voters)
 	mapId: string?, -- the chosen map, once the vote is over
 	order: { number }, -- draft order (userIds)
@@ -125,10 +149,16 @@ export type LobbyState = {
 	turnTicks: number, -- length of one turn
 	turnTicksLeft: number,
 	picks: { [number]: NationId }, -- userId -> nation
+	owner: number?, -- a private server's owner (userId): only they change the settings; nil = public server
+	settings: MatchSettings, -- the next match's settings (changed only during the vote)
 }
 
--- Lobby intents: CommandRouter checks the shape, Sim/Lobby checks the rules.
-export type LobbyIntent = { kind: "Vote", map: string } | { kind: "Pick", nation: NationId }
+-- Lobby intents: CommandRouter checks the shape, Sim/Lobby (and Sim/Settings) the rules. A Setting names a
+-- MatchSettings key; "team" sets player `value`'s team to `extra`.
+export type LobbyIntent =
+	{ kind: "Vote", map: string }
+	| { kind: "Pick", nation: NationId }
+	| { kind: "Setting", key: string, value: string | number | boolean, extra: number }
 
 -- The tutorial match (Sim.Tutorial): which prompt the new player is on. Lives outside MatchState, like the lobby.
 export type TutorialState = {

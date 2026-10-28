@@ -1295,10 +1295,11 @@ function Emulator.buttons(client: Machine)
 	return out
 end
 
--- Press the first visible button whose text contains `needle` (plain match). Errors if there is none.
+-- Press the first visible button whose text contains `needle` (plain match), or whose name is `needle`. Errors if
+-- there is none.
 function Emulator.press(client: Machine, needle: string)
 	for _, b in Emulator.buttons(client) do
-		if string.find(b.text, needle, 1, true) then
+		if string.find(b.text, needle, 1, true) or b.button.Name == needle then
 			eventOf(b.button, "Activated"):Fire(nil, 1)
 			return b.button
 		end

@@ -248,7 +248,7 @@ Config.Bots = {
 	Easy = { planTicks = 6, attackRatio = 1.6, noPlayerWarTicks = 8 * 60, targetsLeadingPlayer = false },
 	Normal = { planTicks = 3, attackRatio = 1.3, noPlayerWarTicks = 0, targetsLeadingPlayer = false },
 	Hard = { planTicks = 2, attackRatio = 1.1, noPlayerWarTicks = 0, targetsLeadingPlayer = true },
-	Difficulty = "Normal", -- what every bot plays on; private servers may pick later
+	Difficulty = "Normal", -- what every bot plays on (a private server's owner can pick another: Config.Private)
 	DefendRatio = 0.8,
 	MenPerProvince = 800,
 	BotsPlanningPerTick = 2,
@@ -257,6 +257,19 @@ Config.Bots = {
 	UpkeepReserveMonths = 2, -- build only with gold left over after this many months of upkeep
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
+}
+
+-- Private servers (docs/MONETIZATION.md 3.4): what the owner may pick in the Lobby's settings sheet. The defaults
+-- (Sim.Settings.defaults) are what public servers play: Config.Phases, Config.Bots.Difficulty, everything on.
+
+Config.Private = {
+	Minutes = { 15, 25, 35 }, -- match length; the Cataclysm is always its last (MatchEndTick - WarEndTick) ticks
+	PeaceMinutes = { 0, 3, 5 },
+	MaxBots = 9, -- bots 0..9; 9 fills every nation nobody plays
+	Difficulties = { "Easy", "Normal", "Hard" },
+	Themes = { "Vote", "Default" }, -- "Default" forces every map's default theme
+	Teams = 4, -- team numbers the owner can give players (0 = no team); a team holds Config.Diplomacy.MaxAllianceSize
+	FullRewardHumans = 4, -- a private match pays full XP and Glory with default rules and this many players
 }
 
 -- Tutorial (docs/DESIGN.md "Tutorial"): a new player's first match, on a reserved server of its own -------------

@@ -10,6 +10,7 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Progression = require(Shared.Sim.Progression)
 local Remotes = require(Shared.Remotes)
+local Settings = require(Shared.Sim.Settings)
 local Types = require(Shared.Types)
 
 local Server = script.Parent.Parent
@@ -39,11 +40,11 @@ local function isVip(player: Player): boolean
 	return ShopService.isVip(player) -- +25% match XP and Glory (MONETIZATION 3.3)
 end
 
-local function options(player: Player, data: Types.PlayerProfile): Progression.RewardOptions
+local function options(player: Player, data: Types.PlayerProfile, state: Types.MatchState): Progression.RewardOptions
 	return {
 		vip = isVip(player),
 		firstMatchToday = Progression.isFirstMatchToday(data, today()),
-		standardRules = true, -- private-server custom rules arrive later
+		standardRules = Settings.fullRewards(state), -- private servers: default rules and 4+ players, or half
 	}
 end
 
@@ -62,7 +63,7 @@ local function grant(
 	state: Types.MatchState,
 	entry: Types.PlayerMatchStats
 ): Types.RewardReport
-	local reward = Progression.matchReward(state, entry, options(player, data))
+	local reward = Progression.matchReward(state, entry, options(player, data, state))
 	local report = Progression.grant(data, entry, reward, today())
 	for _, hook in rewardHooks do
 		local ok, err = pcall(hook, player, data, entry, report)

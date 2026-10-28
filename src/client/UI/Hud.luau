@@ -8,9 +8,9 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
-local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local Match = require(Shared.Sim.Match)
+local Settings = require(Shared.Sim.Settings)
 local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
@@ -142,8 +142,9 @@ end
 local function updateClock()
 	local tick = ClientState.tick()
 	local snap = ClientState.snapshot()
-	local phase = if snap and snap.result then "Results" else Match.phaseAt(tick)
-	local remaining = if phase == "Results" then 0 else Config.Phases.MatchEndTick - tick
+	local setup = if snap then snap.setup else nil -- a private server's match length and Peace
+	local phase = if snap and snap.result then "Results" else Match.phaseAt(tick, setup)
+	local remaining = if phase == "Results" then 0 else Settings.timing(setup).matchEnd - tick
 	clockLabel.Text = (PHASE_ICONS[phase] or "") .. " " .. formatClock(remaining)
 	if os.clock() > toastUntil then
 		local nextText = table.remove(toastQueue, 1)
