@@ -3,6 +3,8 @@
 -- nation one at a time in a random order. On your turn tap a nation in the list to take it, or tap its land on
 -- the map and confirm. A banner says whose turn it is and how long is left. Bots keep the rest.
 -- The theme vote's winner is credited at the top of the panel ("🌙 Night Earth, brought by Alice").
+-- Picking a nation picks its race (docs/DESIGN.md "Races"): every nation's card shows its race (icon and name), and
+-- the nation you tap gets a race card above the Pick button with its one-line bonus.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +22,7 @@ local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local MapRenderer = require(Client.MapRenderer)
 local Palette = require(Client.Palette)
+local RaceInfo = require(Client.RaceInfo)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
@@ -41,6 +44,7 @@ local orderLabel: TextLabel
 local themeLabel: TextLabel
 local grid: Frame
 local confirm: TextButton
+local raceCard: TextLabel
 local buttons: { [number]: TextButton } = {} -- nation id -> its button in the list
 local stars: { [number]: GuiObject } = {} -- nation id -> the star on your own nation's button
 local builtFor: any = nil -- the snapshot the buttons were made for
@@ -131,6 +135,10 @@ local function render()
 			star.Position = UDim2.fromOffset(4, 4)
 			star.Visible = false
 			stars[id] = star
+			local race = Widgets.icon(button, RaceInfo.icon(nation.race), 16) -- the race this nation plays
+			race.Name = "Race"
+			race.AnchorPoint = Vector2.new(1, 1)
+			race.Position = UDim2.new(1, -4, 1, -6)
 		end
 	end
 	for _, nation in snap.nations do
@@ -140,7 +148,7 @@ local function render()
 			if taken and nation.userId ~= me then
 				button.Text = nation.name .. "\n" .. nameOf(nation.userId)
 			else
-				button.Text = nation.name
+				button.Text = nation.name .. "\n" .. nation.race
 			end
 			stars[nation.id].Visible = nation.userId == me -- your nation wears a star
 			-- taken nations fade into the panel (a grey nation colour must still read as free)
@@ -155,6 +163,20 @@ local function render()
 		confirm.Visible = true
 	else
 		confirm.Visible = false
+	end
+	-- the tapped nation's race and its bonus (else your own nation's, once you have one)
+	local shown = choice
+	if shown == nil then
+		for _, nation in snap.nations do
+			if nation.userId == me then
+				shown = nation
+			end
+		end
+	end
+	raceCard.Visible = shown ~= nil
+	if shown then
+		Icons.set(raceCard:FindFirstChild("Icon") :: GuiObject, RaceInfo.icon(shown.race))
+		raceCard.Text = string.format("%s: %s · %s", shown.name, shown.race, RaceInfo.bonus(shown.race))
 	end
 end
 
@@ -246,6 +268,16 @@ function Draft.init()
 	confirm.TextWrapped = false
 	confirm.TextTruncate = Enum.TextTruncate.AtEnd
 	confirm.Visible = false
+
+	-- the race card, just above the Pick button
+	raceCard = Widgets.chip(gui, "humans", "", nil, 34)
+	raceCard.Name = "RaceCard"
+	raceCard.AnchorPoint = Vector2.new(0.5, 1)
+	raceCard.Position = UDim2.new(0.5, -PANEL_WIDTH // 2, 1, -12 - 48 - Theme.space.m)
+	raceCard.BackgroundColor3 = Theme.color.navy
+	raceCard.BackgroundTransparency = 0
+	Widgets.stroke(raceCard)
+	raceCard.Visible = false
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	LobbyState.onChange(render)

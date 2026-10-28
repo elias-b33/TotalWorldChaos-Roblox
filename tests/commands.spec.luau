@@ -85,8 +85,8 @@ end)
 T.test("recruit spends gold and manpower and merges into one army", function()
 	local state, nation, capital = fresh()
 	nation.gold, nation.manpower = 1000, 10000
-	T.expect((Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = 2 })))
-	T.expect((Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = 3 })))
+	T.expect((Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = 2, troop = "Infantry" })))
+	T.expect((Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = 3, troop = "Infantry" })))
 	T.equal(nation.gold, 1000 - 50)
 	T.equal(nation.manpower, 10000 - 5000)
 	local armies = 0
@@ -104,11 +104,13 @@ T.test("recruit checks the amount and manpower", function()
 	local state, nation, capital = fresh()
 	nation.gold, nation.manpower = 1000, 1500
 	for _, bad in { 0, -1, 1.5, Config.Army.MaxRecruitPerCommand + 1 } do
-		local ok, err = Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = bad })
+		local ok, err =
+			Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = bad, troop = "Infantry" })
 		T.expect(not ok, "accepted " .. bad)
 		T.equal(err, "BadAmount")
 	end
-	local ok, err = Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = 2 })
+	local ok, err =
+		Commands.apply(state, 1, { kind = "Recruit", province = capital.id, regiments = 2, troop = "Infantry" })
 	T.expect(not ok)
 	T.equal(err, "NotEnoughManpower")
 	T.equal(nation.gold, 1000)
@@ -194,7 +196,8 @@ T.test("applyFor: a bot acts for its nation until a player takes it over", funct
 	T.expect(not ok2)
 	T.equal(err2, "NoNation")
 	T.equal(nation.gold, gold)
-	local ok4 = Commands.applyFor(state, nil, 1, { kind = "Recruit", province = capital.id, regiments = 1 })
+	local ok4 =
+		Commands.applyFor(state, nil, 1, { kind = "Recruit", province = capital.id, regiments = 1, troop = "Infantry" })
 	T.expect(not ok4, "nor a queued Recruit")
 	T.equal(nation.gold, gold, "the player's gold is untouched")
 	Match.unseatPlayer(state, ALICE)

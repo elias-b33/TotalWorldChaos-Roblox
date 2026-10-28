@@ -5,10 +5,13 @@
 -- One siege per province: whoever started it keeps it while one of its armies (or an ally's) stands there; a rival
 -- besieger at peace with it waits instead of blocking. An interrupted siege (a battle, a defender, the besieger
 -- leaving) keeps its progress for Config.Siege.GraceTicks, then resets. Retreating armies are ignored.
+-- Army size doesn't matter, but troops do: while an army with Ironguard in it besieges (the holder's or an ally's),
+-- the siege moves Config.Troops.Ironguard.siegeSpeed times as fast.
 
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Events = require("./Events")
+local Troops = require("./Troops")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -52,6 +55,7 @@ function Siege.step(state: MatchState)
 
 	for provinceId, province in state.provinces do
 		local besiegers: { number } = {} -- owners of armies standing here that may besiege it, in army id order
+		local besieging: { Types.Army } = {} -- those armies
 		local blocked = false
 		for _, a in here[provinceId] or {} do
 			local hostileToOwner = province.owner == nil or Diplomacy.atWar(state, a.owner, province.owner)
@@ -61,6 +65,7 @@ function Siege.step(state: MatchState)
 				blocked = true -- a fight, a neutral garrison or the owner's own army holds the province
 			elseif #a.path == 0 and (hostileToOwner or rebels) then
 				table.insert(besiegers, a.owner)
+				table.insert(besieging, a)
 			end
 		end
 		local current = province.siege
@@ -84,7 +89,14 @@ function Siege.step(state: MatchState)
 				then current
 				else { by = leader, progress = 0, required = Siege.required(province), lastTick = state.tick }
 			province.siege = siege
-			siege.progress += 1
+			-- Ironguard besiege faster: the fastest army besieging with the leader sets the pace
+			local speed = 1
+			for _, a in besieging do
+				if Diplomacy.friendly(state, leader, a.owner) then
+					speed = math.max(speed, Troops.siegeSpeed(a.troops))
+				end
+			end
+			siege.progress += speed
 			siege.lastTick = state.tick
 			if siege.progress >= siege.required then
 				local old = province.owner

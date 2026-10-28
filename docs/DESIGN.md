@@ -16,7 +16,7 @@ A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and pla
 | Source | Keep | Cut |
 | --- | --- | --- |
 | EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
-| WorldBox | God powers (here: Primordial powers), disasters, watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
+| WorldBox | God powers (here: Primordial powers), disasters, the four classic races, watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
 
 ## Match structure
 
@@ -59,7 +59,7 @@ Joining mid-match takes over a bot's nation. For Studio solo tests (and the harn
 
 ## Core systems
 
-Two resources (gold and manpower), one unit type and one siege rule carry the whole game. Every number below is a starting value for playtests and lives in one `Config` module.
+Two resources (gold and manpower), four races, seven troop types (three for everyone, one elite per race) and one siege rule carry the whole game. Every number below is a starting value for playtests and lives in one `Config` module.
 
 ### Map and provinces
 
@@ -69,6 +69,22 @@ Two resources (gold and manpower), one unit type and one siege rule carry the wh
 - No sea in v1. Islands connect through "straits": extra neighbour links drawn as bridges or sea lanes.
 - Three maps: **Earth** (real world), **Eldmoor** (fantasy continent) and **Skyshards** (floating islands). Every nation starts with 8 provinces and 17 total development on every map. Details, art and data pipeline: `docs/MAPS.md`.
 
+### Races
+
+WorldBox's four classic races. Every nation has one, set per nation in the map data (`docs/MAPS.md`), so picking a nation in the draft picks its race. Neutral garrisons and Rebels have none. Each race has one passive and one elite troop (see Troops).
+
+| Race | Passive | Elite |
+| --- | --- | --- |
+| Humans | +10% gold income (gross: provinces and capital, before upkeep) | Knights |
+| Elves | Cross forest at plains speed; +10% combat strength in battles in forest provinces | Rangers |
+| Orcs | +20% manpower income | Berserkers |
+| Dwarves | +25% combat strength when defending in hills; forts cost half | Ironguard |
+
+- Combat bonuses add to the battle modifier like the terrain, fort and catch-up bonuses, for the whole side: an ally fighting beside an Elven army in a forest shares the Elves' bonus (as with the underdog bonus).
+- Every map mixes all four races, at least two nations of each, fitted to the land where it makes sense (Elves where there is forest, Dwarves in hills, Humans and Orcs elsewhere) and spread so every race gets strong and weak start positions.
+- The draft card shows each nation's race (icon and name); the nation you tap gets a race card with its one-line bonus. The nations drawer shows every nation's race, and yours with its bonus.
+- Rules: `Sim/Races.luau`; numbers: `Config.Races`; balance: `docs/BALANCE.md` section 18.
+
 ### Economy
 
 Income is paid every month (10 s). A nation starts with 100 gold and 3,000 manpower.
@@ -77,23 +93,46 @@ Income is paid every month (10 s). A nation starts with 100 gold and 3,000 manpo
 | --- | --- | --- |
 | Province income | — | +1 gold and +100 manpower per development level |
 | Capital | — | +5 gold per month |
-| Regiment (1,000 men) | 10 gold + 1,000 manpower | Upkeep 1.5 gold per month |
+| Race bonus | — | Humans +10% gold (gross, before upkeep), Orcs +20% manpower |
+| Regiment (1,000 men of one troop type) | Infantry 10 gold + 1,000 manpower; the other troops in Troops | Upkeep per month: infantry 1.5 gold, the others in Troops |
 | Develop province | 30 gold × current level | +1 development (max 5) |
 | Farm | 50 gold | +50% gold from this province |
 | Barracks | 40 gold | +50% manpower from this province |
-| Fort | 60 gold | +50% defence, siege time ×2 |
+| Fort | 60 gold (Dwarves 30) | +50% defence, siege time ×2 |
+
+### Troops
+
+The regiment (1,000 men) is a troop type now. An army is still one token and one stack, with a composition: how many men of each troop type it holds. `Army.men` stays the total; one helper (`Army.setTroops`) changes it and the composition together, so they always agree.
+
+| Troop | Who | Cost | Upkeep | Attack | Defence | Speed |
+| --- | --- | --- | --- | --- | --- | --- |
+| Infantry (the old regiment) | everyone | 10 gold + 1,000 manpower | 1.5 | 1.0 | 1.0 | normal |
+| Archers | everyone | 15 gold + 1,000 manpower | 2 | 0.75 | 1.5 | normal |
+| Cavalry | everyone | 25 gold + 1,000 manpower | 3 | 1.5 | 1.0 | fast |
+| Knights | Humans | 35 gold + 1,000 manpower | 4 | 2.0 | 1.25 | fast |
+| Rangers | Elves | 20 gold + 1,000 manpower | 2.5 | 1.25 | 1.75 | normal |
+| Berserkers | Orcs | 12 gold + 750 manpower | 1.5 | 1.75 | 0.75 | normal |
+| Ironguard | Dwarves | 25 gold + 1,000 manpower | 2 | 1.5 | 2.0 | normal; an army with Ironguard besieges 1.5× as fast |
+
+- Upkeep is gold per regiment (1,000 men) per month. Normal speed: 5 s per plains province, 8 s forest and hills; fast: 3 s and 6 s.
+- The spec's first numbers were tuned with bot tournaments (`docs/BALANCE.md` section 18): Berserkers' upkeep 2 → 1.5, Ironguard 30 → 25 gold, upkeep 3 → 2, attack 1.25 → 1.5 and sieges 1.25× → 1.5×, the Elves' forest bonus 25% → 10%.
+- Recruit buys whole regiments of one type into the army standing in the province (or a new one). A nation recruits the three shared troops and its race's elite; the server refuses another race's elite.
+- Battles: a side's strength is the sum of its men × each troop's attack (attacking side) or defence (defending side), times the modifiers. Losses split over an army's troop types in proportion to their men. Merging stacks adds the compositions.
+- An army moves at its slowest troop's speed (retreating too).
+- A Meteor's 50% applies to every troop type. Neutral garrisons and Rebels are infantry. Every rule that counts men (retreats under 500, the bots' army sizes, the HUD) counts the total; quests, achievements, telemetry and the tutorial count every troop as a regiment.
+- Rules: `Sim/Troops.luau`, `Sim/Army.luau`; numbers: `Config.Troops`; balance: `docs/BALANCE.md` section 18.
 
 ### Armies and combat
 
-- One unit type, the regiment. An army is a stack of regiments shown as one token on the map: a nation's armies that stand still in the same province (not marching, fighting or retreating) merge into one.
-- Movement: one province per 5 s on plains, 8 s on forest and hills. Paths follow province neighbours (BFS).
-- A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers.
-- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, random ±10% per battle.
-- After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at normal speed, under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home.
+- An army is a stack of regiments of any troop types (its composition, see Troops) shown as one token on the map: a nation's armies that stand still in the same province (not marching, fighting or retreating) merge into one, and their compositions add up.
+- Movement: one province per 5 s on plains, 8 s on forest and hills; 3 s and 6 s for fast troops (cavalry, knights). An army moves at its slowest troop's speed, and Elves cross forest at plains speed. Paths follow province neighbours (BFS).
+- A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers. Strength = the sum of its men × each troop's attack (attackers) or defence (defenders); losses split over troop types in proportion to their men.
+- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, Elves in a forest +10%, Dwarves defending in hills +25%, random ±10% per battle.
+- After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at its own speed (its slowest troop's), under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home.
 
 ### Sieges
 
-- An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital.
+- An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital. Army size doesn't matter, but an army with Ironguard in it (the holder's or an ally's) besieges 1.5× as fast (a third less time).
 - One siege per province. Whoever started it keeps it while one of its (or an ally's) armies stands there; another besieger at peace with it waits instead of blocking, and takes over (from zero) once the first one leaves.
 - An interrupted siege (a battle there, a defending army, the besieger stepping out) keeps its progress for 10 s, then resets. Peace with the owner, or the province changing hands, ends it at once.
 - When the siege completes, the province flips to the attacker immediately. No war score and no haggling over provinces in peace deals.
@@ -258,6 +297,9 @@ export type Terrain = "Plains" | "Forest" | "Hills" | "Mountain"
 export type Building = "None" | "Farm" | "Barracks" | "Fort"
 export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
 export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
+export type Race = "Humans" | "Elves" | "Orcs" | "Dwarves"
+export type Troop = "Infantry" | "Archers" | "Cavalry" | "Knights" | "Rangers" | "Berserkers" | "Ironguard"
+export type Composition = { [Troop]: number } -- men per troop type; adds up to Army.men
 
 export type Province = {
     id: ProvinceId,
@@ -277,6 +319,7 @@ export type Nation = {
     id: NationId,
     name: string,
     colorIndex: number,        -- palette index, so game logic stays Roblox-free and testable
+    race: Race,                -- from the map data
     controller: "Player" | "Bot",
     userId: number?,           -- nil for bots
     capital: ProvinceId,
@@ -292,7 +335,8 @@ export type Army = {
     id: ArmyId,
     owner: NationId,           -- 0 = neutral (garrisons, Rebels)
     location: ProvinceId,
-    men: number,
+    men: number,               -- the total; changes only through Army.setTroops
+    troops: Composition,       -- men per troop type (garrisons and Rebels: infantry)
     path: { ProvinceId },      -- remaining route
     moveProgress: number,      -- ticks spent toward next province
     inBattle: boolean,
@@ -348,7 +392,7 @@ export type MapDef = {
     title: string,
     theme: string,             -- texture set: "earth" | "fantasy" | "sky"
     imageSize: { x: number, y: number },
-    nations: { { slot: number, name: string, capital: ProvinceId, colorIndex: number } },
+    nations: { { slot: number, name: string, capital: ProvinceId, colorIndex: number, race: Race } },
     provinces: { ProvinceDef },
     straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean } },
     grid: GridDef,
@@ -361,7 +405,7 @@ Intents are typed too. `CommandRouter` checks their shape; `Sim/Commands` checks
 export type Command =
     { kind: "Develop", province: ProvinceId }
     | { kind: "Build", province: ProvinceId, building: Building }
-    | { kind: "Recruit", province: ProvinceId, regiments: number }
+    | { kind: "Recruit", province: ProvinceId, regiments: number, troop: Troop }
 ```
 
 ### Remotes
@@ -369,14 +413,14 @@ export type Command =
 | Remote | Direction | Payload |
 | --- | --- | --- |
 | `RequestMove` | client → server | armyId, targetProvince |
-| `RequestRecruit` | client → server | provinceId, regiments |
+| `RequestRecruit` | client → server | provinceId, regiments, troop type (the nation's race must be allowed it) |
 | `RequestBuild` | client → server | provinceId, building |
 | `RequestDevelop` | client → server | provinceId |
 | `RequestDiplomacy` | client → server | action (War, Ally, AcceptAlly, Peace, AcceptPeace), targetNation, gold? |
 | `RequestPower` | client → server | power, target province or nation |
 | `CommandResult` | server → client | requestId, ok, reason |
-| `Snapshot` | server → client | full match state, sent on join |
-| `Delta` | server → client | changed provinces, nations, armies, events |
+| `Snapshot` | server → client | full match state, sent on join (every nation's race, every army's composition) |
+| `Delta` | server → client | changed provinces, nations, armies (with their composition), events |
 | `ArmyPositions` (unreliable) | server → client | armyId, from, to, progress |
 | `Notify` | server → client | toast type and text |
 | `RequestBuy` | client → server | itemId, "Glory" or "Robux" |
@@ -395,8 +439,8 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
 - **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank, and a mute button (see "Sound and effects").
 - **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce).
-- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit, or Declare war and Ally on foreign provinces.
-- **Moving armies:** tap the army, tap the destination, see the path with arrival time, tap Confirm.
+- **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit (one button per troop your race recruits, each with its price), or Declare war and Ally on foreign provinces.
+- **Moving armies:** tap the army, tap the destination, see the path with arrival time (at the army's own speed), tap Confirm. The army sheet shows the composition as chips (troop icon and men).
 - **Primordial powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
 - **Map modes:** Political (default), Diplomacy (allies green, enemies red), Terrain.
 - **Feedback:** toasts for war declared, province lost and battle won; a short screen shake for a meteor.
@@ -407,7 +451,7 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - Icons and numbers over words; no paragraphs anywhere in the HUD.
 - Every UI change is checked in Studio's phone emulator before it's merged.
 
-**Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit, siege, make an ally, declare war, use a Primordial power.
+**Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit (the Infantry button), siege, make an ally, declare war, use a Primordial power.
 
 - **Where:** a public server's match is shared by up to 12 players, so the tutorial runs on a reserved server of the same place. A player whose profile hasn't finished the tutorial (`tutorialDone`) and hasn't played a match is teleported to a fresh reserved server; every reserved server plays the tutorial. Private (VIP) servers never send anyone, so friends who join one stay together. When its match ends, or the player skips, they go back to a public server; a failed teleport is tried again a few times (`Config.Tutorial`), the player is never seated in the next tutorial match, and a small "🌍 Play online" button stays on screen after Skip or "Stay". In Studio the Workspace attribute `Tutorial` starts the tutorial match directly (teleports can't run there).
 - **The match:** Earth, the player as Ganges (`Config.Tutorial`), the 5 nations nearest to them as Easy bots, and the other 4 nations gone (their land neutral, with garrisons). No Lobby. The player starts with a 3-regiment army so the first prompt can start at once.
@@ -468,11 +512,11 @@ Each bot checks a short priority list every few seconds and does the first actio
 
 **Priority list** (bots are staggered so 1–2 plan per tick)
 
-1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there.
-2. **Recruit:** total army is below provinces × 800 men and manpower is available.
+1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there: archers (the best defenders) if I can pay for them and they make up at most 30% of my men, else infantry.
+2. **Recruit:** total army is below provinces × 800 men and manpower is available. Infantry is the base; at war, my race's elite or cavalry if I can pay for it and still keep 2 months of upkeep, while the two make up at most 30% of my men (the elite first when it costs no more upkeep than cavalry, else whichever I have fewer men of).
 3. **Expand:** a neutral neighbour whose garrison I can beat → attack it.
 4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
-5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders, then develop.
+5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders (Dwarves pay half), then develop; with everything built, spare gold buys regiments (the Recruit step's troop).
 6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
 7. **Primordial power:** with 2 charges, Meteor the biggest army of a nation I'm at war with that isn't immune right now. This rides along with whatever else the plan does, so charges don't pile up.
 
@@ -557,6 +601,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Sound and effects for battles and Primordial powers
 - [x] UI kit with a "pixel kingdom" look and runtime pixel icons, on the HUD, sheets, powers, nations, offers, map vote, draft, private settings and emotes ("UI style")
 - [ ] Shop, Quests, Results and Tutorial restyled on the UI kit
+- [x] Races (Humans, Elves, Orcs, Dwarves) and troop types (infantry, archers, cavalry, one elite per race): map data, rules, bots, the recruit buttons, army composition chips, races on the draft and the nations drawer (evidence: `docs/BALANCE.md` section 18)
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 

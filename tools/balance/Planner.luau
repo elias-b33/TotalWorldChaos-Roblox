@@ -109,14 +109,20 @@ local function recruit(state: MatchState, nationId: number, provinceId: number, 
 	local nation = state.nations[nationId]
 	local affordable = math.min(
 		regiments,
-		math.floor(nation.gold / Config.Army.RegimentGold),
-		math.floor(nation.manpower / Config.Army.RegimentManpower),
+		math.floor(nation.gold / Config.Troops.Infantry.gold),
+		math.floor(nation.manpower / Config.Troops.Infantry.manpower),
 		Config.Army.MaxRecruitPerCommand
 	)
 	if affordable < 1 then
 		return false
 	end
-	return (Commands.apply(state, nationId, { kind = "Recruit", province = provinceId, regiments = affordable }))
+	return (
+		Commands.apply(
+			state,
+			nationId,
+			{ kind = "Recruit", province = provinceId, regiments = affordable, troop = "Infantry" }
+		)
+	)
 end
 
 local function bestImprovement(state: MatchState, nationId: number): (Types.Command?, number)
@@ -223,7 +229,7 @@ function Planner.step(state: MatchState, nationId: number, opts: Options)
 	end
 
 	-- spare manpower: a new army beside the best untaken target
-	if nation.manpower >= 2 * Config.Army.RegimentManpower and nation.gold >= 2 * Config.Army.RegimentGold then
+	if nation.manpower >= 2 * Config.Troops.Infantry.manpower and nation.gold >= 2 * Config.Troops.Infantry.gold then
 		local bestTarget, bestFrom, bestScore = nil, nil, 0
 		for pid, p in state.provinces do
 			if not taken[pid] and isTarget(state, nationId, opts, pid) then
@@ -243,7 +249,7 @@ function Planner.step(state: MatchState, nationId: number, opts: Options)
 	end
 
 	-- improvements with the gold the manpower can't use
-	local reserve = Config.Army.RegimentGold * math.floor(nation.manpower / Config.Army.RegimentManpower)
+	local reserve = Config.Troops.Infantry.gold * math.floor(nation.manpower / Config.Troops.Infantry.manpower)
 	local command, cost = bestImprovement(state, nationId)
 	if command and nation.gold - cost >= reserve then
 		Commands.apply(state, nationId, command)

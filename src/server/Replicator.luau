@@ -1,12 +1,13 @@
 --!strict
 -- Sends a full snapshot to a player when they join (or a new match starts), then one delta per tick to everyone.
+-- Records carry what clients need: every nation's race, every army's composition (Shared.Snapshot).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Lobby = require(Shared.Sim.Lobby)
-local Pathing = require(Shared.Sim.Pathing)
+local Movement = require(Shared.Sim.Movement)
 local Remotes = require(Shared.Remotes)
 local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
@@ -65,8 +66,8 @@ function Replicator.broadcast(state: Types.MatchState)
 	lastSent = current
 	table.clear(state.events)
 
-	local positions = Snapshot.positions(state, function(provinceId)
-		return Pathing.moveTicks(state.provinces[provinceId].terrain)
+	local positions = Snapshot.positions(state, function(provinceId, army)
+		return Movement.moveTicks(state, army, provinceId) -- its slowest troop's speed (Elves: forest as plains)
 	end)
 	local flat = {}
 	for i, p in positions do

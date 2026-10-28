@@ -85,7 +85,8 @@ def to_luau(layout: dict, ids_path: str) -> str:
     ]
     for n in layout["nations"]:
         lines.append(
-            f"\t\t{{ slot = {n['slot']}, name = {lua_str(n['name'])}, capital = {n['capital']}, colorIndex = {n['colorIndex']} }},"
+            f"\t\t{{ slot = {n['slot']}, name = {lua_str(n['name'])}, capital = {n['capital']}, "
+            f"colorIndex = {n['colorIndex']}, race = {lua_str(n['race'])} }},"
         )
     lines.append("\t},")
     lines.append("\tprovinces = {")

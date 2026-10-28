@@ -6,8 +6,9 @@
 -- (MatchState.primordials) with charges of their own. Powers work in War and Cataclysm, never in Peace.
 -- Harmful powers (Meteor, Plague, Rebels, Earthquake) respect the nation's 30 s immunity and start it again;
 -- Blessing and Shield are gifts and ignore it. A Primordial may target anyone, the nation that beat them included.
--- Meteor targets an army: the army's owner must not be immune and becomes immune. The development level it also
--- costs the province is skipped while that province's owner is immune, and doesn't start their immunity.
+-- Meteor targets an army: the army's owner must not be immune and becomes immune. It kills half of every troop type
+-- in the army. The development level it also costs the province is skipped while that province's owner is immune,
+-- and doesn't start their immunity. Rebels are infantry.
 
 local Army = require("./Army")
 local Config = require("../Config")
@@ -141,7 +142,7 @@ local function strike(state: MatchState, power: Power, target: number, hit: numb
 	if power == "Meteor" then
 		local army = state.armies[target]
 		local before = army.men
-		army.men = math.floor(army.men * (1 - p.Meteor.armyLoss))
+		Army.shrinkTo(army, math.floor(army.men * (1 - p.Meteor.armyLoss))) -- every troop type loses its share
 		killed = before - army.men
 		if army.men < Config.Army.MinArmyMen then
 			state.armies[target] = nil

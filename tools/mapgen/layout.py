@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 START_SIZE = 8  # provinces each nation owns at the start (~40% of land stays neutral)
+RACES = ("Humans", "Elves", "Orcs", "Dwarves")  # every nation has one (docs/DESIGN.md "Races"); every map mixes all four
 MIN_SHARED_BORDER = 3  # pixels of shared border before two provinces count as neighbours
 
 
@@ -328,11 +329,14 @@ def auto_connect(lay: Layout) -> None:
         add_strait(lay, a, b, pts, auto=True)
 
 
-def assign_start_territories(lay: Layout, allowed=None, order: list[str] | None = None) -> None:
+def assign_start_territories(
+    lay: Layout, allowed=None, order: list[str] | None = None, races: dict[str, str] | None = None
+) -> None:
     """Round-robin claims outward from each capital until every nation holds START_SIZE provinces.
 
     allowed(slot, province) -> bool can restrict claims (Skyshards keeps each nation on its own shard).
     order lists the nations by slot; by default slots follow the capitals' seed order.
+    races gives each nation (by name) its race, one of RACES (validate() checks every nation has one).
     """
     n = len(lay.seeds)
     caps = [(i, s.nation) for i, s in enumerate(lay.seeds) if s.nation]
@@ -342,7 +346,8 @@ def assign_start_territories(lay: Layout, allowed=None, order: list[str] | None 
     lay.nations = []
     for slot, (i, name) in enumerate(caps):
         lay.owner[i] = slot
-        lay.nations.append({"slot": slot + 1, "name": name, "capital": i, "colorIndex": slot + 1})
+        race = (races or {}).get(name)
+        lay.nations.append({"slot": slot + 1, "name": name, "capital": i, "colorIndex": slot + 1, "race": race})
     # hop distance from every capital
     hops = []
     for i, _ in caps:
@@ -448,6 +453,12 @@ def validate(lay: Layout) -> list[str]:
         problems.append(f"duplicate names: {sorted(dupes)}")
     if len(lay.seeds) > 150:
         problems.append(f"{len(lay.seeds)} provinces is over the 150 budget")
+    for n in lay.nations:
+        if n.get("race") not in RACES:
+            problems.append(f"nation '{n['name']}' has no race (one of {', '.join(RACES)})")
+    missing = [r for r in RACES if r not in {n.get("race") for n in lay.nations}]
+    if missing:
+        problems.append(f"races missing from the map: {', '.join(missing)}")
     return problems
 
 

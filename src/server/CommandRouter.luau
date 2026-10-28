@@ -15,6 +15,7 @@ local Primordial = require(Shared.Sim.Primordial)
 local RateLimit = require(Shared.RateLimit)
 local Remotes = require(Shared.Remotes)
 local Telemetry = require(Shared.Sim.Telemetry)
+local Troops = require(Shared.Sim.Troops)
 local Types = require(Shared.Types)
 
 type Pending = {
@@ -103,13 +104,19 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			end)
 		end)
 
+	-- a troop type every race knows by name (Sim.Commands checks the nation's race may recruit it)
 	Remotes.event("RequestRecruit").OnServerEvent
-		:Connect(function(player: Player, requestId: unknown, province: unknown, regiments: unknown)
+		:Connect(function(player: Player, requestId: unknown, province: unknown, regiments: unknown, troop: unknown)
 			accept(player, requestId, function()
-				if not isId(province) or not isId(regiments) then
+				if not isId(province) or not isId(regiments) or not Troops.isTroop(troop) then
 					return nil
 				end
-				return { kind = "Recruit", province = province :: number, regiments = regiments :: number }
+				return {
+					kind = "Recruit",
+					province = province :: number,
+					regiments = regiments :: number,
+					troop = troop :: Types.Troop,
+				}
 			end)
 		end)
 

@@ -8,6 +8,10 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Pathing = require(Shared.Sim.Pathing)
+local Races = require(Shared.Sim.Races)
+local Snapshot = require(Shared.Snapshot)
+local Troops = require(Shared.Sim.Troops)
+local Types = require(Shared.Types)
 
 local ClientState = require(script.Parent.ClientState)
 
@@ -107,13 +111,18 @@ function Relations.path(nationId: number, from: number, to: number): { number }?
 	end, from, to)
 end
 
--- Seconds to walk a route.
-function Relations.travelTime(path: { number }): number
+-- Seconds an army takes to walk a route (Sim.Movement.moveTicks): its slowest troop's speed, with Elves crossing
+-- forest at plains speed. Without an army, normal infantry speed.
+function Relations.travelTime(path: { number }, army: Snapshot.ArmyRecord?): number
 	local map = ClientState.map()
 	local t = 0
 	if map then
+		local troops: Types.Composition = if army then Troops.decode(army.troops) else { Infantry = 1 }
+		local owner = if army then ClientState.nation(army.owner) else nil
+		local race = if owner then owner.race :: Types.Race else nil
 		for _, id in path do
-			t += Pathing.moveTicks(map.provinces[id].terrain) * Config.TickSeconds
+			local terrain = Races.moveTerrain(race, map.provinces[id].terrain)
+			t += Troops.moveTicks(troops, terrain) * Config.TickSeconds
 		end
 	end
 	return t

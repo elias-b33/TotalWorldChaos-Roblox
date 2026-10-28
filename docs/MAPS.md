@@ -30,6 +30,7 @@ These are checked by the generator (`tools/mapgen/layout.py`), so a map that bre
 - **≤ 150 provinces** (the performance budget).
 - **Straits** are extra neighbour links across water or void, exactly as in the design doc. Each map draws them in its own style: dashed sea lanes on Earth, ink sea lanes on Eldmoor, rope bridges on Skyshards.
 - **Neutral garrisons** default to one regiment (1,000 men, `Config.NeutralGarrison`). A map can give a province a bigger garrison: the two map centres (the Crownlands and the Heartstone) and a few provinces set for start-position balance (see each map).
+- **Races** (docs/DESIGN.md "Races"): every nation has one of WorldBox's four races, set per nation in the generator (`RACES` in each `tools/mapgen/maps/*.py`, written into `layout.json` and `MapData` as the nation's `race`). Every map mixes all four, at least two nations of each, fitted to the land where it makes sense: Elves on the forest starts, Dwarves in the hills, Humans and Orcs elsewhere. The validator flags a nation without a race and a map missing one.
 - **Start-position balance** is measured, not assumed: `lune run tools/harness/tournament 200 <map>` plays 200 bot matches and prints each slot's wins against its fair share. The goal (`docs/BALANCE.md` section 17) is that no slot wins more than about twice its share and none (almost) never wins. Fixes go into the generator (garrisons, passes, sea lanes, where a capital sits), never into special rules.
 
 ## Earth
@@ -38,18 +39,20 @@ The real world on a Miller projection, centred on 11°E so the Americas sit on t
 
 **Names avoid modern countries.** Provinces use geographic and historic regions (Castile, Anatolia, Levant, Bengal, Formosa, Patagonia), and the ten nations are named after great rivers. That keeps the map clear of touchy borders and flags (the concern in the design doc's open questions) while staying instantly recognisable.
 
-| Colour | Nation | Capital | Start region |
-| --- | --- | --- | --- |
-| 1 crimson | Rhine | Rhineland | Western Europe |
-| 2 blue | Volga | Muscovy | Russia |
-| 3 gold | Tigris | Mesopotamia | Middle East |
-| 4 violet | Ganges | Ganges Plain | India |
-| 5 orange | Yangtze | Yangtze Valley | China |
-| 6 teal | Mekong | Mekong | Southeast Asia |
-| 7 magenta | Niger | Niger Bend | West Africa |
-| 8 lime | Zambezi | Zambezi | Southern Africa |
-| 9 bronze | Mississippi | Mississippi | North America |
-| 10 charcoal | Amazon | Amazonia | South America |
+| Colour | Nation | Capital | Start region | Race |
+| --- | --- | --- | --- | --- |
+| 1 crimson | Rhine | Rhineland | Western Europe | Orcs |
+| 2 blue | Volga | Muscovy | Russia | Elves |
+| 3 gold | Tigris | Mesopotamia | Middle East | Dwarves |
+| 4 violet | Ganges | Ganges Plain | India | Humans |
+| 5 orange | Yangtze | Yangtze Valley | China | Dwarves |
+| 6 teal | Mekong | Mekong | Southeast Asia | Elves |
+| 7 magenta | Niger | Niger Bend | West Africa | Humans |
+| 8 lime | Zambezi | Zambezi | Southern Africa | Humans |
+| 9 bronze | Mississippi | Mississippi | North America | Orcs |
+| 10 charcoal | Amazon | Amazonia | South America | Elves |
+
+**Races:** Elves in the great forests (Volga's taiga, the Mekong and Amazon jungles), Dwarves in the hills of Mesopotamia and China, Humans on the plains of India and Africa, Orcs on the plains of Western Europe and North America. Orcs were kept off any region where "orcs" could read as a jab at a real people. Start positions are spread over the races: the first draft gave the Humans Yangtze and Niger, two of the weakest starts, and the Dwarves Zambezi, one of the strongest; now Zambezi is Human and the hilly Yangtze Dwarven (`docs/BALANCE.md` section 18).
 
 **How it plays**
 
@@ -71,18 +74,20 @@ Sea lanes: Iceland–Scotland, Iceland–Greenland, Greenland–Laurentia, Engla
 
 A fantasy continent built for chokepoint fights. Ten kingdoms ring the **Crownlands**, a rich neutral heartland around Moonmere lake. The **Dragonspine** mountains wall the Crownlands off: three wide gaps and four one-province mountain passes. Crownlands provinces have development 3–4 and 3,000-man garrisons, so taking the centre is a mid-game commitment, not an opening move.
 
-| Colour | Nation | Region | Terrain |
-| --- | --- | --- | --- |
-| 1 crimson | Mistborn | Isle of Mists (east island) | Wildwood, meadows |
-| 2 blue | Saltmarsh | Southwest coast | Meadows, woods |
-| 3 gold | Ironholds | Northeast | Highlands, frost |
-| 4 violet | Frostmarch | Frozen north | Frostfields |
-| 5 orange | Greenvale | Western breadbasket | Meadows |
-| 6 teal | Elderwood | Great eastern forest | Wildwood |
-| 7 magenta | Wyrmcoast | Northwest | Highlands, meadows |
-| 8 lime | Sunscorch | Southern desert | Dunes |
-| 9 bronze | Ashen Dominion | Southeast volcano | Ashlands, dunes |
-| 10 charcoal | Corsairs | Corsair Isles (southwest archipelago) | Meadows, highlands |
+| Colour | Nation | Region | Terrain | Race |
+| --- | --- | --- | --- | --- |
+| 1 crimson | Mistborn | Isle of Mists (east island) | Wildwood, meadows | Elves |
+| 2 blue | Saltmarsh | Southwest coast | Meadows, woods | Humans |
+| 3 gold | Ironholds | Northeast | Highlands, frost | Dwarves |
+| 4 violet | Frostmarch | Frozen north | Frostfields | Humans |
+| 5 orange | Greenvale | Western breadbasket | Meadows | Orcs |
+| 6 teal | Elderwood | Great eastern forest | Wildwood | Elves |
+| 7 magenta | Wyrmcoast | Northwest | Highlands, meadows | Dwarves |
+| 8 lime | Sunscorch | Southern desert | Dunes | Orcs |
+| 9 bronze | Ashen Dominion | Southeast volcano | Ashlands, dunes | Orcs |
+| 10 charcoal | Corsairs | Corsair Isles (southwest archipelago) | Meadows, highlands | Humans |
+
+**Races:** Elves in the two wildwoods (the Isle of Mists, Elderwood), Dwarves in the highlands (Ironholds, Wyrmcoast), Orcs in the desert, the ash wastes round Mount Cinder and the western breadbasket, Humans on the southwest coast, the frostfields and the Corsair Isles. Start positions are spread over the races (`docs/BALANCE.md` section 18): the first draft gave the Orcs Frostmarch and Wyrmcoast, the two strongest kingdoms, and the Dwarves and Humans the weakest (Ironholds, Greenvale).
 
 **How it plays**
 
@@ -122,6 +127,7 @@ Province names are generated from per-region word lists (Hoarreach, Silvershade,
 ```
 
 - **Home shards:** 8 provinces around an impassable storm spire. The capital (Landing) is on the far side from the Heartstone, and the Gate faces it.
+- **Races:** every shard has the same land, so the races alternate round the ring and no two neighbouring shards share one: Aurora Humans, Zephyr Orcs, Nimbus Elves, Tempest Dwarves, Halo Humans, Solace Elves, Ember Dwarves, Rime Humans, Verdance Elves, Umbra Orcs (3 Humans, 3 Elves, 2 Orcs, 2 Dwarves). Races are the one thing that differs between shards.
 - **Drift isles:** 10 two-province islets between neighbouring shards. These are the first contested land.
 - **The Heartstone:** 10 Approaches (development 3, 2,000-man garrisons) and 10 Sanctums (development 4, 3,000-man garrisons) around the Heartstone Spire. That's almost two-thirds of the map's neutral development in one place.
 
@@ -193,7 +199,7 @@ Everything here comes from `python3 tools/mapgen/generate.py` (about 1–2 minut
 
 | File | What it is | Used by |
 | --- | --- | --- |
-| `assets/maps/<map>/layout.json` | Provinces, neighbours, straits, nations, start owners, development, garrisons | Converted into `src/shared/MapData/<Map>.luau` |
+| `assets/maps/<map>/layout.json` | Provinces, neighbours, straits, nations (with their race), start owners, development, garrisons | Converted into `src/shared/MapData/<Map>.luau` |
 | `assets/maps/<map>/province_ids.png` | Every pixel's province id (`R + 256·G`, 0 = none) | The province grid in `MapData` (half resolution) |
 | `assets/maps/<map>/terrain.jpg`, `political.jpg` | Full-size previews | Reviews and Studio reference |
 | `assets/maps/<map>/atlas.jpg` | Terrain view with province ids printed | Debugging, bug reports ("army stuck in 57") |
@@ -259,3 +265,4 @@ Done when: 3 test clients vote and the chosen map loads
 - **Scale:** 1 px = 0.5 stud, and texture tiles every 128 studs.
 - **Earth straits:** the Bering Strait wraps around the map edge. The Dakar–Natal lane was removed for start-position balance (Amazon attacked Niger through it in almost every match); the Americas reach the Old World through Greenland–Iceland and Bering.
 - **`biome`** is a cosmetic field in map data only. `MatchState` is unchanged.
+- **Races per nation** (the tables above): set in the generator, fitted to the land and spread so each race gets strong and weak start positions; Orcs only where the name can't read as a jab at a real people.

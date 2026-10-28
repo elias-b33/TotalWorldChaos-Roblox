@@ -86,6 +86,14 @@ SLOTS = [
     "Mistborn", "Saltmarsh", "Ironholds", "Frostmarch", "Greenvale",
     "Elderwood", "Wyrmcoast", "Sunscorch", "Ashen Dominion", "Corsairs",
 ]
+# Races (docs/DESIGN.md "Races"): Elves in the wildwoods (the Isle of Mists, Elderwood), Dwarves in the highlands
+# (Ironholds, Wyrmcoast), Orcs in the desert, the ash wastes round Mount Cinder and the western breadbasket, Humans on
+# the southwest coast, the frostfields and the Corsair Isles. Each race gets strong and weak start positions alike
+# (docs/BALANCE.md section 18).
+RACES = {
+    "Mistborn": "Elves", "Saltmarsh": "Humans", "Ironholds": "Dwarves", "Frostmarch": "Humans", "Greenvale": "Orcs",
+    "Elderwood": "Elves", "Wyrmcoast": "Dwarves", "Sunscorch": "Orcs", "Ashen Dominion": "Orcs", "Corsairs": "Humans",
+}
 
 # name, centre, biome mix, nation (None = neutral zone)
 ZONES = [
@@ -259,7 +267,7 @@ def build() -> Layout:
     extra_straits(lay)
     passes = {i for i, s in enumerate(lay.seeds) if s.name.endswith(" Pass")}
     # passes start neutral; slots keep their numbers (colours) when a capital moves
-    assign_start_territories(lay, allowed=lambda slot, q: q not in passes, order=SLOTS)
+    assign_start_territories(lay, allowed=lambda slot, q: q not in passes, order=SLOTS, races=RACES)
     balance_start_development(lay)
     return lay
 

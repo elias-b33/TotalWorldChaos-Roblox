@@ -9,6 +9,7 @@ local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Movement = require("./Movement")
 local Primordial = require("./Primordial")
+local Troops = require("./Troops")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -53,7 +54,8 @@ local function build(
 	provinceId: number,
 	building: Types.Building
 ): (boolean, string?)
-	local cost = Economy.buildingCost(building)
+	local nation = state.nations[nationId]
+	local cost = Economy.buildingCost(building, nation.race) -- Dwarves pay less for a fort
 	if cost == nil then
 		return false, "BadBuilding"
 	end
@@ -64,7 +66,6 @@ local function build(
 	if province.building ~= "None" then
 		return false, "AlreadyBuilt"
 	end
-	local nation = state.nations[nationId]
 	if nation.gold < cost then
 		return false, "NotEnoughGold"
 	end
@@ -73,16 +74,29 @@ local function build(
 	return true, nil
 end
 
-local function recruit(state: MatchState, nationId: number, provinceId: number, regiments: number): (boolean, string?)
+-- Regiments of one troop type: the shared troops for everyone, an elite only for its own race (WrongRace).
+local function recruit(
+	state: MatchState,
+	nationId: number,
+	provinceId: number,
+	regiments: number,
+	troop: Types.Troop
+): (boolean, string?)
 	if regiments ~= math.floor(regiments) or regiments < 1 or regiments > Config.Army.MaxRecruitPerCommand then
 		return false, "BadAmount"
+	end
+	if not Troops.isTroop(troop) then
+		return false, "BadTroop"
 	end
 	local province, err = ownedProvince(state, nationId, provinceId)
 	if province == nil then
 		return false, err
 	end
 	local nation = state.nations[nationId]
-	local gold, manpower = Economy.recruitCost(regiments)
+	if not Troops.canRecruit(nation.race, troop) then
+		return false, "WrongRace"
+	end
+	local gold, manpower = Economy.recruitCost(regiments, troop)
 	if nation.gold < gold then
 		return false, "NotEnoughGold"
 	end
@@ -91,7 +105,7 @@ local function recruit(state: MatchState, nationId: number, provinceId: number, 
 	end
 	nation.gold -= gold
 	nation.manpower -= manpower
-	Army.reinforce(state, nationId, provinceId, regiments * Config.Army.MenPerRegiment)
+	Army.reinforce(state, nationId, provinceId, regiments * Config.Army.MenPerRegiment, troop)
 	return true, nil
 end
 
@@ -110,7 +124,7 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 	elseif command.kind == "Build" then
 		return build(state, nationId, command.province, command.building)
 	elseif command.kind == "Recruit" then
-		return recruit(state, nationId, command.province, command.regiments)
+		return recruit(state, nationId, command.province, command.regiments, command.troop)
 	elseif command.kind == "Move" then
 		return Movement.order(state, nationId, command.army, command.to)
 	elseif command.kind == "Power" then

@@ -1,6 +1,9 @@
 --!strict
 -- Bot AI (docs/DESIGN.md "Bot AI"). Each plan walks the priority list and returns the first command that applies:
 --   1. Defend  2. Recruit  3. Expand  4. Attack  5. Build  6. Diplomacy  (7. Primordial power: see below)
+-- Troops: infantry is the base; a threatened province raises archers (while they are under Config.Bots.ArcherShare
+-- of my men); at war, a bot that can pay for them and keep its upkeep reserve recruits its race's elite or cavalry
+-- instead (see pickTroop), while the two are under Config.Bots.AttackShare of my men.
 -- Bots send the same commands players do, through CommandRouter, and every command is dry-run against
 -- Sim/Commands first, so a bot almost never sends one the server refuses. No cheating: bots read the same state
 -- any player could see and pay full price for everything.
@@ -15,6 +18,7 @@ local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Pathing = require("./Pathing")
 local Rng = require("./Rng")
+local Troops = require("./Troops")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -107,6 +111,8 @@ type Ctx = {
 	mayEnter: { [number]: boolean }, -- owners whose land my armies may enter (Diplomacy.canEnter)
 	myArmies: { Army }, -- sorted by id
 	men: number,
+	troopMen: { [string]: number }, -- my men per troop type
+	upkeep: number, -- what my armies cost a month
 	isEnemy: { [number]: boolean }, -- nations at war with me
 	enemies: { number },
 	targeted: { [number]: boolean }, -- provinces my armies stand in (abroad) or are marching to
@@ -150,9 +156,15 @@ local function context(state: MatchState, me: number, rng: Rng.Rng, settings: Se
 	local hostile: { [number]: { Army } } = {}
 	local myArmies = {}
 	local men = 0
+	local troopMen: { [string]: number } = {}
 	local targeted = {}
 	for _, id in sortedKeys(state.armies) do
 		local a = state.armies[id]
+		if a.owner == me then
+			for troop, n in a.troops do
+				troopMen[troop] = (troopMen[troop] or 0) + n
+			end
+		end
 		if a.retreating then
 			-- walking home: it takes no orders and fights nobody, but it is still mine to count
 			if a.owner == me then
@@ -191,6 +203,8 @@ local function context(state: MatchState, me: number, rng: Rng.Rng, settings: Se
 		mayEnter = mayEnter,
 		myArmies = myArmies,
 		men = men,
+		troopMen = troopMen,
+		upkeep = Economy.upkeep(state, me),
 		isEnemy = isEnemy,
 		enemies = enemies,
 		targeted = targeted,
@@ -226,8 +240,10 @@ local function menOf(armies: { Army }): number
 	return n
 end
 
--- Combat strength (men × the Battle modifiers: terrain, fort, catch-up bonuses) of my armies and theirs if they
--- fight in this province. `iDefend` says which side holds it. Rolls are the random ± per battle (0 = average).
+-- Combat strength (men × each troop's attack or defence × the Battle modifiers: terrain, fort, race and catch-up
+-- bonuses) of my armies and theirs if they fight in this province. `iDefend` says which side holds it. Rolls are the
+-- random ± per battle (0 = average). Also each side's kills per man (strength / men: losses split evenly over troop
+-- types, so it holds for the whole battle) and my bare modifier.
 local function strengths(
 	ctx: Ctx,
 	provinceId: number,
@@ -236,7 +252,7 @@ local function strengths(
 	iDefend: boolean,
 	myRoll: number,
 	theirRoll: number
-): (number, number, number, number)
+): (number, number, number, number, number)
 	local sides: Battle.Sides = if iDefend
 		then { defenderOwner = ctx.me, defenders = mine, attackers = theirs }
 		else {
@@ -246,7 +262,11 @@ local function strengths(
 		}
 	local myMod = Battle.modifier(ctx.state, provinceId, sides, iDefend, myRoll)
 	local theirMod = Battle.modifier(ctx.state, provinceId, sides, not iDefend, theirRoll)
-	return menOf(mine) * myMod, menOf(theirs) * theirMod, myMod, theirMod
+	local my, their = Battle.strength(mine, iDefend) * myMod, Battle.strength(theirs, not iDefend) * theirMod
+	local myMen, theirMen = menOf(mine), menOf(theirs)
+	local myRate = if myMen > 0 then my / myMen else myMod
+	local theirRate = if theirMen > 0 then their / theirMen else theirMod
+	return my, their, myRate, theirRate, myMod
 end
 
 -- Plays out a battle's rounds: do I end with more men, and enough to survive?
@@ -268,8 +288,8 @@ local function canBeat(ctx: Ctx, provinceId: number, armies: { Army }): boolean
 		return menOf(armies) >= Config.Army.MinArmyMen
 	end
 	local spread = Config.Battle.RandomSpread
-	local _, _, myMod, theirMod = strengths(ctx, provinceId, armies, theirs, false, -spread, spread)
-	return wouldWin(menOf(armies), myMod, menOf(theirs), theirMod)
+	local _, _, myRate, theirRate = strengths(ctx, provinceId, armies, theirs, false, -spread, spread)
+	return wouldWin(menOf(armies), myRate, menOf(theirs), theirRate)
 end
 
 -- Are these armies strong enough (by the difficulty's attack ratio) to attack `theirs` in a province?
@@ -415,15 +435,59 @@ local function moveStack(stack: Stack, to: number): { Command }
 	return out
 end
 
--- Regiments I can pay for in one command.
-local function affordable(ctx: Ctx): number
+-- Regiments of a troop I can pay for in one command.
+local function affordable(ctx: Ctx, troop: Types.Troop): number
 	local nation = ctx.nation
+	local t = Troops.stats(troop)
 	local n = math.min(
 		Config.Army.MaxRecruitPerCommand,
-		math.floor(nation.gold / Config.Army.RegimentGold),
-		math.floor(nation.manpower / Config.Army.RegimentManpower)
+		math.floor(nation.gold / t.gold),
+		math.floor(nation.manpower / t.manpower)
 	)
 	return math.max(0, n)
+end
+
+-- How many of up to `regiments` regiments of a troop I can buy and still keep Config.Bots.UpkeepReserveMonths of
+-- upkeep (theirs included) in the bank.
+local function richEnough(ctx: Ctx, troop: Types.Troop, regiments: number): number
+	local t = Troops.stats(troop)
+	local n = math.min(regiments, affordable(ctx, troop))
+	while n >= 1 and ctx.nation.gold - n * t.gold < Config.Bots.UpkeepReserveMonths * (ctx.upkeep + n * t.upkeep) do
+		n -= 1
+	end
+	return n
+end
+
+-- Are this troop type's men (`men`) still under `share` of my army? Infantry stays the base of the mix.
+local function underShare(ctx: Ctx, men: number, share: number): boolean
+	return men <= share * ctx.men
+end
+
+-- What to recruit (up to `regiments` regiments) for the next fight: at war, my race's elite or cavalry (the elite
+-- first when it costs no more upkeep than cavalry, else whichever I have fewer men of), if I am rich enough for it
+-- and they are under Config.Bots.AttackShare of my men; else infantry, the base.
+local function pickTroop(ctx: Ctx, regiments: number): (Types.Troop, number)
+	local elite = Troops.elite(ctx.nation.race)
+	local attackMen = (ctx.troopMen.Cavalry or 0) + (if elite then ctx.troopMen[elite] or 0 else 0)
+	if #ctx.enemies > 0 and underShare(ctx, attackMen, Config.Bots.AttackShare) then
+		local options: { Types.Troop } = { "Cavalry" }
+		if elite then
+			-- the elite first when it is no dearer to keep than cavalry, else whichever I have fewer men of
+			local cheaper = Troops.stats(elite).upkeep <= Troops.stats("Cavalry").upkeep
+			if cheaper or (ctx.troopMen[elite] or 0) <= (ctx.troopMen.Cavalry or 0) then
+				table.insert(options, 1, elite)
+			else
+				table.insert(options, elite)
+			end
+		end
+		for _, troop in options do
+			local n = richEnough(ctx, troop, regiments)
+			if n >= 1 then
+				return troop, n
+			end
+		end
+	end
+	return "Infantry", math.min(regiments, affordable(ctx, "Infantry"))
 end
 
 -- The commands, if the server would accept all of them in this order (dry run on one copy of the state).
@@ -579,7 +643,7 @@ local function defend(ctx: Ctx): { Command }?
 	end
 	for _, t in list do
 		local guards = guardsOf(ctx, t.target)
-		local my, their, myMod = strengths(ctx, t.target, guards, t.armies, true, 0, 0)
+		local my, their, _, _, myMod = strengths(ctx, t.target, guards, t.armies, true, 0, 0)
 		if my >= ratio * their then
 			for _, g in guards do
 				ctx.reserved[g.id] = t.location
@@ -597,13 +661,21 @@ local function defend(ctx: Ctx): { Command }?
 					end
 				end
 			end
-			-- not enough men nearby: raise them where the threat is
-			local missing = ratio * their / myMod - menOf(guards)
-			local regiments = math.min(math.ceil(missing / Config.Army.MenPerRegiment), affordable(ctx))
-			if regiments >= 1 then
-				local result = try(ctx, { kind = "Recruit", province = t.target, regiments = regiments })
-				if result then
-					return result
+			-- not enough men nearby: raise them where the threat is, archers (the best defenders) if I can pay and
+			-- they are still under Config.Bots.ArcherShare of my men
+			local missing = ratio * their - my
+			local options: { Types.Troop } = if underShare(ctx, ctx.troopMen.Archers or 0, Config.Bots.ArcherShare)
+				then { "Archers", "Infantry" }
+				else { "Infantry" }
+			for _, troop in options do
+				local perRegiment = Config.Army.MenPerRegiment * Troops.stats(troop).defence * myMod
+				local regiments = math.min(math.ceil(missing / perRegiment), affordable(ctx, troop))
+				if regiments >= 1 then
+					local result =
+						try(ctx, { kind = "Recruit", province = t.target, regiments = regiments, troop = troop })
+					if result then
+						return result
+					end
 				end
 			end
 		end
@@ -660,13 +732,13 @@ local function recruit(ctx: Ctx): { Command }?
 	if ctx.men >= wanted then
 		return nil
 	end
-	local regiments =
-		math.min(Config.Bots.RecruitBatch, math.ceil((wanted - ctx.men) / Config.Army.MenPerRegiment), affordable(ctx))
+	local troop, regiments =
+		pickTroop(ctx, math.min(Config.Bots.RecruitBatch, math.ceil((wanted - ctx.men) / Config.Army.MenPerRegiment)))
 	local site = recruitSite(ctx)
 	if regiments < 1 or site == nil then
 		return nil
 	end
-	return try(ctx, { kind = "Recruit", province = site, regiments = regiments })
+	return try(ctx, { kind = "Recruit", province = site, regiments = regiments, troop = troop })
 end
 
 -- 3. Expand ----------------------------------------------------------------------------------------------
@@ -901,8 +973,7 @@ end
 
 local function build(ctx: Ctx): { Command }?
 	local state = ctx.state
-	local upkeep = Economy.monthlyIncome(state, ctx.me).upkeep
-	local spare = ctx.nation.gold - Config.Bots.UpkeepReserveMonths * upkeep
+	local spare = ctx.nation.gold - Config.Bots.UpkeepReserveMonths * ctx.upkeep
 	if spare <= 0 then
 		return nil
 	end
@@ -954,7 +1025,7 @@ local function build(ctx: Ctx): { Command }?
 		cost = Config.Buildings.Farm.cost
 	elseif richest(border) then
 		command = { kind = "Build", province = richest(border) :: number, building = "Fort" }
-		cost = Config.Buildings.Fort.cost
+		cost = Economy.buildingCost("Fort", ctx.nation.race) :: number
 	else
 		local poorest: number? = nil
 		for _, id in ctx.mine do
@@ -972,10 +1043,11 @@ local function build(ctx: Ctx): { Command }?
 	end
 	if command == nil then
 		-- everything is built and fully developed: turn the spare gold into regiments
-		local regiments = math.min(affordable(ctx), math.floor(spare / Config.Army.RegimentGold))
+		local troop, regiments = pickTroop(ctx, Config.Army.MaxRecruitPerCommand)
+		regiments = math.min(regiments, math.floor(spare / Troops.stats(troop).gold))
 		local site = recruitSite(ctx)
 		if regiments >= 1 and site then
-			return try(ctx, { kind = "Recruit", province = site, regiments = regiments })
+			return try(ctx, { kind = "Recruit", province = site, regiments = regiments, troop = troop })
 		end
 		return nil
 	end

@@ -40,6 +40,12 @@ ISLE_RX, ISLE_RY = 56, 38
 HEART_R = 280
 
 NATIONS = ["Aurora", "Zephyr", "Nimbus", "Tempest", "Halo", "Solace", "Ember", "Rime", "Verdance", "Umbra"]
+# Races (docs/DESIGN.md "Races"): every shard has the same land, so the races just alternate round the ring and no
+# two neighbouring shards share one (3 Humans, 3 Elves, 2 Orcs, 2 Dwarves).
+RACES = {
+    "Aurora": "Humans", "Zephyr": "Orcs", "Nimbus": "Elves", "Tempest": "Dwarves", "Halo": "Humans",
+    "Solace": "Elves", "Ember": "Dwarves", "Rime": "Humans", "Verdance": "Elves", "Umbra": "Orcs",
+}
 DRIFTS = ["Cinder", "Feather", "Lantern", "Thistle", "Comet", "Willow", "Copper", "Echo", "Ivory", "Storm"]
 SANCTUMS = ["Dawn", "Storms", "Stars", "Embers", "Tides", "Echoes", "Crowns", "Thorns", "Mirrors", "Ashes"]
 
@@ -147,7 +153,7 @@ def build() -> Layout:
         bridge(f"{nation} Gate", f"{nation} Approach")
         bridge(f"{nation} Windward", f"{DRIFTS[k]} Rock")
         bridge(f"{DRIFTS[k]} Reach", f"{NATIONS[(k + 1) % 10]} Leeward")
-    assign_start_territories(lay, allowed=lambda slot, q: lay.seeds[q].name.startswith(NATIONS[slot] + " "))
+    assign_start_territories(lay, allowed=lambda slot, q: lay.seeds[q].name.startswith(NATIONS[slot] + " "), races=RACES)
     balance_start_development(lay)
     return lay
 

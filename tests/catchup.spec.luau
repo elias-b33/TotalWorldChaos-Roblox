@@ -8,6 +8,7 @@ local Diplomacy = require("../src/shared/Sim/Diplomacy")
 local Economy = require("../src/shared/Sim/Economy")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
+local Races = require("../src/shared/Sim/Races")
 local Rng = require("../src/shared/Sim/Rng")
 local T = require("./TestKit")
 local Types = require("../src/shared/Types")
@@ -87,10 +88,11 @@ T.test("overextension cuts gross gold income only, not manpower or upkeep", func
 		end
 	end
 	local n = Match.provinceCount(state, 1)
+	local race = state.nations[1].race
 	T.expect(n >= 25 and n < 30, "25-29 provinces")
-	T.near(income.gold, gold * 0.95, 1e-9)
-	T.equal(income.manpower, manpower)
-	T.equal(income.upkeep, 4 * Config.Army.UpkeepPerRegiment)
+	T.near(income.gold, gold * 0.95 * Races.goldMultiplier(race), 1e-9)
+	T.near(income.manpower, manpower * Races.manpowerMultiplier(race), 1e-9)
+	T.equal(income.upkeep, 4 * Config.Troops.Infantry.upkeep)
 end)
 
 T.test("a starting nation is not overextended", function()
