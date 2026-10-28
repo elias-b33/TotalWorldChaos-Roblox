@@ -87,6 +87,20 @@ SHOTS = [
     ("primordial/08_rebels_close", "Rebels badge and siege pills", ["Map"]),
     ("retreat/02_retreating", "Retreating army beside the winner", ["Map"]),
     ("effects/11_shield", "Battle and power pills", ["Map"]),
+    # races and troops on the map: race soldiers, the main troop's badge icon, each race's capital
+    ("races/06_ironguard_siege", "Races: a dwarf army besieging (soldier token, troop icon badges)", ["Map"]),
+    ("races/07_archers_hold", "Races: archers holding a province, capitals by race (Eldmoor)", ["Map"]),
+    ("races/08_archers_attack", "Races: archers attacking, an orc capital (Eldmoor)", ["Map"]),
+    ("kingdoms/01_whole_map", "Kingdoms: a soldier of its race by every capital (whole map)", ["Map"]),
+    ("kingdoms/02_humans_region", "Kingdoms: Humans at the region zoom (knights badge)", ["Map"]),
+    ("kingdoms/03_humans_close", "Kingdoms: the Humans' capital close up", ["Map"]),
+    ("kingdoms/04_elves_region", "Kingdoms: Elves at the region zoom (archers badge)", ["Map"]),
+    ("kingdoms/05_elves_close", "Kingdoms: the Elves' tree hall close up", ["Map"]),
+    ("kingdoms/06_orcs_region", "Kingdoms: Orcs at the region zoom (berserkers badge)", ["Map"]),
+    ("kingdoms/07_orcs_close", "Kingdoms: the Orcs' war camp close up", ["Map"]),
+    ("kingdoms/08_dwarves_region", "Kingdoms: Dwarves at the region zoom (ironguard badge)", ["Map"]),
+    ("kingdoms/09_dwarves_close", "Kingdoms: the Dwarves' stone hall close up", ["Map"]),
+    ("kingdoms/10_orc_capital_sheet", "Kingdoms: province sheet of an Orc capital (race and troop chips)", ["ProvinceSheet", "Map"]),
 ]
 
 LABEL_H = 44

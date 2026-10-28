@@ -104,8 +104,15 @@ local function renderStatus(provinceId: number, record: Snapshot.ProvinceRecord)
 				elseif a.owner == 0 then
 					chip(status, "shield", shortMen(a.men) .. " garrison")
 				else
+					-- the icon of the troop type it is mostly made of, as on its badge on the map
 					local tint = if owner then Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.45) else nil
-					chip(status, "sword", shortMen(a.men) .. " " .. (if owner then owner.name else "?"), tint)
+					local c = chip(
+						status,
+						RaceInfo.mainTroopIcon(a.troops),
+						shortMen(a.men) .. " " .. (if owner then owner.name else "?"),
+						tint
+					)
+					c.Name = "ArmyChip" .. a.id
 				end
 			end
 		end
@@ -141,13 +148,14 @@ local function render()
 	title.Text = def.name
 	Icons.set(titleIcon, if def.isCapital then "crown" else TERRAIN_ICONS[def.terrain] or "flag")
 
-	-- the info chips: terrain, owner (with your relation), development, building
+	-- the info chips: terrain, owner (your relation with it, else its race), development, building
 	Widgets.clear(info)
 	chip(info, TERRAIN_ICONS[def.terrain] or "flag", def.terrain)
 	if owner then
 		local relation = if me and owner.id ~= me.id then Icons.fromEmoji(Relations.icon(me.id, owner.id)) else nil
+		local race = if owner.race ~= "" then RaceInfo.icon(owner.race) else "flag"
 		local c =
-			chip(info, relation or "flag", owner.name, Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.4))
+			chip(info, relation or race, owner.name, Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.4))
 		c.Name = "Owner"
 	else
 		chip(info, "flag", if def.terrain == "Mountain" then "Impassable" else "Neutral", Theme.color.textDim)
@@ -213,7 +221,7 @@ local function render()
 				action(
 					"arrow",
 					"Move",
-					{ { "sword", shortMen(a.men) } },
+					{ { RaceInfo.mainTroopIcon(a.troops), shortMen(a.men) } },
 					Widgets.GOOD,
 					not a.inBattle and not a.retreating,
 					function()

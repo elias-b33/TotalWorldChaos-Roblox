@@ -4,6 +4,7 @@
 local IconArt = require("../src/client/IconArt")
 local MapBadges = require("../src/client/MapBadges")
 local T = require("./TestKit")
+local Troops = require("../src/shared/Sim/Troops")
 
 T.test("an army's badge icon follows its state, Rebels and garrisons first", function()
 	T.equal(MapBadges.armyIcon(false, false, false, false), "sword")
@@ -15,6 +16,49 @@ T.test("an army's badge icon follows its state, Rebels and garrisons first", fun
 		T.expect(IconArt.rows(icon) ~= nil, icon .. " is a painted icon")
 	end
 end)
+
+-- MapBadges.mainTroop with the game's own troop order and prices (Config.Troops), as RaceInfo calls it.
+local function gold(troop: string): number
+	return Troops.stats(troop :: any).gold
+end
+local function main(troops: { [string]: number }): string?
+	return MapBadges.mainTroop(troops, Troops.LIST :: any, gold)
+end
+
+T.test("an army's main troop type is the one with the most men", function()
+	T.equal(main({ Infantry = 3000 }), "Infantry")
+	T.equal(main({ Infantry = 1000, Archers = 3000, Cavalry = 2000 }), "Archers", "archer-heavy")
+	T.equal(main({ Infantry = 4000, Knights = 3000 }), "Infantry", "men count, not price")
+	T.equal(main({ Berserkers = 2500, Infantry = 2499 }), "Berserkers")
+	T.equal(main({}), nil, "an empty composition has none")
+	T.equal(main({ Archers = 0 }), nil, "types with no men left don't count")
+end)
+
+T.test("a tie goes to the dearer troop, then to the later one in Troops.LIST (the elites)", function()
+	T.expect(gold("Knights") > gold("Infantry"), "knights cost more than infantry")
+	T.equal(main({ Infantry = 2000, Knights = 2000 }), "Knights")
+	T.equal(main({ Knights = 2000, Infantry = 2000 }), "Knights", "whatever order the table is in")
+	T.equal(main({ Infantry = 1000, Archers = 1000 }), "Archers")
+	T.equal(main({ Infantry = 1000, Berserkers = 1000 }), "Berserkers", "12 gold beats 10")
+	T.equal(gold("Cavalry"), gold("Ironguard"), "cavalry and ironguard cost the same")
+	T.equal(main({ Cavalry = 1000, Ironguard = 1000 }), "Ironguard", "an equal price: the elite, later in the list")
+	T.equal(main({ Infantry = 1000, Archers = 1000, Cavalry = 1000, Ironguard = 1000 }), "Ironguard")
+end)
+
+T.test(
+	"the badge shows the main troop's icon, unless the army is fighting, retreating, Rebels or a garrison",
+	function()
+		T.equal(MapBadges.armyIcon(false, false, false, false, "Archers"), "archers")
+		T.equal(MapBadges.armyIcon(false, false, true, false, "Archers"), "battle", "a battle's burst first")
+		T.equal(MapBadges.armyIcon(false, false, false, true, "Archers"), "retreat", "then the retreat flag")
+		T.equal(MapBadges.armyIcon(true, false, false, false, "Infantry"), "rebels", "Rebels keep their flag")
+		T.equal(MapBadges.armyIcon(false, true, false, false, "Infantry"), "shield", "garrisons keep their shield")
+		for _, troop in Troops.LIST do
+			local icon = MapBadges.armyIcon(false, false, false, false, troop)
+			T.expect(IconArt.rows(icon) ~= nil, troop .. "'s badge icon " .. icon .. " is a painted icon")
+		end
+	end
+)
 
 T.test("army sizes are short", function()
 	T.equal(MapBadges.shortMen(800), "800")

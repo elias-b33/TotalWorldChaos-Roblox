@@ -290,6 +290,212 @@ T.test("capitals keep their castle on top in the close-up", function()
 	T.equal(PixelArt.detailPixel(d, x0 + 11, y0 + 1), RED, "still there after the neighbours are repainted")
 end)
 
+------------------------------------------------------------------------------------------------- each race's capital
+
+local RACES = { "Humans", "Elves", "Orcs", "Dwarves" }
+
+-- A map like `m` whose nations are all of one race; nil: no nations at all (every capital the Humans' look).
+local function asRace(m: any, race: string?): any
+	local nations: { any }? = nil
+	if race then
+		local list = {}
+		for i, n in m.nations do
+			list[i] = { capital = n.capital, race = race }
+		end
+		nations = list
+	end
+	return { theme = m.theme, provinces = m.provinces, nations = nations }
+end
+
+-- Eldmoor (every race on it) painted with its own races, and as if every nation were of one race: painted once.
+local eldmoor = Maps.get("eldmoor")
+local eldmoorGrid = MapGrid.decode(eldmoor)
+local eldmoorArts: { [string]: PixelArt.Art } = {}
+local function eldmoorAs(race: string): PixelArt.Art
+	local a = eldmoorArts[race]
+	if a == nil then
+		a = PixelArt.new(if race == "own" then eldmoor else asRace(eldmoor, race), eldmoorGrid)
+		eldmoorArts[race] = a
+	end
+	return a
+end
+
+local function centreOf(m: any, g: MapGrid.Grid, id: number): (number, number)
+	local p = m.provinces[id]
+	return math.floor(p.center.x / g.scale), math.floor(p.center.y / g.scale)
+end
+
+-- The whole map's 5 × 6 pixels at a capital (its sprite), as a string.
+local function wholeCapital(a: PixelArt.Art, cx: number, cy: number): string
+	local out = {}
+	for y = cy - 3, cy + 2 do
+		for x = cx - 2, cx + 2 do
+			table.insert(out, PixelArt.pixel(a, x, y))
+		end
+	end
+	return table.concat(out, ",")
+end
+
+-- A close-up round a capital, and the sub-pixel at the top left of its 21 × 22 building.
+local function capitalCloseUp(a: PixelArt.Art, cx: number, cy: number): (PixelArt.Detail, number, number)
+	local d = closeUpAt(a, cx - 40, cy - 24)
+	return d, (cx - d.x0) * F + F // 2 - 10, (cy + 3 - d.y0) * F - 22
+end
+
+local function closeCapital(d: PixelArt.Detail, x0: number, y0: number): string
+	local out = {}
+	for y = y0, y0 + 21 do
+		for x = x0, x0 + 20 do
+			table.insert(out, PixelArt.detailPixel(d, x, y))
+		end
+	end
+	return table.concat(out, ",")
+end
+
+T.test(
+	"every capital is its nation's race's: the Humans' castle (a dome on Skyshards) as before, the others new",
+	function()
+		for _, id in { "earth", "eldmoor", "skyshards" } do
+			local m = Maps.get(id)
+			local g = if id == "skyshards" then grid elseif id == "eldmoor" then eldmoorGrid else MapGrid.decode(m)
+			local raced = if id == "eldmoor" then eldmoorAs("own") else PixelArt.new(m, g)
+			local plain = PixelArt.new(asRace(m, nil), g)
+			local humans, others = 0, 0
+			for _, n in m.nations do
+				local cx, cy = centreOf(m, g, n.capital)
+				local a, b = wholeCapital(raced, cx, cy), wholeCapital(plain, cx, cy)
+				if n.race == "Humans" then
+					T.equal(a, b, id .. ": " .. n.name .. "'s castle as before")
+					humans += 1
+				else
+					T.expect(a ~= b, id .. ": " .. n.name .. " builds the " .. n.race .. "' capital")
+					others += 1
+				end
+			end
+			T.expect(humans >= 2 and others >= 6, id .. " has every race's capitals")
+		end
+	end
+)
+
+T.test("each race's capital looks its own and flies its owner's flag, on the whole map and close up", function()
+	local m, g = eldmoor, eldmoorGrid
+	local capital = m.nations[1].capital
+	local cx, cy = centreOf(m, g, capital)
+	local seenWhole: { [string]: string } = {}
+	local seenClose: { [string]: string } = {}
+	for _, race in RACES do
+		local a = eldmoorAs(race)
+		PixelArt.setOwners(a, { [capital] = 1 }, { [1] = RED }, { [1] = RED_BORDER })
+		T.equal(PixelArt.pixel(a, cx - 2, cy - 3), RED, race .. ": the owner's flag on the whole map")
+		local d, x0, y0 = capitalCloseUp(a, cx, cy)
+		T.equal(PixelArt.detailPixel(d, x0 + 11, y0 + 1), RED, race .. ": the owner's flag close up")
+		local whole, close = wholeCapital(a, cx, cy), closeCapital(d, x0, y0)
+		T.expect(seenWhole[whole] == nil, race .. " looks like " .. tostring(seenWhole[whole]) .. " on the whole map")
+		T.expect(seenClose[close] == nil, race .. " looks like " .. tostring(seenClose[close]) .. " close up")
+		seenWhole[whole], seenClose[close] = race, race
+	end
+end)
+
+T.test("a captured capital keeps its race's look under the new owner's flag, and every repaint is exact", function()
+	local m, g = eldmoor, eldmoorGrid
+	local a = eldmoorAs("own")
+	local owners: { [number]: number } = {}
+	local colors: { [number]: number } = {}
+	for _, p in m.provinces do
+		owners[p.id] = p.startOwner or 0
+	end
+	for _, n in m.nations do
+		colors[n.slot] = mix(0x1f3f8f, 0xffffff, n.slot / 12) -- a different blue each
+	end
+	PixelArt.setOwners(a, owners, colors)
+	for _, race in RACES do
+		local nation, other
+		for _, n in m.nations do
+			if nation == nil and n.race == race then
+				nation = n
+			end
+		end
+		for _, n in m.nations do
+			if other == nil and n.race ~= race then
+				other = n
+			end
+		end
+		local cx, cy = centreOf(m, g, nation.capital)
+		local d, x0, y0 = capitalCloseUp(a, cx, cy)
+		-- captured by a nation of another race: its flag, the same building
+		owners[nation.capital] = other.slot
+		PixelArt.setOwners(a, owners, colors)
+		T.expect(PixelArt.syncDetail(a, d), race .. ": the close-up caught up")
+		T.equal(PixelArt.detailPixel(d, x0 + 11, y0 + 1), colors[other.slot], race .. ": the new owner's flag")
+		T.equal(PixelArt.pixel(a, cx - 2, cy - 3), colors[other.slot], race .. ": on the whole map too")
+		local theirs = eldmoorAs(other.race)
+		PixelArt.setOwners(theirs, owners, colors)
+		T.expect(
+			wholeCapital(a, cx, cy) ~= wholeCapital(theirs, cx, cy),
+			race .. ": not the " .. other.race .. "' look"
+		)
+		T.expect(
+			buffer.tostring(d.pixels) == buffer.tostring(closeUpAt(a, d.x0, d.y0).pixels),
+			race .. ": exact repaint"
+		)
+		-- its neighbours change hands: the building stays on top, exactly
+		for _, neighbour in a.touching[nation.capital] do
+			owners[neighbour] = nation.slot
+		end
+		PixelArt.setOwners(a, owners, colors)
+		PixelArt.syncDetail(a, d)
+		T.expect(buffer.tostring(d.pixels) == buffer.tostring(closeUpAt(a, d.x0, d.y0).pixels), race .. ": neighbours")
+		-- and taken back
+		owners[nation.capital] = nation.slot
+		PixelArt.setOwners(a, owners, colors)
+		PixelArt.syncDetail(a, d)
+		T.equal(PixelArt.detailPixel(d, x0 + 11, y0 + 1), colors[nation.slot], race .. ": its own flag again")
+		T.expect(buffer.tostring(d.pixels) == buffer.tostring(closeUpAt(a, d.x0, d.y0).pixels), race .. ": taken back")
+	end
+end)
+
+T.test("Skyshards builds the other races' capitals of its own materials", function()
+	-- one meadow (a sky meadow on Skyshards) with a capital in the middle, or without: what differs is the building
+	local function flat(theme: string, race: string, capital: boolean): PixelArt.Art
+		local w, h = 24, 20
+		local ids = buffer.create(w * h)
+		buffer.fill(ids, 0, 1)
+		local biome = if theme == "sky" then "skymeadow" else "meadow"
+		local p = { id = 1, biome = biome, isCapital = capital, center = { x = 12, y = 10 } }
+		return PixelArt.new(
+			{ theme = theme, provinces = { p }, nations = { { capital = 1, race = race } } },
+			{ width = w, height = h, ids = ids, scale = 1 }
+		)
+	end
+	local function building(theme: string, race: string): { [number]: boolean }
+		local with, without = flat(theme, race, true), flat(theme, race, false)
+		local colours: { [number]: boolean } = {}
+		for y = 0, with.height - 1 do
+			for x = 0, with.width - 1 do
+				local c = PixelArt.pixel(with, x, y)
+				if c ~= PixelArt.pixel(without, x, y) and c ~= 0xb0b0b0 then -- (the flag: grey while neutral)
+					colours[c] = true
+				end
+			end
+		end
+		return colours
+	end
+	for _, race in { "Elves", "Orcs", "Dwarves" } do
+		local classic, sky = building("fantasy", race), building("sky", race)
+		T.expect(next(classic) ~= nil and next(sky) ~= nil, race .. " builds")
+		for c in sky do
+			T.expect(not classic[c], string.format("%s on Skyshards: #%06x is a classic colour", race, c))
+		end
+	end
+	local dome, castle = building("sky", "Humans"), building("fantasy", "Humans")
+	T.expect(next(dome) ~= nil, "the Humans' dome")
+	local same = true
+	for c in dome do
+		same = same and castle[c] == true
+	end
+	T.expect(not same, "the dome isn't the castle")
+end)
+
 T.test("a theme recolours the close-up's terrain, never the nation's wash", function()
 	local night = PixelArt.new(map, grid, nil, "night")
 	PixelArt.setOwners(night, { [provA] = 1 }, { [1] = RED })
