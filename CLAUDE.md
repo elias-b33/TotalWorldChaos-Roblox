@@ -14,6 +14,7 @@ The full spec is `docs/DESIGN.md`; the three maps, textures and map data pipelin
 - `src/server/Services/` are thin Roblox wrappers: they call Sim, handle remotes and timing, and nothing else.
 - `--!strict` at the top of every Luau file. Types come from `src/shared/Types.luau`. If you need to change a type, say so in your final message.
 - Map data and textures are generated. Never hand-edit `assets/maps/*/layout.json`, `assets/textures/` or `src/shared/MapData/`: change `tools/mapgen/` and rerun it, then check the validator printed no `PROBLEM` lines.
+- Never use the words "god", "gods", "godlike", "divine" or "holy" anywhere: player-facing text, names, docs, comments or identifiers. Eliminated players are Primordials and their abilities are Primordial powers; the shield power is "Shield".
 - Inside `src/shared/`, use string requires (`require("./Rng")`) so the same files load in Roblox and Lune. If a require pattern fails in either runtime, fix it consistently and note it under "Decisions".
 
 ## Commands
