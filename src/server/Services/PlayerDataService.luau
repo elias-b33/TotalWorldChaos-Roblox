@@ -99,7 +99,9 @@ local function load(player: Player)
 	end
 	profiles[player] = profile
 	sendSummary(player, profile.Data)
-	runHooks(loadHooks, player, profile.Data, "load")
+	for _, hook in loadHooks do
+		task.spawn(hook, player, profile.Data)
+	end
 end
 
 local function release(player: Player)
@@ -145,7 +147,8 @@ function PlayerDataService.onLeaving(hook: (Player, Data) -> ())
 	table.insert(leaveHooks, hook)
 end
 
--- Run `hook` once a joining player's profile has loaded (e.g. a reward that waited for it).
+-- Run `hook` (in its own thread) once a joining player's profile has loaded: sending a new player to the
+-- tutorial, a Results reward that waited for the profile.
 function PlayerDataService.onLoaded(hook: (Player, Data) -> ())
 	table.insert(loadHooks, hook)
 end

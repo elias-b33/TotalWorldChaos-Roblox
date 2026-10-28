@@ -190,4 +190,15 @@ Config.Bots = {
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
 }
 
+-- Tutorial (docs/DESIGN.md "Tutorial"): a new player's first match, on a reserved server of its own -------------
+
+Config.Tutorial = {
+	Map = "earth",
+	PlayerSlot = 4, -- Ganges: borders three nations and has weak neutral land next door
+	Bots = 5, -- the nations nearest the player stay, as bots; the rest of the map turns neutral
+	Difficulty = "Easy",
+	StartRegiments = 3, -- a ready army at the capital, so the first prompt (take a neutral province) can start at once
+	GiftCharges = 1, -- the power prompt tops the player's charges up to this (a Blessing costs 1)
+}
+
 return Config

@@ -2,7 +2,8 @@
 -- Boots the server and runs the 1-second tick (docs/DESIGN.md "Tick order").
 -- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 7 (bots) is AIService, step 9 is
 -- Replicator. Between matches the Lobby runs instead (map vote, then nation draft; LobbyService), unless Workspace
--- has SkipLobby set, which starts every match straight away.
+-- has SkipLobby set, which starts every match straight away. A tutorial server (TutorialService) skips the Lobby too
+-- and plays the tutorial match.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +24,7 @@ local MatchService = require(Server.Services.MatchService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
+local TutorialService = require(Server.Services.TutorialService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -30,14 +32,26 @@ local PHASE_TOASTS = {
 	Results = "The match is over",
 }
 
+-- A tutorial match seats its player in the tutorial nation.
+local function seat(player: Player): number?
+	if TutorialService.active() then
+		return TutorialService.seat(player)
+	end
+	return MatchService.seat(player)
+end
+
 local function startMatch()
-	local state = MatchService.start(MatchService.chooseMap())
+	local tutorial = TutorialService.enabled()
+	local state = MatchService.start(if tutorial then Config.Tutorial.Map else MatchService.chooseMap())
 	CommandRouter.clear()
-	AIService.reset()
+	AIService.reset(if tutorial then Config.Tutorial.Difficulty else nil)
+	if tutorial then
+		TutorialService.start(state)
+	end
 	Replicator.reset(state)
 	-- seat everyone who is already here, in join order
 	for _, player in Players:GetPlayers() do
-		Replicator.sendSnapshot(player, state, MatchService.seat(player))
+		Replicator.sendSnapshot(player, state, seat(player))
 	end
 	print(string.format("[server] match started on %s", state.mapId))
 end
@@ -78,7 +92,7 @@ end
 
 -- The next match: the Lobby, or straight into Peace with SkipLobby.
 local function nextMatch()
-	if LobbyService.skipped() then
+	if LobbyService.skipped() or TutorialService.enabled() then
 		startMatch()
 	else
 		openLobby()
@@ -89,6 +103,7 @@ Replicator.init()
 CommandRouter.init(MatchService.nationOf)
 PlayerDataService.init()
 ProgressionService.init(MatchService.current)
+TutorialService.init()
 nextMatch()
 
 Players.PlayerAdded:Connect(function(player)
@@ -102,7 +117,7 @@ Players.PlayerAdded:Connect(function(player)
 		Replicator.sendLobby(LobbyService.view(), player)
 		return
 	end
-	local nationId = MatchService.seat(player)
+	local nationId = seat(player)
 	Replicator.sendSnapshot(player, MatchService.state(), nationId)
 end)
 
@@ -121,6 +136,7 @@ local function tick()
 	-- 7. bots plan. Sim.Tick runs steps 2-8 in one call, so bots plan right after it; their commands wait in the
 	-- queue for step 1 of the next tick either way, so nothing changes in between.
 	AIService.step(state)
+	TutorialService.afterTick(state) -- the tutorial's prompts and the bots' part in it
 	ProgressionService.afterTick(state) -- match stats from this tick's events; XP and Glory at Results
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
@@ -164,6 +180,7 @@ while true do
 			warn("[server] tick failed: " .. tostring(err))
 		end
 		if MatchService.isOver() then
+			TutorialService.matchOver()
 			nextMatch()
 			nextTick = os.clock() + Config.TickSeconds
 		end

@@ -104,4 +104,9 @@ function Intents.pick(nationId: number)
 	send("RequestPick", nationId)
 end
 
+-- Tutorial: "Skip" it, or "Leave" for a public server once it is over.
+function Intents.tutorial(action: string)
+	send("RequestTutorial", action)
+end
+
 return Intents

@@ -24,6 +24,7 @@ local ProvinceSheet = require(Client.UI.ProvinceSheet)
 local Relations = require(Client.Relations)
 local Results = require(Client.UI.Results)
 local Sounds = require(Client.Sounds)
+local Tutorial = require(Client.UI.Tutorial)
 
 local selectedArmy: number? = nil
 
@@ -129,6 +130,9 @@ Powers.init(Hud.toast, function()
 	selectProvince(nil) -- the power picker replaces any open sheet
 end)
 Nations.init()
+Tutorial.init(function()
+	return selectedArmy
+end)
 Results.init(function()
 	selectProvince(nil)
 end)

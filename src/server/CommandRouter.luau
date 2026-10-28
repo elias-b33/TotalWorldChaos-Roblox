@@ -172,6 +172,25 @@ function CommandRouter.init(getNation: (Player) -> number?)
 	end)
 end
 
+-- Tutorial requests ("Skip", "Leave"): the shape and the rate limit are checked here, then `handler` runs at once
+-- (they change the player's tutorial and profile, never the match).
+function CommandRouter.onTutorial(handler: (Player, string) -> ())
+	Remotes.event("RequestTutorial").OnServerEvent:Connect(function(player: Player, requestId: unknown, action: unknown)
+		if not isId(requestId) then
+			return
+		end
+		local id = requestId :: number
+		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+			reply(player, id, false, "TooFast")
+		elseif action ~= "Skip" and action ~= "Leave" then
+			reply(player, id, false, "BadRequest")
+		else
+			handler(player, action :: string)
+			reply(player, id, true, nil)
+		end
+	end)
+end
+
 -- Lobby step 1: apply queued votes and picks in arrival order. Without a lobby (a match is running) they are
 -- refused.
 function CommandRouter.applyLobbyQueued(apply: ((userId: number, intent: Types.LobbyIntent) -> (boolean, string?))?)
