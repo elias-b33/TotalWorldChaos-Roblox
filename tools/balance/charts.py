@@ -28,6 +28,14 @@ SERIES = [(42, 120, 214), (235, 104, 52), (27, 175, 122), (237, 161, 0)]  # blue
 MUTED = (150, 149, 144)
 
 
+def config_number(name):
+    """A number from src/shared/Config.luau (e.g. "DominationShare"), so the chart's lines follow Config."""
+    import re
+
+    text = open(os.path.join(ROOT, "src", "shared", "Config.luau")).read()
+    return float(re.search(r"\b" + name + r"\s*=\s*([0-9.]+)", text).group(1))
+
+
 def font(size, bold=False):
     name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
     for folder in ("/usr/share/fonts/truetype/dejavu", "/Library/Fonts", "C:/Windows/Fonts"):
@@ -157,18 +165,19 @@ def domination():
             by[(r["map"], r["variant"])].append((int(r["tick"]), float(r["share"])))
     c = Chart(
         "How fast someone dominates",
-        "Largest nation's share of all provinces, all 10 nations greedy after Peace, 5 seeds per map",
+        "Largest nation's share of the ownable provinces, all 10 nations greedy after Peace, 5 seeds per map",
         "match time",
         "share of provinces",
         (180, 1500),
-        (0, 0.45),
+        (0, 0.55),
         [180, 300, 600, 900, 1200, 1500],
-        [0, 0.1, 0.2, 0.3, 0.4],
+        [0, 0.1, 0.2, 0.3, 0.4, 0.5],
         xfmt=mmss,
         yfmt=lambda v: f"{int(round(v * 100))}%",
     )
-    c.hline(0.25, "crown (25%)")
-    c.hline(0.40, "domination (40%)")
+    crown, win = config_number("CoalitionThreshold"), config_number("DominationShare")
+    c.hline(crown, f"crown ({round(crown * 100)}%)")
+    c.hline(win, f"domination ({round(win * 100)}%)")
     maps = ["earth", "eldmoor", "skyshards"]
     seen = set()
     for (m, _), pts in sorted(by.items()):

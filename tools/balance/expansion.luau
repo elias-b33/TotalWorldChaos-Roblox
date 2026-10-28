@@ -50,12 +50,9 @@ local function nationIds(state: MatchState): { number }
 	return ids
 end
 
+-- Shares (crown, domination) count ownable provinces only, as the rules do.
 local function totalProvinces(state: MatchState): number
-	local n = 0
-	for _ in state.provinces do
-		n += 1
-	end
-	return n
+	return CatchUp.ownableCount(state.provinces)
 end
 
 local function median(xs: { number }): number
@@ -78,7 +75,7 @@ local function fmtTime(ticks: number?): string
 end
 
 local overrides = process.env.SET
-if overrides then
+if overrides and overrides ~= "" then
 	for _, pair in string.split(overrides, ",") do
 		local path, value = string.match(pair, "^%s*([%w%.]+)%s*=%s*([%d%.]+)%s*$")
 		assert(path and value, "bad SET entry: " .. pair)
@@ -178,7 +175,11 @@ for _, mapId in maps do
 	local total = totalProvinces(state)
 	print("After Peace, one greedy nation against nine frozen ones (each nation tried as the aggressor):\n")
 	print(
-		"| Variant | Crown (25%) median / best | 40% domination median / best | Wins before 25:00 | Provinces at 4:00 (median) | Net gold/month at 4:00 (median) | Regiments at 4:00 (median) |"
+		"| Variant | Crown ("
+			.. math.floor(Config.Diplomacy.CoalitionThreshold * 100 + 0.5)
+			.. "%) median / best | "
+			.. math.floor(Config.Win.DominationShare * 100 + 0.5)
+			.. "% domination median / best | Wins before 25:00 | Provinces at 4:00 (median) | Net gold/month at 4:00 (median) | Regiments at 4:00 (median) |"
 	)
 	print("| --- | --- | --- | --- | --- | --- | --- |")
 	for _, variant in { "static", "nocatchup", "empty" } do
@@ -350,7 +351,7 @@ end
 
 fs.writeDir("tools/balance/data")
 local suffix = (if process.env.MAP then "_" .. (process.env.MAP :: string) else "")
-	.. (if overrides then "_whatif" else "")
+	.. (if overrides and overrides ~= "" then "_whatif" else "")
 fs.writeFile("tools/balance/data/expansion_peace" .. suffix .. ".csv", table.concat(peaceCsv, "\n") .. "\n")
 fs.writeFile("tools/balance/data/expansion_war" .. suffix .. ".csv", table.concat(warCsv, "\n") .. "\n")
 print("\nwrote tools/balance/data/expansion_peace" .. suffix .. ".csv and expansion_war" .. suffix .. ".csv")

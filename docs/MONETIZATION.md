@@ -351,7 +351,7 @@ Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: pl
 | --- | --- | --- |
 | First Blood | Win a battle | 50 Glory |
 | Land Grab | Capture 10 neutral provinces in one Peace phase | 100 Glory |
-| Domination | Win by holding 40% of provinces | 300 Glory, title "the Dominant" |
+| Domination | Win by holding half of the land (50% of ownable provinces) | 300 Glory, title "the Dominant" |
 | Better Together | Win an alliance victory | 200 Glory |
 | Comeback | Win after being in the bottom 3 at 10:00 | 500 Glory, title "the Unbroken" |
 | Kingmaker | As a Primordial, see an ally win | 200 Glory |

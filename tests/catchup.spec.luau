@@ -46,12 +46,9 @@ local function withCounts(counts: { number }): (Types.MatchState, { number })
 	return state, ids
 end
 
+-- Shares count ownable provinces only (mountains can't be owned).
 local function total(state: Types.MatchState): number
-	local n = 0
-	for _ in state.provinces do
-		n += 1
-	end
-	return n
+	return CatchUp.ownableCount(state.provinces)
 end
 
 local function count(t: { [number]: boolean }): number
@@ -166,13 +163,17 @@ T.test("underdog bonus reaches Battle.modifier and adds to terrain", function()
 	local def = Army.spawn(state, 8, home, 1000)
 	local att = Army.spawn(state, 1, home, 1000)
 	local sides = { defenderOwner = 8, defenders = { def }, attackers = { att } }
-	T.near(Battle.modifier(state, home, sides, true, 0), 1 + 0.25 + 0.2, 1e-9)
+	T.near(
+		Battle.modifier(state, home, sides, true, 0),
+		1 + Config.Battle.TerrainDefenceBonus + Config.Battle.UnderdogBonus,
+		1e-9
+	)
 	T.near(Battle.modifier(state, home, sides, false, 0), 1, 1e-9)
 end)
 
 -- Coalition -------------------------------------------------------------------------------------
 
-T.test("coalition: the crown needs exactly 25% of all provinces", function()
+T.test("coalition: the crown needs exactly CoalitionThreshold of the ownable provinces", function()
 	local all = total(Match.new(map))
 	local need = math.ceil(Config.Diplomacy.CoalitionThreshold * all)
 	local below = withCounts({ need - 1, 5 })
@@ -181,14 +182,33 @@ T.test("coalition: the crown needs exactly 25% of all provinces", function()
 	local leaders = CatchUp.leaders(at)
 	T.equal(count(leaders), 1)
 	T.expect(leaders[1])
-	T.equal(count(CatchUp.leadersFrom({ 25, 25, 50 }, 100)), 3, "everyone at 25%+ wears a crown")
-	T.equal(count(CatchUp.leadersFrom({ 24 }, 100)), 0)
+	local q = math.ceil(Config.Diplomacy.CoalitionThreshold * 100)
+	T.equal(count(CatchUp.leadersFrom({ q, q, 50 }, 100)), 3, "everyone at the threshold or above wears a crown")
+	T.equal(count(CatchUp.leadersFrom({ q - 1 }, 100)), 0)
 	T.equal(count(CatchUp.leadersFrom({}, 0)), 0)
+end)
+
+T.test("shares ignore mountains: the crown threshold counts ownable provinces only", function()
+	local state = Match.new(map)
+	local all, mountains = 0, 0
+	for _, p in state.provinces do
+		all += 1
+		if p.terrain == "Mountain" then
+			mountains += 1
+		end
+	end
+	T.expect(mountains > 0, "the test map has mountains")
+	local _, counted = CatchUp.counts(state)
+	T.equal(counted, all - mountains)
+	-- exactly the threshold share of the ownable land wears the crown, although it is less of all provinces
+	local need = math.ceil(Config.Diplomacy.CoalitionThreshold * (all - mountains))
+	T.expect(need < Config.Diplomacy.CoalitionThreshold * all)
+	T.equal(count(CatchUp.leaders((withCounts({ need, 5 })))), 1)
 end)
 
 T.test("coalition: +10% for anyone fighting the leader, attacking or defending", function()
 	local all = total(Match.new(map))
-	local state = withCounts({ math.ceil(0.25 * all), 6, 6, 6, 6, 6, 6, 6, 6, 6 })
+	local state = withCounts({ math.ceil(Config.Diplomacy.CoalitionThreshold * all), 6, 6, 6, 6, 6, 6, 6, 6, 6 })
 	local b = Config.Battle.CoalitionBonus
 	T.near(CatchUp.battleBonus(state, { 2 }, { 1 }, false), b, 1e-9)
 	T.near(CatchUp.battleBonus(state, { 2 }, { 1 }, true), b, 1e-9)
@@ -199,7 +219,7 @@ end)
 
 T.test("coalition: two crowned nations fighting each other both get it", function()
 	local all = total(Match.new(map))
-	local q = math.ceil(0.25 * all)
+	local q = math.ceil(Config.Diplomacy.CoalitionThreshold * all)
 	local state = withCounts({ q, q, 3, 3 })
 	local b = Config.Battle.CoalitionBonus
 	T.near(CatchUp.battleBonus(state, { 1 }, { 2 }, false), b, 1e-9)
@@ -208,14 +228,14 @@ end)
 
 T.test("coalition: eliminated nations never wear the crown", function()
 	local all = total(Match.new(map))
-	local state = withCounts({ math.ceil(0.25 * all), 5 })
+	local state = withCounts({ math.ceil(Config.Diplomacy.CoalitionThreshold * all), 5 })
 	state.nations[1].eliminated = true
 	T.equal(count(CatchUp.leaders(state)), 0)
 end)
 
 T.test("a whole battle: the coalition bonus turns an even fight", function()
 	local all = total(Match.new(map))
-	local state, ids = withCounts({ math.ceil(0.25 * all), 6, 6, 6, 6, 6, 6, 6, 6, 6 })
+	local state, ids = withCounts({ math.ceil(Config.Diplomacy.CoalitionThreshold * all), 6, 6, 6, 6, 6, 6, 6, 6, 6 })
 	state.tick = Config.Phases.PeaceEndTick
 	state.phase = "War"
 	state.wars[1] = { id = 1, attackers = { 2 }, defenders = { 1 }, startedAt = state.tick }
@@ -233,7 +253,7 @@ T.test("a whole battle: the coalition bonus turns an even fight", function()
 	T.expect(state.armies[att.id] ~= nil, "attacker survives")
 	T.equal(state.armies[att.id].location, field, "attacker holds the field")
 	local d = state.armies[def.id]
-	T.expect(d == nil or d.location ~= field, "the leader's army retreated")
+	T.expect(d == nil or d.retreating == true, "the leader's army retreats")
 end)
 
 T.finish()

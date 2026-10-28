@@ -83,7 +83,7 @@ Roblox only accepts authentic gameplay video and allows 3 video uploads a month,
 | 3–8 s | Fast-forward Peace phase: borders spread across the map | Rising music |
 | 8–14 s | War declared toast; two armies collide; province flips | Battle hits |
 | 14–20 s | Player eliminated; screen turns to Primordial view; meteor strikes | Bass drop |
-| 20–26 s | Cataclysm: disaster hits; alliance takes 55%; victory animation | Peak |
+| 20–26 s | Cataclysm: disaster hits; alliance takes 65%; victory animation | Peak |
 | 26–30 s | Logo, "Free to play. Everything for sale is cosmetic." | Sting |
 
 ### Maturity, localization and links

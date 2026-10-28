@@ -369,7 +369,11 @@ local function refreshCrowns()
 			firstOwned[record.owner] = math.min(firstOwned[record.owner] or math.huge, record.id)
 		end
 	end
-	local leaders = CatchUp.leadersFrom(counts, #snapshot.provinces)
+	local map = ClientState.map()
+	if map == nil then
+		return
+	end
+	local leaders = CatchUp.leadersFrom(counts, CatchUp.ownableCount(map.provinces))
 	for nationId, label in crowns do
 		label.Visible = leaders[nationId] == true
 	end
@@ -470,7 +474,12 @@ local function refreshArmies()
 			tokens[army.id] = token
 		end
 		local t = assert(token, "token")
-		t.label.Text = (if t.neutral then "🛡 " elseif army.inBattle then "💥 " else "⚔ ") .. shortMen(army.men)
+		local icon = if t.neutral
+			then "🛡 "
+			elseif army.inBattle then "💥 "
+			elseif army.retreating then "🏳 "
+			else "⚔ "
+		t.label.Text = icon .. shortMen(army.men)
 		t.target = target
 		t.province = army.location
 	end

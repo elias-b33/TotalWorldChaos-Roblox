@@ -251,20 +251,23 @@ T.test("at war and above the attack ratio: attack", function()
 end)
 
 T.test("at war but below the attack ratio: hold", function()
-	local state = attackSetup(7000) -- 8000 against 7000: 1.14×, below Normal's 1.3×
+	-- Zephyr owns the world, so it wears the crown and Aurora fights it with the coalition bonus: 8000 men × that
+	-- against this many is 1.2×, below Normal's 1.3× and above Hard's 1.1×
+	local guard = math.floor(8000 * (1 + Config.Battle.CoalitionBonus) / 1.2)
+	local state = attackSetup(guard)
 	warPhase(state)
 	assert(Diplomacy.declareWar(state, AURORA, ZEPHYR))
 	-- every other Zephyr province is guarded too, so there is nothing weak to take
 	for _, p in state.provinces do
 		if p.owner == ZEPHYR and p.terrain ~= "Mountain" and p.id ~= id("Cinder Rock") then
-			Army.spawn(state, ZEPHYR, p.id, 7000)
+			Army.spawn(state, ZEPHYR, p.id, guard)
 		end
 	end
 	local commands = Bot.plan(state, AURORA, Rng.new(1), "Normal")
 	T.expect(not movesInto(state, commands, ZEPHYR), "attacked below the ratio")
 	-- Hard takes the risk at 1.1×
 	local hard = Bot.plan(state, AURORA, Rng.new(1), "Hard")
-	T.expect(movesInto(state, hard, ZEPHYR), "Hard should attack at 1.14×")
+	T.expect(movesInto(state, hard, ZEPHYR), "Hard should attack at 1.2×")
 end)
 
 -- Difficulties ------------------------------------------------------------------------------------------
@@ -292,6 +295,41 @@ T.test("Hard goes after the leading player, Normal after the weakest neighbour",
 end)
 
 -- Diplomacy ---------------------------------------------------------------------------------------------
+
+T.test("bots Meteor the biggest enemy army in a war, never an immune nation, along with their plan", function()
+	local state = attackSetup(4000)
+	warPhase(state)
+	assert(Diplomacy.declareWar(state, AURORA, ZEPHYR))
+	local small = Army.spawn(state, ZEPHYR, id("Cinder Reach"), 2000)
+	local big = Army.spawn(state, ZEPHYR, id("Zephyr Landing"), 9000)
+	T.expect(state.armies[small.id] and state.armies[big.id], "armies stand apart")
+	local peaceful = Army.spawn(state, UMBRA, id("Umbra Landing"), 20000)
+	local function meteor(commands: { Types.Command }): number?
+		for _, c in commands do
+			if c.kind == "Power" then
+				T.equal(c.power, "Meteor")
+				return c.target
+			end
+		end
+		return nil
+	end
+	-- no charges, no power
+	state.nations[AURORA].charges = 0
+	T.equal(meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")), nil)
+	state.nations[AURORA].charges = Config.Primordial.Powers.Meteor.charges
+	local commands = Bot.plan(state, AURORA, Rng.new(1), "Normal")
+	T.equal(meteor(commands), big.id, "the biggest army of a nation I'm at war with (not Umbra's, at peace)")
+	T.expect(#commands >= 2, "the power rides along with the plan's other command")
+	T.expect(peaceful.id ~= meteor(commands))
+	-- the server takes it
+	T.expect((Commands.apply(state, AURORA, { kind = "Power", power = "Meteor", target = big.id })))
+	T.equal(big.men, 4500)
+	-- Zephyr is now immune for a while: no wasted charge
+	state.nations[AURORA].charges = Config.Primordial.Powers.Meteor.charges
+	T.equal(meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")), nil)
+	state.tick += Config.Primordial.ImmunityTicks
+	T.expect(meteor(Bot.plan(state, AURORA, Rng.new(1), "Normal")) ~= nil, "immunity over")
+end)
 
 T.test("a bot that lost 30% of its provinces in a war accepts peace", function()
 	local state = borderWar(0, 0)

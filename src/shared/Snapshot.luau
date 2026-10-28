@@ -44,6 +44,7 @@ export type ArmyRecord = {
 	next: number, -- next province on its route, 0 = standing still
 	dest: number, -- end of its route, 0 = standing still
 	inBattle: boolean,
+	retreating: boolean, -- beaten and walking home: takes no orders
 }
 
 -- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes.
@@ -144,6 +145,7 @@ function Snapshot.full(state: MatchState): SnapshotData
 			next = a.path[1] or 0,
 			dest = a.path[#a.path] or 0,
 			inBattle = a.inBattle,
+			retreating = a.retreating == true,
 		})
 	end
 	return {

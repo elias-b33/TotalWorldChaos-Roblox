@@ -26,7 +26,7 @@ Config.Phases = {
 -- Start ------------------------------------------------------------------------------------------
 
 Config.StartGold = 100
-Config.StartManpower = 5000
+Config.StartManpower = 3000
 Config.NeutralGarrison = 1000 -- men in a neutral province unless the map sets more
 
 -- Economy ----------------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ Config.Army = {
 	MenPerRegiment = 1000,
 	RegimentGold = 10,
 	RegimentManpower = 1000,
-	UpkeepPerRegiment = 0.5, -- gold per month
+	UpkeepPerRegiment = 1.5, -- gold per month: income / 1.5 is the army a nation can keep (docs/BALANCE.md 15)
 	MaxRecruitPerCommand = 10, -- regiments in one Recruit intent
 	MoveTicks = { Plains = 5, Forest = 8, Hills = 8 },
 	MinArmyMen = 500, -- smaller armies are destroyed after a battle
@@ -61,14 +61,15 @@ Config.Battle = {
 	Rounds = 3,
 	KillRatePerRound = 0.15, -- each side kills this × its own strength × modifiers
 	TerrainDefenceBonus = 0.25, -- defender in forest or hills
-	UnderdogBonus = 0.2,
-	CoalitionBonus = 0.1,
+	UnderdogBonus = 0.5, -- a defending underdog holds like a fort (docs/BALANCE.md 5)
+	CoalitionBonus = 0.3,
 	RandomSpread = 0.1, -- ± per battle
 }
 
 Config.Siege = {
 	TicksPerDevelopment = 10,
 	CapitalMultiplier = 3,
+	GraceTicks = 10, -- an interrupted siege keeps its progress this long
 }
 
 -- Diplomacy --------------------------------------------------------------------------------------
@@ -76,7 +77,7 @@ Config.Siege = {
 Config.Diplomacy = {
 	MaxAllianceSize = 3,
 	TruceTicks = 3 * 60,
-	CoalitionThreshold = 0.25, -- share of all provinces that puts a crown on a nation
+	CoalitionThreshold = 0.2, -- share of the ownable provinces (not mountains) that puts a crown on a nation
 	OfferTicks = 30, -- alliance and peace offers expire after this
 	PeaceTributes = { 0, 50, 100 }, -- gold a peace offer can include (the buttons in the province sheet)
 }
@@ -113,8 +114,8 @@ Config.CatchUp = {
 -- Win conditions ---------------------------------------------------------------------------------
 
 Config.Win = {
-	DominationShare = 0.4,
-	AllianceShare = 0.55,
+	DominationShare = 0.5, -- of the ownable provinces (mountains don't count): half the land wins
+	AllianceShare = 0.65,
 	ScorePerProvince = 10,
 	ScorePerDevelopment = 5,
 	ScorePerBattleWon = 2,

@@ -1,7 +1,9 @@
 --!strict
 -- Battles (tick order step 3): when hostile armies share a province they fight Config.Battle.Rounds rounds,
 -- one per tick. Each round, each side kills enemy men equal to KillRatePerRound × its own strength × modifiers.
--- Then the side with fewer men retreats to its nearest owned province, and armies under MinArmyMen are destroyed.
+-- Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at normal
+-- speed, can't take orders, and doesn't fight, block or besiege on the way (Army.retreating). Armies under
+-- MinArmyMen are destroyed, and so is a loser with no way home.
 
 local CatchUp = require("./CatchUp")
 local Config = require("../Config")
@@ -121,13 +123,13 @@ local function finish(state: MatchState, provinceId: number, sides: Sides)
 	end
 	-- losers retreat (or are destroyed if they have nowhere to go); tiny armies are destroyed either way
 	for _, a in losers do
-		local target = if a.owner ~= 0 then Pathing.nearestOwned(state, a.owner, provinceId) else nil
-		if target == nil or a.men < Config.Army.MinArmyMen then
+		local path = if a.owner ~= 0 then Pathing.retreatPath(state, a.owner, provinceId) else nil
+		if path == nil or a.men < Config.Army.MinArmyMen then
 			state.armies[a.id] = nil
 		else
-			a.location = target
-			a.path = {}
+			a.path = path
 			a.moveProgress = 0
+			a.retreating = true
 		end
 	end
 	for _, a in winners do
@@ -156,11 +158,13 @@ function Battle.step(state: MatchState, rng: Rng.Rng)
 	for _, id in ids do
 		local a = state.armies[id]
 		a.inBattle = false
-		if byProvince[a.location] == nil then
-			byProvince[a.location] = {}
-			table.insert(provinceOrder, a.location)
+		if not a.retreating then -- retreating armies walk past every fight
+			if byProvince[a.location] == nil then
+				byProvince[a.location] = {}
+				table.insert(provinceOrder, a.location)
+			end
+			table.insert(byProvince[a.location], a)
 		end
-		table.insert(byProvince[a.location], a)
 	end
 	table.sort(provinceOrder)
 

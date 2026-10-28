@@ -34,7 +34,10 @@ local function render()
 	title.Text = string.format("⚔ %s at %s", shortMen(army.men), map.provinces[army.location].name)
 	Widgets.clear(buttons)
 	local dest, path = sel.dest, sel.path
-	if dest and path then
+	if army.retreating then
+		local home = if army.dest ~= 0 then map.provinces[army.dest].name else "home"
+		hint.Text = string.format("🏳 Retreating to %s: no orders until it gets there", home)
+	elseif dest and path then
 		hint.Text = string.format("➜ %s  ·  ⏱ %d s", map.provinces[dest].name, Relations.travelTime(path))
 		local armyId = sel.army
 		Widgets.button(buttons, "✅ Go", 120, Widgets.GOOD, function()

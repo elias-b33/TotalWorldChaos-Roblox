@@ -7,7 +7,8 @@
 -- Underdog: the UnderdogCount living nations with the fewest provinces defend at +Config.Battle.UnderdogBonus
 --   combat strength (the defending side of a battle only, not sieges). A tie at the cut-off leaves everyone in it
 --   out, so there are never more than UnderdogCount underdogs, and nobody is one while everyone is level.
--- Coalition: a living nation holding Config.Diplomacy.CoalitionThreshold of all provinces wears the crown, and any
+-- Coalition: a living nation holding Config.Diplomacy.CoalitionThreshold of the ownable provinces (mountains don't
+--   count) wears the crown, and any
 --   nation's side fighting against a crowned nation gets +Config.Battle.CoalitionBonus combat strength (neutral
 --   garrisons and Rebels don't). Two crowned nations fighting each other both get it.
 -- Eliminated nations hold no provinces that count, are never underdogs and never wear the crown.
@@ -19,7 +20,23 @@ type MatchState = Types.MatchState
 
 local CatchUp = {}
 
--- Province counts of living nations (nations with no provinces count as 0), and the total number of provinces.
+-- Mountains can never be owned, so shares (the crown, domination, alliance victory) count only the other provinces.
+function CatchUp.ownable(terrain: Types.Terrain): boolean
+	return terrain ~= "Mountain"
+end
+
+-- How many provinces of this map can be owned.
+function CatchUp.ownableCount(provinces: { [number]: { terrain: Types.Terrain } }): number
+	local n = 0
+	for _, p in provinces do
+		if CatchUp.ownable(p.terrain) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- Province counts of living nations (nations with no provinces count as 0), and the number of ownable provinces.
 function CatchUp.counts(state: MatchState): ({ [number]: number }, number)
 	local counts: { [number]: number } = {}
 	for id, nation in state.nations do
@@ -29,7 +46,9 @@ function CatchUp.counts(state: MatchState): ({ [number]: number }, number)
 	end
 	local total = 0
 	for _, p in state.provinces do
-		total += 1
+		if CatchUp.ownable(p.terrain) then
+			total += 1
+		end
 		local owner = p.owner
 		if owner ~= nil and counts[owner] ~= nil then
 			counts[owner] += 1
@@ -82,7 +101,7 @@ function CatchUp.underdogsFrom(counts: { [number]: number }): { [number]: boolea
 	return out
 end
 
--- Crowned nations from living nations' province counts and the map's total (normally none or one).
+-- Crowned nations from living nations' province counts and the map's ownable provinces (normally none or one).
 function CatchUp.leadersFrom(counts: { [number]: number }, total: number): { [number]: boolean }
 	local out: { [number]: boolean } = {}
 	if total <= 0 then

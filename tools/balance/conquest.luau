@@ -63,7 +63,7 @@ local function attempt(terrain: Types.Terrain, dev: number, garrison: number, re
 		if p.owner == 1 then
 			return { won = 1, ticks = t, lost = start - (if a then a.men else 0) }
 		end
-		if a == nil or a.location ~= target and #a.path == 0 then
+		if a == nil or a.retreating or a.location ~= target and #a.path == 0 then
 			return { won = 0, ticks = t, lost = start - (if a then a.men else 0) }
 		end
 	end

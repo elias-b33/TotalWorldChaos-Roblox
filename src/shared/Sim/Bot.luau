@@ -101,7 +101,7 @@ type Ctx = {
 	mine: { number }, -- my provinces, sorted
 	isMine: { [number]: boolean },
 	counts: { [number]: number }, -- provinces per owner
-	totalProvinces: number,
+	totalProvinces: number, -- ownable ones (not mountains)
 	armiesAt: { [number]: { Army } },
 	hostile: { [number]: { Army } }, -- armies that would fight mine, by province
 	mayEnter: { [number]: boolean }, -- owners whose land my armies may enter (Diplomacy.canEnter)
@@ -126,7 +126,9 @@ local function context(state: MatchState, me: number, rng: Rng.Rng, settings: Se
 	local mine, isMine, counts = {}, {}, {}
 	local total = 0
 	for _, id in sortedKeys(state.provinces) do
-		total += 1
+		if state.provinces[id].terrain ~= "Mountain" then
+			total += 1 -- shares count ownable provinces only (CatchUp.counts)
+		end
 		local owner = state.provinces[id].owner
 		if owner then
 			counts[owner] = (counts[owner] or 0) + 1
@@ -151,6 +153,13 @@ local function context(state: MatchState, me: number, rng: Rng.Rng, settings: Se
 	local targeted = {}
 	for _, id in sortedKeys(state.armies) do
 		local a = state.armies[id]
+		if a.retreating then
+			-- walking home: it takes no orders and fights nobody, but it is still mine to count
+			if a.owner == me then
+				men += a.men
+			end
+			continue
+		end
 		armiesAt[a.location] = armiesAt[a.location] or {}
 		table.insert(armiesAt[a.location], a)
 		if a.owner ~= me and (a.owner == 0 or isEnemy[a.owner]) then
@@ -341,8 +350,8 @@ end
 -- home, not besieging, not fighting, not guarding a border. Biggest stack first.
 type Stack = { location: number, armies: { Army }, men: number }
 
--- Men of other nations' armies in a province that neither fight me nor let me besiege it (Siege.step blocks
--- rival besiegers), and the lowest of their nation ids.
+-- Men of other nations' armies in a province that neither fight me nor help me besiege it, and the lowest of their
+-- nation ids.
 local function rivalsAt(ctx: Ctx, provinceId: number): (number, number)
 	local men, lowest = 0, math.huge
 	for _, a in ctx.armiesAt[provinceId] or {} do
@@ -354,8 +363,8 @@ local function rivalsAt(ctx: Ctx, provinceId: number): (number, number)
 	return men, lowest
 end
 
--- Abroad (neutral or enemy land), my army is busy while it fights or besieges. If a rival besieger blocks the
--- siege, the smaller side gives way (equal: the higher nation id), so two bots never wait on each other forever.
+-- Abroad (neutral or enemy land), my army is busy while it fights or besieges. Siege.step gives a province's siege
+-- to whoever started it, so if a rival at peace with me holds the siege here, my army gives way.
 local function holdsGround(ctx: Ctx, a: Army): boolean
 	local province = ctx.state.provinces[a.location]
 	local owner = province.owner
@@ -363,20 +372,13 @@ local function holdsGround(ctx: Ctx, a: Army): boolean
 		return false -- at home (or stranded in a land at peace with me)
 	end
 	local siege = province.siege
-	if (siege and siege.by == ctx.me) or #hostileAt(ctx, a.location) > 0 then
+	if #hostileAt(ctx, a.location) > 0 then
 		return true
+	elseif siege and Diplomacy.friendly(ctx.state, ctx.me, siege.by) then
+		return true -- my siege (or an ally's)
 	end
-	local rivals, lowest = rivalsAt(ctx, a.location)
-	if rivals == 0 then
-		return true
-	end
-	local mine = 0
-	for _, b in ctx.armiesAt[a.location] do
-		if b.owner == ctx.me then
-			mine += b.men
-		end
-	end
-	return mine > rivals or (mine == rivals and ctx.me < lowest)
+	-- no siege of mine: wait for one only if no rival stands here (it may hold the siege, or win the next one)
+	return (rivalsAt(ctx, a.location)) == 0
 end
 
 local function freeStacks(ctx: Ctx): { Stack }
@@ -1140,9 +1142,28 @@ local function diplomacy(ctx: Ctx, memory: Memory): { Command }?
 end
 
 -- 7. Primordial power ------------------------------------------------------------------------------------
--- PRIMORDIAL POWERS GO HERE: "spend a charge on the biggest enemy army in a war I'm in" (docs/DESIGN.md
--- "Bot AI" item 7). Add a `primordial(ctx)` step returning the power command once it exists, and call it last
--- in Bot.plan below. Pre-check it with `try` like every other step.
+-- A Meteor on the biggest army of a nation I'm at war with that isn't immune to powers right now (the same
+-- command a player sends). A charge never waits for a quiet moment: this step rides along with the plan's
+-- other command.
+
+local function primordial(ctx: Ctx): { Command }?
+	local state = ctx.state
+	if #ctx.enemies == 0 or ctx.nation.charges < Config.Primordial.Powers.Meteor.charges then
+		return nil
+	end
+	local best: Army?, bestMen = nil, 0
+	for _, id in sortedKeys(state.armies) do
+		local a = state.armies[id]
+		local owner = state.nations[a.owner]
+		if ctx.isEnemy[a.owner] and owner and owner.powerImmuneUntil <= state.tick and a.men > bestMen then
+			best, bestMen = a, a.men
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	return try(ctx, { kind = "Power", power = "Meteor", target = best.id })
+end
 
 -- Plan ---------------------------------------------------------------------------------------------------
 
@@ -1161,7 +1182,7 @@ function Bot.plan(
 	local ctx = context(state, nationId, rng, Bot.settings(difficulty))
 	local mem = memory or Bot.newMemory()
 	rememberWars(ctx, mem)
-	return defend(ctx)
+	local commands = defend(ctx)
 		or recruit(ctx)
 		or expand(ctx)
 		or attack(ctx)
@@ -1169,6 +1190,12 @@ function Bot.plan(
 		or build(ctx)
 		or diplomacy(ctx, mem)
 		or {}
+	local power = primordial(ctx)
+	if power then
+		commands = table.clone(commands)
+		table.insert(commands, power[1])
+	end
+	return commands
 end
 
 -- Schedule -----------------------------------------------------------------------------------------------
@@ -1203,13 +1230,23 @@ function Bot.step(schedule: Schedule, state: MatchState, rng: Rng.Rng, difficult
 		return a < b
 	end)
 	local planTicks = Bot.settings(difficulty).planTicks
+	local meteored: { [number]: boolean } = {} -- nations a bot's power hits this tick
 	for i = 1, math.min(#due, Config.Bots.BotsPlanningPerTick) do
 		local id = due[i]
 		schedule.nextDue[id] = state.tick + planTicks
 		local memory = schedule.memory[id] or Bot.newMemory()
 		schedule.memory[id] = memory
 		for _, command in Bot.plan(state, id, rng, difficulty, memory) do
-			table.insert(orders, { nation = id, command = command })
+			-- two bots planning on the same tick could Meteor the same nation; the second would hit its immunity
+			local hit = if command.kind == "Power" and state.armies[command.target]
+				then state.armies[command.target].owner
+				else nil
+			if hit == nil or not meteored[hit] then
+				table.insert(orders, { nation = id, command = command })
+				if hit then
+					meteored[hit] = true
+				end
+			end
 		end
 	end
 	return orders

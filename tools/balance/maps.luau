@@ -6,7 +6,7 @@ local Maps = require("../../src/shared/Maps")
 
 print(
 	"| Map | Provinces (all) | Mountains | Ownable | Start-owned | Neutral | Neutral dev 1/2/3/4/5 "
-		.. "| Neutral garrisons (men: count) | Provinces for 25% / 40% | Forest+hills share of land |"
+		.. "| Neutral garrisons (men: count) | Provinces for crown / domination (of ownable) | Forest+hills share of land |"
 )
 print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
 for _, id in Maps.ids do
@@ -58,8 +58,8 @@ for _, id in Maps.ids do
 			neutral,
 			table.concat(devText, "/"),
 			table.concat(gtext, ", "),
-			math.ceil(Config.Diplomacy.CoalitionThreshold * total),
-			math.ceil(Config.Win.DominationShare * total),
+			math.ceil(Config.Diplomacy.CoalitionThreshold * (total - mountains)), -- shares count ownable land only
+			math.ceil(Config.Win.DominationShare * (total - mountains)),
 			100 * rough / (total - mountains)
 		)
 	)

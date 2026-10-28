@@ -56,20 +56,28 @@ function Pathing.find(state: MatchState, nationId: number, from: number, to: num
 	end, from, to)
 end
 
--- Nearest province `owner` holds, other than `from`, by number of steps over passable land. Used for retreats.
-function Pathing.nearestOwned(state: MatchState, owner: number, from: number): number?
-	local seen: { [number]: boolean } = { [from] = true }
+-- The route to the nearest province `owner` holds, other than `from`, over land its armies may enter (fewest
+-- steps; ties go to the lower province id). nil if there is none. Used for retreats.
+function Pathing.retreatPath(state: MatchState, owner: number, from: number): { number }?
+	local cameFrom: { [number]: number } = { [from] = from }
 	local queue = { from }
 	local head = 1
 	while head <= #queue do
 		local cur = queue[head]
 		head += 1
-		for _, n in state.provinces[cur].neighbors do
-			local p = state.provinces[n]
-			if not seen[n] and p.terrain ~= "Mountain" then
-				seen[n] = true
-				if p.owner == owner then
-					return n
+		local next = table.clone(state.provinces[cur].neighbors)
+		table.sort(next)
+		for _, n in next do
+			if cameFrom[n] == nil and Diplomacy.canEnter(state, owner, n) then
+				cameFrom[n] = cur
+				if state.provinces[n].owner == owner then
+					local path = { n }
+					local step = cur
+					while step ~= from do
+						table.insert(path, 1, step)
+						step = cameFrom[step]
+					end
+					return path
 				end
 				table.insert(queue, n)
 			end

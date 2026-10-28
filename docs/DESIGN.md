@@ -20,7 +20,7 @@ A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and pla
 
 ## Match structure
 
-A match runs 25 minutes in six phases and always ends with a winner: a nation holding 40% of provinces wins on the spot, otherwise the top score at 25:00 wins.
+A match runs 25 minutes in six phases and always ends with a winner: a nation holding half of the land (50% of the provinces that can be owned) wins on the spot, otherwise the top score at 25:00 wins.
 
 | Setting | Value |
 | --- | --- |
@@ -44,8 +44,9 @@ Joining mid-match takes over a bot's nation. For Studio solo tests (and the harn
 
 **Win conditions**
 
-- **Domination:** own 40% of all provinces → instant win.
-- **Alliance victory:** an alliance (max 3 nations) jointly holds 55% → all members win.
+- **Domination:** own 50% of the ownable provinces → instant win.
+- **Alliance victory:** an alliance (max 3 nations) jointly holds 65% → all members win.
+- Shares (domination, alliance victory and the coalition crown) count only provinces that can be owned: mountains never count.
 - **Score:** at 25:00 the highest score wins. Score = provinces × 10 + total development × 5 + battles won × 2.
 
 **Elimination and leavers**
@@ -69,13 +70,13 @@ Two resources (gold and manpower), one unit type and one siege rule carry the wh
 
 ### Economy
 
-Income is paid every month (10 s).
+Income is paid every month (10 s). A nation starts with 100 gold and 3,000 manpower.
 
 | Item | Cost | Effect |
 | --- | --- | --- |
 | Province income | — | +1 gold and +100 manpower per development level |
 | Capital | — | +5 gold per month |
-| Regiment (1,000 men) | 10 gold + 1,000 manpower | Upkeep 0.5 gold per month |
+| Regiment (1,000 men) | 10 gold + 1,000 manpower | Upkeep 1.5 gold per month |
 | Develop province | 30 gold × current level | +1 development (max 5) |
 | Farm | 50 gold | +50% gold from this province |
 | Barracks | 40 gold | +50% manpower from this province |
@@ -83,15 +84,17 @@ Income is paid every month (10 s).
 
 ### Armies and combat
 
-- One unit type, the regiment. An army is a stack of regiments shown as one token on the map.
+- One unit type, the regiment. An army is a stack of regiments shown as one token on the map: a nation's armies that stand still in the same province (not marching, fighting or retreating) merge into one.
 - Movement: one province per 5 s on plains, 8 s on forest and hills. Paths follow province neighbours (BFS).
 - A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers.
-- Modifiers: defender in forest or hills +25%, fort +50%, underdog +20%, coalition +10%, random ±10% per battle.
-- After round 3 the side with fewer men retreats to its nearest owned province. Armies under 500 men are destroyed.
+- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, random ±10% per battle.
+- After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at normal speed, under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home.
 
 ### Sieges
 
 - An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital.
+- One siege per province. Whoever started it keeps it while one of its (or an ally's) armies stands there; another besieger at peace with it waits instead of blocking, and takes over (from zero) once the first one leaves.
+- An interrupted siege (a battle there, a defending army, the besieger stepping out) keeps its progress for 10 s, then resets. Peace with the owner, or the province changing hands, ends it at once.
 - When the siege completes, the province flips to the attacker immediately. No war score and no haggling over provinces in peace deals.
 
 ### Diplomacy
@@ -99,7 +102,7 @@ Income is paid every month (10 s).
 - **War:** declare on any nation you border. Your allies join automatically.
 - **Alliance:** request and accept; max 3 nations per alliance.
 - **Peace:** white peace, or peace plus a gold tribute. A 3-minute truce follows.
-- **Coalition:** a nation holding 25%+ of provinces gets a crown on the map, and every other nation gets +10% combat strength against it.
+- **Coalition:** a nation holding 20%+ of the ownable provinces gets a crown on the map, and every other nation gets +30% combat strength against it.
 
 ### Primordial powers
 
@@ -124,9 +127,9 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 ### Catch-up
 
 - **Overextension:** above 20 provinces, every 5 extra provinces cut gold income by 5%. Only full steps count (21–24 provinces: −0%, 25–29: −5%, 30–34: −10%), and the cut applies to gross gold (provinces + capital) before upkeep, never below zero. Manpower is not cut.
-- **Underdog:** the 3 nations with the fewest provinces get +20% defence: +20% combat strength when their side is the defender in a battle (not sieges, not when attacking). Only living nations count. A tie at the cut-off leaves everyone in the tie out, so there are never more than 3 underdogs, nobody is one while every nation is level, and the largest nation never is.
-- **Coalition** against the leader (see Diplomacy): every living nation with 25%+ of all provinces wears the crown, and any nation's side fighting a crowned nation gets +10% combat strength, attacking or defending (neutral garrisons and Rebels don't). Two crowned nations fighting each other both get it.
-- Combat bonuses add to the other modifiers (terrain, fort, the random roll). Rules: `Sim/CatchUp.luau`; numbers and their effect: `docs/BALANCE.md`.
+- **Underdog:** the 3 nations with the fewest provinces get +50% defence: +50% combat strength when their side is the defender in a battle (not sieges, not when attacking). Only living nations count. A tie at the cut-off leaves everyone in the tie out, so there are never more than 3 underdogs, nobody is one while every nation is level, and the largest nation never is.
+- **Coalition** against the leader (see Diplomacy): every living nation with 20%+ of the ownable provinces wears the crown, and any nation's side fighting a crowned nation gets +30% combat strength, attacking or defending (neutral garrisons and Rebels don't). Two crowned nations fighting each other both get it.
+- Combat bonuses add to the other modifiers (terrain, fort, the random roll). Because a side's kills scale with its own size, +50% is worth about 15% more men and +30% about 8% (`docs/BALANCE.md` section 5); the bonuses are sized for that. Rules: `Sim/CatchUp.luau`; numbers and their effect: `docs/BALANCE.md`.
 
 ## Technical architecture
 
@@ -181,7 +184,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 ### Tick order
 
 1. Apply queued commands.
-2. Move armies.
+2. Move armies (retreating armies walk home too), then merge a nation's armies standing in the same province.
 3. Resolve battles.
 4. Advance sieges and flip provinces.
 5. Every 10th tick: pay income and upkeep.
@@ -258,7 +261,7 @@ export type Province = {
     development: number,       -- 1..5
     building: Building,
     isCapital: boolean,
-    siege: { by: NationId, progress: number, required: number }?,
+    siege: { by: NationId, progress: number, required: number, lastTick: number }?, -- lastTick: last progress (grace period)
     shieldUntil: number?,      -- tick when Divine Shield ends
     buffs: { [string]: number }, -- buff name -> tick it ends
 }
@@ -286,6 +289,7 @@ export type Army = {
     path: { ProvinceId },      -- remaining route
     moveProgress: number,      -- ticks spent toward next province
     inBattle: boolean,
+    retreating: boolean?,      -- beaten and walking home: no orders, no fighting, no sieges
 }
 
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
@@ -399,7 +403,7 @@ Each bot checks a short priority list every few seconds and does the first actio
 4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
 5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders, then develop.
 6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
-7. **Primordial power:** spend a charge on the biggest enemy army in a war I'm in.
+7. **Primordial power:** with 2 charges, Meteor the biggest army of a nation I'm at war with that isn't immune right now. This rides along with whatever else the plan does, so charges don't pile up.
 
 | Difficulty | Plans every | Attack ratio | Behaviour |
 | --- | --- | --- | --- |

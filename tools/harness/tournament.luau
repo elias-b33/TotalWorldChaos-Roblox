@@ -5,6 +5,7 @@
 --   lune run tools/harness/tournament                 # 20 seeds × every map, Normal bots
 --   lune run tools/harness/tournament 5 skyshards     # 5 seeds on one map
 --   lune run tools/harness/tournament 20 all Hard     # another difficulty
+--   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
 
 local process = require("@lune/process")
 
@@ -22,6 +23,22 @@ local mapArg = process.args[2] or "all"
 local difficulty = (process.args[3] or "Normal") :: Bot.Difficulty
 local mapIds = if mapArg == "all" then Maps.ids else { mapArg }
 
+local overrides = process.env.SET
+if overrides and overrides ~= "" then
+	for _, pair in string.split(overrides, ",") do
+		local path, value = string.match(pair, "^%s*([%w%.]+)%s*=%s*([%d%.]+)%s*$")
+		assert(path and value, "bad SET entry: " .. pair)
+		local node: any = Config
+		local keys = string.split(path, ".")
+		for i = 1, #keys - 1 do
+			node = node[keys[i]]
+		end
+		assert(node[keys[#keys]] ~= nil, "unknown Config value: " .. path)
+		node[keys[#keys]] = tonumber(value)
+		print(string.format("what-if: Config.%s = %s", path, value))
+	end
+end
+
 local MINUTES = Config.Phases.MatchEndTick // 60
 
 type MatchStats = {
@@ -32,7 +49,41 @@ type MatchStats = {
 	rejected: number,
 	rejectReasons: { [string]: number },
 	wars: number,
+	conquests: number, -- provinces taken from another nation (not neutral land)
+	powers: number, -- Primordial powers bots used
+	leaderChanges: number, -- minutes (from 3:00) that ended with a different nation holding the most provinces
+	armyStats: { [number]: ArmyStats }, -- at the end of minutes 15 and 25 (or the end of the match)
 }
+
+-- Nations' armies at one moment: how many, how many men, the biggest nation's men, and standing armies that share
+-- a province with another standing army of the same owner (overlapping tokens).
+type ArmyStats = { armies: number, men: number, maxMen: number, stacked: number }
+
+local function armyStats(state: Types.MatchState): ArmyStats
+	local out = { armies = 0, men = 0, maxMen = 0, stacked = 0 }
+	local perNation: { [number]: number } = {}
+	local standing: { [string]: number } = {}
+	for _, a in state.armies do
+		if a.owner ~= 0 then
+			out.armies += 1
+			out.men += a.men
+			perNation[a.owner] = (perNation[a.owner] or 0) + a.men
+			if #a.path == 0 and not a.inBattle then
+				local key = a.owner .. ":" .. a.location
+				standing[key] = (standing[key] or 0) + 1
+			end
+		end
+	end
+	for _, n in perNation do
+		out.maxMen = math.max(out.maxMen, n)
+	end
+	for _, n in standing do
+		if n > 1 then
+			out.stacked += n
+		end
+	end
+	return out
+end
 
 local function runMatch(mapId: string, seed: number): MatchStats
 	local state = Match.new(Maps.get(mapId))
@@ -40,6 +91,7 @@ local function runMatch(mapId: string, seed: number): MatchStats
 	local botRng = Rng.new(seed * 7919 + 13)
 	local schedule = Bot.newSchedule()
 	local queue: { Bot.Order } = {}
+	local lastLeader = 0
 	local stats = {
 		leaderByMinute = {},
 		finalProvinces = {},
@@ -47,11 +99,18 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		rejected = 0,
 		rejectReasons = {},
 		wars = 0,
+		conquests = 0,
+		powers = 0,
+		leaderChanges = 0,
+		armyStats = {},
 	}
 	while state.result == nil do
 		for _, order in queue do -- 1. apply queued commands
 			stats.commands += 1
 			local ok, reason = Commands.apply(state, order.nation, order.command)
+			if ok and order.command.kind == "Power" then
+				stats.powers += 1
+			end
 			if not ok then
 				stats.rejected += 1
 				local key = order.command.kind .. ":" .. tostring(reason)
@@ -63,15 +122,27 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		for _, e in state.events do
 			if e.kind == "WarDeclared" then
 				stats.wars += 1
+			elseif e.kind == "ProvinceTaken" and e.a ~= 0 and e.b ~= 0 then
+				stats.conquests += 1
 			end
 		end
 		table.clear(state.events)
 		if state.tick % 60 == 0 or state.result then
-			local best = 0
-			for id in state.nations do
-				best = math.max(best, Match.provinceCount(state, id))
+			local best, leader = 0, 0
+			for id = 1, #state.nations do
+				local n = Match.provinceCount(state, id)
+				if n > best then
+					best, leader = n, id
+				end
 			end
 			stats.leaderByMinute[math.ceil(state.tick / 60)] = best
+			if state.tick > Config.Phases.PeaceEndTick and leader ~= lastLeader then
+				stats.leaderChanges += 1
+			end
+			lastLeader = leader
+		end
+		if state.tick == 15 * 60 or state.result then
+			stats.armyStats[if state.tick <= 15 * 60 then 15 else 25] = armyStats(state)
 		end
 	end
 	for id in state.nations do
@@ -91,6 +162,10 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		rejected = stats.rejected,
 		rejectReasons = stats.rejectReasons,
 		wars = stats.wars,
+		conquests = stats.conquests,
+		powers = stats.powers,
+		leaderChanges = stats.leaderChanges,
+		armyStats = stats.armyStats,
 	}
 end
 
@@ -122,7 +197,11 @@ for _, mapId in mapIds do
 	local kinds: { [string]: number } = {}
 	local lengths = {}
 	local perMinute: { { number } } = {}
-	local rejected, commands, wars = 0, 0, 0
+	local rejected, commands, wars, conquests, leaderChanges, powers = 0, 0, 0, 0, 0, 0
+	local atMinute: { [number]: { [string]: { number } } } = {}
+	for _, m in { 15, 25 } do
+		atMinute[m] = { armies = {}, men = {}, maxMen = {}, stacked = {} }
+	end
 	local reasons: { [string]: number } = {}
 	for m = 1, MINUTES do
 		perMinute[m] = {}
@@ -140,9 +219,21 @@ for _, mapId in mapIds do
 		for m = 1, MINUTES do
 			table.insert(perMinute[m], s.leaderByMinute[m])
 		end
+		for m, lists in atMinute do
+			local a = s.armyStats[m] or s.armyStats[15] or s.armyStats[25]
+			if a then
+				table.insert(lists.armies, a.armies)
+				table.insert(lists.men, a.men)
+				table.insert(lists.maxMen, a.maxMen)
+				table.insert(lists.stacked, a.stacked)
+			end
+		end
 		rejected += s.rejected
 		commands += s.commands
 		wars += s.wars
+		conquests += s.conquests
+		powers += s.powers
+		leaderChanges += s.leaderChanges
 		for k, v in s.rejectReasons do
 			reasons[k] = (reasons[k] or 0) + v
 		end
@@ -151,7 +242,21 @@ for _, mapId in mapIds do
 	grandCommands += commands
 
 	local total = #map.provinces
-	print(string.format("\n== %s (%d provinces, domination at %d) ==", map.title, total, math.ceil(0.4 * total)))
+	local ownable = 0
+	for _, p in map.provinces do
+		if p.terrain ~= "Mountain" then
+			ownable += 1
+		end
+	end
+	print(
+		string.format(
+			"\n== %s (%d provinces, %d ownable, domination at %d) ==",
+			map.title,
+			total,
+			ownable,
+			math.ceil(Config.Win.DominationShare * ownable)
+		)
+	)
 	print("slot  nation        start position (capital)      wins  avg final provinces")
 	local mostWins = 0
 	for _, def in map.nations do
@@ -197,11 +302,39 @@ for _, mapId in mapIds do
 			wars / seeds
 		)
 	)
+	local sortedLengths = table.clone(lengths)
+	table.sort(sortedLengths)
+	local ends = {}
+	for _, l in sortedLengths do
+		table.insert(ends, clock(l))
+	end
+	print("match ends: " .. table.concat(ends, " "))
+	print(
+		string.format(
+			"provinces taken from nations per match %.1f  |  leader changes per match (minute checks after 3:00) %.1f  |  powers used by bots per match %.1f",
+			conquests / seeds,
+			leaderChanges / seeds,
+			powers / seeds
+		)
+	)
 	local row = {}
 	for m = 1, MINUTES do
 		table.insert(row, string.format("%d:%s", m, tostring(median(perMinute[m]))))
 	end
 	print("median leader provinces by minute: " .. table.concat(row, " "))
+	for _, m in { 15, 25 } do
+		local lists = atMinute[m]
+		print(
+			string.format(
+				"armies at %d:00 (median): %d armies, %dk men in all, biggest nation %dk men, %d stacked tokens",
+				m,
+				median(lists.armies),
+				median(lists.men) // 1000,
+				median(lists.maxMen) // 1000,
+				median(lists.stacked)
+			)
+		)
+	end
 	print(string.format("bot commands %d, rejected %d", commands, rejected))
 	for k, v in reasons do
 		print(string.format("  rejected %s × %d", k, v))
