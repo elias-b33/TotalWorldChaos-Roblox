@@ -893,6 +893,7 @@ Done when: Studio shows the button only when an ad is available; build and lint 
 | 11 | Sell troop skins, capital skins, people sets and ship skins (section 13.2; looks only) | Yes |
 | 12 | A Sandbox Pass (199 Robux): extra tools that only work in your own singleplayer world (section 13.2) | Yes if you're comfortable with a pass that isn't purely cosmetic; it never touches a match |
 | 13 | A flag and banner art pass before the soft launch (section 13.3) | Yes (owner's call) |
+| 14 | Big spenders: at launch no strength for sale, depth instead (section 13.7); every other option stays open until the launch data is in | Owner: keep all options, analyse after launch |
 
 ## 13. Plan update after the content wave
 
@@ -946,6 +947,24 @@ After the gameplay stages, so nothing in flight slows down:
 ### 13.6 What it should add
 
 The new categories mostly give players who already pay more to buy (people sets, troop and ship skins), rather than adding payers. A fair guess is 10–20% more revenue per paying player than the scenarios in section 9.2, once Season 1 carries them. The Sandbox Pass may add payers among younger players who love the singleplayer world; give it its own analytics event and judge it on that.
+
+### 13.7 Big spenders, and the options kept open
+
+**At launch (owner, October 2026):** no strength for sale, even a slight one. In a 25-minute strategy match a small edge snowballs (gold buys armies, armies take land, land pays gold), and free players are almost everyone in every match, including the opponents payers want to beat. Big spenders get depth instead:
+
+- collections and status: people sets, troop and ship skins, animated Legendary flags and victory animations, map themes and emotes, aiming at about 300 items in the first year (20,000–30,000 Robux of things a top spender can want);
+- convenience outside the match: VIP, quest rerolls, the season pass;
+- private servers with any rules, and the Sandbox Pass for being overpowered in your own world.
+
+**Kept open, to analyse with launch data:**
+
+| Option | What it would be | Guardrails if we ever test it |
+| --- | --- | --- |
+| Sidegrades | A different style of play rather than a stronger one (like BedWars kits), for example a doctrine that sieges faster but defends worse | Earnable with Glory as well as Robux; balanced with 200-seed tournaments to within the race-share band (0.8–1.25×); off in ranked |
+| Progression boosts | More XP or Glory per match beyond VIP's +25% | Outside the match only; never a shortcut to anything that changes a match |
+| Paid draft or start choices | Picking your nation or race first | Not recommended: start positions differ in strength (docs/BALANCE.md), so it would sell strength |
+
+**What to look at first (from the `docs/LAUNCH.md` analytics):** monthly payer share and Robux per payer against section 9.2, D1 and D7 retention of free and paying players, how often payers win compared with free players of the same level, and the "pay to win" share of reviews and comments. A sidegrade is only worth testing if revenue per payer is under the base case and free-player retention is healthy. Test it on some servers first and compare.
 
 ## 14. Sources
 
