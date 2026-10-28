@@ -15,7 +15,7 @@ import os
 import sys
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 SCALE = 2  # render at 2x so small phone text stays legible
 TEXT_FONTS = [
@@ -541,6 +541,8 @@ def layout(node, x, y, w, h, out):
     lst = child_of(node, "UIListLayout")
     grid = child_of(node, "UIGridLayout")
     extent = 0.0
+    first_out = len(out)
+    segments = []  # (zIndex, start, end) of each laid-out child's subtree in `out`, for the draw order
     if grid:
         cw, ch = udim(grid["cell"], w, h)
         px, py = udim(grid["cellPadding"], w, h)
@@ -548,7 +550,9 @@ def layout(node, x, y, w, h, out):
         for i, k in enumerate(kids):
             cx = x + (i % per_row) * (cw + px)
             cy = y + (i // per_row) * (ch + py)
+            start = len(out)
             place(k, cx, cy, cw, ch, out, fixed=True)
+            segments.append((k.get("zIndex", 1), start, len(out)))
             extent = max(extent, cy + ch - y)
     elif lst:
         gap = lst["padding"][0] * (w if lst["fill"] == "Horizontal" else h) + lst["padding"][1] * SCALE
@@ -556,6 +560,7 @@ def layout(node, x, y, w, h, out):
         first = len(out)
         for k in kids:
             kw, kh = udim(k["size"], w, h)
+            start = len(out)
             if lst["fill"] == "Horizontal":
                 ky = y + ((h - kh) / 2 if lst["valign"] == "Center" else 0)
                 rect = place(k, x + cursor, ky, kw, kh, out, fixed=True)
@@ -565,6 +570,7 @@ def layout(node, x, y, w, h, out):
                 rect = place(k, x, y + cursor, kw, kh, out, fixed=True)
                 cursor += (rect[3] - rect[1]) + gap
                 extent = max(extent, cursor - gap)
+            segments.append((k.get("zIndex", 1), start, len(out)))
         # a horizontal list centred or right-aligned: move the row (and everything inside it) over
         if lst["fill"] == "Horizontal" and lst.get("halign") in ("Center", "Right") and kids:
             spare = w - (cursor - gap)
@@ -579,6 +585,10 @@ def layout(node, x, y, w, h, out):
             ax, ay = k["anchor"]
             rect = place(k, x + px - ax * kw, y + py - ay * kh, kw, kh, out, fixed=False, anchor=(ax, ay))
             extent = max(extent, rect[3] - y)
+    # Roblox draws siblings by ZIndex (ZIndexBehavior Sibling), whatever order a layout puts them in
+    if segments and any(z != segments[0][0] for z, _, _ in segments):
+        chunks = [out[a:b] for _, a, b in sorted(segments, key=lambda seg: seg[0])]
+        out[first_out:] = [item for chunk in chunks for item in chunk]
     return extent + (pad["pad"][1] * SCALE if pad else 0) + (pad["pad"][0] * SCALE if pad else 0)
 
 
@@ -644,6 +654,9 @@ def draw_image(img, rect, info, images, rotation=0):
             _images[path] = Image.frombytes("RGBA", (info["width"], info["height"]), f.read())
     src = _images[path]
     x0, y0, x1, y1 = rect
+    if info.get("slice"):
+        draw_slice(img, rect, src, info)
+        return
     if info.get("fit") and x1 > x0 and y1 > y0:
         # ScaleType.Fit: the largest box with the image's shape, centred in the label
         scale = min((x1 - x0) / src.width, (y1 - y0) / src.height)
@@ -667,6 +680,76 @@ def draw_image(img, rect, info, images, rotation=0):
         # GuiObject.Rotation turns clockwise round the centre (whole images only, e.g. an icon turned to point down)
         part = part.rotate(-rotation, resample=Image.NEAREST if info.get("pixelated") else Image.BICUBIC)
     img.alpha_composite(part, (int(vx0), int(vy0)))
+
+
+def nine_slice(src, sl, scale, w, h):
+    """Roblox ScaleType.Slice + SliceScale + Pixelated at w x h output pixels (tools/uimock/frameart.py's
+    nine_slice): corners keep scale x their size, edges stretch along one axis, the centre both ways."""
+    x0, y0, x1, y1 = (int(v) for v in sl)
+    iw, ih = src.size
+    left, right = x0 * scale, (iw - x1) * scale
+    top, bottom = y0 * scale, (ih - y1) * scale
+    if left + right > w:  # smaller than its borders: the borders shrink to fit
+        k = w / max(left + right, 1)
+        left, right = int(left * k), w - int(left * k)
+    if top + bottom > h:
+        k = h / max(top + bottom, 1)
+        top, bottom = int(top * k), h - int(top * k)
+    cw, ch = max(0, w - left - right), max(0, h - top - bottom)
+    xs, ys = [0, x0, x1, iw], [0, y0, y1, ih]
+    dxs, dys = [0, left, left + cw, w], [0, top, top + ch, h]
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    for j in range(3):
+        for i in range(3):
+            sx0, sx1, sy0, sy1 = xs[i], xs[i + 1], ys[j], ys[j + 1]
+            dx0, dx1, dy0, dy1 = int(dxs[i]), int(dxs[i + 1]), int(dys[j]), int(dys[j + 1])
+            if sx1 <= sx0 or sy1 <= sy0 or dx1 <= dx0 or dy1 <= dy0:
+                continue
+            part = src.crop((sx0, sy0, sx1, sy1)).resize((dx1 - dx0, dy1 - dy0), Image.NEAREST)
+            out.alpha_composite(part, (dx0, dy0))
+    return out
+
+
+def draw_slice(img, rect, src, info):
+    x0, y0, x1, y1 = (int(round(v)) for v in rect)
+    w, h = x1 - x0, y1 - y0
+    if w < 1 or h < 1 or x1 < 0 or y1 < 0 or x0 > img.width or y0 > img.height:
+        return
+    part = nine_slice(src, info["slice"], int(info.get("sliceScale", 1) * SCALE), w, h)
+    tint, fade = info.get("color", [1, 1, 1]), info.get("transparency", 0)
+    if tint != [1, 1, 1] or fade > 0:
+        a = np.asarray(part, dtype=np.float64).copy()
+        a[..., :3] *= np.array(tint)
+        a[..., 3] *= 1 - fade
+        part = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
+    left, top = max(0, -x0), max(0, -y0)
+    img.alpha_composite(part.crop((left, top, w, h)), (x0 + left, y0 + top))
+
+
+def draw_shadow(img, rect, sh, radius):
+    """A UIShadow: the object's rounded rectangle, offset and spread, blurred by BlurRadius (0 = a hard pixel
+    shadow), in its colour, behind the object."""
+    x0, y0, x1, y1 = rect
+    ox, oy = sh["offset"][0] * SCALE, sh["offset"][1] * SCALE
+    sx, sy = sh["spread"][0] * SCALE, sh["spread"][1] * SCALE
+    r = (x0 + ox - sx, y0 + oy - sy, x1 + ox + sx, y1 + oy + sy)
+    blur = sh.get("blur", 0) * SCALE
+    pad = int(blur * 2) + 2
+    lx, ly = int(r[0]) - pad, int(r[1]) - pad
+    w, h = int(math.ceil(r[2])) - lx + pad, int(math.ceil(r[3])) - ly + pad
+    if w <= 0 or h <= 0 or lx > img.width or ly > img.height or lx + w < 0 or ly + h < 0:
+        return
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((r[0] - lx, r[1] - ly, r[2] - lx, r[3] - ly), radius=radius, fill=255)
+    if blur > 0:
+        mask = mask.filter(ImageFilter.GaussianBlur(blur / 2))
+    alpha = 1 - sh.get("transparency", 0)
+    layer = Image.new("RGBA", (w, h), rgba(sh["color"]))
+    layer.putalpha(Image.fromarray((np.asarray(mask, dtype=np.float64) * alpha).astype(np.uint8)))
+    left, top = max(0, -lx), max(0, -ly)
+    if left >= w or top >= h:
+        return
+    img.alpha_composite(layer.crop((left, top, w, h)), (lx + left, ly + top))
 
 
 def sample(keys, t):
@@ -698,10 +781,13 @@ def gradient_fill(img, rect, color, alpha, radius, grad):
     img.alpha_composite(Image.fromarray(layer, "RGBA"), (cx0, cy0))
 
 
-def outline(img, rect, color, alpha, thickness, radius):
-    """A UIStroke round the border: outside the box, following its rounded corners."""
+def outline(img, rect, color, alpha, thickness, radius, position="Outer"):
+    """A UIStroke round the border, following its rounded corners: outside the box (Outer, the default), inside it
+    (Inner) or across its edge (Center)."""
     x0, y0, x1, y1 = rect
     t = thickness
+    out_by = t if position == "Outer" else (t / 2 if position == "Center" else 0)
+    in_by = t - out_by
     pad = int(t) + 2
     ox, oy = int(x0) - pad, int(y0) - pad
     w, h = int(math.ceil(x1)) - ox + pad, int(math.ceil(y1)) - oy + pad
@@ -709,9 +795,11 @@ def outline(img, rect, color, alpha, thickness, radius):
         return
     ring = Image.new("L", (w, h), 0)
     d = ImageDraw.Draw(ring)
-    d.rounded_rectangle((x0 - t - ox, y0 - t - oy, x1 + t - ox, y1 + t - oy), radius=radius + t if radius > 0 else 0,
-                        fill=255)
-    d.rounded_rectangle((x0 - ox, y0 - oy, x1 - ox, y1 - oy), radius=radius, fill=0)
+    d.rounded_rectangle((x0 - out_by - ox, y0 - out_by - oy, x1 + out_by - ox, y1 + out_by - oy),
+                        radius=radius + out_by if radius > 0 else 0, fill=255)
+    if x1 - x0 > 2 * in_by and y1 - y0 > 2 * in_by:
+        d.rounded_rectangle((x0 + in_by - ox, y0 + in_by - oy, x1 - in_by - ox, y1 - in_by - oy),
+                            radius=max(0, radius - in_by), fill=0)
     layer = Image.new("RGBA", (w, h), rgba(color, alpha))
     layer.putalpha(Image.fromarray((np.asarray(ring, dtype=np.float64) * alpha).astype(np.uint8)))
     left, top = max(0, -ox), max(0, -oy)
@@ -750,6 +838,8 @@ def draw_nodes(img, out, images=()):
         if corner:
             radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
             radius = min(radius, min(x1 - x0, y1 - y0) / 2)
+        for sh in node.get("shadows", []):
+            draw_shadow(img, rect, sh, radius)
         if alpha > 0.01:
             if node.get("gradient"):
                 gradient_fill(img, rect, node["bg"], alpha, radius, node["gradient"])
@@ -757,14 +847,18 @@ def draw_nodes(img, out, images=()):
                 fill(img, rect, node["bg"], alpha, radius)
         if node.get("image") and images:
             draw_image(img, rect, node["image"], images, node.get("rotation", 0))
-        stroke = node.get("uiStroke")
-        if stroke and not stroke.get("text") and stroke.get("transparency", 0) < 0.99:
-            outline(img, rect, stroke["color"], 1 - stroke.get("transparency", 0), stroke["thickness"] * SCALE, radius)
+        strokes = node.get("uiStrokes") or ([node["uiStroke"]] if node.get("uiStroke") else [])
+        for st in sorted(strokes, key=lambda st: st.get("zIndex", 1)):
+            if not st.get("text") and st.get("transparency", 0) < 0.99:
+                outline(img, rect, st["color"], 1 - st.get("transparency", 0), st["thickness"] * SCALE, radius,
+                        st.get("position", "Outer"))
+        text_strokes = [st for st in strokes if st.get("text")]
+        stroke = text_strokes[-1] if text_strokes else None
         if node.get("text") and node.get("textT", 0) < 0.99:
             text_stroke = None
             if stroke and stroke.get("text"):
                 text_stroke = (rgba(stroke["color"], 1 - stroke.get("transparency", 0)),
-                               max(1, int(stroke["thickness"] * SCALE)))
+                               max(1, int(round(stroke["thickness"] * SCALE))))
             elif node.get("stroke"):
                 text_stroke = (rgba(node.get("strokeColor", [0, 0, 0]), 1 - node.get("strokeT", 0)), SCALE)
             pad = child_of(node, "UIPadding")

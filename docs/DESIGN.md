@@ -617,6 +617,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Results, Tutorial, phase banners and map overlays (names, pip bars, army badges, status pills, crown) restyled on the UI kit
 - [x] Races (Humans, Elves, Orcs, Dwarves) and troop types (infantry, archers, cavalry, one elite per race): map data, rules, bots, the recruit buttons, army composition chips, races on the draft and the nations drawer (evidence: `docs/BALANCE.md` section 18)
 - [x] Races and troops on the map: each race's capital in the pixel art, a soldier of the nation's race as the default army token, the main troop type's icon on army badges and province sheet chips, the race icon on the owner chip (harness scenario `kingdoms`)
+- [x] "Slate & Brass" GUI (`docs/UI_DIRECTION.md` section 8), step 1: painted pixel frames (`FrameArt`, `Frames`, `Widgets.skin`) and enamel buttons everywhere; the harness draws 9-slice frames, shadows and stacked strokes
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 

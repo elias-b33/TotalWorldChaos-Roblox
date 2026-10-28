@@ -824,10 +824,62 @@ roblox.implementMethod("HttpService", "GenerateGUID", function(_service, wrap)
 	return if wrap == false then guid else "{" .. guid .. "}"
 end)
 
--- Property-changed signals exist but never fire headless (sizes and positions don't change here).
+-- Property-changed signals. Sizes and positions never change headless (there is no layout engine), but scripts do
+-- change properties other scripts follow: a skinned widget's caption mirrors its root's Text, its face follows the
+-- root's padding and colour. Each signal remembers the value it last saw, and Emulator.flushProperties() fires the
+-- ones whose property changed since. Polling every frame would be slow, so screenshots flush first (Scene.save):
+-- what they show matches what Roblox would draw.
+local watched = {} -- { inst, property, last, signal }
+
+local function readProperty(inst, property)
+	local ok, value = pcall(function()
+		return inst[property]
+	end)
+	return ok, value
+end
+
 roblox.implementMethod("Instance", "GetPropertyChangedSignal", function(inst, property)
-	return eventOf(inst, "PropertyChanged_" .. tostring(property), false)
+	local name = "PropertyChanged_" .. tostring(property)
+	local fresh = events[inst] == nil or events[inst][name] == nil
+	local sig = eventOf(inst, name, false)
+	if fresh then
+		local ok, value = readProperty(inst, property)
+		if ok then
+			table.insert(watched, { inst = inst, property = property, last = value, signal = sig })
+		end
+	end
+	return sig
 end)
+
+local function inDataModel(inst): boolean
+	local node = inst
+	while node.Parent ~= nil do
+		node = node.Parent
+	end
+	return node.ClassName == "DataModel"
+end
+
+function Emulator.flushProperties()
+	for _ = 1, 3 do -- a handler may change what another one follows
+		local fired = false
+		local keep = {}
+		for _, w in watched do
+			if inDataModel(w.inst) then -- destroyed or dropped objects stop being watched
+				table.insert(keep, w)
+				local ok, value = readProperty(w.inst, w.property)
+				if ok and value ~= w.last then
+					w.last = value
+					w.signal:Fire()
+					fired = true
+				end
+			end
+		end
+		watched = keep
+		if not fired then
+			break
+		end
+	end
+end
 
 local closeCallbacks = {}
 roblox.implementMethod("DataModel", "BindToClose", function(_dm, fn)
@@ -1356,6 +1408,10 @@ function Emulator.addClient(name: string, viewport: any?, userId: number?): Mach
 	pcall(function()
 		dm:GetService("Workspace").Terrain = terrain
 	end)
+	-- Roblox's top-bar row on a phone: 58 px tall, its menu buttons in the first 104 px (docs/UI_DIRECTION.md 7.9)
+	local guiService = dm:GetService("GuiService")
+	guiService.TopbarInset = roblox.Rect.new(104, 0, client.viewport.X, 58)
+	guiService.ReducedMotionEnabled = false
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 70
 	cam.ViewportSize = client.viewport

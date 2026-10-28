@@ -224,7 +224,7 @@ function Draft.init()
 	bannerText = Widgets.title(banner, "", Theme.text.title, BANNER_HEIGHT)
 	bannerText.Position = UDim2.fromOffset(16, 0)
 	bannerText.Size = UDim2.new(1, -170, 1, 0)
-	bannerIcon = Widgets.leadIcon(bannerText, "star", Theme.size.iconButton)
+	bannerIcon = Widgets.leadIcon(bannerText, "star", Theme.icon.small)
 	timer = Widgets.chip(banner, "hourglass", "", 96, 34)
 	timer.Name = "Timer"
 	timer.AnchorPoint = Vector2.new(1, 0.5)

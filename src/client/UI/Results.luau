@@ -421,7 +421,7 @@ local function render()
 	)
 	heading.Name = "Winner"
 	heading.LayoutOrder = 1
-	Widgets.leadIcon(heading, if iWon then "trophy" else "flag", Theme.size.iconButton)
+	Widgets.leadIcon(heading, if iWon then "trophy" else "flag", Theme.icon.small)
 	local how = HOW[result.kind] or { icon = "flag", text = result.kind }
 	local howLine = Widgets.label(body, how.text, Theme.text.body, 22)
 	howLine.Name = "How"

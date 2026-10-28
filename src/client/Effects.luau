@@ -912,7 +912,7 @@ function Effects.init()
 	local pad = Widgets.padding(banner, Theme.space.xl, 0)
 	pad.PaddingBottom = UDim.new(0, math.floor(BANNER_HEIGHT * Theme.bevel)) -- the words sit above the darker edge
 	pad.PaddingRight = UDim.new(0, Theme.space.xl + Theme.space.s)
-	bannerIcon = Widgets.leadIcon(banner, "war", Theme.size.iconLarge, Theme.space.m)
+	bannerIcon = Widgets.leadIcon(banner, "war", Theme.icon.medium, Theme.space.m)
 	bannerScale = Instance.new("UIScale")
 	bannerScale.Parent = banner
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

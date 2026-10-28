@@ -409,7 +409,7 @@ local function build(): Refs
 	title.AutomaticSize = Enum.AutomaticSize.X
 	title.TextTruncate = Enum.TextTruncate.None
 	title.LayoutOrder = 0
-	Widgets.leadIcon(title, "trophy", Theme.size.iconButton)
+	Widgets.leadIcon(title, "trophy", Theme.icon.small)
 	local tabs: { [Tab]: TextButton } = {}
 	for i, name in TABS do
 		local b = Widgets.tab(row, name, 0, false, function()

@@ -97,7 +97,7 @@ function ArmySheet.init(goHandler: (number, number) -> (), cancelHandler: () -> 
 	Widgets.list(sheet, false, Theme.space.s)
 	title = Widgets.title(sheet, "", Theme.text.title, 30)
 	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "sword", Theme.size.iconButton)
+	Widgets.leadIcon(title, "sword", Theme.icon.small)
 	chips = Instance.new("Frame")
 	chips.Name = "Troops"
 	chips.BackgroundTransparency = 1

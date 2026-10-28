@@ -185,7 +185,7 @@ local function buildPanel()
 	header.Parent = p
 	local title = Widgets.title(header, "Private server settings", Theme.text.heading, HEADER_HEIGHT)
 	title.Size = UDim2.fromScale(0.45, 1)
-	Widgets.leadIcon(title, "gear", Theme.size.iconButton)
+	Widgets.leadIcon(title, "gear", Theme.icon.small)
 	rewardLabel = Widgets.hint(header, "", TEXT_SIZE, HEADER_HEIGHT)
 	rewardLabel.Name = "Rewards"
 	rewardLabel.Position = UDim2.fromScale(0.45, 0)

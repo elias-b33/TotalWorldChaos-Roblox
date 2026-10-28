@@ -1,45 +1,80 @@
 --!strict
--- The UI's design tokens (docs/DESIGN.md "UI style"): the "pixel kingdom" look that sits on WorldBox's map.
--- Chunky navy panels with a 2 px ink outline and a bevel, warm gold accents, buttons with a darker bottom edge
--- that press down, Fredoka One for titles and numbers, Builder Sans for everything else. Every screen takes its
--- colours, fonts, sizes and spacing from here (through Widgets), never its own.
+-- The UI's design tokens (docs/UI_DIRECTION.md "Slate & Brass", docs/DESIGN.md "UI style"): slate panels with a lit
+-- edge, iron bands on in-match sheets and brass on reward and meta screens, enamel buttons on a thick base,
+-- recessed wells, all painted on the map's 2 px pixel grid (FrameArt). Colour encodes role: gold for the one
+-- primary action, emerald for confirm and buy, crimson for war and close, azure for diplomacy and info, royal for
+-- Primordial and season content, slate for everything secondary. Fredoka One for titles, numbers and captions
+-- (outlined in ink), Builder Sans for body text. Every screen takes its colours, fonts, sizes and spacing from here
+-- (through Widgets), never its own.
 
 local Theme = {}
 
 local hex = Color3.fromHex
 
 Theme.color = {
-	ink = hex("#0b0d1a"), -- outlines around panels, buttons and chips
-	navy = hex("#1d2448"), -- panels and sheets
-	navyDeep = hex("#12172f"), -- the top bar, wells, chips and full-screen backdrops
-	navyRaised = hex("#2a3366"), -- cards inside a panel
-	gold = hex("#f5c242"), -- titles, highlights, the selected tab
-	goldDeep = hex("#b67f24"),
-	goldPale = hex("#ffe9a6"),
-	text = hex("#fff7e3"), -- warm white body text
-	textDim = hex("#b6bcdc"), -- hints and secondary lines
-	textDark = hex("#2b1d0c"), -- text on gold
-	primary = hex("#3d7ce0"), -- the main button colour (blue)
-	good = hex("#3aa856"), -- confirm, accept, go (green)
-	danger = hex("#d9434b"), -- war, leave, destructive (red)
-	secondary = hex("#4a5385"), -- cancel and neutral options (slate)
-	disabled = hex("#353a57"), -- can't be pressed now
-	textDisabled = hex("#8a8fb0"),
-	special = hex("#8a4fd8"), -- Primordial powers (purple)
-	warn = hex("#ff7a6e"), -- negative numbers
+	ink = hex("#0b0d1a"), -- every outline, text strokes, shadows
+	slate950 = hex("#0e111c"), -- full-screen dims (at 40% transparency)
+	slate900 = hex("#141927"), -- well fill
+	slate850 = hex("#191f30"), -- well light edge, panel bottom shade
+	slate800 = hex("#1e2538"), -- panel fill
+	slate700 = hex("#283149"), -- raised cards, slot tile faces, panel lip
+	slate600 = hex("#36415f"), -- lit plate edges, dividers
+	slate500 = hex("#4c5878"), -- raised plate edges
+	slate400 = hex("#6b7799"), -- muted icons on slate
+	slate300 = hex("#98a2c0"), -- section labels, minor numbers
+	brass100 = hex("#fff1b8"),
+	brass200 = hex("#ffe08a"),
+	brass300 = hex("#f6c453"),
+	brass400 = hex("#e0a23a"),
+	brass500 = hex("#b8752a"),
+	brass600 = hex("#7e4a1e"),
+	iron200 = hex("#c9d1e0"),
+	iron400 = hex("#8f9ab3"),
+	iron500 = hex("#5f6a85"),
+	iron600 = hex("#3d4660"),
+	text = hex("#fff6e0"), -- body and captions (warm white)
+	textDim = hex("#aeb6d0"), -- hints, secondary lines
+	textDark = hex("#2a1a08"), -- text on gold
+	textDisabled = hex("#8a91ad"), -- disabled captions
+	gold = hex("#f4bf45"), -- the primary button, gold text and highlights, selection
+	emerald = hex("#41b54a"), -- confirm, accept, go, Robux prices, claim, equip
+	crimson = hex("#d8453e"), -- war, close, leave, danger
+	azure = hex("#3a85de"), -- diplomacy (ally), info, the trophies button
+	royal = hex("#8a52da"), -- Primordial powers, season pass
+	slate = hex("#4a5576"), -- secondary buttons: cancel, not now, pager, top-bar icon buttons
+	disabled = hex("#3a4157"), -- can't be pressed now
+	peace = hex("#55c35a"), -- phase medallions
+	war = hex("#e0483f"),
+	cataclysm = hex("#9a5bea"),
+	negative = hex("#ff6b5e"), -- negative gold, unaffordable costs
+	positive = hex("#8bea7c"), -- gains
+	-- the "pixel kingdom" names, kept as aliases while screens migrate
+	navy = hex("#1e2538"), -- slate800
+	navyDeep = hex("#141927"), -- slate900
+	navyRaised = hex("#283149"), -- slate700
+	goldDeep = hex("#b8752a"), -- brass500
+	goldPale = hex("#ffe08a"), -- brass200
+	primary = hex("#3a85de"), -- azure
+	good = hex("#41b54a"), -- emerald
+	danger = hex("#d8453e"), -- crimson
+	secondary = hex("#4a5576"), -- slate
+	special = hex("#8a52da"), -- royal
+	warn = hex("#ff6b5e"), -- negative
 }
 
 Theme.font = {
 	display = Font.fromEnum(Enum.Font.FredokaOne), -- titles, buttons, numbers
 	body = Font.fromEnum(Enum.Font.BuilderSansBold), -- labels and lines
 	bodyLight = Font.fromEnum(Enum.Font.BuilderSansMedium), -- hints
+	label = Font.fromEnum(Enum.Font.BuilderSansExtraBold), -- section labels, rarity tags (uppercase)
 }
 
 -- Type scale in px: nothing under 14 on a phone (docs/DESIGN.md "Rules for every screen").
 Theme.text = {
 	hero = 28, -- full-screen titles (map vote, results)
-	title = 22, -- panel titles
+	title = 20, -- title plates
 	heading = 18, -- sheet titles, big numbers
+	button = 17, -- button captions (16 or 15 when dense)
 	body = 15,
 	small = 14,
 }
@@ -47,24 +82,45 @@ Theme.text = {
 Theme.space = { xs = 4, s = 6, m = 8, l = 12, xl = 16 }
 Theme.radius = { s = 4, m = 6, l = 8 }
 Theme.stroke = 2 -- every outline is 2 px
-Theme.bevel = 0.16 -- the darker bottom edge of buttons, as a share of their height
+Theme.bevel = 0.16 -- the flat look's darker bottom edge on buttons, as a share of their height
+Theme.art = 2 -- GUI px per art pixel: frames are drawn at SliceScale 2, so sizes and positions are even
+
+-- Icons only at 1x, 2x and 3x of the 16×16 sprites: 16 beside text, 32 on buttons, tabs, tiles and counters, 48
+-- in reward cells and heroes.
+Theme.icon = { small = 16, medium = 32, large = 48 }
 
 Theme.size = {
 	button = 44, -- the smallest touch target
-	buttonLarge = 48,
-	icon = 20, -- icons beside text
-	iconButton = 24, -- icons inside buttons
-	iconLarge = 32,
-	chip = 30,
-	bar = 44, -- the HUD's top bar
+	buttonLarge = 52, -- slot tiles and large actions
+	icon = 16, -- icons beside text
+	iconButton = 32, -- icons alone on a button
+	iconLarge = 48, -- reward cells and heroes
+	chip = 28,
+	counter = 32,
+	bar = 44, -- the HUD's plates
+	titlePlate = 28,
 }
 
--- Cosmetic rarities (shop cards, season pass rewards): the card outline and the rarity line.
+-- Window frames: the painted border's thickness and the content padding inside it (docs/UI_DIRECTION.md 7.1).
+Theme.frame = {
+	border = { left = 12, right = 10, top = 14, bottom = 12 },
+	pad = { side = 16, top = 22, topBare = 18, bottom = 14 },
+}
+
+-- Depth (docs/UI_DIRECTION.md 6.6): hard pixel shadows under plates and windows, glows under rare things.
+Theme.shadow = {
+	plate = { y = 4, transparency = 0.55 }, -- plates over the map: top-bar items, toasts, Lobby buttons
+	button = { y = 3, transparency = 0.6 }, -- buttons over the map
+	window = { y = 6, transparency = 0.5 }, -- windows and sheets
+	glow = { blur = 12, transparency = 0.45 }, -- rare shop cards, claimable rewards
+}
+
+-- Cosmetic rarities (shop cards, season pass reward cells): the frame band, the tag and the glow.
 Theme.rarity = {
-	Common = hex("#c9cde0"),
-	Rare = hex("#5aa8ff"),
+	Common = hex("#b9c1d9"),
+	Rare = hex("#4fa3ff"),
 	Epic = hex("#b36ff2"),
-	Legendary = hex("#ff9f3a"),
+	Legendary = hex("#ffa53a"),
 } :: { [string]: Color3 }
 
 return Theme
