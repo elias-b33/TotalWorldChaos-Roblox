@@ -51,6 +51,7 @@ local function dumpGui(inst)
 			node.textXAlign = enumName(inst.TextXAlignment)
 			node.textWrapped = inst.TextWrapped
 			node.stroke = inst.TextStrokeTransparency < 0.9
+			node.textT = inst.TextTransparency
 		end
 		if inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
 			local image = Emulator.editableImage(inst.ImageContent.Uri or "")

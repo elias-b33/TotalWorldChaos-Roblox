@@ -32,6 +32,10 @@ local anchor: Anchor? = nil
 local applied = { x = math.huge, y = math.huge, w = -1, h = -1 }
 local lastZoom = -1
 local zoomListeners: { (number) -> () } = {}
+local shakeStrength = 0 -- screen pixels at the start of the current shake
+local shakeSeconds = 0
+local shakeLeft = 0
+local shakeOffset = Vector2.zero
 
 local function viewport(): Vector2
 	local camera = workspace.CurrentCamera
@@ -148,6 +152,13 @@ function MapView.toMap(screenPos: Vector2): Vector2
 	return focus + (screenPos - viewCentre()) / zoom
 end
 
+-- Is this map point on screen (or within `margin` screen pixels of it)?
+function MapView.onScreen(p: Vector2, margin: number): boolean
+	local s = MapView.toScreen(p)
+	local vp = viewport()
+	return s.X >= -margin and s.Y >= TOP_BAR - margin and s.X <= vp.X + margin and s.Y <= vp.Y + margin
+end
+
 -- The region zoom (the middle wheel step), for things that should show from there on.
 function MapView.regionZoom(): number
 	return levelZoom(2)
@@ -176,8 +187,8 @@ local function apply()
 	end
 	local centre = viewCentre()
 	-- whole pixels, so the pixel art doesn't shimmer while panning
-	local x = math.floor(centre.X - focus.X * zoom + 0.5)
-	local y = math.floor(centre.Y - focus.Y * zoom + 0.5)
+	local x = math.floor(centre.X - focus.X * zoom + 0.5) + shakeOffset.X
+	local y = math.floor(centre.Y - focus.Y * zoom + 0.5) + shakeOffset.Y
 	local w = math.floor(mapSize.X * zoom + 0.5)
 	local h = math.floor(mapSize.Y * zoom + 0.5)
 	if x ~= applied.x or y ~= applied.y then
@@ -194,6 +205,27 @@ local function apply()
 			fn(zoom)
 		end
 	end
+end
+
+-- Shake the map for a moment (a meteor, an earthquake): up to `strength` screen pixels, fading out over
+-- `seconds`. A weaker shake doesn't cut a stronger one short.
+function MapView.shake(strength: number, seconds: number)
+	local current = if shakeSeconds > 0 then shakeStrength * shakeLeft / shakeSeconds else 0
+	if strength >= current then
+		shakeStrength, shakeSeconds, shakeLeft = strength, seconds, seconds
+	end
+end
+
+-- The shake's offset this frame, in whole screen pixels (so the pixel art stays crisp).
+local function stepShake(dt: number)
+	if shakeLeft <= 0 then
+		shakeOffset = Vector2.zero
+		return
+	end
+	shakeLeft = math.max(0, shakeLeft - dt)
+	local amount = shakeStrength * shakeLeft / shakeSeconds
+	local t = os.clock()
+	shakeOffset = Vector2.new(math.floor(amount * math.sin(t * 61) + 0.5), math.floor(amount * math.cos(t * 47) + 0.5))
 end
 
 -- Zoom to z keeping the map point under screenPos where it is (pinch midpoint, mouse pointer).
@@ -303,6 +335,7 @@ function MapView.init(onTap: TapHandler)
 				focus = targetFocus
 			end
 		end
+		stepShake(dt)
 		apply()
 	end)
 end

@@ -9,6 +9,7 @@ local Client = script.Parent
 local ArmySheet = require(Client.UI.ArmySheet)
 local ClientState = require(Client.ClientState)
 local Draft = require(Client.UI.Draft)
+local Effects = require(Client.Effects)
 local Hud = require(Client.UI.Hud)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
@@ -22,6 +23,7 @@ local ProfileState = require(Client.ProfileState)
 local ProvinceSheet = require(Client.UI.ProvinceSheet)
 local Relations = require(Client.Relations)
 local Results = require(Client.UI.Results)
+local Sounds = require(Client.Sounds)
 
 local selectedArmy: number? = nil
 
@@ -139,6 +141,8 @@ Draft.init()
 ClientState.onReset(function()
 	selectedArmy = nil
 end)
+Effects.init() -- after MapRenderer: draws on the canvas it builds
+Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
 ProfileState.init()
 LobbyState.init()
 ClientState.init()

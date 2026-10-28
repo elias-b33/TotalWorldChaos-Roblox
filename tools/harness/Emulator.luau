@@ -236,7 +236,7 @@ local EVENT_PROPS = {
 	},
 	{ "RunService", { "Heartbeat", "RenderStepped", "Stepped" }, false },
 	{ "GuiButton", { "Activated", "MouseButton1Click" }, false },
-	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged" }, false },
+	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged", "DescendantAdded" }, false },
 }
 for _, spec in EVENT_PROPS do
 	local class, names, queued = spec[1], spec[2], spec[3]
@@ -461,6 +461,130 @@ end)
 function Emulator.terrainBlocks(client: Machine)
 	return terrainBlocks[client.dm:GetService("Workspace"):FindFirstChildOfClass("Terrain")] or {}
 end
+
+---------------------------------------------------------------------------------------------- tweens and sounds
+
+-- TweenService: tweens step once a frame in Emulator.run (numbers, and anything with :Lerp: UDim2, Color3,
+-- Vector2...), with the common easing styles, delays, repeats and reverses, so screenshots catch effects
+-- mid-animation. Sounds don't play; every Play is logged in Emulator.sounds instead.
+local TweenInfo = {}
+function TweenInfo.new(time, style, direction, repeatCount, reverses, delayTime)
+	return {
+		Time = time or 1,
+		EasingStyle = style or roblox.Enum.EasingStyle.Quad,
+		EasingDirection = direction or roblox.Enum.EasingDirection.Out,
+		RepeatCount = repeatCount or 0,
+		Reverses = reverses or false,
+		DelayTime = delayTime or 0,
+	}
+end
+
+local activeTweens = {}
+
+local function easeIn(style: string, t: number): number
+	if style == "Linear" then
+		return t
+	elseif style == "Sine" then
+		return 1 - math.cos(t * math.pi / 2)
+	elseif style == "Cubic" then
+		return t * t * t
+	elseif style == "Back" then
+		return t * t * (2.70158 * t - 1.70158)
+	end
+	return t * t -- Quad and anything else
+end
+
+local function ease(info, t: number): number
+	local style = info.EasingStyle.Name
+	local dir = info.EasingDirection.Name
+	if dir == "In" then
+		return easeIn(style, t)
+	elseif dir == "Out" then
+		return 1 - easeIn(style, 1 - t)
+	end
+	return if t < 0.5 then easeIn(style, t * 2) / 2 else 1 - easeIn(style, (1 - t) * 2) / 2
+end
+
+local function lerp(a, b, t: number)
+	if type(a) == "number" then
+		return a + (b - a) * t
+	end
+	local ok, v = pcall(function()
+		return a:Lerp(b, t)
+	end)
+	if ok then
+		return v
+	end
+	return if t >= 1 then b else a
+end
+
+roblox.implementMethod("TweenService", "Create", function(_service, inst, info, goals)
+	local tween = { Instance = inst, Completed = Signal.new() }
+	function tween.Play(self)
+		self.from = {}
+		for prop in goals do
+			self.from[prop] = inst[prop]
+		end
+		self.started = now
+		activeTweens[self] = true
+	end
+	function tween.Cancel(self)
+		activeTweens[self] = nil
+	end
+	tween.Pause = tween.Cancel
+	tween.Destroy = tween.Cancel
+	function tween.step(self)
+		local elapsed = now - self.started - info.DelayTime
+		if elapsed < 0 then
+			return
+		end
+		local cycle = info.Time * (if info.Reverses then 2 else 1)
+		local loops = if cycle > 0 then math.floor(elapsed / cycle) else math.huge
+		local done = info.RepeatCount >= 0 and loops > info.RepeatCount
+		local alpha
+		if done then
+			alpha = if info.Reverses then 0 else 1
+		else
+			local within = (elapsed - loops * cycle) / math.max(info.Time, 1e-6)
+			alpha = if within > 1 then 2 - within else within
+		end
+		local k = ease(info, math.clamp(alpha, 0, 1))
+		for prop, goal in goals do
+			inst[prop] = lerp(self.from[prop], goal, k)
+		end
+		if done then
+			activeTweens[self] = nil
+			self.Completed:Fire(roblox.Enum.PlaybackState.Completed)
+		end
+	end
+	return tween
+end)
+
+local function stepTweens()
+	local list = {}
+	for t in activeTweens do
+		table.insert(list, t)
+	end
+	for _, t in list do
+		if activeTweens[t] then
+			local ok, err = pcall(t.step, t)
+			if not ok then
+				activeTweens[t] = nil
+				table.insert(errors, "[tween] ERROR " .. tostring(err))
+				log("[tween] ERROR " .. tostring(err))
+			end
+		end
+	end
+end
+
+Emulator.sounds = {} -- { name, id, time } for every Sound:Play()
+
+roblox.implementMethod("Sound", "Play", function(sound)
+	table.insert(Emulator.sounds, { name = sound.Name, id = sound.SoundId, time = now })
+end)
+roblox.implementMethod("Sound", "Stop", function() end)
+roblox.implementMethod("Sound", "Pause", function() end)
+roblox.implementMethod("Sound", "Resume", function() end)
 
 ---------------------------------------------------------------------------------------------- data stores
 
@@ -836,6 +960,7 @@ makeEnv = function(m: Machine, scriptInst)
 			none = roblox.Content.none,
 		},
 		RaycastParams = RaycastParams,
+		TweenInfo = TweenInfo,
 		os = {
 			clock = function()
 				return now
@@ -1029,6 +1154,7 @@ function Emulator.run(seconds: number)
 			eventOf(rs, "RenderStepped"):Fire(FRAME)
 			eventOf(rs, "Heartbeat"):Fire(FRAME)
 		end
+		stepTweens()
 	end
 end
 

@@ -597,7 +597,7 @@ def draw_nodes(img, out, images=()):
             ImageDraw.Draw(img).rectangle(
                 (x0 - t, y0 - t, x1 + t - 1, y1 + t - 1), outline=rgba(stroke["color"]), width=max(1, int(t))
             )
-        if node.get("text"):
+        if node.get("text") and node.get("textT", 0) < 0.5:
             draw_text_block(
                 img,
                 rect,
