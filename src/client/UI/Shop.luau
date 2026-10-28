@@ -46,20 +46,42 @@ local OFFERS_PER_PAGE = 3 -- offer cards are wider: what's inside is a list
 local TODAY_COLUMNS = 6 -- 4 daily and 2 weekly slots
 local HISTORY_PER_PAGE = 6
 local BAR = Widgets.BUTTON_HEIGHT -- the header and the tab row
-local GAP = Theme.space.m -- between cards
+local GAP = 9 -- between item cards: five 152 px cards fill an 844 px phone's 796 (docs/UI_DIRECTION.md 7.12)
+local OFFER_GAP = Theme.space.m
 local TODAY_GAP = Theme.space.s
 local TAB_GAP = Theme.space.xs
 local FOOTER_HEIGHT = 18
-local PREVIEW_HEIGHT = 52
-local COMPACT_PREVIEW = 40 -- the Today tab's cards: their section titles take a line
-local TAG_HEIGHT = 36
-local BUTTONS_HEIGHT = 2 * Widgets.BUTTON_HEIGHT + Theme.space.s -- a card's price buttons, stacked
-local TITLE_HEIGHT = 32 -- an offer card's icon and name
+-- the window: at most as big as on an 844 x 390 phone (a tablet shows the same cards larger, by its DeviceScale),
+-- and what its padding, header, tabs and footer leave for the cards (the padding under the title plate and at the
+-- bottom, two 44 px rows, the footer and four gaps, the header's included)
+local MAX_WINDOW = Vector2.new(828, 366)
+local CHROME = Vector2.new(2 * Theme.frame.pad.side, 160)
+-- a card (docs/UI_DIRECTION.md 7.12): its rarity tag rides on its top edge, the lit display well under it, the
+-- name, a detail line when there is room, and the prices at the bottom
+local TAG_ROOM = 10 -- above the cards: their tags and title plates ride on the top edge
+local TAG_RIDE = 10 -- a rarity tag's top above its card
+local RARITY_TAG_HEIGHT = 26
+local CARD_SIDE = 12 -- the display well and the prices inside the card's frame
+-- the well's top, the gap under it, the space over the bottom area and under it: under a tag on a full card, tighter
+-- on the Today tab's six (no tag: the well starts inside the frame's top band)
+local NORMAL = { top = 22, gap = 4, spacing = 6, bottom = 14 }
+local COMPACT = { top = 14, gap = 2, spacing = 4, bottom = 12 }
+local WELL_RIM = 3 -- the glow inside the well's rim
+local WELL_INSET = 4 -- round the preview inside the well
+local MIN_WELL = 24
+local PREVIEW = 48 -- a preview's height in a full-size well
+local NAME_HEIGHT = 18
+local DETAIL_HEIGHT = 16
+local PRICE_PAD = 6 -- a price button's sides
+local PRICE_GAP = 4 -- between two prices side by side, or stacked
+local TAG_HEIGHT = 32
+local TITLE_HEIGHT = 22 -- a bundle card's name
 local LINE = 17 -- a 14 px line
 local HISTORY_ROW = 32
 local DATE_WIDTH = 104
 local PRICE_WIDTH = 96
 local TEST_WIDTH = 150
+local GLORY_WIDTH = 96 -- the Glory counter: "12,345" and its medal
 local SECONDS_PER_DAY = 86400
 local DEFAULT_COLOR = 1 -- previews use your nation's colour, or red before you have one
 local SEASON_PASS = "Season Pass"
@@ -116,7 +138,14 @@ local toast: (string) -> () = function(_text: string) end
 local gui: ScreenGui
 local openButton: TextButton
 local panel: Frame
+local panelSize = MAX_WINDOW -- the window's size in phone px (placePanel)
 local offerPanel: Frame
+local offerDim: Frame
+
+-- The cards' row: the window less its padding, header, tabs and footer (phone px).
+local function contentSize(): Vector2
+	return panelSize - CHROME
+end
 local ui: Refs? = nil
 local tab = "Offers"
 local page = 1
@@ -197,97 +226,144 @@ local function centred(
 	return l
 end
 
--- Stack a card's buttons and tags from the bottom of its button area up, each centred.
-local function stack(items: { GuiObject })
-	local y = BUTTONS_HEIGHT
-	for i = #items, 1, -1 do
-		local item = items[i]
-		local h = item.Size.Y.Offset
-		y -= h
-		item.AnchorPoint = Vector2.new(0.5, 0)
-		item.Position = UDim2.new(0.5, 0, 0, y)
-		y -= Theme.space.s
+-- A price's width on its button, estimated for Fredoka One 14 (TextService isn't available everywhere this runs),
+-- erring a little wide: it decides whether a card's two prices fit side by side.
+local function priceWidth(text: string, icon: boolean): number
+	local w = 2 * PRICE_PAD + (if icon then Theme.size.icon + 2 else 0)
+	for _, code in utf8.codes(text) do
+		local c = utf8.char(code)
+		w += if c == ROBUX then 15 elseif string.match(c, "%d") then 8 elseif c == "," or c == " " then 4 else 9
 	end
+	return w
 end
 
-local function buttonArea(card: Frame): Frame
+-- A price button (docs/UI_DIRECTION.md 7.12): 44 px tall, as wide as its currency icon and number in Fredoka One
+-- 14. Robux on emerald (the Robux glyph in the text), Glory on gold (the medal).
+local function priceButton(
+	parent: Instance,
+	icon: string?,
+	text: string,
+	color: Color3,
+	onPress: () -> (),
+	name: string
+): TextButton
+	local b = Widgets.button(parent, text, 0, color, onPress)
+	b.Name = name
+	b.AutomaticSize = Enum.AutomaticSize.X
+	b.TextSize = Theme.text.small
+	b.TextWrapped = false
+	Widgets.padding(b, PRICE_PAD, 0)
+	if icon then
+		Widgets.leadIcon(b, icon, Theme.size.icon, 2)
+	end
+	b:SetAttribute("Estimate", priceWidth(text, icon ~= nil))
+	return b
+end
+
+-- The bottom of a card (prices, Equip, a tag): two prices side by side when both fit (centred, 4 px apart), else
+-- everything stacked and centred, Robux on top. Returns the height it takes.
+local function arrange(area: Frame, items: { GuiObject }, width: number): number
+	if #items == 2 then
+		local a, b = items[1]:GetAttribute("Estimate"), items[2]:GetAttribute("Estimate")
+		if type(a) == "number" and type(b) == "number" and a + PRICE_GAP + b <= width then
+			local row = Widgets.list(area, true, PRICE_GAP)
+			row.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			row.VerticalAlignment = Enum.VerticalAlignment.Top
+			for i, item in items do
+				item.LayoutOrder = i
+			end
+			return Widgets.BUTTON_HEIGHT
+		end
+	end
+	local y = 0
+	for i, item in items do
+		item.AnchorPoint = Vector2.new(0.5, 0)
+		item.Position = UDim2.new(0.5, 0, 0, y)
+		y += item.Size.Y.Offset + (if i < #items then PRICE_GAP else 0)
+	end
+	return y
+end
+
+-- A card's bottom area, `height` px tall over the card's bottom border, as wide as its display well.
+local function buttonArea(card: Frame, height: number, compact: boolean?): Frame
 	local area = Instance.new("Frame")
 	area.Name = "Buttons"
 	area.BackgroundTransparency = 1
 	area.AnchorPoint = Vector2.new(0, 1)
-	area.Position = UDim2.fromScale(0, 1)
-	area.Size = UDim2.new(1, 0, 0, BUTTONS_HEIGHT)
+	area.Position = UDim2.new(0, CARD_SIDE, 1, -(if compact then COMPACT else NORMAL).bottom)
+	area.Size = UDim2.new(1, -2 * CARD_SIDE, 0, height)
 	area.Parent = card
 	return area
 end
 
--- A raised card (Widgets.card) sized by the grid it sits in, outlined in its rarity's colour.
-local function newCard(parent: Instance, name: string, order: number, outline: Color3?): Frame
+-- A card in the grid: `material` is its frame (a rarity's colour, "plate" for free and earned things, "brass" for
+-- VIP and offers), `size` its cell. Children are placed on the card's whole box (no padding).
+local function newCard(parent: Instance, name: string, order: number, material: string | Color3, size: Vector2): Frame
 	local card = Widgets.card(parent)
 	card.Name = name
 	card.LayoutOrder = order
 	card.AutomaticSize = Enum.AutomaticSize.None -- the grid's cell is its size
-	local pad = card:FindFirstChildOfClass("UIPadding")
-	if pad then
-		pad.PaddingLeft = UDim.new(0, Theme.space.s)
-		pad.PaddingRight = UDim.new(0, Theme.space.s)
-		pad.PaddingTop = UDim.new(0, Theme.space.s)
-		pad.PaddingBottom = UDim.new(0, Theme.space.s)
-	end
-	local stroke = card:FindFirstChild("Outline")
-	if outline and stroke and stroke:IsA("UIStroke") then
-		stroke.Color = outline
-	end
+	card.Size = UDim2.fromOffset(size.X, size.Y)
+	Widgets.material(card, material)
+	Widgets.padding(card, 0)
 	return card
 end
 
--- The Robux price button (greyed out during a match: a tap explains why).
-local function robuxButton(parent: Instance, id: string, listPrice: number): TextButton
-	local b = Widgets.fitButton(
-		parent,
-		nil,
-		ROBUX .. " " .. formatNumber(robuxPrice(id, listPrice)),
-		Widgets.BUTTON,
-		function()
-			buyRobux(id)
-		end,
-		"BuyRobux"
-	)
-	if not robuxOpen() then
-		Widgets.setEnabled(b, false)
+-- The rarity tag on a card's top edge (docs/UI_DIRECTION.md 7.12): a small plate in the rarity's colour with the
+-- rarity in capitals, dark text on the light ones. Named "Rarity".
+local function rarityTag(card: Frame, text: string, color: Color3)
+	local t = Instance.new("TextLabel")
+	t.Name = "Rarity"
+	t.AnchorPoint = Vector2.new(0.5, 0)
+	t.Position = UDim2.new(0.5, 0, 0, -TAG_RIDE)
+	t.Size = UDim2.fromOffset(0, RARITY_TAG_HEIGHT)
+	t.AutomaticSize = Enum.AutomaticSize.X
+	t.BackgroundColor3 = color
+	t.BorderSizePixel = 0
+	t.FontFace = Theme.font.label
+	t.TextSize = Theme.text.small
+	t.TextColor3 = if color == Theme.rarity.Common
+			or color == Theme.rarity.Legendary
+			or color == Theme.color.gold
+		then Theme.color.textDark
+		else Theme.color.text
+	t.Text = string.upper(text)
+	t.ZIndex = 3
+	t.Parent = card
+	Widgets.corner(t, Theme.radius.s)
+	Widgets.stroke(t)
+	local pad = Widgets.padding(t, 10, 0)
+	if Widgets.skin(t, "titlePlate", color) then
+		pad.PaddingBottom = UDim.new(0, 4) -- the caption sits on the plate's face, above its darker base rows
 	end
-	return b
 end
 
--- The little picture on a card, `height` px tall (pictures are 4 px less, 4:3 for flags).
-local function preview(parent: Instance, item: Types.CatalogueItem, height: number)
-	local holder = Instance.new("Frame")
-	holder.Name = "Preview"
-	holder.BackgroundTransparency = 1
-	holder.Size = UDim2.new(1, 0, 0, height)
-	holder.Parent = parent
+-- The little picture on a card, at most `h` px tall and `maxWidth` wide: flags 4:3, swatches 3:2, tokens square,
+-- map themes 7:4, power effects 4:3, a nameplate frame round your name, an emote's first frame.
+local function preview(parent: Instance, item: Types.CatalogueItem, h: number, maxWidth: number)
 	local color = myColor()
-	local h = height - 4
 	local function size(aspect: number): UDim2
-		return UDim2.fromOffset(math.floor(h * aspect), h)
+		local height = math.min(h, math.floor(maxWidth / aspect))
+		local width = math.floor(height * aspect)
+		return UDim2.fromOffset(width - width % 2, height - height % 2)
 	end
 	local thing: GuiObject
 	if item.slot == "Flag" then
-		thing = Cosmetics.flagLabel(holder, item.id, color, size(4 / 3))
+		thing = Cosmetics.flagLabel(parent, item.id, color, size(4 / 3))
 	elseif item.slot == "Border" then
-		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, size(1.5))
+		thing = Cosmetics.swatchLabel(parent, item.art, "default", color, size(1.5))
 	elseif item.slot == "Shades" then
-		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, size(1.5))
+		thing = Cosmetics.swatchLabel(parent, "solid", item.art, color, size(1.5))
 	elseif item.slot == "Token" then
-		thing = Cosmetics.tokenLabel(holder, item.id, color, size(1))
+		thing = Cosmetics.tokenLabel(parent, item.id, color, size(1))
 	elseif item.slot == "PowerFx" then
-		thing = Cosmetics.effectLabel(holder, item.id, size(4 / 3))
+		thing = Cosmetics.effectLabel(parent, item.id, size(4 / 3))
 	elseif item.slot == "Theme" then
-		thing = Cosmetics.themeLabel(holder, item.id, size(1.75))
+		thing = Cosmetics.themeLabel(parent, item.id, size(1.75))
 	elseif item.slot == "Frame" then
-		local l = centred(holder, Players.LocalPlayer.Name, Theme.text.small, 28)
-		l.Size = UDim2.new(1, -Theme.space.m, 0, 28)
-		l.BackgroundColor3 = Theme.color.navyDeep
+		local l = centred(parent, Players.LocalPlayer.Name, Theme.text.small, 28)
+		l.Size = UDim2.new(1, -2 * Theme.space.s, 0, 28)
+		l.BackgroundColor3 = Theme.color.slate700
 		l.BackgroundTransparency = 0
 		local frameColor = Cosmetics.frameColor(item.id)
 		if frameColor then
@@ -298,10 +374,98 @@ local function preview(parent: Instance, item: Types.CatalogueItem, height: numb
 		Widgets.corner(l, Theme.radius.m)
 		thing = l
 	else -- emotes and victory animations are emoji over a capital: their first frame
-		thing = centred(holder, string.split(item.art, " ")[1], math.floor(h * 0.7), h)
+		thing = centred(parent, string.split(item.art, " ")[1], math.floor(h * 0.7), h)
 	end
 	thing.AnchorPoint = Vector2.new(0.5, 0.5)
 	thing.Position = UDim2.fromScale(0.5, 0.5)
+	thing.ZIndex = 2
+end
+
+-- The lit display well at the top of a card: a recessed well with a glow of the card's colour falling from its
+-- top. Named "Preview".
+local function displayWell(card: Frame, top: number, height: number, glow: Color3?): ImageLabel
+	local well = Instance.new("ImageLabel")
+	well.Name = "Preview"
+	well.BorderSizePixel = 0
+	well.Position = UDim2.fromOffset(CARD_SIDE, top)
+	well.Size = UDim2.new(1, -2 * CARD_SIDE, 0, height)
+	well.Parent = card
+	Widgets.material(well, "well")
+	if glow then
+		local g = Instance.new("Frame")
+		g.Name = "Glow"
+		g.BorderSizePixel = 0
+		g.BackgroundColor3 = glow
+		g.Position = UDim2.fromOffset(WELL_RIM, WELL_RIM)
+		g.Size = UDim2.new(1, -2 * WELL_RIM, 1, -2 * WELL_RIM)
+		g.Parent = well
+		local fade = Instance.new("UIGradient")
+		fade.Rotation = 90
+		fade.Transparency = NumberSequence.new(0.55, 1)
+		fade.Parent = g
+	end
+	return well
+end
+
+-- Where a page's cards put their wells, names and detail lines, so they line up across the row: under the
+-- tallest bottom area on the page; the well (from `top`) takes what is left (the picture shrinks on a small phone).
+type Geometry = { wellTop: number, wellHeight: number, nameTop: number, detail: boolean }
+
+local function geometry(size: Vector2, area: number, detail: boolean, compact: boolean): Geometry
+	local m = if compact then COMPACT else NORMAL
+	local nameTop = size.Y - m.bottom - area - m.spacing - NAME_HEIGHT - (if detail then DETAIL_HEIGHT else 0)
+	if detail and nameTop - m.gap - m.top < MIN_WELL + DETAIL_HEIGHT then
+		detail = false -- no room: the picture matters more
+		nameTop += DETAIL_HEIGHT
+	end
+	local wellHeight = math.max(nameTop - m.gap - m.top, MIN_WELL)
+	return { wellTop = m.top, wellHeight = wellHeight, nameTop = nameTop, detail = detail }
+end
+
+-- A card built but for its well and name: its bottom area's height, whether it has a detail line, and what places
+-- the rest once the page's geometry is known.
+type Pending = { area: number, detail: boolean, finish: (Geometry) -> () }
+
+-- Finish a page of cards alike once they are all built; `compact` cards (the Today tab's six) have no tag on their
+-- edge and tighter spacing.
+local function finishCards(pending: { Pending }, size: Vector2, compact: boolean?)
+	local area, detail = 0, false
+	for _, p in pending do
+		area = math.max(area, p.area)
+		detail = detail or p.detail
+	end
+	local g = geometry(size, area, detail, compact == true)
+	for _, p in pending do
+		p.finish(g)
+	end
+end
+
+-- A card's name (Fredoka One 16, outlined) and its detail line (dim) under it.
+local function cardName(card: Frame, g: Geometry, name: string, detail: string?)
+	local label = centred(card, name, Theme.text.body + 1, NAME_HEIGHT)
+	label.Name = "Name"
+	label.FontFace = Theme.font.display
+	label.Position = UDim2.fromOffset(Theme.space.m, g.nameTop)
+	label.Size = UDim2.new(1, -2 * Theme.space.m, 0, NAME_HEIGHT)
+	Widgets.textStroke(label)
+	if detail and g.detail then
+		local d = centred(card, detail, Theme.text.small, DETAIL_HEIGHT, Theme.color.textDim)
+		d.Name = "Detail"
+		d.FontFace = Theme.font.bodyLight
+		d.Position = UDim2.fromOffset(Theme.space.m, g.nameTop + NAME_HEIGHT)
+		d.Size = UDim2.new(1, -2 * Theme.space.m, 0, DETAIL_HEIGHT)
+	end
+end
+
+-- The Robux price button (greyed out during a match: a tap explains why).
+local function robuxButton(parent: Instance, id: string, listPrice: number): TextButton
+	local b = priceButton(parent, nil, ROBUX .. " " .. formatNumber(robuxPrice(id, listPrice)), Widgets.GOOD, function()
+		buyRobux(id)
+	end, "BuyRobux")
+	if not robuxOpen() then
+		Widgets.setEnabled(b, false)
+	end
+	return b
 end
 
 -- Is this item or offer in the shop today? Core items always are; rotating ones in their slots (Sim.ShopRotation).
@@ -311,46 +475,53 @@ local function onSaleToday(id: string): boolean
 	return rotation == nil or ShopRotation.onSale(id, rotation.day)
 end
 
-local function itemCard(item: Types.CatalogueItem, order: number, parent: Instance, compact: boolean?)
-	local rarity = Theme.rarity[item.rarity] or Theme.color.textDim
-	local card = newCard(parent, "Card_" .. item.id, order, if item.rarity ~= "Common" then rarity else nil)
-	local top = if compact then COMPACT_PREVIEW else PREVIEW_HEIGHT
-	preview(card, item, top)
-	local name = centred(card, item.name, Theme.text.body, 18)
-	name.Name = "Name"
-	name.Position = UDim2.fromOffset(0, top + 2)
-	local detail = item.rarity
+-- What a card says under its name beyond its rarity (the power an effect is for, "Any map", "Animated").
+local function detailOf(item: Types.CatalogueItem): string?
 	if item.power then
-		detail ..= " · " .. item.power
+		return item.power
 	elseif item.slot == "Theme" and not item.free then
-		detail ..= " · any map"
+		return "Any map"
 	elseif item.animated then
-		detail ..= " · animated"
-	elseif item.free then
-		detail = "Free"
-	elseif item.vipOnly then
-		detail = "VIP only"
-	elseif item.earned then
-		detail ..= " · earned"
+		return "Animated"
 	end
-	local line = centred(
-		card,
-		detail,
-		Theme.text.small,
-		16,
-		if item.free then Theme.color.textDim elseif item.vipOnly then Theme.color.gold else rarity
-	)
-	line.Name = "Rarity"
-	line.Position = UDim2.fromOffset(0, top + 20)
+	return nil
+end
 
-	local area = buttonArea(card)
+-- An item card (docs/UI_DIRECTION.md 7.12): its rarity's frame and tag, the lit display well with the preview,
+-- the name, and at the bottom its prices or what you can do with it (Equip, Get VIP) or a tag saying why not.
+local function itemCard(
+	item: Types.CatalogueItem,
+	order: number,
+	parent: Instance,
+	size: Vector2,
+	compact: boolean?
+): Pending
+	local rarity = Theme.rarity[item.rarity] or Theme.color.textDim
+	local plain = item.free or item.earned
+	local material: string | Color3 = if item.vipOnly then "brass" elseif plain then "plate" else rarity
+	local card = newCard(parent, "Card_" .. item.id, order, material, size)
+	-- six to a row (compact), the frame's colour and the glow say the rarity: a tag would cost the picture its room
+	if not compact then
+		if item.free then
+			rarityTag(card, "Free", Theme.color.slate)
+		elseif item.vipOnly then
+			rarityTag(card, "VIP", Theme.color.gold)
+		else
+			rarityTag(card, item.rarity, rarity)
+		end
+	end
+	if not plain and not item.vipOnly and item.rarity ~= "Common" then
+		Widgets.glow(card, rarity) -- Rare and better
+	end
+
+	local area = buttonArea(card, 0, compact)
 	local items: { GuiObject } = {}
 	if ShopState.owns(item.id) then
 		if item.slot == "Emote" then
 			table.insert(items, Widgets.tag(area, "check", "Owned", TAG_HEIGHT))
 		elseif ShopState.isEquipped(item) then
 			local t = Widgets.tag(area, "check", "Equipped", TAG_HEIGHT)
-			t.TextColor3 = Theme.color.goldPale
+			t.TextColor3 = Theme.color.gold
 			table.insert(items, t)
 		else
 			table.insert(
@@ -378,7 +549,8 @@ local function itemCard(item: Types.CatalogueItem, order: number, parent: Instan
 		table.insert(items, Widgets.tag(area, "ticket", "Season", TAG_HEIGHT))
 	elseif not onSaleToday(item.id) then
 		table.insert(items, Widgets.tag(area, "reroll", "Not today", TAG_HEIGHT))
-		local back = centred(area, string.format("Back within %d days", RETURN_DAYS), Theme.text.small, 2 * LINE)
+		local back = centred(area, string.format("Back within\n%d days", RETURN_DAYS), Theme.text.small, 2 * LINE)
+		back.Size = UDim2.new(1, 0, 0, 2 * LINE)
 		back.TextWrapped = true
 		back.TextColor3 = Theme.color.textDim
 		back.FontFace = Theme.font.bodyLight
@@ -390,7 +562,7 @@ local function itemCard(item: Types.CatalogueItem, order: number, parent: Instan
 		if item.glory then
 			local summary = ProfileState.summary()
 			local cost = item.glory
-			local b = Widgets.fitButton(area, "medal", formatNumber(cost), Widgets.GOLD, function()
+			local b = priceButton(area, "medal", formatNumber(cost), Widgets.GOLD, function()
 				Intents.buy(item.id, "Glory")
 			end, "BuyGlory")
 			if summary == nil or summary.glory < cost then
@@ -399,31 +571,45 @@ local function itemCard(item: Types.CatalogueItem, order: number, parent: Instan
 			table.insert(items, b)
 		end
 	end
-	stack(items)
+	local areaHeight = arrange(area, items, size.X - 2 * CARD_SIDE)
+	area.Size = UDim2.new(1, -2 * CARD_SIDE, 0, areaHeight)
+
+	local detail = if compact then nil else detailOf(item)
+	return {
+		area = areaHeight,
+		detail = detail ~= nil,
+		finish = function(g: Geometry)
+			cardName(card, g, item.name, detail)
+			local glow = if plain then nil elseif item.vipOnly then Theme.color.gold else rarity
+			local well = displayWell(card, g.wellTop, g.wellHeight, glow)
+			local h = math.min(PREVIEW, g.wellHeight - 2 * WELL_INSET)
+			preview(well, item, h, size.X - 2 * (CARD_SIDE + WELL_INSET))
+		end,
+	}
 end
 
--- An offer card's top: its pixel icon and name.
-local function offerTitle(card: Frame, icon: string, name: string)
-	local title = Widgets.title(card, name, Theme.text.heading, TITLE_HEIGHT)
-	title.Name = "Title"
-	Widgets.leadIcon(title, icon, Theme.icon.medium, Theme.space.s)
-end
-
--- A dim block of short lines (what's inside), then a gold note under it.
-local function offerText(card: Frame, lines: { string }, note: string)
-	local list = Widgets.label(card, table.concat(lines, "\n"), Theme.text.small, LINE * #lines)
-	list.Name = "Contents"
-	list.FontFace = Theme.font.bodyLight
-	list.TextColor3 = Theme.color.textDim
-	list.TextYAlignment = Enum.TextYAlignment.Top
-	list.TextTruncate = Enum.TextTruncate.AtEnd
-	list.Position = UDim2.fromOffset(0, TITLE_HEIGHT + Theme.space.xs)
+-- A dim block of short lines (what's inside) from `top`, in two columns on a `wide` card with more than four, then
+-- a gold note under it.
+local function offerText(card: Frame, lines: { string }, note: string, top: number, wide: boolean?)
+	local columns = if wide and #lines > 4 then 2 else 1
+	local rows = math.ceil(#lines / columns)
+	for c = 1, columns do
+		local part = table.move(lines, (c - 1) * rows + 1, math.min(#lines, c * rows), 1, {})
+		local list = Widgets.label(card, table.concat(part, "\n"), Theme.text.small, LINE * rows)
+		list.Name = "Contents"
+		list.FontFace = Theme.font.bodyLight
+		list.TextColor3 = Theme.color.textDim
+		list.TextYAlignment = Enum.TextYAlignment.Top
+		list.TextTruncate = Enum.TextTruncate.AtEnd
+		list.Size = UDim2.new(1 / columns, if columns > 1 then -Theme.space.xs else 0, 0, LINE * rows)
+		list.Position = UDim2.new((c - 1) / columns, 0, 0, top)
+	end
 	local noteLines = #string.split(note, "\n")
 	local n = Widgets.label(card, note, Theme.text.small, LINE * noteLines)
 	n.Name = "Note"
 	n.TextColor3 = Theme.color.gold
 	n.TextYAlignment = Enum.TextYAlignment.Top
-	n.Position = UDim2.fromOffset(0, TITLE_HEIGHT + 2 * Theme.space.xs + LINE * #lines)
+	n.Position = UDim2.fromOffset(0, top + Theme.space.xs + LINE * rows)
 end
 
 local function itemLine(id: string): string?
@@ -433,10 +619,41 @@ end
 
 local OFFER_ICONS: { [string]: string } = { vip = "crown", starter = "gift" }
 
-local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance)
-	local card = newCard(parent, "Card_" .. offer.id, order, Theme.color.gold)
+-- An offer card (VIP, the starter pack, the season pass): a brass card with its name on a title plate on the top
+-- edge, what's inside as dim lines, a gold note, and one button at the bottom.
+local function offerFrame(
+	parent: Instance,
+	name: string,
+	order: number,
+	size: Vector2,
+	icon: string,
+	title: string
+): Frame
+	local card = newCard(parent, name, order, "brass", size)
+	local pad = Widgets.padding(card, Theme.frame.pad.side, 0)
+	pad.PaddingBottom = UDim.new(0, Theme.frame.pad.bottom)
+	Widgets.header(card, title, icon)
+	return card
+end
+
+-- The button at the bottom of an offer card, centred.
+local function offerButton(card: Frame, item: GuiObject)
+	local area = Instance.new("Frame")
+	area.Name = "Buttons"
+	area.BackgroundTransparency = 1
+	area.AnchorPoint = Vector2.new(0, 1)
+	area.Position = UDim2.fromScale(0, 1)
+	area.Size = UDim2.new(1, 0, 0, item.Size.Y.Offset)
+	area.Parent = card
+	item.Parent = area
+	item.AnchorPoint = Vector2.new(0.5, 0)
+	item.Position = UDim2.fromScale(0.5, 0)
+end
+
+local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance, size: Vector2)
 	local icon = OFFER_ICONS[offer.id] or Icons.fromEmoji(offer.icon) or "gift"
-	offerTitle(card, icon, offer.name)
+	local card = offerFrame(parent, "Card_" .. offer.id, order, size, icon, offer.name)
+	Widgets.glow(card, Theme.color.gold)
 	-- what's inside, one short line each (they must fit a phone card)
 	local lines = {}
 	if offer.kind == "Pass" then
@@ -460,23 +677,21 @@ local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance
 	if offer.oncePerAccount and offer.kind == "Product" then
 		note ..= "\nOne per account"
 	end
-	offerText(card, lines, note)
-	local area = buttonArea(card)
+	offerText(card, lines, note, 0, true)
 	if ShopState.owns(offer.id) then
-		stack({ Widgets.tag(area, "check", "Owned", TAG_HEIGHT) })
+		offerButton(card, Widgets.tag(card, "check", "Owned", TAG_HEIGHT))
 	else
-		stack({ robuxButton(area, offer.id, offer.robux) })
+		offerButton(card, robuxButton(card, offer.id, offer.robux))
 	end
 end
 
 -- The Offers tab's season pass card: what the pass holds, and the way to its screen (bought there).
-local function seasonCard(order: number, parent: Instance)
+local function seasonCard(order: number, parent: Instance, size: Vector2)
 	local view = SeasonState.view()
 	if view == nil or view.id == "" then
 		return
 	end
-	local card = newCard(parent, "Card_season_pass", order, Theme.color.gold)
-	offerTitle(card, "ticket", SEASON_PASS)
+	local card = offerFrame(parent, "Card_season_pass", order, size, "ticket", SEASON_PASS)
 	-- what the premium track holds, counted from the season's reward list
 	local items, glory = 0, 0
 	local def = Season.def(view.id)
@@ -493,10 +708,9 @@ local function seasonCard(order: number, parent: Instance)
 		string.format("%d cosmetics, a title", items),
 		string.format("%s Glory on the way", formatNumber(glory)),
 		"Only this season",
-	}, string.format("No tier skips\nBundle: pass + %d tiers", Config.Season.BundleTiers))
-	local area = buttonArea(card)
+	}, string.format("No tier skips\nBundle: pass + %d tiers", Config.Season.BundleTiers), 0)
 	local b = Widgets.fitButton(
-		area,
+		card,
 		if view.premium then "check" else "ticket",
 		if view.premium then "See your pass" else "See the pass",
 		Widgets.SPECIAL,
@@ -507,14 +721,27 @@ local function seasonCard(order: number, parent: Instance)
 		end,
 		"SeeSeason"
 	)
-	stack({ b })
+	offerButton(card, b)
 end
 
--- The weekly bundle on the Today tab: the offer card, narrow enough for a sixth of the screen.
-local function bundleCard(offer: Types.ShopOffer, order: number, parent: Instance)
-	local card = newCard(parent, "Card_" .. offer.id, order, Theme.color.gold)
-	local title = Widgets.title(card, offer.name, Theme.text.small, TITLE_HEIGHT)
+-- The weekly bundle on the Today tab: a brass card as narrow as an item's, its name, what's inside, the real sum
+-- and the price.
+local function bundleCard(offer: Types.ShopOffer, order: number, parent: Instance, size: Vector2)
+	local card = newCard(parent, "Card_" .. offer.id, order, "brass", size)
+	Widgets.glow(card, Theme.color.gold)
+	local inner = Instance.new("Frame")
+	inner.Name = "Inside"
+	inner.BackgroundTransparency = 1
+	inner.Position = UDim2.fromOffset(CARD_SIDE, COMPACT.top)
+	inner.Size = UDim2.new(1, -2 * CARD_SIDE, 1, -(COMPACT.top + COMPACT.bottom))
+	inner.Parent = card
+	local title = Widgets.label(inner, offer.name, Theme.text.small, TITLE_HEIGHT)
 	title.Name = "Title"
+	title.FontFace = Theme.font.display
+	title.TextColor3 = Theme.color.gold
+	title.TextWrapped = false
+	title.TextTruncate = Enum.TextTruncate.AtEnd
+	Widgets.textStroke(title)
 	Widgets.leadIcon(title, Icons.fromEmoji(offer.icon) or "gift", Theme.size.icon, Theme.space.xs)
 	local names = {}
 	for _, id in offer.items do
@@ -524,15 +751,15 @@ local function bundleCard(offer: Types.ShopOffer, order: number, parent: Instanc
 		end
 	end
 	offerText(
-		card,
+		inner,
 		names,
-		string.format("Separately:\n%s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id, robuxPrice)))
+		string.format("Separately:\n%s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id, robuxPrice))),
+		TITLE_HEIGHT
 	)
-	local area = buttonArea(card)
 	if ShopState.owns(offer.id) then
-		stack({ Widgets.tag(area, "check", "Owned", TAG_HEIGHT) })
+		offerButton(inner, Widgets.tag(inner, "check", "Owned", TAG_HEIGHT))
 	else
-		stack({ robuxButton(area, offer.id, offer.robux) })
+		offerButton(inner, robuxButton(inner, offer.id, offer.robux))
 	end
 end
 
@@ -558,7 +785,7 @@ local function sectionTitle(parent: Instance, name: string, icon: string, text: 
 end
 
 -- The Today tab: the 4 daily slots and the 2 weekly ones, each section with the time until it changes.
-local function renderToday(content: Frame)
+local function renderToday(content: Frame, area: Vector2)
 	local view = ShopState.view()
 	local rotation = if view then view.rotation else nil
 	if rotation == nil then
@@ -578,17 +805,19 @@ local function renderToday(content: Frame)
 	cards.Position = UDim2.fromOffset(0, 24)
 	cards.Size = UDim2.new(1, 0, 1, -24)
 	cards.Parent = content
+	local size = Vector2.new(Widgets.tileWidth(area.X, TODAY_COLUMNS, TODAY_GAP), area.Y - 24)
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.new(1 / TODAY_COLUMNS, -TODAY_GAP, 1, 0)
+	grid.CellSize = UDim2.fromOffset(size.X, size.Y)
 	grid.CellPadding = UDim2.fromOffset(TODAY_GAP, 0)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = cards
+	local pending: { Pending } = {}
 	local order = 0
 	for _, id in rotation.daily do
 		local item = Catalogue.item(id)
 		if item then
 			order += 1
-			itemCard(item, order, cards, true)
+			table.insert(pending, itemCard(item, order, cards, size, true))
 		end
 	end
 	for _, id in rotation.weekly do
@@ -596,34 +825,24 @@ local function renderToday(content: Frame)
 		local item = Catalogue.item(id)
 		local offer = Catalogue.offer(id)
 		if item then
-			itemCard(item, order, cards, true)
+			table.insert(pending, itemCard(item, order, cards, size, true))
 		elseif offer then
-			bundleCard(offer, order, cards)
+			bundleCard(offer, order, cards, size)
 		end
 	end
+	finishCards(pending, size, true)
 end
 
--- The Themes tab's last card: what you see when a theme wins the vote (the opt-out, saved in your profile).
-local function themeSettingCard(order: number, parent: Instance)
-	local card = newCard(parent, "Card_ThemeSetting", order, nil)
-	local eye = Widgets.icon(card, "eye", Theme.icon.medium)
-	eye.AnchorPoint = Vector2.new(0.5, 0)
-	eye.Position = UDim2.new(0.5, 0, 0, Theme.space.s)
-	local title = centred(card, "What you see", Theme.text.body, 18)
-	title.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT + 2)
+-- The Themes tab's last card: what you see when a theme wins the vote (the opt-out, saved in your profile). A
+-- plain card like a free item's, the choice explained in its well.
+local function themeSettingCard(order: number, parent: Instance, size: Vector2): Pending
+	local card = newCard(parent, "Card_ThemeSetting", order, "plate", size)
+	rarityTag(card, "Setting", Theme.color.slate)
 	local classic = Cosmetics.classicOnly()
-	-- short lines: they must fit a phone card
-	local text = if classic
-		then "Always the classic map, whatever theme wins"
-		else "The theme the map's voters bring wins"
-	local line = centred(card, text, Theme.text.small, 3 * LINE, Theme.color.textDim, true)
-	line.FontFace = Theme.font.bodyLight
-	line.TextYAlignment = Enum.TextYAlignment.Top
-	line.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT + 22)
-	local area = buttonArea(card)
+	local area = buttonArea(card, Widgets.BUTTON_HEIGHT)
 	local b = Widgets.fitButton(
 		area,
-		nil,
+		"eye",
 		if classic then "Show themes" else "Always classic",
 		Widgets.BUTTON,
 		function()
@@ -632,7 +851,23 @@ local function themeSettingCard(order: number, parent: Instance)
 		"ThemeSetting"
 	)
 	b.TextSize = Theme.text.small
-	stack({ b })
+	arrange(area, { b }, size.X - 2 * CARD_SIDE)
+	return {
+		area = Widgets.BUTTON_HEIGHT,
+		detail = false,
+		finish = function(g: Geometry)
+			cardName(card, g, "What you see", nil)
+			local well = displayWell(card, g.wellTop, g.wellHeight, nil)
+			-- short lines: they must fit a phone card
+			local text = if classic
+				then "Always the classic map, whatever theme wins"
+				else "The theme the map's voters bring wins"
+			local line = centred(well, text, Theme.text.small, g.wellHeight, Theme.color.textDim, true)
+			line.FontFace = Theme.font.bodyLight
+			line.Size = UDim2.new(1, -2 * WELL_INSET, 1, 0)
+			line.Position = UDim2.fromOffset(WELL_INSET, 0)
+		end,
+	}
 end
 
 -- A readable name for a Robux product that isn't a catalogue item or offer (the season pass and its bundle are
@@ -685,14 +920,13 @@ local function renderHistory(content: Frame): number
 	end
 	for i = (page - 1) * HISTORY_PER_PAGE + 1, math.min(#history, page * HISTORY_PER_PAGE) do
 		local h = history[i]
-		local row = Instance.new("Frame")
+		local row = Instance.new("ImageLabel")
 		row.Name = "Purchase"
-		row.BackgroundColor3 = Theme.color.navyRaised
 		row.BorderSizePixel = 0
 		row.Size = UDim2.new(1, 0, 0, HISTORY_ROW)
 		row.LayoutOrder = i
 		row.Parent = content
-		Widgets.corner(row, Theme.radius.m)
+		Widgets.material(row, "raised")
 		Widgets.padding(row, Theme.space.m, 0)
 		local t = os.date("!*t", h.at) :: any -- Roblox's os.date only takes "*t" and "!*t"
 		local date = Widgets.label(row, string.format("%04d-%02d-%02d", t.year, t.month, t.day), nil, HISTORY_ROW)
@@ -712,7 +946,7 @@ local function renderHistory(content: Frame): number
 		price.Position = UDim2.fromScale(1, 0)
 		price.Size = UDim2.fromOffset(PRICE_WIDTH, HISTORY_ROW)
 		price.TextXAlignment = Enum.TextXAlignment.Right
-		price.TextColor3 = Theme.color.goldPale
+		price.TextColor3 = Theme.color.gold
 	end
 	return pages
 end
@@ -772,16 +1006,22 @@ render = function()
 		pages = renderHistory(content)
 		r.footer.Text = "Purchase history: your Robux purchases, newest first"
 	elseif tab == "Today" then
-		renderToday(content)
+		renderToday(content, contentSize())
 		r.footer.Text = string.format(
 			"The same shop for everyone, nothing random. Every item comes back within %d days.",
 			RETURN_DAYS
 		)
 	else
 		local perPage = if tab == "Offers" then OFFERS_PER_PAGE else PER_PAGE
+		local gap = if tab == "Offers" then OFFER_GAP else GAP
+		local area = contentSize()
+		local size = Vector2.new(Widgets.tileWidth(area.X, perPage, gap), area.Y - TAG_ROOM)
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, TAG_ROOM) -- the cards' tags and title plates ride above them
+		pad.Parent = content
 		local grid = Instance.new("UIGridLayout")
-		grid.CellSize = UDim2.new(1 / perPage, -GAP, 1, 0)
-		grid.CellPadding = UDim2.fromOffset(GAP, 0)
+		grid.CellSize = UDim2.fromOffset(size.X, size.Y)
+		grid.CellPadding = UDim2.fromOffset(gap, 0)
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.Parent = content
 		local entries: { any } = {}
@@ -801,20 +1041,22 @@ render = function()
 		local extra = if (tab == "Offers" and SeasonState.active()) or tab == "Theme" then 1 else 0
 		pages = math.max(1, math.ceil((#entries + extra) / perPage))
 		page = math.clamp(page, 1, pages)
+		local pending: { Pending } = {}
 		for i = (page - 1) * perPage + 1, math.min(#entries, page * perPage) do
 			if tab == "Offers" then
-				offerCard(entries[i], i, content)
+				offerCard(entries[i], i, content, size)
 			else
-				itemCard(entries[i], i, content)
+				table.insert(pending, itemCard(entries[i], i, content, size))
 			end
 		end
 		if extra > 0 and page == pages then
 			if tab == "Theme" then
-				themeSettingCard(#entries + 1, content)
+				table.insert(pending, themeSettingCard(#entries + 1, content, size))
 			else
-				seasonCard(#entries + 1, content)
+				seasonCard(#entries + 1, content, size)
 			end
 		end
+		finishCards(pending, size)
 		r.footer.Text = if robuxOpen()
 			then "No random items: you always see what you get. Glory is earned by playing, never sold."
 			else "Robux purchases open after the match. Glory purchases and equipping work any time."
@@ -854,8 +1096,11 @@ local function build(): Refs
 	info.BackgroundTransparency = 1
 	info.Size = UDim2.new(1, -(pager.Size.X.Offset + Theme.space.m), 1, 0)
 	info.Parent = header
-	Widgets.list(info, true, Theme.space.m)
-	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
+	Widgets.list(info, true, Theme.space.l)
+	local room = Instance.new("UIPadding")
+	room.PaddingLeft = UDim.new(0, 10) -- the counter's medal rides over its left end
+	room.Parent = info
+	local glory = Widgets.counter(info, "medal", "", GLORY_WIDTH)
 	glory.Name = "Glory"
 	glory.LayoutOrder = 2
 	local vip = Widgets.chip(info, "crown", "VIP", nil, Theme.size.chip)
@@ -925,6 +1170,7 @@ end
 
 local function hideStarterOffer()
 	offerPanel.Visible = false
+	offerDim.Visible = false
 	Widgets.clear(offerPanel)
 end
 
@@ -977,7 +1223,7 @@ local function showStarterOffer()
 	row.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
 	row.LayoutOrder = 4
 	row.Parent = offerPanel
-	Widgets.list(row, true, Theme.space.m)
+	Widgets.list(row, true, Theme.space.m).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	local price = robuxPrice("starter", offer.robux)
 	local buy = Widgets.button(row, "Buy  " .. ROBUX .. " " .. formatNumber(price), 176, Widgets.GOOD, function()
 		hideStarterOffer()
@@ -989,6 +1235,7 @@ local function showStarterOffer()
 	later.Name = "NotNow"
 	later.LayoutOrder = 2
 	offerPanel.Visible = true
+	offerDim.Visible = true
 	Intents.signal("OfferOpened") -- analytics
 end
 
@@ -1028,7 +1275,29 @@ function ShopUI.init(showToast: (string) -> ())
 
 	panel = Widgets.window(gui, "ShopPanel")
 	Widgets.list(panel, false, Theme.space.s)
+	-- at most a phone's window: on a tablet the cards keep their size (it all grows by the DeviceScale)
+	local function placePanel()
+		local screen = Widgets.screenSize(gui) / Widgets.uiScale()
+		local w = math.min(screen.X - 2 * Theme.space.m, MAX_WINDOW.X)
+		local h = math.min(screen.Y - 3 * Theme.space.m, MAX_WINDOW.Y)
+		panelSize = Vector2.new(w - w % 2, h - h % 2)
+		Widgets.fit(panel, UDim2.fromOffset(panelSize.X, panelSize.Y), UDim2.new(0.5, 0, 0.5, Theme.space.xs))
+		render()
+	end
+	placePanel()
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placePanel)
+	Widgets.onScale(placePanel)
 
+	-- the starter-pack pop-up: a brass window over a dimmed screen
+	offerDim = Instance.new("Frame")
+	offerDim.Name = "StarterOfferDim"
+	offerDim.Active = true -- taps on the dim never reach what is under it
+	offerDim.Size = UDim2.fromScale(1, 1)
+	offerDim.BackgroundColor3 = Theme.color.slate950
+	offerDim.BackgroundTransparency = 0.4
+	offerDim.BorderSizePixel = 0
+	offerDim.Visible = false
+	offerDim.Parent = gui
 	offerPanel = Widgets.panel(gui, 400, "brass")
 	offerPanel.Name = "StarterOffer"
 	offerPanel.AnchorPoint = Vector2.new(0.5, 0.5)
