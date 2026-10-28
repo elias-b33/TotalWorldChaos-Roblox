@@ -850,13 +850,14 @@
     1229,
     504
    ],
-   "area": 3551,
+   "area": 2366,
    "neighbors": [
     37,
     38,
     40,
     41,
-    42
+    42,
+    89
    ],
    "startOwner": 3,
    "isCapital": false
@@ -871,10 +872,11 @@
     1221,
     552
    ],
-   "area": 2440,
+   "area": 1872,
    "neighbors": [
     38,
     39,
+    89,
     108
    ],
    "startOwner": null,
@@ -911,7 +913,7 @@
     1268,
     468
    ],
-   "area": 2075,
+   "area": 2064,
    "neighbors": [
     39,
     41,
@@ -1002,7 +1004,8 @@
     54
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 47,
@@ -1022,7 +1025,8 @@
     50
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 48,
@@ -1266,7 +1270,7 @@
     1354,
     494
    ],
-   "area": 2603,
+   "area": 2614,
    "neighbors": [
     42,
     43,
@@ -1849,18 +1853,18 @@
   },
   {
    "id": 89,
-   "name": "Westralia",
-   "terrain": "Plains",
-   "biome": "desert",
+   "name": "Oman",
+   "terrain": "Hills",
+   "biome": "drylands",
    "development": 1,
    "center": [
-    1649,
-    800
+    1277,
+    521
    ],
-   "area": 6705,
+   "area": 1753,
    "neighbors": [
-    90,
-    91
+    39,
+    40
    ],
    "startOwner": null,
    "isCapital": false
@@ -1872,12 +1876,11 @@
    "biome": "desert",
    "development": 1,
    "center": [
-    1724,
-    794
+    1666,
+    793
    ],
-   "area": 5330,
+   "area": 10545,
    "neighbors": [
-    89,
     91,
     92,
     93
@@ -1893,12 +1896,11 @@
    "development": 2,
    "center": [
     1715,
-    735
+    739
    ],
-   "area": 3042,
+   "area": 3333,
    "neighbors": [
     85,
-    89,
     90,
     92
    ],
@@ -1912,10 +1914,10 @@
    "biome": "savanna",
    "development": 2,
    "center": [
-    1784,
+    1778,
     773
    ],
-   "area": 4356,
+   "area": 5116,
    "neighbors": [
     88,
     90,
@@ -1935,7 +1937,7 @@
     1790,
     843
    ],
-   "area": 5581,
+   "area": 6020,
    "neighbors": [
     90,
     92,
@@ -1969,15 +1971,14 @@
    "development": 2,
    "center": [
     935,
-    471
+    470
    ],
-   "area": 4186,
+   "area": 3037,
    "neighbors": [
     9,
     96,
     100,
-    101,
-    102
+    145
    ],
    "startOwner": 7,
    "isCapital": false
@@ -2000,7 +2001,7 @@
     97,
     100
    ],
-   "startOwner": 7,
+   "startOwner": null,
    "isCapital": false
   },
   {
@@ -2075,14 +2076,15 @@
     990,
     510
    ],
-   "area": 5125,
+   "area": 5083,
    "neighbors": [
     95,
     96,
     97,
     102,
     103,
-    104
+    104,
+    145
    ],
    "startOwner": 7,
    "isCapital": false
@@ -2094,15 +2096,14 @@
    "biome": "savanna",
    "development": 2,
    "center": [
-    884,
-    562
+    886,
+    569
    ],
-   "area": 3365,
+   "area": 1748,
    "neighbors": [
-    95,
     102,
     105,
-    149
+    145
    ],
    "startOwner": 7,
    "isCapital": false
@@ -2114,17 +2115,17 @@
    "biome": "savanna",
    "development": 3,
    "center": [
-    943,
-    554
+    946,
+    557
    ],
-   "area": 4311,
+   "area": 3330,
    "neighbors": [
-    95,
     100,
     101,
     103,
     105,
-    106
+    106,
+    145
    ],
    "startOwner": 7,
    "isCapital": true
@@ -2231,7 +2232,8 @@
     111
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 108,
@@ -2250,7 +2252,8 @@
     111
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 109,
@@ -2432,7 +2435,8 @@
     114
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 118,
@@ -2963,10 +2967,9 @@
     583,
     795
    ],
-   "area": 2951,
+   "area": 3104,
    "neighbors": [
     143,
-    145,
     147,
     148
    ],
@@ -2975,21 +2978,22 @@
   },
   {
    "id": 145,
-   "name": "Araucania",
-   "terrain": "Hills",
-   "biome": "hills",
+   "name": "Mauretania",
+   "terrain": "Plains",
+   "biome": "desert",
    "development": 2,
    "center": [
-    562,
-    870
+    902,
+    524
    ],
-   "area": 2356,
+   "area": 3789,
    "neighbors": [
-    144,
-    146,
-    147
+    95,
+    100,
+    101,
+    102
    ],
-   "startOwner": null,
+   "startOwner": 7,
    "isCapital": false
   },
   {
@@ -3002,9 +3006,8 @@
     561,
     937
    ],
-   "area": 4293,
+   "area": 5309,
    "neighbors": [
-    145,
     147
    ],
    "startOwner": null,
@@ -3017,13 +3020,12 @@
    "biome": "grassland",
    "development": 3,
    "center": [
-    606,
-    840
+    595,
+    853
    ],
-   "area": 5862,
+   "area": 7049,
    "neighbors": [
     144,
-    145,
     146,
     148,
     150
@@ -3066,7 +3068,6 @@
    ],
    "area": 4947,
    "neighbors": [
-    101,
     139,
     148,
     150
@@ -3197,12 +3198,12 @@
    "a": 39,
    "b": 42,
    "from": [
-    1281,
-    493
+    1253,
+    494
    ],
    "to": [
-    1280,
-    490
+    1255,
+    484
    ],
    "wrap": false,
    "auto": false
@@ -3427,20 +3428,6 @@
    "to": [
     467,
     523
-   ],
-   "wrap": false,
-   "auto": false
-  },
-  {
-   "a": 101,
-   "b": 149,
-   "from": [
-    822,
-    561
-   ],
-   "to": [
-    760,
-    676
    ],
    "wrap": false,
    "auto": false

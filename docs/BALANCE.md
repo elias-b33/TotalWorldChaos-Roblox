@@ -11,7 +11,7 @@ Every number below comes from `Config.luau` as of this document or from one of t
 | `lune run tools/balance/conquest` | Time and cost to take a neutral province, through `Sim/Tick` (section 7) |
 | `lune run tools/balance/catchup` | Overextension by size, where the thresholds sit, break-even ratios; writes `data/catchup.csv` (section 9) |
 | `lune run tools/balance/expansion` | Whole matches with a greedy planner: Peace income, best-case domination, free-for-all; writes `data/expansion_*.csv` (sections 10–12). About 3 minutes (`MAP=earth` for one map). `SET="Siege.TicksPerDevelopment=20"` runs a what-if (section 14) |
-| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15). Takes `SET="…"` too |
+| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 16: use 200 seeds per map, about 12 min each). Takes `SET="…"` too |
 | `python3 tools/balance/charts.py` | The four charts in `docs/images/balance_*.png`, from the CSVs (Pillow; matplotlib isn't installed) |
 
 `tools/balance/Planner.luau` is the greedy player used by `expansion`. It is **not** the bot AI: it sends ordinary commands through `Sim/Commands`, so it obeys every rule, and it plays close to the fastest possible expansion. It never defends on purpose (armies standing in their own provinces still fight), so its matches are faster and bloodier than real ones. The bot tournament is the other bracket: Normal bots defend, keep a reserve and only attack at 1.3× strength, so their matches are slower than real players'. A real match sits between the two.
@@ -59,11 +59,11 @@ This document was first written before bots existed; its sections 13 and 14 list
 
 | Map | Provinces (all) | Mountains | Ownable | Start-owned | Neutral | Neutral dev 1/2/3/4/5 | Neutral garrisons (men: count) | Provinces for crown (20%) / domination (50%) | Forest+hills share of land |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Earth | 150 | 11 | 139 | 80 | 59 | 22/28/9/0/0 | 1000: 59 | 28 / 70 | 52% |
-| Eldmoor | 146 | 15 | 131 | 80 | 51 | 9/20/9/13/0 | 1000: 38, 3000: 13 | 27 / 66 | 50% |
+| Earth | 150 | 11 | 139 | 80 | 59 | 22/28/9/0/0 | 1000: 54, 2000: 5 | 28 / 70 | 52% |
+| Eldmoor | 147 | 11 | 136 | 80 | 56 | 13/21/9/13/0 | 1000: 41, 2000: 2, 3000: 13 | 28 / 68 | 51% |
 | Skyshards | 131 | 11 | 120 | 80 | 40 | 0/20/10/10/0 | 1000: 20, 2000: 10, 3000: 10 | 24 / 60 | 42% |
 
-Every nation starts with 8 provinces and 17 development. The crown, domination and alliance thresholds count only the **ownable** provinces: mountains can never be owned, so they don't count (before the balance pass, 40% of all provinces was really 43–44% of the land a nation could hold).
+Every nation starts with 8 provinces and 17 development. (Rows updated after the start-position pass, section 16; the other sections were measured on the maps before it, with 146 Eldmoor provinces.) The crown, domination and alliance thresholds count only the **ownable** provinces: mountains can never be owned, so they don't count (before the balance pass, 40% of all provinces was really 43–44% of the land a nation could hold).
 
 ## 2. Economy
 
@@ -306,7 +306,7 @@ New observations from the bot tournament:
 
 7. **Late-game armies exploded** (one nation over 150,000 men at 25:00, 100+ tokens): gold income grows with development, and at 0.5 gold upkeep a nation could keep 2 regiments per gold of income. Fixed with `UpkeepPerRegiment` 1.5 and the merge rule (section 15).
 8. **Manpower piles up.** Bots bank hundreds of thousands of manpower by the Cataclysm (over 200,000 each in a soak at the old upkeep) because gold, not manpower, limits recruiting. Harmless now (upkeep caps armies), but manpower barely matters after the first minutes. A manpower cap (EU4 style) would make it matter again; not done.
-9. **Start positions:** Eldmoor's Frostmarch and Elderwood and Earth's Amazon win 7–9 of 20 bot matches each and Ironholds, Sunscorch, Tigris and Niger almost never; Skyshards is closer (Umbra 7, every other slot 0–3). That is the Phase 5 "per-map balance" task.
+9. **Start positions:** Eldmoor's Frostmarch and Elderwood and Earth's Amazon win 7–9 of 20 bot matches each and Ironholds, Sunscorch, Tigris and Niger almost never; Skyshards is closer (Umbra 7, every other slot 0–3). Fixed (section 16): one cause was the bots' planning order (it followed nation ids), the rest was the maps.
 
 ## 14. The recommended Config changes, measured
 
@@ -339,3 +339,83 @@ The first version of this document recommended five Config changes without apply
 - Armies at 15:00 are about the same; at 25:00 there are a third as many men and the biggest nation holds 39k–54k instead of 156k–185k, so a 3,000-man Rebels or a Meteor (−50% of one army) matters again. Bots now use Meteor about 22–25 times per match (all nations together).
 - Standing armies sharing a province with another of the same owner: 62–77 tokens at 25:00 before, none now (the merge rule). Army counts at 25:00 fell from 102–125 to 31–40.
 - No slot wins most matches on any map (most: 7–9 of 20).
+
+## 16. Start positions (per-map balance)
+
+The Phase 5 task "per-map balance from win rate by start position". `lune run tools/harness/tournament 200 <map>` plays 200 bot matches (Normal) per map and prints each slot's wins and its **share**: wins over the fair share (all wins, alliance co-winners included, divided by 10). The goal: on every map no slot above about 2× and none (almost) never winning.
+
+**How noisy is it?** A slot's win count at 200 seeds moves by about ±5 (±0.2×) from one batch of seeds to the next, and 20 seeds (the old tournament default) can't tell a 2× slot from a fair one. Skyshards is perfectly symmetric, so its "after" spread is pure noise: **0.65×–1.16× is what a fair map looks like at 200 seeds**. Everything below was measured on the same 200 seeds before and after.
+
+**What was wrong**
+
+1. **A bot habit, not the map: the planning order followed nation ids.** `Bot.step` lets two bots plan per tick, and at match start they lined up by id, so the same pairs always planned at the same moment relative to the monthly payday. On Skyshards slots 9 and 10 planned their first expansion right after the first payday, recruited a fourth regiment first, and so took their Heartstone Approach at 1:01 instead of 1:41 (the others' 3,000-man stacks couldn't beat its 2,000 garrison straight after a drift isle). They then had 13 provinces at 3:00 against 11.5 for their neighbours, and every bot attacks its weakest neighbour: Umbra declared war on Aurora 88 times in 100 matches, Verdance on Rime 91 times, and on a perfectly symmetric map Umbra won 42 matches and Rime 2. **Fix:** the first planning order is shuffled from the bots' rng each match (`Bot.step`, test in `tests/bot.spec.luau`). The same order bias was also hiding in the Earth and Eldmoor numbers.
+2. **Eldmoor: walled-in kingdoms.** Ironholds and Sunscorch had no way into the Crownlands and 1–2 neutral provinces of their own, so they had the fewest provinces at 3:00 (9 and 10, against 14–16) and were every neighbour's first war at 3:03 (eliminated in 89–90% of matches). Frostmarch, the only kingdom with a Dragonspine gap to itself, took the rich Crownlands and won 63% of matches.
+3. **Earth: safe backyards beat the crowded middle.** Amazon (South America) and Mekong (South-East Asia and Oceania) held about 15 provinces nobody else could reach and never lost them; Amazon's only neighbour was Niger, across the Dakar–Natal lane, and it declared war on Niger 85 times in 100 matches. Niger and Tigris had the least neutral land (11.5 provinces at 3:00, against 14–16) and several such neighbours; Ganges sat between Mekong and Yangtze, which both attacked it.
+
+**What changed** (generator only, details in `docs/MAPS.md`; every nation still starts with 8 provinces and 17 development)
+
+| Map | Change | Why |
+| --- | --- | --- |
+| All | Bots' first planning order random per match (`Bot.step`) | Fixed order favoured the same slots every match |
+| Eldmoor | Four one-province passes through the Dragonspine (Wyrmcoast, Ironholds, Sunscorch, Saltmarsh) | Every mainland kingdom gets its own door to the Crownlands |
+| Eldmoor | Elderwood's capital moves south (Silverglade) | Its start territory no longer touches Ironholds; the north forest starts neutral |
+| Eldmoor | An eighth Isle of Mists province (Oakshire) | Mistborn starts on its island, not on a foothold against Ironholds |
+| Eldmoor | 2,000-man garrisons on Highcairn and Duskshade | Ironholds' two open flanks hold out longer |
+| Earth | Dakar–Natal lane removed | Amazon's only target was Niger |
+| Earth | Oman and Mauretania added; Westralia and Araucania merged into Outback and Patagonia | Free land moves from Mekong's and Amazon's backyards to Tigris and Niger |
+| Earth | 2,000-man garrisons on Ob, Yenisei, the Horn, Abyssinia and Madagascar | Volga's and Zambezi's quiet backyards fill more slowly |
+
+Garrisons were the weakest lever and a cliff: 2,000 men on all of Oceania barely slowed Mekong, 3,000 turned it from 2.6× into 0.1× (its armies spent Peace on the outback while Ganges ate it). Moving land between backyards and the middle, and giving walled-in nations a way out, changed the most.
+
+**Earth** (fair share 22.3 wins before, 27.6 after: more alliance victories, 11 → 37)
+
+| Slot | Nation (capital) | Before: wins (share) | Bot fix only, 100 seeds | After: wins (share) | Avg final provinces before → after |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Rhine (Rhineland) | 8 (0.36×) | 5 (0.47×) | **34 (1.23×)** | 9.4 → 13.4 |
+| 2 | Volga (Muscovy) | 34 (1.52×) | 13 (1.23×) | **48 (1.74×)** | 16.9 → 15.5 |
+| 3 | Tigris (Mesopotamia) | 4 (0.18×) | 4 (0.38×) | **26 (0.94×)** | 5.9 → 9.6 |
+| 4 | Ganges (Ganges Plain) | 10 (0.45×) | 1 (0.09×) | **43 (1.56×)** | 9.1 → 14.9 |
+| 5 | Yangtze (Yangtze Valley) | 9 (0.40×) | 5 (0.47×) | **9 (0.33×)** | 14.9 → 12.0 |
+| 6 | Mekong (Mekong) | 57 (2.56×) | 23 (2.17×) | **22 (0.80×)** | 23.0 → 16.7 |
+| 7 | Niger (Niger Bend) | 0 (0.00×) | 1 (0.09×) | **21 (0.76×)** | 2.0 → 9.2 |
+| 8 | Zambezi (Zambezi) | 34 (1.52×) | 14 (1.32×) | **47 (1.70×)** | 19.9 → 16.6 |
+| 9 | Mississippi (Mississippi) | 11 (0.49×) | 10 (0.94×) | **12 (0.43×)** | 15.8 → 15.3 |
+| 10 | Amazon (Amazonia) | 56 (2.51×) | 30 (2.83×) | **14 (0.51×)** | 21.9 → 15.7 |
+
+**Eldmoor** (fair share 31.8 before, 25.8 after: alliance victories 59 → 29)
+
+| Slot | Nation (capital) | Before: wins (share) | Bot fix only, 100 seeds | After: wins (share) | Avg final provinces before → after |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Mistborn (Oakstead) | 67 (2.11×) | 36 (2.43×) | **30 (1.16×)** | 21.7 → 15.7 |
+| 2 | Saltmarsh (Thornthicket) | 22 (0.69×) | 9 (0.61×) | **20 (0.78×)** | 15.0 → 10.3 |
+| 3 | Ironholds (Stoneridge) | 0 (0.00×) | 0 (0.00×) | **17 (0.66×)** | 1.1 → 10.3 |
+| 4 | Frostmarch (Hoarreach) | 125 (3.93×) | 44 (2.97×) | **37 (1.43×)** | 22.5 → 12.4 |
+| 5 | Greenvale (Stoneheath) | 0 (0.00×) | 3 (0.20×) | **17 (0.66×)** | 4.3 → 9.8 |
+| 6 | Elderwood (Silvershade → Silverglade) | 71 (2.23×) | 36 (2.43×) | **27 (1.05×)** | 24.2 → 19.6 |
+| 7 | Wyrmcoast (Clovershire) | 11 (0.35×) | 5 (0.34×) | **39 (1.51×)** | 14.7 → 16.4 |
+| 8 | Sunscorch (Dunehaven) | 0 (0.00×) | 0 (0.00×) | **28 (1.09×)** | 0.8 → 12.5 |
+| 9 | Ashen Dominion (Scorchoasis) | 17 (0.53×) | 10 (0.68×) | **22 (0.85×)** | 10.5 → 12.6 |
+| 10 | Corsairs (Moonroot) | 5 (0.16×) | 5 (0.34×) | **21 (0.81×)** | 16.0 → 16.3 |
+
+**Skyshards** (map unchanged; fair share 21.2 before, 21.6 after)
+
+| Slot | Nation | Before: wins (share) | Bot fix only, 100 seeds | After: wins (share) | Avg final provinces before → after |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Aurora | 9 (0.42×) | 14 (1.27×) | **24 (1.11×)** | 7.3 → 12.3 |
+| 2 | Zephyr | 28 (1.32×) | 11 (1.00×) | **20 (0.93×)** | 13.6 → 12.0 |
+| 3 | Nimbus | 17 (0.80×) | 5 (0.45×) | **14 (0.65×)** | 10.8 → 11.3 |
+| 4 | Tempest | 17 (0.80×) | 13 (1.18×) | **22 (1.02×)** | 12.2 → 11.8 |
+| 5 | Halo | 22 (1.04×) | 12 (1.09×) | **24 (1.11×)** | 12.1 → 12.8 |
+| 6 | Solace | 16 (0.75×) | 13 (1.18×) | **25 (1.16×)** | 10.7 → 11.4 |
+| 7 | Ember | 22 (1.04×) | 12 (1.09×) | **21 (0.97×)** | 14.3 → 12.2 |
+| 8 | Rime | 2 (0.09×) | 9 (0.82×) | **22 (1.02×)** | 6.8 → 12.6 |
+| 9 | Verdance | 37 (1.75×) | 13 (1.18×) | **21 (0.97×)** | 15.5 → 11.5 |
+| 10 | Umbra | 42 (1.98×) | 8 (0.73×) | **23 (1.06×)** | 16.5 → 12.2 |
+
+**Result:** Earth 0.33×–1.74× (was 0×–2.56×), Eldmoor 0.66×–1.51× (was 0×–3.93×), Skyshards 0.65×–1.16× (was 0.09×–1.98×). Other match numbers barely moved: matches still end at 25:00 in 80–96% of games, wars per match 9.6–10.6, provinces taken from nations per match 40 / 49 / 37 (Earth / Eldmoor / Skyshards; Earth was 48: fewer easy victims).
+
+**Still to watch**
+
+- **Yangtze (0.33×)** is Earth's weakest slot. Once Mekong lost its extra Oceania province, Mekong became Yangtze's "weakest neighbour", and Yangtze declares war on it about 75 times in 100 matches; the war through hills, jungle and sea lanes goes nowhere while Ganges and Volga attack Yangtze. Cutting Bengal–Sichuan (what-if) only moved it to 0.44×, within noise, so it was left alone. A bot that weighed terrain and straits when picking its war target would help here; the spec says "weakest neighbour", so that is a design question, not a map fix.
+- **Mississippi (0.43×)** now fights Amazon, its only neighbour in the Americas.
+- Player behaviour differs from bots: once real matches run, use the "win rate by start position" analytics event (`docs/LAUNCH.md`) and redo this with the same levers.

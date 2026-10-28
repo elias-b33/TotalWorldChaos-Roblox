@@ -530,7 +530,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [ ] Analytics events (`docs/LAUNCH.md`): match length, quit time, phase reached, win rate by start position, funnels, economy
 - [ ] Weekly balance patch from the data
 - [ ] Easy and Hard bots
-- [ ] Per-map balance from win rate by start position
+- [x] Per-map balance from win rate by start position (bot tournament; `docs/BALANCE.md` section 16)
 - [ ] Season pass (8 weeks, 50 tiers)
 - [ ] Rotating shop
 - [ ] Weekly, friends and global leaderboards; achievements

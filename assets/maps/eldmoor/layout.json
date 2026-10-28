@@ -7,12 +7,12 @@
   1024
  ],
  "summary": {
-  "provinces": 146,
-  "Plains": 65,
+  "provinces": 147,
+  "Plains": 66,
   "Forest": 35,
-  "Hills": 31,
-  "Mountain": 15,
-  "neutralAtStart": 51
+  "Hills": 35,
+  "Mountain": 11,
+  "neutralAtStart": 56
  },
  "nations": [
   {
@@ -48,7 +48,7 @@
   {
    "slot": 6,
    "name": "Elderwood",
-   "capital": 98,
+   "capital": 84,
    "colorIndex": 6
   },
   {
@@ -101,9 +101,9 @@
   },
   {
    "id": 2,
-   "name": "Gianttalon",
-   "terrain": "Mountain",
-   "biome": "peaks",
+   "name": "Gianttalon Pass",
+   "terrain": "Hills",
+   "biome": "highlands",
    "development": 1,
    "center": [
     752,
@@ -190,9 +190,9 @@
   },
   {
    "id": 6,
-   "name": "Titanspine",
-   "terrain": "Mountain",
-   "biome": "peaks",
+   "name": "Titanspine Pass",
+   "terrain": "Hills",
+   "biome": "highlands",
    "development": 1,
    "center": [
     1231,
@@ -321,9 +321,9 @@
   },
   {
    "id": 12,
-   "name": "Titanpeak",
-   "terrain": "Mountain",
-   "biome": "peaks",
+   "name": "Titanpeak Pass",
+   "terrain": "Hills",
+   "biome": "highlands",
    "development": 1,
    "center": [
     959,
@@ -364,9 +364,9 @@
   },
   {
    "id": 14,
-   "name": "Eaglespire",
-   "terrain": "Mountain",
-   "biome": "peaks",
+   "name": "Eaglespire Pass",
+   "terrain": "Hills",
+   "biome": "highlands",
    "development": 1,
    "center": [
     811,
@@ -425,7 +425,7 @@
     103,
     113
    ],
-   "startOwner": null,
+   "startOwner": 6,
    "isCapital": false
   },
   {
@@ -1065,13 +1065,14 @@
     1807,
     225
    ],
-   "area": 9260,
+   "area": 8875,
    "neighbors": [
     42,
     88,
     90,
     114,
-    138
+    138,
+    147
    ],
    "startOwner": 1,
    "isCapital": true
@@ -1337,7 +1338,7 @@
     106,
     136
    ],
-   "startOwner": 6,
+   "startOwner": null,
    "isCapital": false
   },
   {
@@ -1613,7 +1614,7 @@
     122,
     143
    ],
-   "startOwner": 6,
+   "startOwner": null,
    "isCapital": false
   },
   {
@@ -1786,8 +1787,9 @@
     106,
     139
    ],
-   "startOwner": 1,
-   "isCapital": false
+   "startOwner": null,
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 81,
@@ -1854,7 +1856,7 @@
    "name": "Silverglade",
    "terrain": "Forest",
    "biome": "wildwood",
-   "development": 2,
+   "development": 3,
    "center": [
     1591,
     581
@@ -1870,7 +1872,7 @@
     122
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": true
   },
   {
    "id": 85,
@@ -1939,15 +1941,15 @@
    "biome": "wildwood",
    "development": 2,
    "center": [
-    1843,
-    325
+    1865,
+    332
    ],
-   "area": 9573,
+   "area": 6237,
    "neighbors": [
     42,
     46,
-    90,
-    145
+    145,
+    147
    ],
    "startOwner": 1,
    "isCapital": false
@@ -1981,13 +1983,13 @@
     1746,
     265
    ],
-   "area": 6801,
+   "area": 4493,
    "neighbors": [
     46,
     54,
     80,
-    88,
-    114
+    114,
+    147
    ],
    "startOwner": 1,
    "isCapital": false
@@ -2144,7 +2146,7 @@
    "name": "Silvershade",
    "terrain": "Forest",
    "biome": "wildwood",
-   "development": 3,
+   "development": 2,
    "center": [
     1507,
     476
@@ -2161,14 +2163,14 @@
     143
    ],
    "startOwner": 6,
-   "isCapital": true
+   "isCapital": false
   },
   {
    "id": 99,
    "name": "Cloverwick",
    "terrain": "Plains",
    "biome": "meadow",
-   "development": 3,
+   "development": 2,
    "center": [
     1522,
     633
@@ -2181,7 +2183,7 @@
     122,
     137
    ],
-   "startOwner": null,
+   "startOwner": 6,
    "isCapital": false
   },
   {
@@ -2265,7 +2267,7 @@
     101,
     136
    ],
-   "startOwner": null,
+   "startOwner": 6,
    "isCapital": false
   },
   {
@@ -2316,7 +2318,7 @@
    "name": "Rosemeadow",
    "terrain": "Plains",
    "biome": "meadow",
-   "development": 2,
+   "development": 3,
    "center": [
     1534,
     336
@@ -2330,7 +2332,7 @@
     80,
     98
    ],
-   "startOwner": 6,
+   "startOwner": null,
    "isCapital": false
   },
   {
@@ -2457,7 +2459,8 @@
     85
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "garrison": 2000
   },
   {
    "id": 113,
@@ -2478,7 +2481,7 @@
     99,
     137
    ],
-   "startOwner": null,
+   "startOwner": 6,
    "isCapital": false
   },
   {
@@ -3100,7 +3103,7 @@
     98,
     117
    ],
-   "startOwner": 6,
+   "startOwner": null,
    "isCapital": false
   },
   {
@@ -3159,6 +3162,25 @@
    ],
    "startOwner": 10,
    "isCapital": true
+  },
+  {
+   "id": 147,
+   "name": "Oakshire",
+   "terrain": "Plains",
+   "biome": "meadow",
+   "development": 2,
+   "center": [
+    1787,
+    323
+   ],
+   "area": 6029,
+   "neighbors": [
+    46,
+    88,
+    90
+   ],
+   "startOwner": 1,
+   "isCapital": false
   }
  ],
  "straits": [
@@ -3167,7 +3189,7 @@
    "b": 54,
    "from": [
     1742,
-    311
+    310
    ],
    "to": [
     1722,

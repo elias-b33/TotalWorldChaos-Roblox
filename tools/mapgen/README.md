@@ -28,3 +28,4 @@ Common edits:
 - **Move a province:** change its seed (lat/lon on Earth, pixels elsewhere) and regenerate. Borders follow automatically.
 - **Change a texture:** edit the biome's parameters in `tiles.py` (colour ramps, density, sizes). `generate.py --only tiles` is quick.
 - **Starting balance:** `START_SIZE` and `START_DEV` in `layout.py`.
+- **Start-position balance** (who wins from which slot; measure with `lune run tools/harness/tournament 200 <map>`): Earth `GARRISONS`, `STRAITS` and `REGIONS`; Eldmoor `PASSES_FOR`, `CAPITAL_AT`, `EXTRA_SEEDS` and `GARRISONS` (all applied without renaming or moving any other province).

@@ -1209,12 +1209,26 @@ function Bot.step(schedule: Schedule, state: MatchState, rng: Rng.Rng, difficult
 		return orders
 	end
 	local due = {}
+	-- new to the schedule (match start, or a player just left): due at once, in a random order. The order sticks
+	-- for the whole match (which bots plan right after each payday, who reaches contested land first), so a fixed
+	-- order by nation id would favour the same start slots in every match.
+	local fresh = {}
+	for _, id in sortedKeys(state.nations) do
+		local nation = state.nations[id]
+		if nation.controller == "Bot" and not nation.eliminated and schedule.nextDue[id] == nil then
+			table.insert(fresh, id)
+		end
+	end
+	for i = #fresh, 2, -1 do
+		local j = Rng.int(rng, 1, i)
+		fresh[i], fresh[j] = fresh[j], fresh[i]
+	end
+	for i, id in fresh do
+		schedule.nextDue[id] = -2 + i / (#fresh + 1) -- below every real tick, in shuffled order
+	end
 	for _, id in sortedKeys(state.nations) do
 		local nation = state.nations[id]
 		if nation.controller == "Bot" and not nation.eliminated then
-			if schedule.nextDue[id] == nil then
-				schedule.nextDue[id] = -1 -- new to the schedule (match start, or a player just left): due at once
-			end
 			if schedule.nextDue[id] <= state.tick then
 				table.insert(due, id)
 			end

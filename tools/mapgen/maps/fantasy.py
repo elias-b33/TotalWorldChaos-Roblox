@@ -1,8 +1,8 @@
 """Eldmoor: a fantasy continent built for readable fights.
 
 Ten home regions ring the Crownlands, a rich neutral heartland behind the
-Dragonspine mountains. The Dragonspine has three passes, so the centre is
-always contested through a few chokepoints. The Corsair Isles and the Isle of
+Dragonspine mountains. The Dragonspine has three gaps and four one-province
+passes, so the centre is always contested through a few chokepoints. The Corsair Isles and the Isle of
 Mists play like Britain and Japan on the Earth map: safe to start, but
 slow to expand from.
 """
@@ -63,6 +63,29 @@ CROWN_CENTER = (1010, 480)
 SPINE_RX, SPINE_RY = 300, 215
 SPINE_ARCS = [(190, 250), (300, 380), (70, 140)]  # degrees, 0 = east, 90 = south
 VOLCANO = ("Mount Cinder", 1365, 790)
+# Start-position balance (docs/MAPS.md, docs/BALANCE.md section 16): the three gaps put Frostmarch,
+# Greenvale/Saltmarsh and Ashen/Elderwood next to the Crownlands, while Ironholds and Sunscorch were walled in with
+# almost no neutral land and never won a bot match. Every mainland kingdom without a gap of its own gets a narrow
+# pass: the Dragonspine peak straight between it and Moonmere becomes a passable highland (one province, neutral at
+# the start, a normal garrison). Peaks are placed before anything else and keep their names (plus " Pass"), so no
+# other province moves or is renamed.
+PASSES_FOR = ["Ironholds", "Sunscorch", "Wyrmcoast", "Saltmarsh"]
+# Capitals sit on the seed nearest their zone's centre unless placed here. Elderwood's capital moves to the south of
+# the great forest, so its start territory no longer reaches Ironholds' border: the northern forest starts neutral
+# and Ironholds has land to grow into in Peace, as the other kingdoms do.
+CAPITAL_AT = {"Elderwood": (1590, 580)}
+# Province seeds added after the random ones (so no other province moves or is renamed). One more province on the
+# Isle of Mists lets Mistborn start on its island alone instead of on a mainland foothold wedged against Ironholds.
+EXTRA_SEEDS = [(1790.0, 335.0)]
+# Neutral garrisons above the 1,000-man default (the Crownlands' 3,000 are set by zone). Ironholds still had the
+# most neighbours of any kingdom; the neutral land on its two open flanks (Highcairn towards Frostmarch, Duskshade
+# towards Elderwood and the Mistborn crossing) holds out longer, so it isn't everyone's first war.
+GARRISONS = {"Highcairn": 2000, "Duskshade": 2000}
+# nation slots (and colours), 1 to 10
+SLOTS = [
+    "Mistborn", "Saltmarsh", "Ironholds", "Frostmarch", "Greenvale",
+    "Elderwood", "Wyrmcoast", "Sunscorch", "Ashen Dominion", "Corsairs",
+]
 
 # name, centre, biome mix, nation (None = neutral zone)
 ZONES = [
@@ -179,7 +202,7 @@ def build() -> Layout:
             hi = r
     r = hi
     mountains = spine_points(r * 0.95) + [VOLCANO[1:]]
-    others = poisson(land, r, mountains, seed=11)
+    others = poisson(land, r, mountains, seed=11) + EXTRA_SEEDS  # extras last: every other name stays
 
     used: set[str] = {z[0] for z in ZONES} | {z[3] for z in ZONES if z[3]}  # keep nation and region names unique
 
@@ -199,6 +222,12 @@ def build() -> Layout:
             used.add(VOLCANO[0])
         else:
             seeds.append(Seed(name_for("peaks"), x, y, "peaks"))
+    for nation in PASSES_FOR:
+        zx, zy = next(z[1] for z in ZONES if z[3] == nation)
+        angle = math.atan2((zy - CROWN_CENTER[1]) / SPINE_RY, (zx - CROWN_CENTER[0]) / SPINE_RX)
+        px, py = CROWN_CENTER[0] + SPINE_RX * math.cos(angle), CROWN_CENTER[1] + SPINE_RY * math.sin(angle)
+        peak = min(seeds[:-1], key=lambda s: (s.x - px) ** 2 + (s.y - py) ** 2)  # never Mount Cinder (last)
+        peak.name, peak.biome, peak.dev = f"{peak.name} Pass", "highlands", 1
     for x, y in others:
         z = ZONES[zone_of(x, y)]
         mix = z[2]
@@ -208,11 +237,16 @@ def build() -> Layout:
             s.dev = 4 if biome == "meadow" else 3
             s.garrison = 3000
         seeds.append(s)
-    # capitals: the passable seed nearest each zone's centre
+    for s in seeds:
+        s.garrison = GARRISONS.get(s.name, s.garrison)
+    missing = set(GARRISONS) - {s.name for s in seeds}
+    assert not missing, f"GARRISONS names no province: {missing}"
+    # capitals: the passable seed nearest each zone's centre (or its CAPITAL_AT spot)
     for zname, (zx, zy), _, nation in ZONES:
         if nation is None:
             continue
-        cands = [s for s in seeds if s.biome != "peaks" and zone_of(s.x, s.y) == ZONES.index(next(z for z in ZONES if z[0] == zname))]
+        zx, zy = CAPITAL_AT.get(nation, (zx, zy))
+        cands = [s for s in seeds if s.biome != "peaks" and not s.name.endswith(" Pass") and zone_of(s.x, s.y) == ZONES.index(next(z for z in ZONES if z[0] == zname))]
         cap = min(cands, key=lambda s: (s.x - zx) ** 2 + (s.y - zy) ** 2)
         cap.nation = nation
         if cap.biome in ("dunes", "frostfields", "ashlands"):
@@ -223,7 +257,9 @@ def build() -> Layout:
     finalize(lay)
     auto_connect(lay)
     extra_straits(lay)
-    assign_start_territories(lay)
+    passes = {i for i, s in enumerate(lay.seeds) if s.name.endswith(" Pass")}
+    # passes start neutral; slots keep their numbers (colours) when a capital moves
+    assign_start_territories(lay, allowed=lambda slot, q: q not in passes, order=SLOTS)
     balance_start_development(lay)
     return lay
 

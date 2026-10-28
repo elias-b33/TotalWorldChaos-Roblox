@@ -190,9 +190,12 @@ REGIONS = [
     ("Borneo", 1.0, 114.0, "jungle"),
     ("Luzon", 15.5, 121.0, "jungle"),
     ("New Guinea", -5.0, 141.0, "jungle"),
+    # Start-position balance (docs/MAPS.md): Oman and Mauretania take the list places (and so the ids) of
+    # Westralia and Araucania, which merged into Outback and Patagonia. Two free provinces move from the safe
+    # backyards of Mekong and Amazon to the crowded Old World, next to Tigris and Niger.
+    ("Oman", 21.0, 57.0, "drylands"),
     # Oceania
-    ("Westralia", -26.0, 121.0, "desert"),
-    ("Outback", -24.0, 134.0, "desert"),
+    ("Outback", -25.0, 128.0, "desert"),
     ("Top End", -14.5, 133.0, "savanna"),
     ("Queensland", -21.0, 145.5, "savanna"),
     ("Murray", -33.5, 146.0, "grassland"),
@@ -250,7 +253,7 @@ REGIONS = [
     ("Cusco", -11.0, -75.0, "hills"),
     ("Altiplano", -17.5, -67.5, "mountains"),
     ("Atacama", -24.0, -69.5, "desert"),
-    ("Araucania", -37.5, -72.5, "hills"),
+    ("Mauretania", 20.5, -11.0, "desert"),  # in Araucania's place, see Oman
     ("Patagonia", -46.0, -69.0, "steppe"),
     ("Pampas", -34.5, -61.5, "grassland"),
     ("Mato Grosso", -13.5, -55.0, "savanna"),
@@ -286,9 +289,15 @@ STRAITS = [
     ("Madagascar", "Sofala"),
     ("Antilles", "Appalachia"),  # Florida Straits
     ("Antilles", "Yucatan"),
-    ("Senegambia", "Sertao"),  # Dakar to Natal, the narrowest Atlantic crossing
+    # No Dakar-Natal lane any more (start-position balance, docs/BALANCE.md section 16): Niger was Amazon's only
+    # neighbour, so Amazon attacked it in almost every match and Niger won 0 of 200 bot matches. The Americas now
+    # reach the Old World only through Greenland-Iceland and the Bering Strait.
 ]
 WRAP_STRAITS = [("Chukotka", "Alaska")]  # Bering Strait, across the map edge
+
+# Neutral garrisons above the 1,000-man default. Volga and Zambezi had quiet backyards no other nation reaches early
+# (western Siberia; the Horn, Abyssinia and Madagascar) and won about twice their share: these wilds hold out longer.
+GARRISONS = {"Ob": 2000, "Yenisei": 2000, "Madagascar": 2000, "Horn": 2000, "Abyssinia": 2000}
 
 TERRAIN = {
     "grassland": "Plains", "steppe": "Plains", "savanna": "Plains", "desert": "Plains", "tundra": "Plains",
@@ -304,7 +313,8 @@ def build() -> Layout:
     for r in REGIONS:
         name, lat, lon, biome = r[:4]
         x, y = project(lon, lat)
-        seeds.append(Seed(name, x, y, biome, nation=r[4] if len(r) > 4 else None))
+        seeds.append(Seed(name, x, y, biome, nation=r[4] if len(r) > 4 else None, garrison=GARRISONS.get(name)))
+    assert set(GARRISONS) <= {s.name for s in seeds}, "GARRISONS names a province that doesn't exist"
     notes: list[str] = []
     labels, seeds = build_regions(land, seeds, notes)
     lay = Layout("earth", "Earth", "earth", W, H, labels, land, seeds, TERRAIN, notes=notes)
