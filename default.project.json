@@ -2,6 +2,11 @@
 	"name": "total-world-chaos",
 	"tree": {
 		"$className": "DataModel",
+		"Players": {
+			"$properties": {
+				"CharacterAutoLoads": false
+			}
+		},
 		"ReplicatedStorage": {
 			"Shared": {
 				"$path": "src/shared"
@@ -17,6 +22,11 @@
 				"Client": {
 					"$path": "src/client"
 				}
+			}
+		},
+		"TextChatService": {
+			"$properties": {
+				"ChatVersion": "TextChatService"
 			}
 		}
 	}

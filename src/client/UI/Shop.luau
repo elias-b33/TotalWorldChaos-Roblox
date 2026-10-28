@@ -123,7 +123,7 @@ local function robuxPrice(id: string, listPrice: number): number
 		task.spawn(function()
 			local ok, info = pcall(function()
 				local kind = if id == "vip" then Enum.InfoType.GamePass else Enum.InfoType.Product
-				return MarketplaceService:GetProductInfo(productId, kind)
+				return MarketplaceService:GetProductInfoAsync(productId, kind)
 			end)
 			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
 				livePrices[id] = info.PriceInRobux

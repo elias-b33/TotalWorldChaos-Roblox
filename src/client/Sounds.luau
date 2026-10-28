@@ -2,10 +2,11 @@
 -- Every sound the game plays, in one place, plus the mute toggle (the 🔊 button Hud puts at the right end of the
 -- top bar, remembered for the session) and a tap sound for every button.
 --
--- Only sounds that ship inside every Roblox client (rbxasset://sounds/...) are used, so nothing has to be uploaded.
--- They can't be checked outside Studio: play each one once in Studio (see docs/DESIGN.md "Sound and effects") and
--- swap any id that is missing or sounds wrong. A missing file is harmless: Roblox logs "Failed to load sound" and
--- the game carries on silently. To use an uploaded sound later, put its "rbxassetid://<id>" here.
+-- Stand-ins until the owner picks real sounds: every id is one of the few files every Roblox client ships in
+-- content/sounds (the default character sounds: footsteps, jumps, landings, falling, swimming, an explosion, a
+-- splash, "oof", "ouch", the volume-slider tick), played at different speeds so each moment sounds different.
+-- To use a Creator Store or uploaded sound, put its "rbxassetid://<id>" here (docs/STUDIO.md "Sounds"). A missing
+-- file is harmless: Roblox logs it and the game carries on silently.
 
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
@@ -30,24 +31,25 @@ export type SoundName =
 	| "Cataclysm"
 	| "Results"
 
--- id: the file; volume 0..1; gap: seconds before the same sound may start again (a burst of battles plays once).
-local SOUNDS: { [string]: { id: string, volume: number, gap: number } } = {
-	Tap = { id = "rbxasset://sounds/clickfast.wav", volume = 0.35, gap = 0.05 },
-	BattleStart = { id = "rbxasset://sounds/swordlunge.wav", volume = 0.45, gap = 0.4 },
-	BattleEnd = { id = "rbxasset://sounds/swordslash.wav", volume = 0.45, gap = 0.4 },
-	ArmyDestroyed = { id = "rbxasset://sounds/collide.wav", volume = 0.5, gap = 0.4 },
-	Capture = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.45, gap = 0.3 },
-	Lost = { id = "rbxasset://sounds/uuhhh.mp3", volume = 0.4, gap = 1 },
-	MeteorFall = { id = "rbxasset://sounds/Rocket whoosh 01.wav", volume = 0.6, gap = 0.2 },
-	MeteorImpact = { id = "rbxasset://sounds/Rocket shot.wav", volume = 0.7, gap = 0.2 },
-	Plague = { id = "rbxasset://sounds/splat.wav", volume = 0.5, gap = 0.5 },
-	Rebels = { id = "rbxasset://sounds/unsheath.wav", volume = 0.55, gap = 0.5 },
-	Earthquake = { id = "rbxasset://sounds/HalloweenThunder.wav", volume = 0.6, gap = 0.5 },
-	Blessing = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.5, gap = 0.5 },
-	Shield = { id = "rbxasset://sounds/swoosh.wav", volume = 0.5, gap = 0.5 },
-	War = { id = "rbxasset://sounds/unsheath.wav", volume = 0.6, gap = 1 },
-	Cataclysm = { id = "rbxasset://sounds/HalloweenThunder.wav", volume = 0.7, gap = 1 },
-	Results = { id = "rbxasset://sounds/victory.wav", volume = 0.6, gap = 1 },
+-- id: the file; volume 0..1; speed: playback speed (pitch); gap: seconds before the same sound may start again (a
+-- burst of battles plays once).
+local SOUNDS: { [string]: { id: string, volume: number, speed: number, gap: number } } = {
+	Tap = { id = "rbxasset://sounds/volume_slider.ogg", volume = 0.5, speed = 1.2, gap = 0.05 },
+	BattleStart = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.6, speed = 0.8, gap = 0.4 },
+	BattleEnd = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.6, speed = 1.1, gap = 0.4 },
+	ArmyDestroyed = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.35, speed = 1.4, gap = 0.4 },
+	Capture = { id = "rbxasset://sounds/action_jump.mp3", volume = 0.5, speed = 1.3, gap = 0.3 },
+	Lost = { id = "rbxasset://sounds/oof.ogg", volume = 0.45, speed = 1, gap = 1 },
+	MeteorFall = { id = "rbxasset://sounds/action_falling.ogg", volume = 0.6, speed = 1.3, gap = 0.2 },
+	MeteorImpact = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.7, speed = 1, gap = 0.2 },
+	Plague = { id = "rbxasset://sounds/impact_water.mp3", volume = 0.5, speed = 0.6, gap = 0.5 },
+	Rebels = { id = "rbxasset://sounds/action_footsteps_plastic.mp3", volume = 0.6, speed = 0.9, gap = 0.5 },
+	Earthquake = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.6, speed = 0.45, gap = 0.5 },
+	Blessing = { id = "rbxasset://sounds/action_jump.mp3", volume = 0.5, speed = 1.8, gap = 0.5 },
+	Shield = { id = "rbxasset://sounds/action_swim.mp3", volume = 0.5, speed = 1.5, gap = 0.5 },
+	War = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.7, speed = 0.55, gap = 1 },
+	Cataclysm = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.7, speed = 0.6, gap = 1 },
+	Results = { id = "rbxasset://sounds/action_get_up.mp3", volume = 0.6, speed = 1.2, gap = 1 },
 }
 
 local muted = false -- module state lives as long as the client session, across matches
@@ -69,6 +71,7 @@ local function soundFor(name: string): Sound?
 	sound.Name = name
 	sound.SoundId = def.id
 	sound.Volume = def.volume
+	sound.PlaybackSpeed = def.speed
 	sound.Parent = SoundService -- not in a part: plays everywhere at the same volume
 	instances[name] = sound
 	return sound

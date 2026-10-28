@@ -5,6 +5,11 @@
 -- Someone else's army -> the sheet of the province it stands in. Empty space -> close everything.
 -- While a Primordial power waits for a target, every tap goes to the power instead.
 
+-- Roblox's own player list would open over the HUD's right end on PC; the game has its own (🌍).
+pcall(function()
+	game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+end)
+
 local Client = script.Parent
 local ArmySheet = require(Client.UI.ArmySheet)
 local ClientState = require(Client.ClientState)

@@ -748,7 +748,7 @@ roblox.implementMethod("MarketplaceService", "UserOwnsGamePassAsync", function(_
 	local owned = Emulator.gamePasses[userId]
 	return owned ~= nil and owned[passId] == true
 end)
-roblox.implementMethod("MarketplaceService", "GetProductInfo", function(_service, id)
+roblox.implementMethod("MarketplaceService", "GetProductInfoAsync", function(_service, id)
 	task.wait()
 	return { PriceInRobux = Emulator.productPrices[id] or 0 }
 end)

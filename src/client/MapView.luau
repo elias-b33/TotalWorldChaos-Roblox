@@ -4,6 +4,7 @@
 -- pointer, a tap (or click) is handed to the tap handler. Map positions are in map-art pixels (1 pixel = 1 stud);
 -- things drawn on the map are children of the canvas, placed by scale so they follow every pan and zoom.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -12,7 +13,7 @@ local TAP_SLOP = 8 -- pixels a press may move and still count as a tap
 local MAX_ZOOM = 10 -- screen pixels per map pixel at the closest zoom
 local ZOOM_LEVELS = 3 -- whole map, region, close-up (mouse wheel steps between them)
 local SMOOTHING = 12 -- higher = snappier
-local TOP_BAR = 44 -- the HUD's top bar (UI/Hud BAR_HEIGHT): the map is framed below it
+local HUD_BAR = 44 -- the HUD's top bar (UI/Hud BAR_HEIGHT), drawn under Roblox's own top bar: the map is framed below both
 
 local MapView = {}
 
@@ -37,20 +38,40 @@ local shakeSeconds = 0
 local shakeLeft = 0
 local shakeOffset = Vector2.zero
 
+-- The whole screen the map GUI covers (ScreenInsets None), in its own coordinates. Camera.ViewportSize leaves out
+-- notches, so it is only the fallback until the GUI has been laid out.
 local function viewport(): Vector2
+	local back = root
+	if back and back.AbsoluteSize.X > 0 then
+		return back.AbsoluteSize
+	end
 	local camera = workspace.CurrentCamera
 	return if camera then camera.ViewportSize else Vector2.new(800, 600)
 end
 
--- The part of the screen the map is framed in (below the top bar), and its centre.
+-- Everything above the map: Roblox's top bar (the inset the HUD sits below) plus the HUD's own bar.
+local function topBand(): number
+	local ok, inset = pcall(function()
+		return GuiService:GetGuiInset()
+	end)
+	return HUD_BAR + (if ok and typeof(inset) == "Vector2" then inset.Y else 0)
+end
+
+-- How far down the screen the map starts (Roblox's top bar plus the HUD's), for things placed in full-screen GUIs.
+function MapView.topBand(): number
+	return topBand()
+end
+
+-- The part of the screen the map is framed in (below the top bars), and its centre.
 local function viewArea(): Vector2
 	local vp = viewport()
-	return Vector2.new(vp.X, math.max(vp.Y - TOP_BAR, 1))
+	return Vector2.new(vp.X, math.max(vp.Y - topBand(), 1))
 end
 
 local function viewCentre(): Vector2
 	local vp = viewport()
-	return Vector2.new(vp.X / 2, TOP_BAR + (vp.Y - TOP_BAR) / 2)
+	local top = topBand()
+	return Vector2.new(vp.X / 2, top + (vp.Y - top) / 2)
 end
 
 local function fitZoom(): number
@@ -156,7 +177,7 @@ end
 function MapView.onScreen(p: Vector2, margin: number): boolean
 	local s = MapView.toScreen(p)
 	local vp = viewport()
-	return s.X >= -margin and s.Y >= TOP_BAR - margin and s.X <= vp.X + margin and s.Y <= vp.Y + margin
+	return s.X >= -margin and s.Y >= topBand() - margin and s.X <= vp.X + margin and s.Y <= vp.Y + margin
 end
 
 -- The region zoom (the middle wheel step), for things that should show from there on.

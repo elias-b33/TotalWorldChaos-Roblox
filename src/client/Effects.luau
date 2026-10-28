@@ -847,7 +847,7 @@ function Effects.init()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "Effects"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true -- the flash covers the whole screen
+	gui.ScreenInsets = Enum.ScreenInsets.None -- the flash covers the whole screen, notch and home bar included
 	gui.DisplayOrder = 11 -- over the Results screen (10), under the map vote (20); it never takes taps
 	flash = Instance.new("Frame")
 	flash.Name = "Flash"

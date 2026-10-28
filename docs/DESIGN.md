@@ -431,7 +431,7 @@ Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): 
 | Any button | | `Tap` |
 
 - **Phones:** at most 240 pooled particle frames, 8 other nations' effects (14 with powers and your own fights) at once, 6 shield domes. Effects off screen are skipped, and other nations' battles and captures are skipped where the province is under 16 screen pixels wide.
-- **Sounds:** only files that ship inside every Roblox client (`rbxasset://sounds/...`), all listed in `Sounds.luau`. Each one must be played once in Studio before launch; swap any that is missing. A missing file is harmless (Roblox logs it and stays silent). You hear your own battles and captures even off screen.
+- **Sounds:** stand-ins for now, all listed in `Sounds.luau`: the few files every Roblox client ships in `content/sounds` (the default character sounds: footsteps, jumps, landings, falling, swimming, an explosion, a splash, "oof"), played at different speeds. Before launch the owner swaps in Creator Store or uploaded sounds (`rbxassetid://…`). A missing file is harmless (Roblox logs it and stays silent). You hear your own battles and captures even off screen.
 - **Mute:** a 🔊 button at the right end of the top bar; it mutes every sound and is remembered for the session.
 
 ## Bot AI
