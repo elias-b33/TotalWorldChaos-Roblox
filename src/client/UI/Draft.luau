@@ -29,6 +29,9 @@ local Widgets = require(script.Parent.Widgets)
 local Theme = Widgets.Theme
 local BANNER_HEIGHT = 48 -- covers the HUD's top bar (44 px) while drafting
 local PANEL_WIDTH = 272
+local CONFIRM_WIDTH = 280 -- the Pick button at most
+local RACE_CARD_WIDTH = 480 -- the race card at most (one line on an 844 px phone)
+local DRAFT_CORNER_BUTTONS = 2 -- corner buttons that stay during the draft: the shop's cart and the quests' scroll
 local CELL = Vector2.new(120, 44)
 local TAKEN_FADE = 0.75 -- background transparency of a nation someone already picked
 
@@ -261,9 +264,16 @@ function Draft.init()
 		end
 	end)
 	confirm.Name = "Confirm"
+	-- between the Lobby's corner buttons (the cart and the scroll stay during the draft) and the panel, as wide as
+	-- there is room for (up to CONFIRM_WIDTH): on a 667 px phone it never sits under the corner buttons
+	local left = Widgets.cornerRowEnd(DRAFT_CORNER_BUTTONS) + Theme.space.m
+	local right = PANEL_WIDTH + 8 + Theme.space.m
 	confirm.AnchorPoint = Vector2.new(0.5, 1)
-	confirm.Position = UDim2.new(0.5, -PANEL_WIDTH // 2, 1, -12)
-	confirm.Size = UDim2.fromOffset(280, 48)
+	confirm.Position = UDim2.new(0.5, (left - right) // 2, 1, -12)
+	confirm.Size = UDim2.new(1, -(left + right), 0, 48)
+	local confirmCap = Instance.new("UISizeConstraint")
+	confirmCap.MaxSize = Vector2.new(CONFIRM_WIDTH, 48)
+	confirmCap.Parent = confirm
 	confirm.TextSize = 18
 	confirm.TextWrapped = false
 	confirm.TextTruncate = Enum.TextTruncate.AtEnd
@@ -272,8 +282,16 @@ function Draft.init()
 	-- the race card, just above the Pick button
 	raceCard = Widgets.chip(gui, "humans", "", nil, 34)
 	raceCard.Name = "RaceCard"
+	-- over the free map left of the panel (above the corner buttons): one line on a big phone, two on a small one
 	raceCard.AnchorPoint = Vector2.new(0.5, 1)
-	raceCard.Position = UDim2.new(0.5, -PANEL_WIDTH // 2, 1, -12 - 48 - Theme.space.m)
+	raceCard.Position = UDim2.new(0.5, (8 - right) // 2, 1, -12 - 48 - Theme.space.m)
+	raceCard.Size = UDim2.new(1, -(8 + right), 0, 34)
+	raceCard.AutomaticSize = Enum.AutomaticSize.Y
+	raceCard.TextWrapped = true
+	raceCard.TextTruncate = Enum.TextTruncate.None
+	local raceCap = Instance.new("UISizeConstraint")
+	raceCap.MaxSize = Vector2.new(RACE_CARD_WIDTH, math.huge)
+	raceCap.Parent = raceCard
 	raceCard.BackgroundColor3 = Theme.color.navy
 	raceCard.BackgroundTransparency = 0
 	Widgets.stroke(raceCard)
