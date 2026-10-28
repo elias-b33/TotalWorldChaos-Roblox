@@ -29,7 +29,8 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	state.phase = Match.phaseAt(state.tick, state.setup)
 	Navy.step(state) -- 2: fleets sail, armies board, fleets land...
 	Movement.step(state) -- ...then armies move and stacks merge
-	Battle.step(state, rng) -- 3: land battles, then sea battles
+	Battle.step(state, rng) -- 3: land battles (armies out of battle recover morale), then sea battles
+	Battle.recoverMorale(state)
 	Navy.battleStep(state, rng)
 	Navy.blockades(state) -- (before sieges and pay, which they speed up and cut)
 	Siege.step(state) -- 4

@@ -306,10 +306,21 @@ The rosters (`Config.Troops`, `Config.Races`; `lune run tools/balance/rosters md
 | elite | Stormlords | 35 gold + 1,000 manpower | 3.5 | 2 | 1.5 | normal |
 | special | Ion storms | 18 gold + 750 manpower | 2 | 1.3 | 0.7 | normal; +40% against garrisons and Rebels |
 
+**Counters.** The line, ranged and fast troops of every race beat each other in a cycle; elites and specials are neutral (they keep their own tricks):
+
+| Role | Beats | Is beaten by |
+| --- | --- | --- |
+| ranged | line | fast |
+| line | fast | ranged |
+| fast | ranged | line |
+| elite, special | — | — |
+
+Each battle round a troop type's damage is × (1 + 25% × the share of enemy men it beats − 25% × the share of enemy men that beats it) (`Config.Battle` `Counters`, `CounterBonus`, `CounterPenalty`). Archers hitting an army of nothing but infantry deal +25%, cavalry −25%; against an army with all three the bonuses mostly cancel. So a mixed army is safe and a one-troop army can be punished. The recruit tiles show what each troop beats, and which one counters the enemy armies near the province (see "Armies and combat").
+
 - Upkeep is gold per regiment (1,000 men) per month. Normal speed: 5 s per plains province, 8 s forest and hills; fast: 3 s and 6 s.
 - The numbers were tuned with bot tournaments: `docs/BALANCE.md` sections 18 and 19.
 - Recruit buys whole regiments of one type into the army standing in the province (or a new one).
-- Battles: a side's strength is the sum of its men × each troop's attack (attacking side) or defence (defending side), with the specials' terrain and anti-garrison bonuses on their own men, times the modifiers. Losses split over an army's troop types in proportion to their men. Merging stacks adds the compositions.
+- Battles: a side's strength is the sum of its men × each troop's attack (attacking side) or defence (defending side), with the specials' terrain and anti-garrison bonuses and the counters on their own men, times the modifiers. Losses split over an army's troop types in proportion to their men. Merging stacks adds the compositions.
 - An army moves at its slowest troop's speed (retreating too).
 - A Meteor's 50% applies to every troop type. Neutral garrisons and Rebels are Earth's line infantry, on every map. A nation's army made without naming a troop (the tutorial's ready army) is its race's line troop. Every rule that counts men (retreats under 500, the bots' army sizes, the HUD) counts the total; quests, achievements, telemetry and the tutorial count every troop as a regiment.
 - Bots, quests, telemetry, the HUD and the tutorial go by role, never by a troop's name: bots raise their race's line, ranged, fast, elite and special troops (see "Bot AI"), and the tutorial's recruit step points at the player's line troop.
@@ -320,9 +331,13 @@ The rosters (`Config.Troops`, `Config.Races`; `lune run tools/balance/rosters md
 
 - An army is a stack of regiments of any troop types (its composition, see Troops) shown as one token on the map: a nation's armies that stand still in the same province (not marching, fighting or retreating) merge into one, and their compositions add up.
 - Movement: one province per 5 s on plains, 8 s on forest and hills; 3 s and 6 s for fast troops (every race's fast troop, and two elites: Knights and Horse archers). An army moves at its slowest troop's speed; a Forest race crosses forest at plains speed and a Swift race marches 15% faster. Paths follow province neighbours (BFS).
-- A battle starts when enemy armies share a province and lasts 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers. Strength = the sum of its men × each troop's attack (attackers) or defence (defenders); losses split over troop types in proportion to their men.
-- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, a Forest race in a forest, a Hills race defending in hills, an Attack race attacking (each race's own numbers, see Races), random ±10% per battle; a special's terrain or anti-garrison bonus counts for its own men only (see Troops).
-- After round 3 the side with fewer men retreats: it walks to its nearest owned province on the shortest path over land it may enter, at its own speed (its slowest troop's), under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home.
+- A battle starts when enemy armies share a province and lasts up to 3 rounds of 1 s. Each round, each side kills enemy men equal to 15% of its own strength × modifiers. Strength = the sum of its men × each troop's attack (attackers) or defence (defenders), × its counter (see Troops); losses split over troop types in proportion to their men.
+- Modifiers: defender in forest or hills +25%, fort +50%, underdog +50%, coalition +30%, flanking (below), a Forest race in a forest, a Hills race defending in hills, an Attack race attacking (each race's own numbers, see Races), random ±10% per battle; a special's terrain or anti-garrison bonus counts for its own men only (see Troops).
+- **Morale** (0–100, `Config.Battle`): every army has it, garrisons and Rebels too. New regiments start full; when armies merge (or regiments join an army) the morale is the average by men. Each battle round costs a side 150 × the share of its men it lost that round + 5 (losing 15% of its men costs 27.5, rounded to whole points), the same for each of its armies. A side's morale is its armies' average by men; when it reaches 0 the side **breaks** and retreats at once, even before round 3 and even with more men. Out of battle morale comes back in steps: +10 every 5 s on its own land (neutral land for garrisons and Rebels), +5 elsewhere, so a recovering army's record changes once every 5 s. A fresh army beats a tired one of the same size: the tired one breaks first.
+- **Flanking:** each army in a battle came in from one direction: the province it stepped in from, or the battle's province for an army that was already standing there (defenders at home, besiegers, armies just raised or landed). A side whose armies came from 2 or more different directions gets +15% per extra direction, at most +30% (`FlankBonus`, `FlankMaxExtra`). An army that joins a battle in progress counts from its round on.
+- **Result**, after every round: a side with no men left loses; a side that broke loses (both broke: the lower morale); after round 3 the side with fewer men loses (a tie goes to the defender). The loser retreats: it walks to its nearest owned province on the shortest path over land it may enter, at its own speed (its slowest troop's), under a 🏳 flag. On the way it takes no orders and doesn't fight, block a siege or besiege; it is a normal army again when it arrives (or when its way closes). Armies under 500 men are destroyed, and so is a loser with no way home (a beaten garrison always is).
+- The battle's toasts say what decided it: the enemy broke ("They broke at…"), your army broke, or a flank. A flank (or the counters) "decided" a battle when, without the kills and morale it took, the other side would have won (`Battle.step` keeps that account for each side; `BattleEnded` carries `broke`, `flank`, `counter` and `outnumbered`).
+- Rules: `Sim/Battle.luau` (counters: `Sim/Troops.luau`); numbers: `Config.Battle`; balance: `docs/BALANCE.md` section 20.
 
 ### Sieges
 
@@ -446,7 +461,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 
 1. Apply queued commands.
 2. Sail fleets, board armies standing on a coast onto their fleets, land fleets that arrived and merge a nation's fleets standing in one zone; then move armies (retreating armies walk home too) and merge a nation's armies standing in the same province.
-3. Resolve battles on land, then at sea; then mark the blockaded provinces.
+3. Resolve battles on land (armies out of battle recover morale every 5th tick), then at sea; then mark the blockaded provinces.
 4. Advance sieges and flip provinces.
 5. Every 10th tick: pay income and upkeep.
 6. Update Primordial-power charges and timers.
@@ -459,7 +474,7 @@ A sandbox server ("Sandbox") runs the same order at the speed its player sets (n
 ### Networking
 
 - **On join:** one full snapshot of provinces, nations, armies and fleets.
-- **Every tick:** one batched delta with only what changed (owners, development, blockades, armies, fleets, battle events).
+- **Every tick:** one batched delta with only what changed (owners, development, blockades, armies, fleets, battle events). An army's morale is a whole number in its record that changes on battle rounds and, while it recovers, once every 5 ticks (all armies on the same tick), so a resting army isn't resent every tick.
 - **Army movement:** an `UnreliableRemoteEvent` with progress between province centres; the client interpolates the token.
 - **Fleet movement:** a sailing fleet's progress towards its next zone goes on the same unreliable channel as the moving armies (in a list of its own), so its record is in a delta only when something else changes: a new zone, a battle, its hull, cargo or orders. The client glides the token between zone centres. The snapshot and the positions hold only the fleets `Navy.visible` shows (everyone sees every fleet for now, so one delta and one positions stream go to everyone; fog of war will need one per viewer). A sailing fleet costs about 36 bytes a tick (4 numbers) plus its record once per zone it enters, where it cost a whole record every tick before.
 - **Intents:** the client fires `Request…` remotes; the server answers with `CommandResult` (ok or reason).
@@ -571,6 +586,8 @@ export type Army = {
     path: { ProvinceId },      -- remaining route
     moveProgress: number,      -- ticks spent toward next province
     inBattle: boolean,
+    morale: number,            -- 0..100, whole points: a side at 0 breaks (see "Armies and combat")
+    from: ProvinceId?,         -- the province it stepped in from while marching or fighting (flanking); nil once settled
     rebel: boolean?,           -- raised by the Rebels power (drawn apart from garrisons)
     retreating: boolean?,      -- beaten and walking home: no orders, no fighting, no sieges
     boardFleet: FleetId?,      -- walking to the coast to board this fleet
@@ -791,13 +808,15 @@ Each bot checks a short priority list every few seconds and does the first actio
 
 **Priority list** (bots are staggered so 1–2 plan per tick)
 
-1. **Defend:** an enemy army borders one of my provinces → send the nearest army if my strength is at least 0.8× theirs, otherwise recruit there: my race's ranged troop (the best defenders) if I can pay for it and it makes up at most 30% of my men, else my line troop.
-2. **Recruit:** total army is below provinces × 800 men and manpower is available. My race's line troop is the base; at war, if I can pay for it and still keep 2 months of upkeep: my special while it makes up at most 10% of my men, else my elite (up to 20%) and my fast troop (up to 10%), the one furthest below its share first (`Config.Bots`: RangedShare, SpecialShare, EliteShare, FastShare). Bots pick troops by role, so every race's bots work the same way.
+1. **Defend:** an enemy army borders one of my provinces → send the nearest rested army if my strength is at least 0.8× theirs, otherwise recruit there: of my ranged troop (the best defenders, while it makes up at most 30% of my men) and my line troop, the one that defends best against that enemy's mix (defence × counter) first.
+2. **Recruit:** total army is below provinces × 800 men and manpower is available. My race's line troop is the base. When the enemy armies near my land (my enemies', or at peace my neighbours') are mostly one role, I raise the troop that beats it, while it makes up at most 35% of my men (`CounterShare`). At war, if I can pay for it and still keep 2 months of upkeep: my special while it makes up at most 10% of my men, else my elite (up to 20%) and my fast troop (up to 10%), the one furthest below its share first (`Config.Bots`: RangedShare, SpecialShare, EliteShare, FastShare). Bots pick troops by role, so every race's bots work the same way.
 3. **Expand:** a neutral neighbour whose garrison I can beat → attack it.
-4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce.
+4. **Attack:** an enemy I'm at war with, or my weakest neighbour, if my strength is above the attack ratio and there's no truce. Two free stacks that can take a province together but not alone march to two different neighbours of it, then strike on the same tick from two sides (a flank).
 5. **Build:** gold left over after 2 months of upkeep → barracks first, then farms, forts on borders (Hills races pay half), then develop; with everything built, spare gold buys regiments (the Recruit step's troop).
 6. **Diplomacy:** ally with a nation that shares my enemy; accept peace after losing 30% of my provinces in a war; join coalitions against the leader.
 7. **Primordial power:** with 2 charges, Meteor the biggest army of a nation I'm at war with that isn't immune right now. This rides along with whatever else the plan does, so charges don't pile up.
+
+**Tactics** (every difficulty; `Config.Bots`): a bot's strength checks include the counters, its flank and both sides' morale (`Battle.outcome` plays the rounds out). It doesn't attack into a counter: when the enemy's troops beat its own (by more than `CounterEdge`) it wants 0.3 more on the attack ratio (`CounteredExtraRatio`). An army under 70 morale (`MinAttackMorale`) doesn't expand, attack or march to help: a broken army rests until it has recovered. A worn-out enemy is fair game: a bot attacks when it would still win against `attack ratio` × the enemy's men.
 
 | Difficulty | Plans every | Attack ratio | Behaviour |
 | --- | --- | --- | --- |
@@ -890,6 +909,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] "Slate & Brass" GUI step 4: the province sheet's actions as slot tiles five to a row (`Widgets.slotTile`: build bronze, recruit green, diplomacy in full colour; gold costs, red when short, greyed when not possible), a coast's Ships tile in the build row (six to a row when they fit), the development as the map's pip bar in a well, status chips on the info row when they fit; army and fleet composition as icon + men chips and a route line; the power button as a royal medallion with the picker docked beside it; your row raised in the nations drawer; offers on plates with a counter, under the toasts' line
 - [x] A cast of five peoples for every map, data-driven (`Config.Races`, `Config.Casts`): human civilisations on Earth, the fantasy peoples and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards with troopers, gunners and hover bikes; seven passive kinds; an elite, a soldier, a capital and icons for each (evidence: `docs/BALANCE.md` section 19)
 - [x] Five troops per race (`Config.Races[race].roster`): a line, a ranged, a fast, an elite and a special troop with one trick (siege, terrain, pathfinder or anti-garrison), each with its own name, icon and soldier token; Earth's five human cultures share four troops and add their own elite; one race per player per match (the server refuses any other troop); bots, the tutorial and the HUD go by role; the province sheet's five recruit buttons (evidence: `docs/BALANCE.md` section 19, harness scenarios `races` and `kingdoms`)
+- [x] Smarter PvP: troop counters, morale, flanking (owner request): a line/ranged/fast counter cycle, morale that breaks a side before round 3, a flank bonus per extra direction, bots that counter-recruit, rest broken armies and strike from two sides; the recruit tiles' counter badges, morale on the army sheet and the map, battle toasts that say what decided it (evidence: `docs/BALANCE.md` section 20, harness scenario `pvp`)
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 

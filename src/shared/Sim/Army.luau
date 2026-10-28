@@ -2,8 +2,10 @@
 -- Army bookkeeping: ids, spawning, reinforcing, and the army's composition (men per troop type, docs/DESIGN.md
 -- "Troops"). Army.men is the total and Army.troops the composition; Army.setTroops is the one place either changes,
 -- so they always agree: recruits, merges, battle losses and a Meteor all go through it. Without a troop type, a
--- nation's new army is its race's line troop and a neutral one (garrisons, Rebels) Troops.BASE.
+-- nation's new army is its race's line troop and a neutral one (garrisons, Rebels) Troops.BASE. New regiments start
+-- with full morale; men joining an army bring theirs, and the army's morale is the average by men (Army.add).
 
+local Config = require("../Config")
 local Troops = require("./Troops")
 local Types = require("../Types")
 
@@ -55,14 +57,22 @@ function Army.shrinkTo(army: Army, total: number)
 	Army.setTroops(army, Troops.split(army.troops, math.max(0, total)))
 end
 
--- A stack takes in another army's men (merging, reinforcing): the compositions add up.
-function Army.add(army: Army, troops: Composition)
+-- A stack takes in another army's men (merging, reinforcing): the compositions add up, and its morale becomes the
+-- average by men of its own and theirs (`morale`: full for new regiments), in whole points.
+function Army.add(army: Army, troops: Composition, morale: number?)
 	local sum = table.clone(army.troops)
+	local added = 0
 	for _, troop in Troops.LIST do
 		local men = troops[troop]
 		if men then
 			sum[troop] = (sum[troop] or 0) + men
+			added += men
 		end
+	end
+	local total = army.men + added
+	if total > 0 then
+		local theirs = morale or Config.Battle.MoraleMax
+		army.morale = math.floor((army.men * army.morale + added * theirs) / total + 0.5)
 	end
 	Army.setTroops(army, sum)
 end
@@ -97,6 +107,7 @@ function Army.spawn(state: MatchState, owner: number, location: number, men: num
 		path = {},
 		moveProgress = 0,
 		inBattle = false,
+		morale = Config.Battle.MoraleMax,
 	}
 	local kind: Troop = troop or defaultTroop(state, owner)
 	Army.setTroops(army, { [kind] = men })

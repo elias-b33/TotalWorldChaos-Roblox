@@ -96,6 +96,25 @@ type MatchStats = {
 	taken: { [string]: number }, -- mixed mode: "AB" = provinces A took from B in the whole match
 	races: { [number]: string }, -- nation -> its race this match
 	recruits: { [string]: number }, -- troop type -> regiments bots recruited
+	battles: { [string]: number }, -- land battles (BATTLE_KEYS): how many, how long, what decided them
+}
+
+-- Land battles that ended with a result, counted by kind ("all", or "nations": between two nations, no garrison or
+-- Rebels): how many, rounds fought, ended by a morale break (before round 3: "early"), fought with a flank bonus on
+-- either side (seen from round 2), decided by a flank or by the troop counters, won by the side with fewer men (the
+-- BattleEnded event's flags, docs/DESIGN.md "Armies and combat").
+local BATTLE_KEYS = {
+	"all",
+	"rounds",
+	"broke",
+	"nations",
+	"nationRounds",
+	"nationBroke",
+	"nationEarly",
+	"flanked",
+	"flank",
+	"counter",
+	"outnumbered",
 }
 
 -- Nations' armies at one moment: how many, how many men, the biggest nation's men, standing armies that share
@@ -199,6 +218,12 @@ local function runMatch(mapId: string, seed: number): MatchStats
 	local earlyTaken: { [string]: number } = {}
 	local taken: { [string]: number } = {}
 	local lastLeader = 0
+	local battles: { [string]: number } = {}
+	for _, k in BATTLE_KEYS do
+		battles[k] = 0
+	end
+	local battleStart: { [number]: number } = {} -- province -> the tick its battle's first round was fought
+	local battleOf: { [number]: any } = {} -- province -> its battle's record (Types.Battle), as last seen
 	local stats = {
 		leaderByMinute = {},
 		finalProvinces = {},
@@ -246,6 +271,31 @@ local function runMatch(mapId: string, seed: number): MatchStats
 					local key = group[e.a] .. group[e.b]
 					earlyWars[key] = (earlyWars[key] or 0) + 1
 				end
+			elseif e.kind == "BattleEnded" then
+				local ev = e :: any
+				local rounds = if battleStart[e.province] then state.tick - battleStart[e.province] + 1 else 1
+				local record = battleOf[e.province]
+				battleStart[e.province] = nil
+				battleOf[e.province] = nil
+				local broke = if ev.broke then 1 else 0
+				battles.all += 1
+				battles.rounds += rounds
+				battles.broke += broke
+				if e.a ~= 0 and e.b ~= 0 then
+					battles.nations += 1
+					battles.nationRounds += rounds
+					battles.nationBroke += broke
+					battles.nationEarly += if ev.broke and rounds < Config.Battle.Rounds then 1 else 0
+					battles.flank += if ev.flank then 1 else 0
+					battles.counter += if ev.counter then 1 else 0
+					battles.outnumbered += if ev.outnumbered then 1 else 0
+					local edges = if record then { record.attackerEdge, record.defenderEdge } else {}
+					local flanked = false
+					for _, edge in edges do
+						flanked = flanked or (edge and edge.flankMen > 0)
+					end
+					battles.flanked += if flanked then 1 else 0
+				end
 			elseif e.kind == "ProvinceTaken" and e.a ~= 0 and e.b ~= 0 then
 				stats.conquests += 1
 				if mixed and group[e.a] and group[e.b] then
@@ -258,6 +308,16 @@ local function runMatch(mapId: string, seed: number): MatchStats
 			end
 		end
 		table.clear(state.events)
+		for p in battleStart do
+			if state.battles[p] == nil then
+				battleStart[p] = nil -- one side left or died out: no result
+				battleOf[p] = nil
+			end
+		end
+		for p, battle in state.battles do
+			battleStart[p] = battleStart[p] or state.tick
+			battleOf[p] = battle
+		end
 		if state.tick % 60 == 0 or state.result then
 			local best, leader = 0, 0
 			for id = 1, #state.nations do
@@ -303,6 +363,7 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		taken = taken,
 		races = races,
 		recruits = recruits,
+		battles = battles,
 	}
 end
 
@@ -367,8 +428,15 @@ for _, mapId in mapIds do
 	local raceNations: { [string]: number } = {}
 	local raceProvinces: { [string]: number } = {}
 	local recruits: { [string]: number } = {}
+	local battles: { [string]: number } = {}
+	for _, k in BATTLE_KEYS do
+		battles[k] = 0
+	end
 	for seed = firstSeed, firstSeed + seeds - 1 do
 		local s = runMatch(mapId, seed)
+		for k, v in s.battles do
+			battles[k] += v
+		end
 		for _, w in s.result.winners do
 			wins[w] = (wins[w] or 0) + 1
 			raceWins[s.races[w]] = (raceWins[s.races[w]] or 0) + 1
@@ -526,6 +594,31 @@ for _, mapId in mapIds do
 		table.insert(row, string.format("%d:%s", m, tostring(median(perMinute[m]))))
 	end
 	print("median leader provinces by minute: " .. table.concat(row, " "))
+	local function pctOf(n: number, of: number): number
+		return math.floor(100 * n / math.max(of, 1) + 0.5)
+	end
+	print(
+		string.format(
+			"battles per match %.1f (%.1f between nations)  |  average length %.2f rounds (between nations %.2f)  |  ended by a morale break %d%% (between nations %d%%, before round %d %d%%)",
+			battles.all / seeds,
+			battles.nations / seeds,
+			battles.rounds / math.max(battles.all, 1),
+			battles.nationRounds / math.max(battles.nations, 1),
+			pctOf(battles.broke, battles.all),
+			pctOf(battles.nationBroke, battles.nations),
+			Config.Battle.Rounds,
+			pctOf(battles.nationEarly, battles.nations)
+		)
+	)
+	print(
+		string.format(
+			"  battles between nations: fought with a flank %d%%, decided by a flank %d%%, by the troop counters %d%%, won by the side with fewer men %d%%",
+			pctOf(battles.flanked, battles.nations),
+			pctOf(battles.flank, battles.nations),
+			pctOf(battles.counter, battles.nations),
+			pctOf(battles.outnumbered, battles.nations)
+		)
+	)
 	for _, m in { 15, 25 } do
 		local lists = atMinute[m]
 		print(

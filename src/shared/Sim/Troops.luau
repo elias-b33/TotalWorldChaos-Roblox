@@ -6,7 +6,8 @@
 -- else: a player is one race for the whole match. Earth's five cultures share four human troops and add their own
 -- elite; on Eldmoor and Skyshards each race's five are its own. Neutral garrisons and Rebels are Infantry (BASE).
 -- Each special has one trick, a small hook here: siegeSpeed (Troops.siegeSpeed), terrain and vsNeutral
--- (Troops.strength), pathfinder (Troops.moveTicks).
+-- (Troops.strength), pathfinder (Troops.moveTicks). The line, ranged and fast troops beat each other in a cycle
+-- (Config.Battle.Counters, Troops.counter).
 
 local Config = require("../Config")
 local Races = require("./Races")
@@ -152,10 +153,100 @@ function Troops.upkeep(troops: Composition): number
 	return gold
 end
 
+-- Counters (docs/DESIGN.md "Troops"): the share of a composition's men in each role ({} without men).
+function Troops.roleShares(troops: Composition): { [string]: number }
+	local total = 0
+	local byRole: { [string]: number } = {}
+	for _, troop in Troops.LIST do
+		local men = troops[troop]
+		if men and men > 0 then
+			local role = STATS[troop].role
+			byRole[role] = (byRole[role] or 0) + men
+			total += men
+		end
+	end
+	if total > 0 then
+		for role, men in byRole do
+			byRole[role] = men / total
+		end
+	end
+	return byRole
+end
+
+-- The role a troop of `role` beats in the counter cycle (Config.Battle.Counters), if any: nil for elites and specials.
+function Troops.beats(role: TroopRole): TroopRole?
+	return (Config.Battle.Counters :: { [string]: TroopRole })[role]
+end
+
+-- The role that beats `role` in the counter cycle (Config.Battle.Counters), if any.
+function Troops.beatenBy(role: TroopRole): TroopRole?
+	for winner, loser in Config.Battle.Counters :: { [string]: string } do
+		if loser == role then
+			return winner :: TroopRole
+		end
+	end
+	return nil
+end
+
+-- How a troop of this role's damage is scaled against an enemy with these role shares (Troops.roleShares):
+-- 1 + CounterBonus × the share of enemy men it beats − CounterPenalty × the share of enemy men that beats it.
+-- Elite and special troops beat nothing and nothing beats them: 1.
+function Troops.counter(role: TroopRole, enemy: { [string]: number }): number
+	local beats = (Config.Battle.Counters :: { [string]: string })[role]
+	local beatenBy = Troops.beatenBy(role)
+	local up = if beats then enemy[beats] or 0 else 0
+	local down = if beatenBy then enemy[beatenBy] or 0 else 0
+	return 1 + Config.Battle.CounterBonus * up - Config.Battle.CounterPenalty * down
+end
+
+-- How well a troop of this role does against an enemy with these role shares: the share of its men it beats minus
+-- the share that beats it (-1..1; 0 for elites and specials).
+function Troops.counterScore(role: TroopRole, enemy: { [string]: number }): number
+	local beats = (Config.Battle.Counters :: { [string]: string })[role]
+	local beatenBy = Troops.beatenBy(role)
+	return (if beats then enemy[beats] or 0 else 0) - (if beatenBy then enemy[beatenBy] or 0 else 0)
+end
+
+-- The role in the counter cycle (line, ranged, fast) that does best against an enemy with these role shares, if it
+-- scores at least `atLeast` (Troops.counterScore; a tie goes to the earlier role in ROLES). Bots raise it, and the
+-- recruit tiles mark it.
+function Troops.bestCounter(enemy: { [string]: number }, atLeast: number): TroopRole?
+	local best: TroopRole?, bestScore = nil, -math.huge
+	for _, role in Troops.ROLES do
+		if (Config.Battle.Counters :: { [string]: string })[role] then
+			local score = Troops.counterScore(role, enemy)
+			if score >= atLeast and score > bestScore then
+				best, bestScore = role, score
+			end
+		end
+	end
+	return best
+end
+
+-- What the recruit tiles say about a troop of this role against the enemy armies near a province (their role
+-- shares): "good" when it is the best counter to them (Troops.bestCounter from `atLeast`), "bad" when they beat it
+-- (its score at or under -`atLeast`), else nil. Bots go by the same rule (Config.Bots.CounterMinScore).
+function Troops.counterHint(role: TroopRole, enemy: { [string]: number }, atLeast: number): string?
+	if Troops.bestCounter(enemy, atLeast) == role then
+		return "good"
+	elseif Troops.counterScore(role, enemy) <= -atLeast then
+		return "bad"
+	end
+	return nil
+end
+
 -- Combat strength before modifiers: each troop's men times its defence (on the defending side) or its attack, and
 -- the specials' tricks that apply: +terrainBonus in a battle in their terrain, +vsNeutral against neutral garrisons
--- and Rebels (`vsNeutral`: the other side is all neutral armies).
-function Troops.strength(troops: Composition, defending: boolean, terrain: Types.Terrain?, vsNeutral: boolean?): number
+-- and Rebels (`vsNeutral`: the other side is all neutral armies). With the enemy's composition (`enemy`), each troop's
+-- counter against it too (Troops.counter).
+function Troops.strength(
+	troops: Composition,
+	defending: boolean,
+	terrain: Types.Terrain?,
+	vsNeutral: boolean?,
+	enemy: Composition?
+): number
+	local shares = if enemy then Troops.roleShares(enemy) else nil
 	local s = 0
 	for _, troop in Troops.LIST do
 		local men = troops[troop]
@@ -168,7 +259,8 @@ function Troops.strength(troops: Composition, defending: boolean, terrain: Types
 			if vsNeutral then
 				bonus += t.vsNeutral or 0
 			end
-			s += men * (if defending then t.defence else t.attack) * (1 + bonus)
+			local counter = if shares then Troops.counter(t.role, shares) else 1
+			s += men * (if defending then t.defence else t.attack) * (1 + bonus) * counter
 		end
 	end
 	return s

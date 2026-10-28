@@ -4,6 +4,10 @@
 -- Troops, by role in the race's roster: the line troop is the base; a threatened province raises the ranged troop
 -- (while it is under Config.Bots.RangedShare of my men); at war, a bot that can pay for them and keep its upkeep
 -- reserve recruits its special, its elite and its fast troop, each up to its share of my men (see pickTroop).
+-- Tactics (docs/DESIGN.md "Bot AI", Config.Bots): it raises the troop that beats the armies near its land
+-- (counterRole), judges fights with the counters, flanks and both sides' morale (strengths, Battle.outcome), won't
+-- attack into a counter without a bigger margin, rests armies with low morale, and strikes with two stacks from two
+-- sides at once (strikeTogether, takePlaces).
 -- Bots send the same commands players do, through CommandRouter, and every command is dry-run against
 -- Sim/Commands first, so a bot almost never sends one the server refuses. No cheating: bots read the same state
 -- any player could see and pay full price for everything.
@@ -243,10 +247,11 @@ local function menOf(armies: { Army }): number
 	return n
 end
 
--- Combat strength (men × each troop's attack or defence × the Battle modifiers: terrain, fort, race and catch-up
--- bonuses) of my armies and theirs if they fight in this province. `iDefend` says which side holds it. Rolls are the
--- random ± per battle (0 = average). Also each side's kills per man (strength / men: losses split evenly over troop
--- types, so it holds for the whole battle) and my bare modifier.
+-- Combat strength (men × each troop's attack or defence × its counter against the other side × the Battle
+-- modifiers: terrain, fort, race, flank and catch-up bonuses) of my armies and theirs if they fight in this province.
+-- `iDefend` says which side holds it. Rolls are the random ± per battle (0 = average). Also each side's kills per man
+-- and round (losses split evenly over troop types, so it holds for the whole battle) and my bare modifier. My armies
+-- count the provinces they stand in as their directions: stacks striking from two neighbours flank.
 local function strengths(
 	ctx: Ctx,
 	provinceId: number,
@@ -270,24 +275,23 @@ local function strengths(
 	for _, a in theirs do
 		neutral = neutral and a.owner == 0
 	end
-	local my = Battle.strength(mine, iDefend, terrain, neutral and #theirs > 0) * myMod
-	local their = Battle.strength(theirs, not iDefend, terrain, false) * theirMod
+	local my = Battle.strength(mine, iDefend, terrain, neutral and #theirs > 0, Battle.composition(theirs)) * myMod
+	local their = Battle.strength(theirs, not iDefend, terrain, false, Battle.composition(mine)) * theirMod
 	local myMen, theirMen = menOf(mine), menOf(theirs)
-	local myRate = if myMen > 0 then my / myMen else myMod
-	local theirRate = if theirMen > 0 then their / theirMen else theirMod
+	local rate = Config.Battle.KillRatePerRound
+	local myRate = rate * (if myMen > 0 then my / myMen else myMod)
+	local theirRate = rate * (if theirMen > 0 then their / theirMen else theirMod)
 	return my, their, myRate, theirRate, myMod
 end
 
--- Plays out a battle's rounds: do I end with more men, and enough to survive?
-local function wouldWin(myMen: number, myMod: number, theirMen: number, theirMod: number): boolean
-	local rate = Config.Battle.KillRatePerRound
-	for _ = 1, Config.Battle.Rounds do
-		if myMen <= 0 or theirMen <= 0 then
-			break
-		end
-		myMen, theirMen = myMen - theirMen * rate * theirMod, theirMen - myMen * rate * myMod
-	end
-	return myMen > math.max(theirMen, 0) and myMen >= Config.Army.MinArmyMen
+-- Plays out a battle's rounds with both sides' morale (Battle.outcome): do I win, with enough men to survive?
+local function wouldWin(mine: Battle.Fighter, theirs: Battle.Fighter, iDefend: boolean): boolean
+	local won, left = Battle.outcome(mine, theirs, iDefend)
+	return won and left >= Config.Army.MinArmyMen
+end
+
+local function fighter(armies: { Army }, rate: number, scale: number?): Battle.Fighter
+	return { men = menOf(armies) * (scale or 1), rate = rate, morale = Battle.morale(armies) }
 end
 
 -- Can these armies beat everything standing in a province they attack, even with unlucky rolls?
@@ -298,18 +302,39 @@ local function canBeat(ctx: Ctx, provinceId: number, armies: { Army }): boolean
 	end
 	local spread = Config.Battle.RandomSpread
 	local _, _, myRate, theirRate = strengths(ctx, provinceId, armies, theirs, false, -spread, spread)
-	return wouldWin(menOf(armies), myRate, menOf(theirs), theirRate)
+	return wouldWin(fighter(armies, myRate), fighter(theirs, theirRate), false)
 end
 
--- Are these armies strong enough (by the difficulty's attack ratio) to attack `theirs` in a province?
+-- How much one side's men gain from the troop counters against the other's, on average per man (0 = nothing).
+local function counterEdge(side: { Army }, enemy: { Army }): number
+	local shares = Troops.roleShares(Battle.composition(enemy))
+	local comp = Battle.composition(side)
+	local total, sum = 0, 0
+	for _, troop in Troops.LIST do
+		local n = comp[troop]
+		if n then
+			total += n
+			sum += n * Troops.counter(Troops.stats(troop).role, shares)
+		end
+	end
+	return if total > 0 then sum / total - 1 else 0
+end
+
+-- Are these armies strong enough (by the difficulty's attack ratio) to attack `theirs` in a province? Not with low
+-- morale; against troops that counter mine, only with Config.Bots.CounteredExtraRatio more. Strong enough is either
+-- that much more strength, or a win even against that many times their men (a worn-out enemy breaks early).
 local function aboveRatio(ctx: Ctx, provinceId: number, armies: { Army }, theirs: { Army }): boolean
-	if menOf(armies) < Config.Army.MinArmyMen then
+	if menOf(armies) < Config.Army.MinArmyMen or Battle.morale(armies) < Config.Bots.MinAttackMorale then
 		return false
 	elseif #theirs == 0 then
 		return true
 	end
-	local my, their = strengths(ctx, provinceId, armies, theirs, false, 0, 0)
-	return my >= ctx.settings.attackRatio * their
+	local my, their, myRate, theirRate = strengths(ctx, provinceId, armies, theirs, false, 0, 0)
+	local ratio = ctx.settings.attackRatio
+	if counterEdge(theirs, armies) - counterEdge(armies, theirs) > Config.Bots.CounterEdge then
+		ratio += Config.Bots.CounteredExtraRatio
+	end
+	return my >= ratio * their or wouldWin(fighter(armies, myRate), fighter(theirs, theirRate, ratio), false)
 end
 
 -- The route an army would take (the same BFS as Movement.order), if it doesn't fight anyone before arriving.
@@ -376,7 +401,7 @@ local function pickTarget(ctx: Ctx, army: Army, want: (number) -> boolean): numb
 end
 
 -- My armies free for a new job, grouped by province (a stack marches and fights together): standing still at
--- home, not besieging, not fighting, not guarding a border. Biggest stack first.
+-- home, rested (Config.Bots.MinAttackMorale), not besieging, not fighting, not guarding a border. Biggest stack first.
 type Stack = { location: number, armies: { Army }, men: number }
 
 -- Men of other nations' armies in a province that neither fight me nor help me besiege it, and the lowest of their
@@ -414,7 +439,13 @@ local function freeStacks(ctx: Ctx): { Stack }
 	local byLocation: { [number]: Stack } = {}
 	local out: { Stack } = {}
 	for _, a in ctx.myArmies do
-		if not a.inBattle and #a.path == 0 and not holdsGround(ctx, a) and ctx.reserved[a.id] == nil then
+		if
+			not a.inBattle
+			and #a.path == 0
+			and a.morale >= Config.Bots.MinAttackMorale -- a tired or broken army rests
+			and not holdsGround(ctx, a)
+			and ctx.reserved[a.id] == nil
+		then
 			local stack = byLocation[a.location]
 			if stack == nil then
 				stack = { location = a.location, armies = {}, men = 0 }
@@ -473,10 +504,34 @@ local function underShare(ctx: Ctx, men: number, share: number): boolean
 	return men <= share * ctx.men
 end
 
--- What to recruit (up to `regiments` regiments) for the next fight, from my race's roster: at war, my special while
+-- The role shares of my enemies' armies in and next to my land (Troops.roleShares).
+local function frontMix(ctx: Ctx): { [string]: number }
+	local near: { [number]: boolean } = {}
+	for _, id in ctx.mine do
+		near[id] = true
+		for _, n in ctx.state.provinces[id].neighbors do
+			near[n] = true
+		end
+	end
+	local men: Types.Composition = {}
+	for location in near do
+		for _, a in ctx.armiesAt[location] or NONE do
+			if a.owner ~= 0 and ctx.isEnemy[a.owner] then
+				for _, troop in Troops.LIST do
+					men[troop] = (men[troop] or 0) + (a.troops[troop] or 0)
+				end
+			end
+		end
+	end
+	return Troops.roleShares(men)
+end
+
+-- What to recruit (up to `regiments` regiments) for the next fight, from my race's roster. At war: my special while
 -- it is under Config.Bots.SpecialShare of my men, else my elite and my fast troop while each is under its share
--- (Config.Bots.EliteShare, FastShare), the one furthest below its share first (a tie: the elite), the first of those I
--- am rich enough for; else my line troop, the base.
+-- (Config.Bots.EliteShare, FastShare), the one furthest below its share first (a tie: the elite), else the troop that
+-- beats my enemies' armies near my land (frontMix, Troops.bestCounter) while it is under Config.Bots.CounterShare,
+-- the first of those I am rich enough for, but never a troop those armies beat (Troops.counterScore at or under
+-- -CounterMinScore). Else my line troop, the base.
 local function pickTroop(ctx: Ctx, regiments: number): (Types.Troop, number)
 	local race = ctx.nation.race
 	local line = Troops.ofRole(race, "line") or Troops.BASE
@@ -504,8 +559,15 @@ local function pickTroop(ctx: Ctx, regiments: number): (Types.Troop, number)
 		for _, troop in pair do
 			table.insert(options, troop)
 		end
+		local mix = frontMix(ctx)
+		local role = Troops.bestCounter(mix, Config.Bots.CounterMinScore)
+		local counter = if role and role ~= "line" then Troops.ofRole(race, role) else nil
+		if counter and underShare(ctx, ctx.troopMen[counter] or 0, Config.Bots.CounterShare) then
+			table.insert(options, counter)
+		end
 		for _, troop in options do
-			local n = richEnough(ctx, troop, regiments)
+			local beaten = Troops.counterScore(Troops.stats(troop).role, mix) <= -Config.Bots.CounterMinScore
+			local n = if beaten then 0 else richEnough(ctx, troop, regiments)
 			if n >= 1 then
 				return troop, n
 			end
@@ -621,7 +683,7 @@ local function guardsOf(ctx: Ctx, provinceId: number): { Army }
 	return out
 end
 
--- My nearest army (by steps) that could come and help in a province, with a clear route there.
+-- My nearest rested army (by steps) that could come and help in a province, with a clear route there.
 local function nearestHelper(ctx: Ctx, provinceId: number, skip: { [number]: boolean }): Army?
 	local candidates = { provinceId }
 	local order = reachable(ctx, provinceId)
@@ -632,7 +694,8 @@ local function nearestHelper(ctx: Ctx, provinceId: number, skip: { [number]: boo
 	for _, p in candidates do
 		local best: Army? = nil
 		for _, a in ctx.armiesAt[p] or {} do
-			if a.owner == ctx.me and not a.inBattle and not skip[a.id] and ctx.reserved[a.id] == nil then
+			local rested = p == provinceId or a.morale >= Config.Bots.MinAttackMorale -- a tired army doesn't march to help
+			if a.owner == ctx.me and not a.inBattle and not skip[a.id] and ctx.reserved[a.id] == nil and rested then
 				if best == nil or a.men > best.men then
 					best = a
 				end
@@ -667,8 +730,11 @@ local function defend(ctx: Ctx): { Command }?
 	end
 	for _, t in list do
 		local guards = guardsOf(ctx, t.target)
-		local my, their, _, _, myMod = strengths(ctx, t.target, guards, t.armies, true, 0, 0)
-		if my >= ratio * their then
+		local my, their, myRate, theirRate, myMod = strengths(ctx, t.target, guards, t.armies, true, 0, 0)
+		-- enough strength, and not so worn out that they would break (Battle.outcome with both sides' morale)
+		local holds = my >= ratio * their
+			and (#guards == 0 or wouldWin(fighter(guards, myRate), fighter(t.armies, theirRate), true))
+		if holds then
 			for _, g in guards do
 				ctx.reserved[g.id] = t.location
 			end
@@ -685,9 +751,9 @@ local function defend(ctx: Ctx): { Command }?
 					end
 				end
 			end
-			-- not enough men nearby: raise them where the threat is, my ranged troop (the best defenders) if I can
-			-- pay and it is still under Config.Bots.RangedShare of my men, else my line troop
-			local missing = ratio * their - my
+			-- not enough men nearby: raise them where the threat is (fresh regiments lift a tired guard's morale):
+			-- my ranged troop (the best defenders) if I can pay and it is still under Config.Bots.RangedShare of my
+			-- men, and my line troop, the one that defends better against this enemy's mix first (its counters)
 			local race = ctx.nation.race
 			local line = Troops.ofRole(race, "line") or Troops.BASE
 			local ranged = Troops.ofRole(race, "ranged")
@@ -695,8 +761,17 @@ local function defend(ctx: Ctx): { Command }?
 					and underShare(ctx, ctx.troopMen[ranged] or 0, Config.Bots.RangedShare)
 				then { ranged, line }
 				else { line }
+			local shares = Troops.roleShares(Battle.composition(t.armies))
+			local function holding(troop: Types.Troop): number
+				local stats = Troops.stats(troop)
+				return stats.defence * Troops.counter(stats.role, shares)
+			end
+			if #options == 2 and holding(options[2]) > holding(options[1]) then
+				options[1], options[2] = options[2], options[1]
+			end
 			for _, troop in options do
-				local perRegiment = Config.Army.MenPerRegiment * Troops.stats(troop).defence * myMod
+				local perRegiment = Config.Army.MenPerRegiment * holding(troop) * myMod
+				local missing = math.max(ratio * their - my, perRegiment) -- at least one regiment
 				local regiments = math.min(math.ceil(missing / perRegiment), affordable(ctx, troop))
 				if regiments >= 1 then
 					local result =
@@ -904,6 +979,113 @@ local function declareWar(ctx: Ctx): { Command }?
 	return nil
 end
 
+-- Two stacks that can take an enemy province together but not alone strike it from two sides (docs/DESIGN.md
+-- "Bot AI"): they march in on the same tick from two neighbours of it, so they arrive together from two directions
+-- and flank (strikeTogether); free stacks first take up places there (takePlaces).
+
+-- Enemy land with enemy armies in it that my armies may march into now.
+local function pincerTarget(ctx: Ctx, p: number): boolean
+	local owner = ctx.state.provinces[p].owner
+	return owner ~= nil
+		and ctx.isEnemy[owner] == true
+		and #hostileAt(ctx, p) > 0
+		and mayInvade(ctx, p)
+		and not ctx.targeted[p]
+		and (rivalsAt(ctx, p)) == 0
+end
+
+-- Neither stack takes the province alone, both together do (standing in two places, they count as two directions).
+local function together(ctx: Ctx, p: number, a: Stack, b: Stack): boolean
+	local theirs = hostileAt(ctx, p)
+	if aboveRatio(ctx, p, a.armies, theirs) or aboveRatio(ctx, p, b.armies, theirs) then
+		return false
+	end
+	local both = table.clone(a.armies)
+	for _, army in b.armies do
+		table.insert(both, army)
+	end
+	return aboveRatio(ctx, p, both, theirs)
+end
+
+-- Two of these stacks standing next to the same province strike it together.
+local function strikeTogether(ctx: Ctx, stacks: { Stack }): { Command }?
+	local checks = 0
+	for i, a in stacks do
+		for _, p in ctx.state.provinces[a.location].neighbors do
+			if pincerTarget(ctx, p) then
+				for k = i + 1, #stacks do
+					local b = stacks[k]
+					if b.location ~= a.location and table.find(ctx.state.provinces[p].neighbors, b.location) then
+						checks += 1
+						if together(ctx, p, a, b) then
+							local commands = moveStack(a, p)
+							for _, command in moveStack(b, p) do
+								table.insert(commands, command)
+							end
+							return tryAll(ctx, commands)
+						elseif checks >= Config.Bots.MaxRouteChecks then
+							return nil
+						end
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- My two biggest free stacks walk to two different neighbours of the nearest province they can take together (clear
+-- of enemies, the nearest such place for each); the next plans strike once both stand there.
+local function takePlaces(ctx: Ctx): { Command }?
+	local stacks = freeStacks(ctx)
+	if #stacks < 2 then
+		return nil
+	end
+	local a, b = stacks[1], stacks[2]
+	local order, distA = reachable(ctx, a.location)
+	local _, distB = reachable(ctx, b.location)
+	-- the nearest neighbour of p a stack can reach and stand in, other than `taken`
+	local function place(p: number, dist: { [number]: number }, taken: number?): number?
+		local best: number?, bestD = nil, math.huge
+		for _, n in ctx.state.provinces[p].neighbors do
+			local d = dist[n]
+			if d and d < bestD and n ~= taken and #hostileAt(ctx, n) == 0 then
+				best, bestD = n, d
+			end
+		end
+		return best
+	end
+	local checks = 0
+	for _, p in order do
+		if distB[p] and pincerTarget(ctx, p) then
+			checks += 1
+			local atA = place(p, distA, nil)
+			local atB = place(p, distB, atA)
+			if atA == nil or atB == nil then
+				atB = place(p, distB, nil)
+				atA = if atB then place(p, distA, atB) else nil
+			end
+			if atA and atB and together(ctx, p, a, b) then
+				local commands: { Command } = {}
+				for _, step in { { stack = a, to = atA }, { stack = b, to = atB } } do
+					if step.stack.location ~= step.to then
+						if clearRoute(ctx, step.stack.armies[1], step.to) == nil then
+							return nil
+						end
+						for _, command in moveStack(step.stack, step.to) do
+							table.insert(commands, command)
+						end
+					end
+				end
+				return tryAll(ctx, commands)
+			elseif checks >= Config.Bots.MaxRouteChecks then
+				return nil
+			end
+		end
+	end
+	return nil
+end
+
 local function attack(ctx: Ctx): { Command }?
 	if #ctx.enemies == 0 then
 		return declareWar(ctx)
@@ -938,6 +1120,21 @@ local function attack(ctx: Ctx): { Command }?
 			end
 		end
 	end
+	-- two stacks (guards or free) standing on two sides of a province they can take together strike it now
+	local ready: { Stack } = {}
+	for _, key in keys do
+		local stack = guardStacks[key]
+		if Battle.morale(stack.armies) >= Config.Bots.MinAttackMorale then
+			table.insert(ready, stack)
+		end
+	end
+	for _, stack in freeStacks(ctx) do
+		table.insert(ready, stack)
+	end
+	local struck = strikeTogether(ctx, ready)
+	if struck then
+		return struck
+	end
 	-- free stacks march on the nearest enemy province they can take (Hard: the leading player's first)
 	local focus = if ctx.settings.targetsLeadingPlayer then leadingPlayer(ctx) else nil
 	if focus and not ctx.isEnemy[focus] then
@@ -971,6 +1168,11 @@ local function attack(ctx: Ctx): { Command }?
 				return result
 			end
 		end
+	end
+	-- no stack can take a province alone: two of them take up places on two sides of one they can take together
+	local placed = takePlaces(ctx)
+	if placed then
+		return placed
 	end
 	-- my enemies are out of reach (far away, or left with no land): find a new war nearby
 	for _, id in ctx.mine do

@@ -4,7 +4,8 @@
 -- province's status pills (its battle or siege, then Primordial-power effects with their seconds left), where armies
 -- resting in one province stand and how their strength badges stack above them, and the development pips painted as
 -- a small segmented bar; a fleet's badge (its state or the ship, its ships and the men aboard) and the blockade
--- marker on a coast (docs/DESIGN.md "Navies"). src/client/MapRenderer.luau puts all of it on screen.
+-- marker on a coast (docs/DESIGN.md "Navies"); an army's morale bar and the battle toasts' lines (docs/DESIGN.md
+-- "Armies and combat"). src/client/MapRenderer.luau puts all of it on screen.
 
 local IconArt = require("./IconArt")
 
@@ -81,6 +82,46 @@ function MapBadges.fleetText(ships: number, men: number): string
 		return ships .. " · " .. MapBadges.shortMen(men)
 	end
 	return tostring(ships)
+end
+
+-- Morale (docs/DESIGN.md "Armies and combat") on the army sheet's bar and the bar under a token: how full it is
+-- (0..1) and its tone: "good" from MORALE_GOOD of full (a bot's armies attack from there too), "low" from MORALE_LOW,
+-- else "broken" (about to break, or resting after it did).
+MapBadges.MORALE_GOOD = 0.7
+MapBadges.MORALE_LOW = 0.35
+
+function MapBadges.morale(morale: number, max: number): (number, string)
+	local f = math.clamp(morale / math.max(max, 1), 0, 1)
+	return f, if f >= MapBadges.MORALE_GOOD then "good" elseif f >= MapBadges.MORALE_LOW then "low" else "broken"
+end
+
+-- Whether an army's token shows its morale bar: while it fights, and while it is below full (tired, or resting after
+-- a battle). Garrisons at rest stay full, so the map stays calm.
+function MapBadges.showMorale(morale: number, max: number, inBattle: boolean): boolean
+	return inBattle or morale < max
+end
+
+-- The toast for a battle this player fought (won or lost at `place`), saying what decided it: a flank (`flank`) or
+-- the loser's morale breaking (`broke`).
+function MapBadges.battleText(won: boolean, place: string, flank: boolean, broke: boolean): string
+	if won then
+		if flank and broke then
+			return "🎉 Flank attack at " .. place .. ": they broke!"
+		elseif flank then
+			return "🎉 Flank attack won at " .. place .. "!"
+		elseif broke then
+			return "🎉 They broke at " .. place .. "!"
+		end
+		return "🎉 Battle won at " .. place
+	end
+	if flank and broke then
+		return "💀 Flanked at " .. place .. ": your army broke"
+	elseif flank then
+		return "💀 Flanked at " .. place .. "!"
+	elseif broke then
+		return "💀 Your army broke at " .. place
+	end
+	return "💀 Battle lost at " .. place
 end
 
 -- A power's shield is the glowing power shield; the plain shield marks neutral garrisons.
