@@ -354,8 +354,24 @@ T.test("an AFK or leaver reward doesn't use up the first-match bonus or count as
 	local left: Types.MatchReward = { xp = 10, glory = 2, lines = {}, stayed = false, afk = false }
 	Progression.grant(profile, Progression.newStats(1, 0), left, 5)
 	T.expect(Progression.isFirstMatchToday(profile, 5))
-	T.equal(profile.stats.matches, 1, "the AFK player still finished")
+	T.equal(profile.stats.matches, 0, "an AFK match isn't a match played (it doesn't move the starter-pack offer)")
 	T.equal(profile.xp, 10)
+end)
+
+T.test("a leave and then Results add the match's captures, battles and powers to the lifetime stats once", function()
+	local profile = Progression.newProfile()
+	local stats = Progression.newStats(1, 0)
+	stats.provincesTaken, stats.battlesWon, stats.powersUsed = 3, 2, 1
+	local left: Types.MatchReward = { xp = 10, glory = 2, lines = {}, stayed = false, afk = false }
+	Progression.grant(profile, stats, left, 5)
+	T.equal(profile.stats.provincesTaken, 3)
+	stats.provincesTaken, stats.battlesWon = 5, 2 -- rejoined, took 2 more
+	local results: Types.MatchReward = { xp = 10, glory = 2, lines = {}, stayed = true, afk = false }
+	Progression.grant(profile, stats, results, 5)
+	T.equal(profile.stats.provincesTaken, 5, "3 then 2 more, not 3 + 5")
+	T.equal(profile.stats.battlesWon, 2)
+	T.equal(profile.stats.powersUsed, 1)
+	T.equal(profile.stats.matches, 1)
 end)
 
 T.test("migrate keeps a v1 profile and recomputes the level from XP", function()

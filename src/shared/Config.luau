@@ -238,6 +238,7 @@ Config.Shop = {
 
 Config.Net = {
 	MaxIntentsPerSecond = 10,
+	MaxShopIntentsPerSecond = 2, -- shop requests (buy, equip, emote, theme setting) on top of that, per player
 }
 
 -- Bots -------------------------------------------------------------------------------------------
@@ -281,6 +282,8 @@ Config.Tutorial = {
 	Difficulty = "Easy",
 	StartRegiments = 3, -- a ready army at the capital, so the first prompt (take a neutral province) can start at once
 	GiftCharges = 1, -- the power prompt tops the player's charges up to this (a Blessing costs 1)
+	TeleportRetries = 3, -- a failed teleport back to a public server is tried again this many times...
+	TeleportRetrySeconds = 5, -- ...this long apart
 }
 
 -- Analytics (docs/LAUNCH.md "Analytics events"): Services/TelemetryService and Sim.Telemetry -------------------

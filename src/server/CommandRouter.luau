@@ -36,6 +36,7 @@ local CommandRouter = {}
 local queue: { Pending } = {}
 local lobbyQueue: { LobbyPending } = {}
 local limiter = RateLimit.new(Config.Net.MaxIntentsPerSecond)
+local shopLimiter = RateLimit.new(Config.Net.MaxShopIntentsPerSecond) -- shop requests may yield to save
 local commandResult: RemoteEvent
 local nationOf: (Player) -> number?
 local observers: { (Player, Types.Command, boolean) -> () } = {}
@@ -205,7 +206,8 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			return
 		end
 		local id = requestId :: number
-		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+		local now = os.clock()
+		if not RateLimit.allow(limiter, player.UserId, now) or not RateLimit.allow(shopLimiter, player.UserId, now) then
 			reply(player, id, false, "TooFast")
 		elseif intent == nil or shopHandler == nil then
 			reply(player, id, false, "BadRequest")
@@ -275,6 +277,7 @@ function CommandRouter.init(getNation: (Player) -> number?)
 
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
+		RateLimit.forget(shopLimiter, player.UserId)
 	end)
 end
 

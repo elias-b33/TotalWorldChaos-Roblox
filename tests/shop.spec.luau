@@ -60,6 +60,11 @@ T.test("bundles show the real sum of their pieces", function()
 	T.equal(assert(Catalogue.offer("starter")).robux, 149)
 	T.equal(Shop.bundleValue("set_royal"), 297)
 	T.equal(assert(Catalogue.offer("set_royal")).robux, S.RareSetRobux)
+	-- with live prices (managed or regional pricing): the sum of the same prices the item cards show
+	local live = Shop.bundleValue("starter", function(id: string, list: number): number
+		return if id == "flag_vanguard" then 79 else list
+	end)
+	T.equal(live, 297 - 99 + 79)
 end)
 
 T.test("a Glory purchase checks the price and the balance", function()
@@ -246,12 +251,22 @@ end)
 T.test("the starter pack is offered from the 2nd match, once per session, until bought", function()
 	local p = Progression.newProfile()
 	p.stats.matches = S.StarterPackAfterMatches - 1
-	T.equal(Shop.shouldOfferStarter(p, false), false, "never before the 2nd match")
+	T.equal(Shop.shouldOfferStarter(p, false, false), false, "never before the 2nd match")
 	p.stats.matches = S.StarterPackAfterMatches
-	T.equal(Shop.shouldOfferStarter(p, false), true)
-	T.equal(Shop.shouldOfferStarter(p, true), false, "once per session")
+	T.equal(Shop.shouldOfferStarter(p, false, false), true)
+	T.equal(Shop.shouldOfferStarter(p, true, false), false, "once per session")
 	Shop.grant(p, "starter")
-	T.equal(Shop.shouldOfferStarter(p, false), false, "not after buying")
+	T.equal(Shop.shouldOfferStarter(p, false, false), false, "not after buying")
+end)
+
+T.test("the starter pack isn't offered to a player who already owns every piece", function()
+	local p = Progression.newProfile()
+	p.stats.matches = S.StarterPackAfterMatches
+	for _, id in assert(Catalogue.offer("starter")).items do
+		p.owned[id] = true
+	end
+	T.equal(select(2, Shop.canBuyRobux(p, "starter", false)), "Owned", "buying it would be refused")
+	T.equal(Shop.shouldOfferStarter(p, false, false), false, "so it isn't offered")
 end)
 
 T.test("Robux purchases open only outside a match", function()

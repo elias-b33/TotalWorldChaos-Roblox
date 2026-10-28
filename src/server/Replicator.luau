@@ -96,4 +96,9 @@ function Replicator.notifyAll(kind: string, text: string)
 	notifyRemote:FireAllClients(kind, text)
 end
 
+-- Toast on one client.
+function Replicator.notify(player: Player, kind: string, text: string)
+	notifyRemote:FireClient(player, kind, text)
+end
+
 return Replicator

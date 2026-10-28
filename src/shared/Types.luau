@@ -129,6 +129,7 @@ export type MatchState = {
 	primordials: { [number]: Primordial }, -- keyed by userId
 	seats: { [number]: NationId }, -- userId -> the nation that player last held (a rejoining player gets it back)
 	nextArmyId: ArmyId, -- army ids are never reused (clients and queued commands refer to armies by id)
+	mergedInto: { [ArmyId]: ArmyId }, -- an army merged into another stack -> the army that took its men (Army.resolve)
 	battles: { [ProvinceId]: Battle },
 	offers: { Offer },
 	events: { MatchEvent },
@@ -253,6 +254,10 @@ export type PlayerMatchStats = {
 	powersUsed: number,
 	paidXp: number, -- already paid this match, when they left earlier
 	paidGlory: number,
+	-- what earlier payments this match already added to the lifetime stats (a leave, then Results)
+	paidProvinces: number,
+	paidBattles: number,
+	paidPowers: number,
 	-- for quests (Sim.Quests): what the player's nation did this match
 	neutralTaken: number, -- provinces captured from neutral land
 	capitalsTaken: number, -- enemy capitals captured

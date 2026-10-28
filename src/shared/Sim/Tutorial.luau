@@ -308,6 +308,13 @@ function Tutorial.update(state: MatchState, tut: TutorialState): number?
 	return tut.step
 end
 
+-- Should a public server send this player to the tutorial? Not once it was finished, skipped or played to the
+-- end of its match, and not if they already played a match (a tutorial teleport that failed, an old save).
+-- Private servers never send anyone (TutorialService): friends who joined one stay together.
+function Tutorial.needed(profile: Types.PlayerProfile): boolean
+	return not profile.tutorialDone and profile.stats.matches == 0
+end
+
 -- The player skips the tutorial: no more prompts.
 function Tutorial.skip(tut: TutorialState)
 	tut.skipped = true

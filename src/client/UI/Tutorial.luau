@@ -62,6 +62,7 @@ local hintLabel: TextLabel
 local skipButton: TextButton
 local doneCard: Frame
 local doneButtons: Frame
+local leaveButton: TextButton -- "🌍 Play online" while the prompts are skipped or done and leaving works here
 local pointerGui: ScreenGui
 local pointer: TextLabel
 local ring: Frame
@@ -244,6 +245,8 @@ local function refresh()
 		skipButton.BackgroundColor3 = Widgets.BUTTON_OFF
 	end
 	doneCard.Visible = v ~= nil and v.step > v.total and not doneDismissed
+	-- after Skip, Stay or a teleport that failed: a way out stays on screen
+	leaveButton.Visible = v ~= nil and v.canLeave and not card.Visible and not doneCard.Visible
 	if target ~= glowOn or (glow and glow.Parent ~= target) then
 		if glow and glow.Parent then
 			glow:Destroy()
@@ -363,6 +366,14 @@ function Tutorial.init(selectedArmy: () -> number?)
 	skipButton.TextSize = 14
 	skipButton.AnchorPoint = Vector2.new(1, 0)
 	skipButton.Position = UDim2.new(1, 0, 0, HINT_TOP)
+
+	-- skipped, or the end card closed with Stay: a small way out where the card was
+	leaveButton = Widgets.button(cardGui, "🌍 Play online", 150, Widgets.GOOD, function()
+		Intents.tutorial("Leave")
+	end)
+	leaveButton.Name = "PlayOnline"
+	leaveButton.Position = UDim2.fromOffset(8, CARD_TOP)
+	leaveButton.Visible = false
 
 	-- the end: a card in the middle of the screen
 	doneCard = Widgets.panel(cardGui, 340)

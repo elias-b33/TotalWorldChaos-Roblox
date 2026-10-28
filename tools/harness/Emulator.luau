@@ -238,6 +238,7 @@ local EVENT_PROPS = {
 	{ "GuiButton", { "Activated", "MouseButton1Click" }, false },
 	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged", "DescendantAdded" }, false },
 	{ "MarketplaceService", { "PromptGamePassPurchaseFinished", "PromptProductPurchaseFinished" }, false },
+	{ "TeleportService", { "TeleportInitFailed" }, false },
 }
 for _, spec in EVENT_PROPS do
 	local class, names, queued = spec[1], spec[2], spec[3]

@@ -336,7 +336,7 @@ local function offerCard(offer: Types.ShopOffer, order: number)
 	centred(card, table.concat(lines, "\n"), 12, 78, OFF_TEXT).LayoutOrder = 3
 	local note = if offer.kind == "Pass"
 		then "Yours forever"
-		else string.format("Bought separately: %s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id)))
+		else string.format("Bought separately: %s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id, robuxPrice)))
 	if offer.oncePerAccount and offer.kind == "Product" then
 		note ..= "\nOne per account"
 	end
@@ -519,7 +519,11 @@ local function showStarterOffer()
 	what.LayoutOrder = 2
 	local sum = Widgets.label(
 		offerPanel,
-		string.format("Bought separately: %s %s · one per account", ROBUX, formatNumber(Shop.bundleValue("starter"))),
+		string.format(
+			"Bought separately: %s %s · one per account",
+			ROBUX,
+			formatNumber(Shop.bundleValue("starter", robuxPrice))
+		),
 		13,
 		20
 	)

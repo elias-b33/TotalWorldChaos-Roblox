@@ -72,6 +72,8 @@ local function startMatch()
 	AIService.reset(if tutorial then Config.Tutorial.Difficulty else state.setup.settings.difficulty)
 	if tutorial then
 		TutorialService.start(state)
+	else
+		TutorialService.stop() -- Studio: the Tutorial attribute was removed; seat players in the new match
 	end
 	seatAll(state, not tutorial)
 	ShopService.onPhase("Peace")
@@ -80,6 +82,7 @@ end
 
 -- Lobby, part 1: the map vote (also after Results, for the next map). Everyone stays in the server.
 local function openLobby()
+	TutorialService.stop()
 	LobbyService.open(MatchService.lockedMap())
 	CommandRouter.clear()
 	Replicator.sendLobby(LobbyService.view())
