@@ -337,7 +337,22 @@ local function build(map: Types.MapDef)
 	layer("Tokens", canvas)
 	layer("Markers", canvas)
 	layer("Crowns", canvas)
+	layer("Effects", canvas).ZIndex = 2 -- Effects' particles, over everything else
 	onZoom(MapView.zoom())
+end
+
+-- A layer of the current map's canvas by name (nil before the first map), the map's size in map pixels, and a
+-- province's rough width in map pixels: for Effects, which draws on the "Effects" layer.
+function MapRenderer.layer(name: string): Frame?
+	return layers[name]
+end
+
+function MapRenderer.mapSize(): Vector2
+	return size
+end
+
+function MapRenderer.provinceWidth(provinceId: number): number
+	return widths[provinceId] or 0
 end
 
 -- Badges above a province, made on demand: battle and siege (markers), Primordial-power effects (effects,

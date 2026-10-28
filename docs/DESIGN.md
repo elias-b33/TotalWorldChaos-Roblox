@@ -377,7 +377,7 @@ export type Command =
 Phone first: the map fills the screen, the HUD stays on the edges, and every action is a tap on the map followed by a tap in a bottom sheet.
 
 - **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
-- **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank.
+- **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank, and a mute button (see "Sound and effects").
 - **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce).
 - **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit, or Declare war and Ally on foreign provinces.
 - **Moving armies:** tap the army, tap the destination, see the path with arrival time, tap Confirm.
@@ -392,6 +392,28 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - Every UI change is checked in Studio's phone emulator before it's merged.
 
 **Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit, siege, make an ally, declare war, use a Primordial power.
+
+### Sound and effects
+
+Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): they read the delta's events and records, never change the match. WorldBox pixel style: square particles in whole map pixels, colours from `Palette.fx`, moved with TweenService.
+
+| Moment | Effect | Sound |
+| --- | --- | --- |
+| Battle starts | dust puff and pixel crossed swords | `BattleStart` |
+| Battle ends | burst in the winner's colour; bigger, with a white flash and a pixel skull, if an army was destroyed | `BattleEnd` / `ArmyDestroyed` |
+| Province changes hands | flash and rings in the new owner's colour | `Capture` (`Lost` if it was yours) |
+| Meteor | falling fireball with a trail, impact flash, ring of fire, crater dust, a crater, screen shake | `MeteorFall`, `MeteorImpact` |
+| Plague | sickly green pulses over the nation's provinces | `Plague` |
+| Rebels | black flags popping up | `Rebels` |
+| Earthquake | map shake and crack lines over the province | `Earthquake` |
+| Blessing | golden sparkles | `Blessing` |
+| Divine shield | a blue dome with a twinkling ring for as long as the shield lasts | `Shield` |
+| War, Cataclysm, Results | a screen-wide flash and a short banner | `War`, `Cataclysm`, `Results` |
+| Any button | | `Tap` |
+
+- **Phones:** at most 240 pooled particle frames, 8 other nations' effects (14 with powers and your own fights) at once, 6 shield domes. Effects off screen are skipped, and other nations' battles and captures are skipped where the province is under 16 screen pixels wide.
+- **Sounds:** only files that ship inside every Roblox client (`rbxasset://sounds/...`), all listed in `Sounds.luau`. Each one must be played once in Studio before launch; swap any that is missing. A missing file is harmless (Roblox logs it and stays silent). You hear your own battles and captures even off screen.
+- **Mute:** a 🔊 button at the right end of the top bar; it mutes every sound and is remembered for the session.
 
 ## Bot AI
 
@@ -484,7 +506,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [ ] Shop: catalogue, Robux and Glory purchases, VIP pass, starter pack, purchase history
 - [ ] Cosmetics shown in the match: flags, borders, tokens, emotes, power effects, victory animations, theme vote
 - [ ] Private server settings
-- [ ] Sound and effects for battles and Primordial powers
+- [x] Sound and effects for battles and Primordial powers
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 

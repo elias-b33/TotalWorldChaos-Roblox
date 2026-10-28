@@ -44,6 +44,31 @@ local Palette = {
 	rebelEdge = Color3.fromHex("#ff3b30"), -- ...with a red edge, so they never pass for the charcoal nation
 	strait = Color3.fromHex("#ffffff"), -- sea lanes
 	energyLink = Color3.fromHex("#7cfbef"), -- Skyshards' bridges between platforms
+	-- Effects' pixel particles (src/client/Effects.luau): WorldBox-like dust, fire, plague, gold and shield colours
+	fx = {
+		white = Color3.fromHex("#ffffff"),
+		dust = Color3.fromHex("#c8b48a"),
+		dustGrey = Color3.fromHex("#9a9aa2"),
+		steel = Color3.fromHex("#e8e8f0"),
+		hilt = Color3.fromHex("#9a6324"),
+		bone = Color3.fromHex("#f4f1e6"),
+		ink = Color3.fromHex("#151515"),
+		fireYellow = Color3.fromHex("#ffe119"),
+		fireOrange = Color3.fromHex("#f58231"),
+		fireRed = Color3.fromHex("#e6194b"),
+		smoke = Color3.fromHex("#5b5e5c"),
+		crater = Color3.fromHex("#333333"),
+		earth = Color3.fromHex("#7b572a"),
+		crack = Color3.fromHex("#2a1d14"),
+		plague = Color3.fromHex("#8bd14a"),
+		plagueDark = Color3.fromHex("#5a8f2e"),
+		plagueLight = Color3.fromHex("#c6f07a"),
+		pole = Color3.fromHex("#5b4a3a"),
+		gold = Color3.fromHex("#ffe119"),
+		paleGold = Color3.fromHex("#fff6a8"),
+		shield = Color3.fromHex("#7cc4ff"),
+		shieldDeep = Color3.fromHex("#3f8fe0"),
+	},
 }
 
 function Palette.nation(colorIndex: number): Color3
