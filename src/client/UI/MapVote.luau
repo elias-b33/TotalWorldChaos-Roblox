@@ -24,7 +24,10 @@ local LobbyState = require(Client.LobbyState)
 local Palette = require(Client.Palette)
 local PixelArt = require(Client.PixelArt)
 local ShopState = require(Client.ShopState)
+local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
+
+local Theme = Widgets.Theme
 
 local THUMB_FACTOR = 4 -- thumbnails are the map grid at 1/4 resolution (Earth 256×128)
 local THUMB_HEIGHT = 120
@@ -32,7 +35,7 @@ local CARD_WIDTH_MAX = 260
 local CARD_HEIGHT = 224
 local CARD_GAP = 12
 local PAINT_SLICE = 0.008 -- seconds of painting per frame
-local SELECTED = Color3.fromRGB(255, 230, 90)
+local SELECTED = Theme.color.gold
 
 -- One short line each (docs/MAPS.md): it has to fit a phone card at 14 px.
 local PITCH: { [string]: string } = {
@@ -40,7 +43,7 @@ local PITCH: { [string]: string } = {
 	eldmoor = "Kingdoms ring a rich heart",
 	skyshards = "Floating isles, fast and fair",
 }
-local ICON: { [string]: string } = { earth = "🌍", eldmoor = "🏰", skyshards = "☁" }
+local ICON: { [string]: string } = { earth = "globe", eldmoor = "castle", skyshards = "sparkles" }
 
 type Card = { button: ImageButton, stroke: UIStroke, votes: TextLabel, status: TextLabel }
 
@@ -49,6 +52,7 @@ local MapVote = {}
 local gui: ScreenGui
 local root: Frame
 local title: TextLabel
+local titleIcon: GuiObject
 local hint: TextLabel
 local timer: TextLabel
 local row: Frame
@@ -124,21 +128,19 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	local button = Instance.new("ImageButton")
 	button.Name = "Card_" .. mapId
 	button.AutoButtonColor = false
-	button.BackgroundColor3 = Widgets.PANEL
+	button.BackgroundColor3 = Theme.color.navy
 	button.Position = UDim2.new((index - 1) / count, CARD_GAP // 2, 0, 0)
 	button.Size = UDim2.new(1 / count, -CARD_GAP, 0, CARD_HEIGHT)
 	button.Parent = row
-	Widgets.corner(button, 12)
-	Widgets.padding(button, 8)
-	Widgets.list(button, false, 6)
+	Widgets.corner(button, Theme.radius.l)
+	Widgets.padding(button, Theme.space.m)
+	Widgets.list(button, false, Theme.space.s)
+	Widgets.bevel(button, true)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(CARD_WIDTH_MAX, CARD_HEIGHT)
 	limit.Parent = button
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
-	stroke.Color = SELECTED
-	stroke.Enabled = false
-	stroke.Parent = button
+	-- the card's outline: ink, gold while chosen, green once it has your vote
+	local stroke = Widgets.stroke(button)
 
 	local holder = Instance.new("Frame")
 	holder.Name = "ThumbHolder"
@@ -150,25 +152,31 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	holder.BorderSizePixel = 0
 	holder.LayoutOrder = 1
 	holder.Parent = button
-	Widgets.corner(holder, 8)
+	Widgets.corner(holder, Theme.radius.m)
+	Widgets.stroke(holder)
 	showThumb(holder, map)
 
-	Widgets.label(button, (ICON[mapId] or "🗺") .. " " .. map.title, 18, 24).LayoutOrder = 2
-	local pitch = Widgets.label(button, PITCH[mapId] or "", 14, 20)
-	pitch.Font = Enum.Font.Gotham
-	pitch.TextColor3 = Color3.fromRGB(200, 204, 220)
+	local name = Widgets.title(button, map.title, Theme.text.heading, 24)
+	name.LayoutOrder = 2
+	Widgets.leadIcon(name, ICON[mapId] or "map", Theme.size.icon)
+	local pitch = Widgets.hint(button, PITCH[mapId] or "", Theme.text.small, 20)
 	pitch.LayoutOrder = 3
 	local footer = Instance.new("Frame")
 	footer.BackgroundTransparency = 1
-	footer.Size = UDim2.new(1, 0, 0, 24)
+	footer.Size = UDim2.new(1, 0, 0, 26)
 	footer.LayoutOrder = 4
 	footer.Parent = button
-	local votes = Widgets.label(footer, "", 16, 24)
-	votes.Size = UDim2.fromScale(0.35, 1)
-	local status = Widgets.label(footer, "", 14, 24)
-	status.Position = UDim2.fromScale(0.35, 0)
-	status.Size = UDim2.fromScale(0.65, 1)
+	local votes = Widgets.chip(footer, "ballot", "", 64, 26)
+	votes.Name = "Votes"
+	local status = Widgets.label(footer, "", Theme.text.small, 26)
+	status.Name = "Status"
+	status.AnchorPoint = Vector2.new(1, 0)
+	status.Position = UDim2.fromScale(1, 0)
+	status.Size = UDim2.fromScale(0, 1)
+	status.AutomaticSize = Enum.AutomaticSize.X
+	status.TextWrapped = false
 	status.TextXAlignment = Enum.TextXAlignment.Right
+	Widgets.leadIcon(status, "check", 18)
 
 	button.Activated:Connect(function()
 		local view = LobbyState.view()
@@ -209,11 +217,12 @@ function MapVote.render()
 			cards[id] = buildCard(id, i, #view.maps)
 		end
 	end
-	title.Text = if view.locked then "🔒 This server plays one map" else "🗳 Vote for the map"
+	title.Text = if view.locked then "This server plays one map" else "Vote for the map"
+	Icons.set(titleIcon, if view.locked then "lock" else "ballot")
 	hint.Text = if view.locked then "The draft starts soon" else "Tap a card, tap again to vote"
 	local bring = myThemeName()
 	if bring then
-		hint.Text ..= "  ·  🎨 You bring the " .. bring .. " theme"
+		hint.Text ..= "  ·  You bring the " .. bring .. " theme"
 	end
 	local mine = LobbyState.myVote()
 	for i, id in view.maps do
@@ -221,18 +230,21 @@ function MapVote.render()
 		if card == nil then
 			continue
 		end
-		card.votes.Text = if view.locked then "" else "🗳 " .. tostring(view.counts[i] or 0)
+		card.votes.Text = tostring(view.counts[i] or 0)
+		card.votes.Visible = not view.locked
 		if view.locked then
-			card.status.Text = "🔒 Locked"
+			Widgets.setIconText(card.status, "🔒 Locked", "lock")
 		elseif mine == id then
-			card.status.Text = "✅ Your vote"
+			Widgets.setIconText(card.status, "✅ Your vote", "check")
 		elseif selected == id then
-			card.status.Text = "👆 Tap again"
+			Widgets.setIconText(card.status, "👆 Tap again", "arrow")
 		else
 			card.status.Text = ""
 		end
-		card.stroke.Enabled = selected == id or mine == id
-		card.stroke.Color = if selected == id then SELECTED else Widgets.GOOD
+		card.status.Visible = card.status.Text ~= ""
+		local chosen = selected == id or mine == id
+		card.stroke.Thickness = if chosen then 3 else Theme.stroke
+		card.stroke.Color = if selected == id then SELECTED elseif mine == id then Widgets.GOOD else Theme.color.ink
 	end
 	root.Visible = true
 end
@@ -240,7 +252,7 @@ end
 local function updateTimer()
 	if root.Visible then
 		local s = LobbyState.secondsLeft()
-		timer.Text = string.format("⏳ %d:%02d", s // 60, s % 60)
+		timer.Text = string.format("%d:%02d", s // 60, s % 60)
 	end
 end
 
@@ -250,24 +262,23 @@ function MapVote.init()
 	root.Name = "Root"
 	root.Active = true -- nothing behind the vote can be tapped
 	root.Size = UDim2.fromScale(1, 1)
-	root.BackgroundColor3 = Color3.fromRGB(12, 14, 22)
+	root.BackgroundColor3 = Theme.color.navyDeep
 	root.BorderSizePixel = 0
 	root.Visible = false
 	root.Parent = gui
 
-	title = Widgets.label(root, "", 22, 32)
+	title = Widgets.title(root, "", Theme.text.hero - 2, 34)
 	title.Position = UDim2.fromOffset(16, 8)
-	title.Size = UDim2.new(1, -160, 0, 32)
-	hint = Widgets.label(root, "", 14, 20)
-	hint.Font = Enum.Font.Gotham
-	hint.TextColor3 = Color3.fromRGB(200, 204, 220)
-	hint.Position = UDim2.fromOffset(16, 40)
+	title.Size = UDim2.new(1, -160, 0, 34)
+	titleIcon = Widgets.leadIcon(title, "ballot", Theme.size.iconLarge - 4)
+	hint = Widgets.hint(root, "", Theme.text.small, 20)
+	hint.Position = UDim2.fromOffset(16, 44)
 	hint.Size = UDim2.new(1, -160, 0, 20)
-	timer = Widgets.label(root, "", 22, 32)
+	timer = Widgets.chip(root, "hourglass", "", 96, 34)
+	timer.Name = "Timer"
 	timer.AnchorPoint = Vector2.new(1, 0)
-	timer.Position = UDim2.new(1, -16, 0, 8)
-	timer.Size = UDim2.fromOffset(130, 32)
-	timer.TextXAlignment = Enum.TextXAlignment.Right
+	timer.Position = UDim2.new(1, -16, 0, 10)
+	timer.TextSize = Theme.text.title - 2
 
 	row = Instance.new("Frame")
 	row.Name = "Cards"

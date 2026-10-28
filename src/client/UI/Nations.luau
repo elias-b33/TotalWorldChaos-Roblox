@@ -1,6 +1,8 @@
 --!strict
--- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its colour, province count and your relation,
--- and at the bottom the way to your quests during a match (the top bar has no room for another button).
+-- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its flag, province count and your relation,
+-- and at the top the way to your quests during a match (the top bar has no room for another button).
+-- One row per nation: flag, who plays it, name (in a nameplate frame if they own one), streak flame, VIP badge,
+-- then provinces and your relation as pixel icons.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,12 +14,19 @@ local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
 local Relations = require(Client.Relations)
+local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
+
+local Theme = Widgets.Theme
+local WIDTH = 250
+local ROW_HEIGHT = 24
+local COUNT_WIDTH = 54
+local TITLE_MAX_WIDTH = 96 -- a worn title after the name, cut with … past this
 
 local Nations = {}
 
--- The play-streak flame after a player's nation name, by tier (Sim.Login.flameTier): 3, 7, 14 and 30 days.
-local FLAMES = { " 🔥", " 🔥🔥", " 💙", " 💙👑" }
+-- The play-streak flames after a player's nation name, by tier (Sim.Login.flameTier): 3, 7, 14 and 30 days.
+local FLAMES: { { string } } = { { "fire" }, { "fire", "fire" }, { "fireBlue" }, { "fireBlue", "crown" } }
 
 local drawer: Frame
 local rows: Frame
@@ -26,13 +35,20 @@ local questsText: () -> string = function()
 	return "📜 Quests"
 end
 
+local function renderQuestsButton()
+	local b = questsButton
+	if b then
+		local text = questsText()
+		Widgets.setIconText(b, text, "scroll")
+		b.Name = text -- the full caption, emoji and all, is what the harness presses
+	end
+end
+
 local function render()
 	if not drawer.Visible then
 		return
 	end
-	if questsButton then
-		questsButton.Text = questsText()
-	end
+	renderQuestsButton()
 	local snap = ClientState.snapshot()
 	Widgets.clear(rows)
 	if snap == nil then
@@ -45,77 +61,115 @@ local function render()
 	end)
 	for i, n in list do
 		local row = Instance.new("Frame")
+		row.Name = "Nation" .. n.id
 		row.BackgroundTransparency = 1
-		row.Size = UDim2.new(1, 0, 0, 24)
+		row.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
 		row.LayoutOrder = i
 		row.Parent = rows
-		Widgets.list(row, true, 6)
+		local left = Instance.new("Frame")
+		left.BackgroundTransparency = 1
+		left.Size = UDim2.new(1, -(COUNT_WIDTH + 22), 1, 0)
+		left.Parent = row
+		left.ClipsDescendants = true -- a very long name and title stop at the province count
+		Widgets.list(left, true, Theme.space.xs)
 		-- the nation's flag (cosmetic), in its colour
 		local looks = Cosmetics.of(n.id)
-		local flag = Cosmetics.flagLabel(row, looks.flag, n.colorIndex, UDim2.fromOffset(20, 15))
+		local flag = Cosmetics.flagLabel(left, looks.flag, n.colorIndex, UDim2.fromOffset(20, 15))
 		flag.LayoutOrder = 1
-		local who = if n.id == me then "⭐ " elseif n.controller == "Player" then "👤 " else ""
-		local status = if n.eliminated then "☠ " else Relations.icon(me, n.id)
-		local vip = if looks.vip then " [VIP]" else ""
-		local flame = FLAMES[looks.flame or 0] or "" -- play-streak reward (MONETIZATION 5.6)
-		local label = Widgets.label(
-			row,
-			string.format("%s%s%s%s  🏴%d %s", who, n.name, flame, vip, Relations.provinceCount(n.id), status),
-			14,
-			24
-		)
-		label.Size = UDim2.new(1, -26, 1, 0)
-		label.LayoutOrder = 2
-		-- an achievement title after the name (MONETIZATION 3.2): last, so a long name cuts the title, nothing else
-		local title = if looks.title then Catalogue.item(looks.title) else nil
-		if title then
-			label.Text ..= " · " .. title.art
-			label.TextWrapped = false
-			label.TextTruncate = Enum.TextTruncate.AtEnd
+		local who = if n.id == me then "star" elseif n.controller == "Player" then "manpower" else nil
+		if who then
+			Widgets.icon(left, who, 16).LayoutOrder = 2
+		end
+		local label = Widgets.label(left, n.name, Theme.text.small, ROW_HEIGHT - 4)
+		label.Size = UDim2.fromOffset(0, ROW_HEIGHT - 4)
+		label.AutomaticSize = Enum.AutomaticSize.X
+		label.TextWrapped = false
+		label.LayoutOrder = 3
+		if n.eliminated then
+			label.TextColor3 = Theme.color.textDim
 		end
 		-- nameplate frame (cosmetic): an outline around the name
 		local frameColor = Cosmetics.frameColor(looks.frame)
 		if frameColor then
-			label.BackgroundTransparency = 0.85
+			label.BackgroundTransparency = 0.8
 			label.BackgroundColor3 = frameColor
-			Widgets.corner(label, 6)
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = frameColor
-			stroke.Thickness = 2
-			stroke.Parent = label
+			Widgets.corner(label, Theme.radius.s)
+			Widgets.padding(label, Theme.space.xs, 0)
+			Widgets.stroke(label, frameColor)
+		end
+		for k, flame in FLAMES[looks.flame or 0] or {} do -- play-streak reward (MONETIZATION 5.6)
+			Widgets.icon(left, flame, 16).LayoutOrder = 3 + k
+		end
+		if looks.vip then
+			local vip = Widgets.badge(left, "VIP", Theme.color.gold)
+			vip.TextColor3 = Theme.color.textDark
+			vip.Size = UDim2.fromOffset(0, 18)
+			vip.LayoutOrder = 9
+		end
+		-- a title after the name (MONETIZATION 3.2: an achievement's or the season pass's): last and capped, so a long
+		-- name and title cut the title, nothing else
+		local title = if looks.title then Catalogue.item(looks.title) else nil
+		if title then
+			local t = Widgets.label(left, "· " .. title.art, Theme.text.small, ROW_HEIGHT - 4)
+			t.Name = "Title"
+			t.Size = UDim2.fromOffset(0, ROW_HEIGHT - 4)
+			t.AutomaticSize = Enum.AutomaticSize.X
+			t.TextWrapped = false
+			t.TextTruncate = Enum.TextTruncate.AtEnd
+			t.TextColor3 = Theme.color.goldPale
+			t.LayoutOrder = 10
+			local cap = Instance.new("UISizeConstraint")
+			cap.MaxSize = Vector2.new(TITLE_MAX_WIDTH, math.huge)
+			cap.Parent = t
+		end
+		-- provinces held, then your relation (at war, allied, truce) or a skull once eliminated
+		local count = Widgets.chip(row, "flag", tostring(Relations.provinceCount(n.id)), COUNT_WIDTH, 22)
+		count.Name = "Provinces"
+		count.AnchorPoint = Vector2.new(1, 0.5)
+		count.Position = UDim2.new(1, -22, 0.5, 0)
+		local status = if n.eliminated then "skull" else Icons.fromEmoji(Relations.icon(me, n.id))
+		if status then
+			local mark = Widgets.icon(row, status, 18)
+			mark.AnchorPoint = Vector2.new(1, 0.5)
+			mark.Position = UDim2.fromScale(1, 0.5)
 		end
 	end
 end
 
 function Nations.toggle()
 	drawer.Visible = not drawer.Visible
+	if not drawer.Visible then
+		Widgets.clear(rows) -- a closed drawer keeps no rows (rebuilt when it opens)
+	end
 	render()
 end
 
 -- onQuests: opens the Quests screen; buttonText: its button's text (with the number of quests to claim).
 function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?)
 	local gui = Widgets.screen("Nations", 4)
-	drawer = Widgets.panel(gui, 230)
+	drawer = Widgets.panel(gui, WIDTH)
 	drawer.Name = "Drawer"
 	drawer.Position = UDim2.fromOffset(8, 52)
 	drawer.Visible = false
-	Widgets.list(drawer, false, 4)
+	Widgets.list(drawer, false, Theme.space.xs)
 	-- the title, and beside it the way to the quests (in the header: a row under ten nations runs off a phone)
 	local header = Instance.new("Frame")
 	header.Name = "Header"
 	header.BackgroundTransparency = 1
-	header.Size = UDim2.new(1, 0, 0, if onQuests then Widgets.BUTTON_HEIGHT else 24)
+	header.Size = UDim2.new(1, 0, 0, if onQuests then Widgets.BUTTON_HEIGHT else 28)
 	header.LayoutOrder = 0
 	header.Parent = drawer
-	Widgets.label(header, "🌍 Nations", 16, if onQuests then Widgets.BUTTON_HEIGHT else 24)
+	local title = Widgets.title(header, "Nations", Theme.text.heading, if onQuests then Widgets.BUTTON_HEIGHT else 28)
+	Widgets.leadIcon(title, "globe", Theme.size.icon)
 	if onQuests then
 		questsText = buttonText or questsText
-		local b = Widgets.button(header, questsText(), 116, Color3.fromRGB(120, 90, 40), onQuests)
+		local b = Widgets.iconTextButton(header, "scroll", "", 112, Widgets.GOLD, onQuests)
 		b.Name = "QuestsButton"
-		b.TextSize = 14
+		b.TextSize = Theme.text.small
 		b.AnchorPoint = Vector2.new(1, 0)
 		b.Position = UDim2.fromScale(1, 0)
 		questsButton = b
+		renderQuestsButton()
 	end
 	rows = Instance.new("Frame")
 	rows.Name = "Rows"

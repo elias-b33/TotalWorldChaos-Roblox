@@ -56,6 +56,49 @@ function H.expect(cond, message: string)
 	print("  ✓ " .. message)
 end
 
+-- Whether a GUI object is on screen: it and every ancestor visible, its ScreenGui enabled.
+local function shown(inst): boolean
+	local node = inst
+	while node and not node:IsA("PlayerGui") do
+		if (node:IsA("GuiObject") and not node.Visible) or (node:IsA("ScreenGui") and not node.Enabled) then
+			return false
+		end
+		node = node.Parent
+	end
+	return true
+end
+
+-- The text of the first visible text object named `name` (chips and labels whose emoji is now a pixel icon, e.g.
+-- the top bar's "Level", "Clock", or the power button's "Charges"), or nil.
+function H.textOf(client, name: string): string?
+	for _, d in client.localPlayer.PlayerGui:GetDescendants() do
+		if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Name == name and shown(d) then
+			return d.Text
+		end
+	end
+	return nil
+end
+
+-- True when a visible text object named `name` shows exactly `text` (one of several cards' chips, say).
+function H.hasText(client, name: string, text: string): boolean
+	for _, d in client.localPlayer.PlayerGui:GetDescendants() do
+		if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Name == name and d.Text == text and shown(d) then
+			return true
+		end
+	end
+	return false
+end
+
+-- True when the UI shows the pixel icon `icon` (src/client/IconArt.luau) somewhere.
+function H.iconShown(client, icon: string): boolean
+	for _, d in client.localPlayer.PlayerGui:GetDescendants() do
+		if d:IsA("GuiObject") and d:GetAttribute("Icon") == icon and shown(d) then
+			return true
+		end
+	end
+	return false
+end
+
 -- A server-side module's table, e.g. H.server("Services.MatchService").
 function H.server(path: string)
 	local node = Emulator.server.dm:GetService("ServerScriptService").Server
@@ -148,7 +191,7 @@ function scenarios.smoke()
 	local nation = state.nations[me]
 	nation.gold = 500 -- enough to try everything
 
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	H.shot(alice, "capital")
 	local capital = state.provinces[nation.capital]
@@ -309,7 +352,7 @@ function scenarios.war()
 	state.nations[A].gold, state.nations[A].manpower = 400, 20000
 
 	-- recruit 3 regiments at the capital
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	for _ = 1, 3 do
 		Emulator.press(alice, "Regiment")
@@ -378,7 +421,7 @@ function scenarios.war()
 	state.nations[B].gold = 300
 	Emulator.run(1)
 	tapProvince(bob, provinceByName("Cinder Reach"))
-	Emulator.press(bob, "+💰50")
+	Emulator.press(bob, "Peace_50")
 	Emulator.run(2)
 	H.expect(Emulator.findText(alice, "offers peace") ~= nil, "Alice sees Bob's peace offer")
 	H.shot(alice, "peace_offer")
@@ -389,11 +432,11 @@ function scenarios.war()
 	H.expect(state.nations[A].gold >= aliceGold + 50, "Alice got the tribute")
 
 	-- the nations drawer
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Zephyr") ~= nil, "the drawer lists the nations")
 	H.shot(alice, "nations")
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 
 	-- give Aurora 30% of the world: the coalition crown, then the domination share and the results screen
 	local given = 0
@@ -437,7 +480,7 @@ function scenarios.primordial()
 	local state = H.state()
 	local A, B = H.myNation(alice), H.myNation(bob)
 	H.expect(A == 1 and B == 2, "Alice is Aurora, Bob is Zephyr")
-	H.expect(Emulator.findText(alice, "⚡0") ~= nil, "a living nation sees the power button with its charges")
+	H.expect(H.textOf(alice, "Charges") == "0", "a living nation sees the power button with its charges")
 
 	-- open war; Aurora takes Zephyr's capital and all but two provinces: Zephyr is eliminated next tick
 	state.tick = 10 * 60
@@ -456,7 +499,7 @@ function scenarios.primordial()
 	H.expect(state.nations[B].eliminated, "Zephyr was eliminated")
 	H.expect(state.primordials[bobId] ~= nil, "Bob rose as a Primordial")
 	H.expect(Emulator.findText(bob, "You rose as a Primordial") ~= nil, "Bob sees the Primordial banner")
-	H.expect(Emulator.findText(bob, "✨ Primordial") ~= nil, "Bob's top bar says Primordial")
+	H.expect(H.textOf(bob, "Nation") == "Primordial", "Bob's top bar says Primordial")
 	H.shot(bob, "primordial")
 	Emulator.run(2.5) -- after the War toast
 	H.expect(Emulator.findText(alice, "Zephyr was eliminated") ~= nil, "Alice hears about it")
@@ -473,10 +516,10 @@ function scenarios.primordial()
 	local army = Army.spawn(state, A, capital, 4000)
 	local dev = state.provinces[capital].development
 	Emulator.run(1.5)
-	H.expect(Emulator.findText(bob, "⚡3") ~= nil, "the power button shows Bob's 3 charges")
+	H.expect(H.textOf(bob, "Charges") == "3", "the power button shows Bob's 3 charges")
 
 	-- button -> pick Meteor -> tap the army -> Confirm
-	Emulator.press(bob, "⚡3")
+	Emulator.press(bob, "PowerButton")
 	Emulator.run(0.3)
 	H.expect(Emulator.findText(bob, "Meteor") ~= nil and Emulator.findText(bob, "Shield") ~= nil, "the picker lists powers")
 	H.shot(bob, "picker")
@@ -498,14 +541,14 @@ function scenarios.primordial()
 	H.expect(state.provinces[capital].development == math.max(1, dev - 1), "and cost the capital a development level")
 	H.expect(state.primordials[bobId].charges == 1, "Bob paid 2 charges")
 	H.expect(Emulator.findText(alice, "Meteor struck your army") ~= nil, "Alice gets the toast")
-	H.expect(Emulator.findText(bob, "⚡1") ~= nil, "Bob's button shows 1 charge left")
+	H.expect(H.textOf(bob, "Charges") == "1", "Bob's button shows 1 charge left")
 	H.shot(alice, "meteor_alice")
 	H.shot(bob, "meteor_bob")
 
 	-- the 30 s immunity: the picker shows Aurora as unavailable instead of sending a power the server refuses
 	state.primordials[bobId].charges = 3
 	Emulator.run(1.5)
-	Emulator.press(bob, "⚡3")
+	Emulator.press(bob, "PowerButton")
 	Emulator.press(bob, "Plague")
 	tapProvince(bob, capital)
 	H.expect(Emulator.findText(bob, "Aurora is immune for") ~= nil, "the target step says Aurora is immune")
@@ -521,7 +564,7 @@ function scenarios.primordial()
 			rebelTarget = id
 		end
 	end
-	Emulator.press(bob, "⚡3")
+	Emulator.press(bob, "PowerButton")
 	Emulator.press(bob, "Rebels")
 	tapProvince(bob, rebelTarget)
 	Emulator.press(bob, "Confirm")
@@ -549,7 +592,7 @@ function scenarios.primordial()
 	bob = Emulator.addClient("Bob", nil, bobId)
 	Emulator.run(2)
 	H.expect(H.myNation(bob) == B, "Bob rejoins on Zephyr")
-	H.expect(Emulator.findText(bob, "✨ Primordial") ~= nil, "still a Primordial")
+	H.expect(H.textOf(bob, "Nation") == "Primordial", "still a Primordial")
 
 	-- Carol takes a nation, leaves, and it is eliminated while a bot runs it: she rejoins as its Primordial
 	local carol = Emulator.addClient("Carol")
@@ -574,7 +617,7 @@ function scenarios.primordial()
 	Emulator.run(2)
 	H.expect(H.myNation(carol) == C, "Carol rejoins on her eliminated nation, not a healthy one")
 	H.expect(state.primordials[carolId] ~= nil, "and is its Primordial")
-	H.expect(Emulator.findText(carol, "✨ Primordial") ~= nil, "her top bar says Primordial")
+	H.expect(H.textOf(carol, "Nation") == "Primordial", "her top bar says Primordial")
 	H.shot(carol, "rejoined_primordial")
 end
 
@@ -682,13 +725,13 @@ function scenarios.progression()
 	local summary = H.client(alice, "ProfileState").summary()
 	H.expect(Data.data(alice.serverPlayer) ~= nil, "Alice's profile loaded with a session lock")
 	H.expect(summary and summary.level == 1 and summary.xp == 0 and summary.glory == 0, "a new player: level 1, no XP")
-	H.expect(Emulator.findText(alice, "🎖 1") ~= nil, "the HUD shows level 1")
+	H.expect(H.textOf(alice, "Level") == "1", "the HUD shows level 1")
 
 	-- recruit 3 regiments, march on the neutral Cinder Rock, beat its garrison and take it
 	local state = H.state()
 	local A = H.myNation(alice)
 	state.nations[A].gold, state.nations[A].manpower = 400, 20000
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	for _ = 1, 3 do
 		Emulator.press(alice, "Regiment")
@@ -735,7 +778,7 @@ function scenarios.progression()
 	H.expect(Emulator.findText(alice, "First match today") ~= nil, "with the breakdown")
 	H.expect(Emulator.findText(alice, "Level 2!") ~= nil, "and the level-up")
 	H.expect(Emulator.findText(alice, "160 / 360 XP") ~= nil, "and the level bar")
-	H.expect(Emulator.findText(alice, "🎖 2") ~= nil, "the HUD shows level 2")
+	H.expect(H.textOf(alice, "Level") == "2", "the HUD shows level 2")
 	H.shot(alice, "results_reward")
 
 	Emulator.run(1)
@@ -757,7 +800,7 @@ function scenarios.progression()
 	H.expect(H.client(again, "ProfileState").summary().level == 2, "and Alice's client knows it")
 	Emulator.run(30) -- the next match
 	H.expect(H.state().result == nil, "a new match started")
-	H.expect(Emulator.findText(again, "🎖 2") ~= nil, "the HUD shows level 2 after rejoining")
+	H.expect(H.textOf(again, "Level") == "2", "the HUD shows level 2 after rejoining")
 	H.shot(again, "rejoined")
 
 	-- the server shuts down a minute into the match, before Alice leaves: she gets what leaving pays (4 XP of
@@ -798,7 +841,7 @@ function scenarios.lobby()
 	local tally = Lobby.tally(LobbyService.state())
 	H.expect(tally.eldmoor == 2 and tally.earth == 1, "the server counted Eldmoor 2, Earth 1")
 	H.expect(Emulator.findText(alice, "Your vote") ~= nil, "Alice sees her vote")
-	H.expect(Emulator.findText(carol, "🗳 2") ~= nil, "everyone sees the tally")
+	H.expect(H.hasText(carol, "Votes", "2"), "everyone sees the tally")
 	H.shot(carol, "voted")
 
 	-- the vote ends: the draft runs on Eldmoor
@@ -949,9 +992,9 @@ function scenarios.effects()
 		H.expect(seen(), "the " .. kind .. " effect plays")
 	end
 
-	H.expect(Emulator.findText(alice, "🔊") ~= nil, "the mute button sits in the top bar")
+	H.expect(H.iconShown(alice, "soundOn"), "the mute button sits in the top bar")
 	local taps = soundsNamed("Tap")
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(0.5)
 	H.expect(soundsNamed("Tap") == taps + 1, "a button tap plays the tap sound")
 	Emulator.press(alice, "✕")
@@ -1061,17 +1104,17 @@ function scenarios.effects()
 	H.expect(Effects.stats().particles <= 240, "particles stay inside the pool")
 
 	-- mute: nothing plays until unmuted, and it is remembered
-	Emulator.press(alice, "🔊")
+	Emulator.press(alice, "Mute")
 	Emulator.run(0.2)
-	H.expect(Emulator.findText(alice, "🔇") ~= nil, "the button shows muted")
+	H.expect(H.iconShown(alice, "soundOff"), "the button shows muted")
 	local before = #Emulator.sounds
 	cast("Blessing", capital)
 	waitFor("Blessing", 3, capital)
 	Emulator.run(1)
 	H.expect(#Emulator.sounds == before, "muted: no sounds")
-	Emulator.press(alice, "🔇")
+	Emulator.press(alice, "Mute")
 	Emulator.run(0.2)
-	H.expect(Emulator.findText(alice, "🔊") ~= nil, "unmuted again")
+	H.expect(H.iconShown(alice, "soundOn"), "unmuted again")
 
 	-- the Cataclysm banner, then the shield runs out and its dome goes
 	state.tick = 20 * 60 - 2
@@ -1213,7 +1256,7 @@ function scenarios.tutorial()
 	H.expect(state.nations[A].charges >= 1, "Alice has a charge")
 	H.expect(Emulator.findText(alice, "Tap the ✨ button") ~= nil, "prompt 6 points at the power button")
 	H.shot(alice, "prompt6_power")
-	Emulator.press(alice, "✨")
+	Emulator.press(alice, "PowerButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Pick 🌟 Blessing") ~= nil, "then at Blessing")
 	H.shot(alice, "prompt6_blessing")
@@ -1371,7 +1414,7 @@ function scenarios.shop()
 	H.expect(Emulator.findText(alice, "Not now") == nil, "at most once per session")
 
 	-- the shop: offers first
-	Emulator.press(alice, "🛒")
+	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "🏅 3,000") ~= nil, "the shop shows Alice's Glory")
 	H.expect(Emulator.findText(alice, ROBUX .. " 249") ~= nil, "VIP shows its Robux price")
@@ -1486,7 +1529,7 @@ function scenarios.shop()
 	-- Alice's flag on her capital (on Bob's screen too) and an army with her token skin
 	local nation = state.nations[A]
 	nation.gold, nation.manpower = 200, 10000
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	Emulator.press(alice, "Regiment")
 	Emulator.run(2)
@@ -1519,12 +1562,12 @@ function scenarios.shop()
 	H.expect(bob.localPlayer.PlayerGui:FindFirstChild("Emote" .. A, true) == nil, "one emote per 10 seconds")
 
 	-- the nations list shows flags, the VIP tag and the frame
-	Emulator.press(bob, "🌍")
+	Emulator.press(bob, "NationsButton")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(bob, "Alice") ~= nil or Emulator.findText(bob, nation.name .. " [VIP]") ~= nil, "Bob's nations list")
-	H.expect(Emulator.findText(bob, "[VIP]") ~= nil, "shows Alice's VIP tag")
+	H.expect(Emulator.findText(bob, "Alice") ~= nil or Emulator.findText(bob, nation.name) ~= nil, "Bob's nations list")
+	H.expect(Emulator.findText(bob, "VIP") ~= nil, "shows Alice's VIP tag")
 	H.shot(bob, "nations_list")
-	Emulator.press(bob, "🌍")
+	Emulator.press(bob, "NationsButton")
 
 	-- Alice wins: her victory animation plays over her capital on Results; Robux purchases open again
 	Data.update(player, function(d)
@@ -1704,21 +1747,21 @@ function scenarios.quests()
 	waitForMatch(alice)
 
 	-- in the match, the quests open from the 🌍 nations drawer (the top bar has no room for another button)
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.3)
 	Emulator.press(alice, "📜 Quests")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Recruit 5 regiments") ~= nil, "the Quests screen opens from the nations drawer")
 	H.shot(alice, "match_quests")
 	Emulator.press(alice, "✕")
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.3)
 
 	-- recruit 5 regiments at the capital, then win
 	local state = H.state()
 	local nation = state.nations[H.myNation(alice)]
 	nation.gold, nation.manpower = 400, 20000
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	for _ = 1, 5 do
 		Emulator.press(alice, "Regiment")
@@ -1799,9 +1842,9 @@ function scenarios.quests()
 	if Emulator.findText(alice, "Not now") then
 		Emulator.press(alice, "Not now") -- the starter-pack offer (after the 2nd match) is the shop's
 	end
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(alice, "🔥") ~= nil, "Alice's nation shows the streak flame in the nations list")
+	H.expect(H.iconShown(alice, "fire"), "Alice's nation shows the streak flame in the nations list")
 	H.shot(alice, "nations_flame")
 	local saved = H.saved(player.UserId).Data
 	H.expect(saved.login.step == 3 and saved.login.streak == 3, "the calendar and streak are saved")
@@ -1932,7 +1975,7 @@ function scenarios.analytics()
 	Data.update(alice.serverPlayer, function(data)
 		data.glory = 3000
 	end)
-	Emulator.press(alice, "🛒")
+	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
 	Emulator.press(alice, "Flags")
 	Emulator.run(0.5)
@@ -1960,7 +2003,7 @@ function scenarios.analytics()
 	H.expect(#failed == 1 and fields(failed[1]) == "flag_comet,Owned,", "purchase_failed: product and reason")
 	Emulator.press(alice, "✕")
 	Emulator.run(0.3)
-	Emulator.press(alice, "🛒")
+	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.3)
 	local _, sessions = steps("Shop", a)
 	H.expect(sessions[#sessions] ~= shopSessions[1], "opening the shop again starts a new Shop session")
@@ -2216,7 +2259,7 @@ function scenarios.themes()
 	end)
 	H.server("Services.ShopService").onPhase("Lobby")
 	Emulator.run(1)
-	Emulator.press(alice, "🛒")
+	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
 	Emulator.press(alice, "Themes")
 	Emulator.run(1)
@@ -2277,7 +2320,7 @@ function scenarios.themes()
 	H.shot(alice, "night_close_up")
 
 	-- Bob opts out: "always classic", saved in his profile; his map repaints in the classic look
-	Emulator.press(bob, "🛒")
+	Emulator.press(bob, "ShopButton")
 	Emulator.run(0.5)
 	Emulator.press(bob, "Themes")
 	Emulator.run(0.5)
@@ -2505,9 +2548,9 @@ function scenarios.private()
 	local LobbyService = H.server("Services.LobbyService")
 	H.expect(LobbyService.phase() == "Lobby", "the private server opens the Lobby")
 	H.expect(LobbyService.state().owner == PRIVATE_OWNER, "the server knows its owner")
-	H.expect(Emulator.findText(olivia, "⚙ Settings") ~= nil, "Olivia, the owner, sees ⚙ Settings")
-	H.expect(Emulator.findText(pete, "⚙ Settings") == nil, "Pete doesn't")
-	H.expect(Emulator.findText(pete, "🔒 Private server") ~= nil, "everyone sees the settings summary")
+	H.expect(Emulator.findText(olivia, "Settings") ~= nil, "Olivia, the owner, sees ⚙ Settings")
+	H.expect(Emulator.findText(pete, "Settings") == nil, "Pete doesn't")
+	H.expect(Emulator.findText(pete, "Private server") ~= nil, "everyone sees the settings summary")
 	H.expect(not H.logged("off to the tutorial"), "a private server sends nobody to the tutorial (friends stay)")
 	Emulator.run(2)
 	H.shot(pete, "vote_summary")
@@ -2518,7 +2561,7 @@ function scenarios.private()
 	H.expect(LobbyService.state().settings.minutes == 25, "Pete can't change the match length")
 	H.expect(Emulator.findText(pete, "Only the server's owner") ~= nil, "Pete is told why")
 
-	Emulator.press(olivia, "⚙ Settings")
+	Emulator.press(olivia, "SettingsButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(olivia, "Private server settings") ~= nil, "the settings sheet opens")
 	H.expect(Emulator.findText(olivia, "full XP and Glory") == nil, "two players: the sheet says the rewards are half")
@@ -2565,8 +2608,11 @@ function scenarios.private()
 	local O, P = H.myNation(olivia), H.myNation(pete)
 	H.expect(O ~= 0 and P ~= 0 and state.nations[O].allianceId ~= nil, "both players have a nation")
 	H.expect(state.nations[O].allianceId == state.nations[P].allianceId, "Olivia and Pete start allied (team 1)")
-	H.expect(Emulator.findText(olivia, "🕊 14:5") ~= nil, "the clock counts down from 15:00")
-	H.expect(Emulator.findText(olivia, "✨\n⚡") == nil, "no power button with powers off")
+	H.expect(
+		string.find(H.textOf(olivia, "Clock") or "", "^14:5") ~= nil and H.iconShown(olivia, "peace"),
+		"the clock counts down from 15:00"
+	)
+	H.expect(H.textOf(olivia, "Charges") == nil, "no power button with powers off")
 	H.shot(olivia, "match_start")
 
 	-- powers are refused, and so is a new alliance (teams are locked)
@@ -2805,7 +2851,7 @@ function scenarios.ads()
 	Emulator.server.dm:GetService("Workspace"):SetAttribute("DevDay", 1) -- a new day: a free reroll and 2 ads again
 	Emulator.run(7)
 	H.expect(QuestState.view().freeRerolls == 1, "a new day")
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.3)
 	Emulator.press(alice, "📜 Quests")
 	Emulator.run(0.5)
@@ -2819,7 +2865,7 @@ function scenarios.ads()
 	H.expect(Emulator.adCallCount("ShowRewardedVideoAdAsync") == shows, "no video played")
 	H.shot(alice, "match_no_ad")
 	Emulator.press(alice, "✕")
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.3)
 
 	-- Alice's first finished match: hand her half the land, Results
@@ -2972,7 +3018,7 @@ function scenarios.season()
 	local A = H.myNation(alice)
 	local nation = state.nations[A]
 	nation.gold, nation.manpower = 300, 20000
-	Emulator.press(alice, "⭐")
+	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	Emulator.press(alice, "Regiment")
 	Emulator.run(1.2)
@@ -3265,13 +3311,13 @@ function scenarios.leaderboards()
 
 	-- the next match: the title under Alice's name, the Warlord frame round it
 	waitForMatch(alice)
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "the Dominant") ~= nil, "the nations list shows Alice's title")
 	H.shot(alice, "nations_title")
-	Emulator.press(alice, "🌍")
+	Emulator.press(alice, "NationsButton")
 	-- the shop's frames: Warlord worn, Centurion earned only (never sold)
-	Emulator.press(alice, "🛒")
+	Emulator.press(alice, "ShopButton")
 	Emulator.run(0.5)
 	Emulator.press(alice, "Tab_Frame")
 	Emulator.run(0.5)

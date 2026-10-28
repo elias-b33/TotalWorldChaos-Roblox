@@ -1,5 +1,5 @@
 --!strict
--- Capital emotes (docs/MONETIZATION.md 3.2): a 😀 button in the bottom-left corner, during a match, once you own an
+-- Capital emotes (docs/MONETIZATION.md 3.2): a smiley button in the bottom-left corner, during a match, once you own an
 -- emote. It opens a row of your emotes; tapping one shows it over your capital to everyone for a few seconds.
 -- Icons only, no text chat. The server checks ownership and the cooldown.
 
@@ -51,7 +51,7 @@ end
 local function renderPicker()
 	Widgets.clear(picker)
 	local ids = owned()
-	picker.Size = UDim2.fromOffset(#ids * (EMOTE_BUTTON + 6) + 14, 0)
+	picker.Size = UDim2.fromOffset(#ids * (EMOTE_BUTTON + 6) + 18, 0)
 	for i, id in ids do
 		local item = Catalogue.item(id)
 		if item then
@@ -68,25 +68,20 @@ end
 
 function Emotes.init()
 	local gui = Widgets.screen("Emotes", 3) -- under the nations drawer, which can cover the corner
-	button = Instance.new("TextButton")
-	button.Name = "EmoteButton"
-	button.AnchorPoint = Vector2.new(0, 1)
-	button.Position = UDim2.new(0, 12, 1, -12)
-	button.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
-	button.BackgroundColor3 = Color3.fromRGB(70, 72, 110)
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 24
-	button.TextColor3 = Color3.new(1, 1, 1)
-	button.Text = "😀"
-	button.Visible = false
-	button.Parent = gui
-	Widgets.corner(button, BUTTON_SIZE // 2)
-	button.Activated:Connect(function()
+	-- the pixel smiley; named after its old emoji, which is what the harness presses
+	button = Widgets.iconButton(gui, "smile", "😀", BUTTON_SIZE, Widgets.BUTTON_OFF, function()
 		picker.Visible = not picker.Visible
 		if picker.Visible then
 			renderPicker()
 		end
 	end)
+	button.AnchorPoint = Vector2.new(0, 1)
+	button.Position = UDim2.new(0, 12, 1, -12)
+	button.Visible = false
+	local round = button:FindFirstChildOfClass("UICorner")
+	if round then
+		round.CornerRadius = UDim.new(0.5, 0)
+	end
 
 	picker = Widgets.panel(gui, 0)
 	picker.Name = "EmotePicker"

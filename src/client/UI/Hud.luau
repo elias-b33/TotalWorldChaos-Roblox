@@ -1,6 +1,6 @@
 --!strict
 -- Top bar (your nation, gold, manpower, rank, phase and timer) and toasts for what happens in the world.
--- Icons and numbers, no paragraphs.
+-- Icons and numbers, no paragraphs: each value is a chip with a pixel icon (Widgets.chip).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,11 +19,16 @@ local Palette = require(Client.Palette)
 local ProfileState = require(Client.ProfileState)
 local Relations = require(Client.Relations)
 local Sounds = require(Client.Sounds)
+local Icons = require(script.Parent.Icons)
+local Widgets = require(script.Parent.Widgets)
 
-local BAR_HEIGHT = 44
+local Theme = Widgets.Theme
+local BAR_HEIGHT = Theme.size.bar
 local BAR_PADDING = 12 -- left and right
-local BAR_GAP = 10 -- between items
+local BAR_GAP = 8 -- between items
+local BAR_BUTTON = 40 -- icon buttons in the bar (the bar's full height is the touch target)
 local TOAST_SECONDS = 2.5
+local TOAST_WIDTH = 340 -- clear of the tutorial card at the top left
 
 local Hud = {}
 
@@ -31,41 +36,16 @@ local gui: ScreenGui
 local goldLabel: TextLabel
 local manpowerLabel: TextLabel
 local clockLabel: TextLabel
+local clockIcon: GuiObject
 local rankLabel: TextLabel
 local nationLabel: TextLabel
 local nationSwatch: Frame
+local nationIcon: GuiObject
 local levelLabel: TextLabel
 local toastLabel: TextLabel
 local toastUntil = 0
 local toastQueue: { string } = {}
 local MAX_QUEUED_TOASTS = 4
-
-local function label(parent: Instance, text: string, width: number, align: Enum.TextXAlignment?): TextLabel
-	local l = Instance.new("TextLabel")
-	l.BackgroundTransparency = 1
-	l.Size = UDim2.new(0, width, 1, 0)
-	l.Font = Enum.Font.GothamBold
-	l.TextSize = 18
-	l.TextColor3 = Color3.new(1, 1, 1)
-	l.TextXAlignment = align or Enum.TextXAlignment.Left
-	l.Text = text
-	l.Parent = parent
-	return l
-end
-
-local function barButton(parent: Instance, name: string, text: string, order: number): TextButton
-	local button = Instance.new("TextButton")
-	button.Name = name
-	button.Size = UDim2.fromOffset(BAR_HEIGHT, BAR_HEIGHT)
-	button.BackgroundTransparency = 1
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 22
-	button.Text = text
-	button.TextColor3 = Color3.new(1, 1, 1)
-	button.LayoutOrder = order
-	button.Parent = parent
-	return button
-end
 
 -- On narrow screens (small or notched phones) the least important items step aside, in this order, so the bar
 -- never runs off the screen.
@@ -108,34 +88,33 @@ local function formatClock(seconds: number): string
 end
 
 local PHASE_ICONS: { [string]: string } = {
-	Peace = "🕊",
-	War = "⚔",
-	Cataclysm = "☄",
-	Results = "🏁",
+	Peace = "peace",
+	War = "war",
+	Cataclysm = "meteor",
+	Results = "flag",
 }
 
 local function refresh()
 	local me = ClientState.nation(ClientState.myNation())
+	local alive = me ~= nil and not me.eliminated
+	goldLabel.Visible = alive
+	manpowerLabel.Visible = alive
+	rankLabel.Visible = alive
+	nationSwatch.Visible = alive
+	nationIcon.Visible = not alive
 	if me and me.eliminated then
-		goldLabel.Text = ""
-		manpowerLabel.Text = ""
-		nationLabel.Text = "✨ Primordial"
-		nationSwatch.Visible = false
-		rankLabel.Text = ""
+		nationLabel.Text = "Primordial"
+		Icons.set(nationIcon, "sparkles")
 	elseif me then
-		goldLabel.Text = "💰 " .. formatNumber(me.gold)
-		goldLabel.TextColor3 = if me.gold < 0 then Color3.fromRGB(255, 120, 120) else Color3.new(1, 1, 1)
-		manpowerLabel.Text = "👥 " .. formatNumber(me.manpower)
+		goldLabel.Text = formatNumber(me.gold)
+		goldLabel.TextColor3 = if me.gold < 0 then Theme.color.warn else Theme.color.text
+		manpowerLabel.Text = formatNumber(me.manpower)
 		nationLabel.Text = me.name
 		nationSwatch.BackgroundColor3 = Palette.nation(me.colorIndex)
-		nationSwatch.Visible = true
-		rankLabel.Text = "🏆 #" .. Relations.rank(me.id)
+		rankLabel.Text = "#" .. Relations.rank(me.id)
 	else
-		goldLabel.Text = ""
-		manpowerLabel.Text = ""
-		nationLabel.Text = "👀 Spectating"
-		nationSwatch.Visible = false
-		rankLabel.Text = ""
+		nationLabel.Text = "Spectating"
+		Icons.set(nationIcon, "eye")
 	end
 end
 
@@ -145,11 +124,13 @@ local function updateClock()
 	local setup = if snap then snap.setup else nil -- a private server's match length and Peace
 	local phase = if snap and snap.result then "Results" else Match.phaseAt(tick, setup)
 	local remaining = if phase == "Results" then 0 else Settings.timing(setup).matchEnd - tick
-	clockLabel.Text = (PHASE_ICONS[phase] or "") .. " " .. formatClock(remaining)
+	clockLabel.Text = formatClock(remaining)
+	clockLabel:SetAttribute("Phase", phase)
+	Icons.set(clockIcon, PHASE_ICONS[phase] or "clock")
 	if os.clock() > toastUntil then
 		local nextText = table.remove(toastQueue, 1)
 		if nextText then
-			toastLabel.Text = nextText
+			Widgets.setToast(toastLabel, nextText)
 			toastLabel.Visible = true
 			toastUntil = os.clock() + TOAST_SECONDS
 		elseif toastLabel.Visible then
@@ -158,7 +139,7 @@ local function updateClock()
 	end
 end
 
--- Queue a toast; they show one after another.
+-- Queue a toast; they show one after another. A leading emoji becomes the toast's pixel icon.
 function Hud.toast(text: string)
 	if #toastQueue < MAX_QUEUED_TOASTS then
 		table.insert(toastQueue, text)
@@ -197,7 +178,7 @@ local function eventText(e: Types.MatchEvent): string?
 		return "🤝 " .. nationName(e.a) .. " and " .. nationName(e.b) .. " are allies"
 	elseif e.kind == "ProvinceTaken" then
 		if e.a == me then
-			return "🏴 You took " .. provinceName(e.province)
+			return "🚩 You took " .. provinceName(e.province)
 		elseif e.b == me then
 			return "🏳 " .. nationName(e.a) .. " took " .. provinceName(e.province) .. "!"
 		end
@@ -213,6 +194,13 @@ local function eventText(e: Types.MatchEvent): string?
 	return nil
 end
 
+-- A plain icon button in the bar. `name` is what the harness presses.
+local function barButton(parent: Instance, name: string, icon: string, order: number, onPress: () -> ()): TextButton
+	local button = Widgets.iconButton(parent, icon, name, BAR_BUTTON, nil, onPress)
+	button.LayoutOrder = order
+	return button
+end
+
 function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopButton: (() -> ())?)
 	gui = Instance.new("ScreenGui")
 	gui.Name = "Hud"
@@ -223,10 +211,12 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	bar.Name = "TopBar"
 	bar.Active = true -- swallow taps so they don't reach the map
 	bar.Size = UDim2.new(1, 0, 0, BAR_HEIGHT)
-	bar.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-	bar.BackgroundTransparency = 0.08 -- nearly solid: map names behind it would read as clutter
+	bar.BackgroundColor3 = Theme.color.navy
+	bar.BackgroundTransparency = 0 -- solid: map names behind it would read as clutter
 	bar.BorderSizePixel = 0
 	bar.Parent = gui
+	Widgets.stroke(bar)
+	Widgets.bevel(bar, true)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, BAR_PADDING)
 	padding.PaddingRight = UDim.new(0, BAR_PADDING)
@@ -239,47 +229,66 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	layout.Parent = bar
 
 	-- capital button: recentres the camera on your capital (stands in for double-tapping it)
-	barButton(bar, "Capital", "⭐", 1).Activated:Connect(onCapitalButton)
+	barButton(bar, "Capital", "castle", 1, onCapitalButton)
 
+	-- your nation: its colour (a Primordial or a spectator gets an icon instead) and its name
 	nationSwatch = Instance.new("Frame")
-	nationSwatch.Size = UDim2.fromOffset(14, 14)
+	nationSwatch.Name = "Swatch"
+	nationSwatch.Size = UDim2.fromOffset(16, 16)
 	nationSwatch.BorderSizePixel = 0
 	nationSwatch.LayoutOrder = 2
 	nationSwatch.Parent = bar
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = nationSwatch
+	Widgets.corner(nationSwatch, Theme.radius.s)
+	Widgets.stroke(nationSwatch)
+	nationIcon = Widgets.icon(bar, "eye", Theme.size.icon)
+	nationIcon.LayoutOrder = 2
+	nationIcon.Visible = false
 
-	nationLabel = label(bar, "", 110)
+	nationLabel = Widgets.label(bar, "", Theme.text.heading, BAR_HEIGHT)
+	nationLabel.Name = "Nation"
+	nationLabel.FontFace = Theme.font.display
+	nationLabel.Size = UDim2.fromOffset(110, BAR_HEIGHT)
+	nationLabel.TextWrapped = false
 	nationLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	nationLabel.LayoutOrder = 3
-	goldLabel = label(bar, "", 80)
-	goldLabel.LayoutOrder = 4
-	manpowerLabel = label(bar, "", 88)
-	manpowerLabel.LayoutOrder = 5
-	rankLabel = label(bar, "", 56)
-	rankLabel.LayoutOrder = 6
-	clockLabel = label(bar, "", 84)
-	clockLabel.LayoutOrder = 7
 
-	barButton(bar, "NationsButton", "🌍", 8).Activated:Connect(onNationsButton)
+	goldLabel = Widgets.chip(bar, "gold", "", 80)
+	goldLabel.Name = "Gold"
+	goldLabel.LayoutOrder = 4
+	manpowerLabel = Widgets.chip(bar, "manpower", "", 84)
+	manpowerLabel.Name = "Manpower"
+	manpowerLabel.LayoutOrder = 5
+	rankLabel = Widgets.chip(bar, "trophy", "", 62)
+	rankLabel.Name = "Rank"
+	rankLabel.LayoutOrder = 6
+	clockLabel = Widgets.chip(bar, "peace", "", 86)
+	clockLabel.Name = "Clock"
+	clockLabel.LayoutOrder = 7
+	clockIcon = clockLabel:FindFirstChild("Icon") :: GuiObject
+
+	barButton(bar, "NationsButton", "globe", 8, onNationsButton)
 
 	-- your account level (MONETIZATION.md 5.2), from the saved profile
-	levelLabel = label(bar, "", 52)
+	levelLabel = Widgets.chip(bar, "medal", "", 52)
 	levelLabel.Name = "Level"
 	levelLabel.LayoutOrder = 9
 	ProfileState.onChange(function()
 		local summary = ProfileState.summary()
-		levelLabel.Text = if summary then "🎖 " .. summary.level else ""
+		levelLabel.Text = if summary then tostring(summary.level) else ""
 	end)
 
 	-- the shop (MONETIZATION.md 3): cosmetics only, Robux purchases open after the match
 	if onShopButton then
-		barButton(bar, "ShopButton", "🛒", 10).Activated:Connect(onShopButton)
+		barButton(bar, "ShopButton", "cart", 10, onShopButton)
 	end
 
 	-- sound on and off for the session (docs/DESIGN.md "Sound and effects")
-	Sounds.attachMuteButton(barButton(bar, "Mute", "🔊", 11))
+	local mute = barButton(bar, "Mute", "soundOn", 11, function() end)
+	local muteIcon = mute:FindFirstChild("Icon") :: GuiObject
+	Sounds.attachMuteButton(mute, function(muted: boolean)
+		Icons.set(muteIcon, if muted then "soundOff" else "soundOn")
+		mute:SetAttribute("Muted", muted)
+	end)
 
 	local optional: { GuiObject } = { levelLabel, rankLabel, nationSwatch }
 	bar:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -287,21 +296,7 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	end)
 	fitBar(bar, optional)
 
-	toastLabel = Instance.new("TextLabel")
-	toastLabel.Name = "Toast"
-	toastLabel.AnchorPoint = Vector2.new(0.5, 0)
-	toastLabel.Position = UDim2.new(0.5, 0, 0, BAR_HEIGHT + 10)
-	toastLabel.Size = UDim2.fromOffset(340, 40)
-	toastLabel.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-	toastLabel.BackgroundTransparency = 0.15
-	toastLabel.Font = Enum.Font.GothamBold
-	toastLabel.TextSize = 16
-	toastLabel.TextColor3 = Color3.new(1, 1, 1)
-	toastLabel.Visible = false
-	toastLabel.Parent = gui
-	local toastCorner = Instance.new("UICorner")
-	toastCorner.CornerRadius = UDim.new(0, 10)
-	toastCorner.Parent = toastLabel
+	toastLabel = Widgets.toast(gui, BAR_HEIGHT + 10, TOAST_WIDTH)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 

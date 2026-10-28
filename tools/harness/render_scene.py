@@ -25,15 +25,45 @@ TEXT_FONTS = [
 SYMBOL_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+# Stand-ins for Roblox font families (FontFace.Family): Fredoka One ships next to this script (OFL), Builder Sans
+# and Gotham are drawn with Inter, the closest font installed here.
+FACE_FONTS = {
+    "FredokaOne": os.path.join(HERE, "fonts", "FredokaOne-Regular.ttf"),
+    "Medium": "/usr/share/fonts/opentype/inter/Inter-Medium.otf",
+    "Regular": "/usr/share/fonts/opentype/inter/Inter-Regular.otf",
+    "ExtraBold": "/usr/share/fonts/opentype/inter/Inter-ExtraBold.otf",
+}
+
 _fonts: dict = {}
 _emoji_font = ImageFont.truetype(EMOJI_FONT, 109) if os.path.exists(EMOJI_FONT) else None
 _emoji_cache: dict = {}
 
 
-def font(size: int, symbols: bool = False):
-    key = (size, symbols)
+def face_key(face) -> str:
+    """The FACE_FONTS key for a dumped FontFace ({family, weight}), or "" for the default bold font."""
+    if not face:
+        return ""
+    family = face.get("family", "")
+    if "FredokaOne" in family:
+        return "FredokaOne"
+    weight = face.get("weight", "Bold")
+    if weight in ("Medium", "Regular", "Light", "ExtraLight", "Thin"):
+        return "Medium" if weight == "Medium" else "Regular"
+    if weight in ("ExtraBold", "Heavy"):
+        return "ExtraBold"
+    return ""
+
+
+def font(size: int, symbols: bool = False, face: str = ""):
+    key = (size, symbols, face)
     if key not in _fonts:
-        path = SYMBOL_FONT if symbols else next(p for p in TEXT_FONTS if os.path.exists(p))
+        if symbols:
+            path = SYMBOL_FONT
+        elif face and os.path.exists(FACE_FONTS.get(face, "")):
+            path = FACE_FONTS[face]
+        else:
+            path = next(p for p in TEXT_FONTS if os.path.exists(p))
         _fonts[key] = ImageFont.truetype(path, size)
     return _fonts[key]
 
@@ -74,17 +104,18 @@ def text_runs(text: str):
     return runs
 
 
-def measure_line(line: str, size: int) -> int:
+def measure_line(line: str, size: int, face: str = "") -> int:
     w = 0
     for kind, s in text_runs(line):
         if kind == "emoji":
             w += int(size * 1.15)
         else:
-            w += int(font(size, kind == "symbol").getlength(s))
+            w += int(font(size, kind == "symbol", face).getlength(s))
     return w
 
 
-def draw_line(img: Image.Image, x: float, y: float, line: str, size: int, color, stroke: bool = False):
+def draw_line(img: Image.Image, x: float, y: float, line: str, size: int, color, stroke=None, face: str = ""):
+    """stroke: None, or (rgba, width in px) for an outline round the glyphs."""
     d = ImageDraw.Draw(img)
     for kind, s in text_runs(line):
         if kind == "emoji":
@@ -94,28 +125,60 @@ def draw_line(img: Image.Image, x: float, y: float, line: str, size: int, color,
             img.alpha_composite(g.resize((w, h), Image.LANCZOS), (int(x), int(y + size * 0.05)))
             x += int(size * 1.15)
         else:
-            f = font(size, kind == "symbol")
-            kw = {"stroke_width": max(1, size // 8), "stroke_fill": (0, 0, 0, 230)} if stroke else {}
+            f = font(size, kind == "symbol", face)
+            kw = {"stroke_width": stroke[1], "stroke_fill": stroke[0]} if stroke else {}
             d.text((x, y), s, font=f, fill=color, **kw)
             x += f.getlength(s)
 
 
-def draw_text_block(img, rect, text, size, color, align="Center", valign="Center", stroke=False):
+def wrap_lines(text: str, size: int, width: float, face: str):
+    """Greedy word wrap, like Roblox's TextWrapped."""
+    out = []
+    for para in text.split("\n"):
+        line = ""
+        for word in para.split(" "):
+            trial = word if not line else line + " " + word
+            if line and measure_line(trial, size, face) > width:
+                out.append(line)
+                line = word
+            else:
+                line = trial
+        out.append(line)
+    return out
+
+
+def truncate_line(line: str, size: int, width: float, face: str) -> str:
+    if measure_line(line, size, face) <= width:
+        return line
+    while line and measure_line(line + "…", size, face) > width:
+        line = line[:-1]
+    return line + "…"
+
+
+def draw_text_block(img, rect, text, size, color, align="Center", valign="Center", stroke=None, face="",
+                    wrapped=False, truncate=False):
     x0, y0, x1, y1 = rect
-    text = text.replace("", "R$")  # Roblox fonts draw U+E002 as the Robux icon; our fonts don't have it
-    lines = text.split("\n")
-    line_h = int(size * 1.25)
+    text = text.replace("\ue002", "R$")  # Roblox fonts draw U+E002 as the Robux icon; our fonts don't have it
+    lines = wrap_lines(text, size, x1 - x0 + 1, face) if wrapped else text.split("\n")
+    if truncate and not wrapped:
+        lines = [truncate_line(line, size, x1 - x0, face) for line in lines]
+    line_h = int(size * 1.2)
     total = line_h * len(lines)
-    y = y0 + ((y1 - y0) - total) / 2 if valign == "Center" else y0
+    if valign == "Top":
+        y = y0
+    elif valign == "Bottom":
+        y = y1 - total
+    else:
+        y = y0 + ((y1 - y0) - total) / 2
     for line in lines:
-        w = measure_line(line, size)
+        w = measure_line(line, size, face)
         if align == "Left":
             x = x0
         elif align == "Right":
             x = x1 - w
         else:
             x = x0 + ((x1 - x0) - w) / 2
-        draw_line(img, x, y, line, size, color, stroke)
+        draw_line(img, x, y - size * 0.06, line, size, color, stroke, face)
         y += line_h
 
 
@@ -503,7 +566,7 @@ def layout(node, x, y, w, h, out):
                 extent = max(extent, cursor - gap)
     else:
         for k in sorted(kids, key=lambda c: c.get("zIndex", 1)):
-            kw, kh = udim(k["size"], w, h)
+            kw, kh = constrain(k, *udim(k["size"], w, h))
             px, py = udim(k["position"], w, h)
             ax, ay = k["anchor"]
             rect = place(k, x + px - ax * kw, y + py - ay * kh, kw, kh, out, fixed=False, anchor=(ax, ay))
@@ -511,7 +574,34 @@ def layout(node, x, y, w, h, out):
     return extent + (pad["pad"][1] * SCALE if pad else 0) + (pad["pad"][0] * SCALE if pad else 0)
 
 
+def constrain(node, w, h):
+    """A UISizeConstraint's limits, applied before the anchor point places the object (as Roblox does)."""
+    cons = child_of(node, "UISizeConstraint")
+    if cons:
+        mx, my = cons["maxSize"]  # null = math.huge
+        if mx is not None:
+            w = min(w, mx * SCALE)
+        if my is not None:
+            h = min(h, my * SCALE)
+    return w, h
+
+
+def text_width(node) -> float:
+    """Width a text object needs for its text plus padding (AutomaticSize X), in render pixels."""
+    size = int(node["textSize"] * SCALE)
+    face = face_key(node.get("font"))
+    w = max((measure_line(line, size, face) for line in node["text"].split("\n")), default=0)
+    pad = child_of(node, "UIPadding")
+    if pad:
+        w += (pad["pad"][2] + pad["pad"][3]) * SCALE
+    return w + 2
+
+
 def place(node, x, y, w, h, out, fixed, anchor=(0, 0)):
+    if node.get("autoSize") in ("X", "XY") and node.get("text") is not None:
+        grown = max(w, text_width(node))
+        x -= (grown - w) * anchor[0]
+        w = grown
     cons = child_of(node, "UISizeConstraint")
     if cons:
         mx, my = cons["maxSize"]  # null = math.huge
@@ -553,7 +643,62 @@ def draw_image(img, rect, info, images):
     box = ((vx0 - x0) * sx, (vy0 - y0) * sy, (vx1 - x0) * sx, (vy1 - y0) * sy)
     resample = Image.NEAREST if info.get("pixelated") else Image.BILINEAR
     part = src.resize((int(vx1 - vx0), int(vy1 - vy0)), resample, box=box)
+    tint, fade = info.get("color", [1, 1, 1]), info.get("transparency", 0)
+    if tint != [1, 1, 1] or fade > 0:
+        a = np.asarray(part, dtype=np.float64).copy()
+        a[..., :3] *= np.array(tint)
+        a[..., 3] *= 1 - fade
+        part = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
     img.alpha_composite(part, (int(vx0), int(vy0)))
+
+
+def sample(keys, t):
+    """A ColorSequence / NumberSequence ([[time, *values]]) at times t (numpy array) -> array of values."""
+    times = [k[0] for k in keys]
+    cols = [np.interp(t, times, [k[i] for k in keys]) for i in range(1, len(keys[0]))]
+    return np.stack(cols, axis=-1)
+
+
+def gradient_fill(img, rect, color, alpha, radius, grad):
+    """A background with a UIGradient: its colours multiply the background, its transparency fades it."""
+    x0, y0, x1, y1 = rect
+    cx0, cy0 = max(int(x0), 0), max(int(y0), 0)
+    cx1, cy1 = min(int(math.ceil(x1)), img.width), min(int(math.ceil(y1)), img.height)
+    if cx1 <= cx0 or cy1 <= cy0:
+        return
+    ys, xs = np.mgrid[cy0:cy1, cx0:cx1].astype(np.float64)
+    u = (xs + 0.5 - x0) / max(x1 - x0, 1) - 0.5 - grad["offset"][0]
+    v = (ys + 0.5 - y0) / max(y1 - y0, 1) - 0.5 - grad["offset"][1]
+    a = math.radians(grad["rotation"])
+    t = np.clip(u * math.cos(a) + v * math.sin(a) + 0.5, 0, 1)
+    mult = sample(grad["colors"], t)
+    fade = sample(grad["transparency"], t)[..., 0]
+    rgb = np.clip(np.array(color)[None, None, :] * mult, 0, 1)
+    mask = Image.new("L", (cx1 - cx0, cy1 - cy0), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((x0 - cx0, y0 - cy0, x1 - cx0, y1 - cy0), radius=radius, fill=255)
+    al = np.asarray(mask, dtype=np.float64) / 255 * alpha * (1 - fade)
+    layer = np.dstack([rgb * 255, al * 255]).astype(np.uint8)
+    img.alpha_composite(Image.fromarray(layer, "RGBA"), (cx0, cy0))
+
+
+def outline(img, rect, color, alpha, thickness, radius):
+    """A UIStroke round the border: outside the box, following its rounded corners."""
+    x0, y0, x1, y1 = rect
+    t = thickness
+    pad = int(t) + 2
+    ox, oy = int(x0) - pad, int(y0) - pad
+    w, h = int(math.ceil(x1)) - ox + pad, int(math.ceil(y1)) - oy + pad
+    if w <= 0 or h <= 0:
+        return
+    ring = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(ring)
+    d.rounded_rectangle((x0 - t - ox, y0 - t - oy, x1 + t - ox, y1 + t - oy), radius=radius + t if radius > 0 else 0,
+                        fill=255)
+    d.rounded_rectangle((x0 - ox, y0 - oy, x1 - ox, y1 - oy), radius=radius, fill=0)
+    layer = Image.new("RGBA", (w, h), rgba(color, alpha))
+    layer.putalpha(Image.fromarray((np.asarray(ring, dtype=np.float64) * alpha).astype(np.uint8)))
+    left, top = max(0, -ox), max(0, -oy)
+    img.alpha_composite(layer.crop((left, top, w, h)), (ox + left, oy + top))
 
 
 def fill(img, rect, color, alpha, radius):
@@ -583,30 +728,45 @@ def draw_nodes(img, out, images=()):
         if x1 < 0 or y1 < 0 or x0 > img.width or y0 > img.height:
             continue
         alpha = 1 - node.get("bgT", 0)
+        corner = child_of(node, "UICorner")
+        radius = 0
+        if corner:
+            radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
+            radius = min(radius, min(x1 - x0, y1 - y0) / 2)
         if alpha > 0.01:
-            corner = child_of(node, "UICorner")
-            radius = 0
-            if corner:
-                radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
-                radius = min(radius, min(x1 - x0, y1 - y0) / 2)
-            fill(img, rect, node["bg"], alpha, radius)
+            if node.get("gradient"):
+                gradient_fill(img, rect, node["bg"], alpha, radius, node["gradient"])
+            else:
+                fill(img, rect, node["bg"], alpha, radius)
         if node.get("image") and images:
             draw_image(img, rect, node["image"], images)
         stroke = node.get("uiStroke")
-        if stroke:
-            t = stroke["thickness"] * SCALE
-            ImageDraw.Draw(img).rectangle(
-                (x0 - t, y0 - t, x1 + t - 1, y1 + t - 1), outline=rgba(stroke["color"]), width=max(1, int(t))
-            )
-        if node.get("text") and node.get("textT", 0) < 0.5:
+        if stroke and not stroke.get("text") and stroke.get("transparency", 0) < 0.99:
+            outline(img, rect, stroke["color"], 1 - stroke.get("transparency", 0), stroke["thickness"] * SCALE, radius)
+        if node.get("text") and node.get("textT", 0) < 0.99:
+            text_stroke = None
+            if stroke and stroke.get("text"):
+                text_stroke = (rgba(stroke["color"], 1 - stroke.get("transparency", 0)),
+                               max(1, int(stroke["thickness"] * SCALE)))
+            elif node.get("stroke"):
+                text_stroke = (rgba(node.get("strokeColor", [0, 0, 0]), 1 - node.get("strokeT", 0)), SCALE)
+            pad = child_of(node, "UIPadding")
+            box = rect
+            if pad:
+                t, b, l, r = (v * SCALE for v in pad["pad"])
+                box = (x0 + l, y0 + t, x1 - r, y1 - b)
             draw_text_block(
                 img,
-                rect,
+                box,
                 node["text"],
                 int(node["textSize"] * SCALE),
-                rgba(node["textColor"]),
+                rgba(node["textColor"], 1 - node.get("textT", 0)),
                 align=node.get("textXAlign", "Center"),
-                stroke=node.get("stroke", False),
+                valign=node.get("textYAlign", "Center"),
+                stroke=text_stroke,
+                face=face_key(node.get("font")),
+                wrapped=node.get("textWrapped", False),
+                truncate=node.get("truncate", False),
             )
 
 

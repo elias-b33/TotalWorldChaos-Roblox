@@ -2,6 +2,7 @@
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
 -- who is standing there; one-tap actions on your own provinces (develop, build, recruit, move an army) and
 -- diplomacy on foreign ones (war, ally, peace). Every button shows its price; the server decides.
+-- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,70 +19,75 @@ local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local Palette = require(Client.Palette)
 local Relations = require(Client.Relations)
+local Icons = require(script.Parent.Icons)
+local Widgets = require(script.Parent.Widgets)
 
+local Theme = Widgets.Theme
 local SHEET_WIDTH = 560
-local BUTTON_HEIGHT = 48 -- at least 44 px on phones
+local CELL = Vector2.new(128, 52) -- action buttons: at least 44 px tall on phones
+local CHIP_HEIGHT = 26
 
-local TERRAIN_ICONS: { [string]: string } = { Plains = "🌾", Forest = "🌲", Hills = "⛰", Mountain = "🏔" }
-local BUILDING_ICONS: { [string]: string } = { None = "", Farm = "🌾", Barracks = "⚔", Fort = "🏰" }
+local TERRAIN_ICONS: { [string]: string } = { Plains = "farm", Forest = "tree", Hills = "hills", Mountain = "mountain" }
+local BUILDING_ICONS: { [string]: string } = { Farm = "farm", Barracks = "sword", Fort = "castle" }
 local BUILDABLE: { Types.Building } = { "Farm", "Barracks", "Fort" }
 
 local ProvinceSheet = {}
 
 local sheet: Frame
 local title: TextLabel
-local info: TextLabel
-local status: TextLabel
+local titleIcon: GuiObject
+local info: Frame
+local status: Frame
 local actions: Frame
 local selected: number? = nil
 local onClose: (() -> ())? = nil
 local onSelectArmy: ((number) -> ())? = nil
 
-local function text(parent: Instance, size: number, height: number): TextLabel
-	local l = Instance.new("TextLabel")
-	l.BackgroundTransparency = 1
-	l.Size = UDim2.new(1, 0, 0, height)
-	l.Font = Enum.Font.GothamBold
-	l.TextSize = size
-	l.TextColor3 = Color3.new(1, 1, 1)
-	l.TextXAlignment = Enum.TextXAlignment.Left
-	l.Parent = parent
-	return l
-end
-
-local function button(caption: string, enabled: boolean, onPress: () -> ())
-	local b = Instance.new("TextButton")
-	b.Size = UDim2.fromOffset(124, BUTTON_HEIGHT)
-	b.BackgroundColor3 = if enabled then Color3.fromRGB(60, 120, 220) else Color3.fromRGB(70, 72, 84)
-	b.AutoButtonColor = enabled
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 15
-	b.TextWrapped = true
-	b.TextColor3 = if enabled then Color3.new(1, 1, 1) else Color3.fromRGB(170, 170, 180)
-	b.Text = caption
-	b.Parent = actions
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = b
-	b.Activated:Connect(onPress)
-end
-
 local function shortMen(men: number): string
 	return if men >= 1000 then string.format("%gk", math.floor(men / 100) / 10) else tostring(men)
 end
 
--- "🛡 1k garrison", "⚔ 3k Zephyr", "⏳ siege 40%", "💥 battle" for whatever is going on in the province.
-local function statusLine(provinceId: number, record: Snapshot.ProvinceRecord): string
+-- An action button: a pixel icon, a caption and its cost (icon + number pairs) under the caption. Greyed out when
+-- you can't afford it (a tap still goes to the server, which explains in a toast). `name` keeps the old caption
+-- the tutorial and the harness look for.
+local function action(
+	icon: string,
+	caption: string,
+	costs: { { string } },
+	color: Color3,
+	enabled: boolean,
+	onPress: () -> (),
+	name: string?
+)
+	local b = Widgets.actionButton(actions, icon, caption, costs, CELL, color, onPress, name)
+	b.LayoutOrder = #actions:GetChildren()
+	if not enabled then
+		Widgets.setEnabled(b, false)
+	end
+end
+
+local function chip(parent: Instance, icon: string, text: string, color: Color3?): TextLabel
+	local c = Widgets.chip(parent, icon, text, nil, CHIP_HEIGHT)
+	c.LayoutOrder = #parent:GetChildren()
+	if color then
+		c.TextColor3 = color
+	end
+	return c
+end
+
+-- Battle, siege and the armies standing here, as chips.
+local function renderStatus(provinceId: number, record: Snapshot.ProvinceRecord)
+	Widgets.clear(status)
 	local snap = ClientState.snapshot()
-	local parts = {}
 	if record.battle then
-		table.insert(parts, "💥 Battle")
+		chip(status, "battle", "Battle")
 	elseif record.siegeRequired > 0 then -- siegeBy is 0 for Rebels
 		local by = ClientState.nation(record.siegeBy)
-		table.insert(
-			parts,
+		chip(
+			status,
+			"hourglass",
 			string.format(
-				"⏳ %s siege %d%%",
+				"%s siege %d%%",
 				if by then by.name else "Rebels",
 				math.floor(100 * record.siegeProgress / record.siegeRequired)
 			)
@@ -91,17 +97,18 @@ local function statusLine(provinceId: number, record: Snapshot.ProvinceRecord): 
 		for _, a in snap.armies do
 			if a.location == provinceId then
 				local owner = ClientState.nation(a.owner)
-				table.insert(
-					parts,
-					if a.rebel
-						then "🏴 " .. shortMen(a.men) .. " Rebels"
-						elseif a.owner == 0 then "🛡 " .. shortMen(a.men) .. " garrison"
-						else "⚔ " .. shortMen(a.men) .. " " .. (if owner then owner.name else "?")
-				)
+				if a.rebel then
+					chip(status, "rebels", shortMen(a.men) .. " Rebels")
+				elseif a.owner == 0 then
+					chip(status, "shield", shortMen(a.men) .. " garrison")
+				else
+					local tint = if owner then Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.45) else nil
+					chip(status, "sword", shortMen(a.men) .. " " .. (if owner then owner.name else "?"), tint)
+				end
 			end
 		end
 	end
-	return table.concat(parts, "   ·   ")
+	status.Visible = #status:GetChildren() > 1 -- more than its layout
 end
 
 local function pips(development: number): string
@@ -114,6 +121,10 @@ local function render()
 	local record = if id then ClientState.province(id) else nil
 	if id == nil or map == nil or record == nil then
 		sheet.Visible = false
+		-- a hidden sheet keeps no chips or buttons (they are rebuilt when it opens): fewer GUI objects
+		Widgets.clear(info)
+		Widgets.clear(status)
+		Widgets.clear(actions)
 		return
 	end
 	local provinceId: number = id -- non-optional copy for the button callbacks
@@ -125,50 +136,58 @@ local function render()
 	end
 	local mine = owner ~= nil and me ~= nil and owner.id == me.id
 
-	title.Text = (if def.isCapital then "⭐ " else "") .. def.name
-	local relation = if owner and me and owner.id ~= me.id then Relations.icon(me.id, owner.id) .. " " else ""
-	local ownerText = if owner
-		then relation .. owner.name
-		elseif def.terrain == "Mountain" then "Impassable"
-		else "Neutral"
-	info.Text = string.format(
-		"%s %s   ·   %s   ·   %s %s",
-		TERRAIN_ICONS[def.terrain] or "",
-		ownerText,
-		pips(record.development),
-		BUILDING_ICONS[record.building] or "",
-		if record.building == "None" then "No building" else record.building
-	)
-	info.TextColor3 = if owner
-		then Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.35)
-		else Color3.new(1, 1, 1)
-	status.Text = statusLine(provinceId, record)
-	status.Visible = status.Text ~= ""
+	title.Text = def.name
+	Icons.set(titleIcon, if def.isCapital then "crown" else TERRAIN_ICONS[def.terrain] or "flag")
 
-	for _, child in actions:GetChildren() do
-		if child:IsA("TextButton") then
-			child:Destroy()
-		end
+	-- the info chips: terrain, owner (with your relation), development, building
+	Widgets.clear(info)
+	chip(info, TERRAIN_ICONS[def.terrain] or "flag", def.terrain)
+	if owner then
+		local relation = if me and owner.id ~= me.id then Icons.fromEmoji(Relations.icon(me.id, owner.id)) else nil
+		local c =
+			chip(info, relation or "flag", owner.name, Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.4))
+		c.Name = "Owner"
+	else
+		chip(info, "flag", if def.terrain == "Mountain" then "Impassable" else "Neutral", Theme.color.textDim)
 	end
+	chip(info, "up", pips(record.development), Theme.color.gold)
+	if record.building ~= "None" then
+		chip(info, BUILDING_ICONS[record.building] or "castle", record.building)
+	else
+		chip(info, "castle", "No building", Theme.color.textDim)
+	end
+	renderStatus(provinceId, record)
+
+	Widgets.clear(actions)
 	if mine and me then
 		local gold = me.gold
 		if record.development < Config.Economy.MaxDevelopment then
 			local cost = Economy.developCost(record.development)
-			button("⬆ Develop\n💰" .. cost, gold >= cost, function()
+			action("up", "Develop", { { "gold", tostring(cost) } }, Widgets.BUTTON, gold >= cost, function()
 				Intents.develop(provinceId)
 			end)
 		end
 		if record.building == "None" then
 			for _, building in BUILDABLE do
 				local cost = Economy.buildingCost(building) or 0
-				button(BUILDING_ICONS[building] .. " " .. building .. "\n💰" .. cost, gold >= cost, function()
-					Intents.build(provinceId, building)
-				end)
+				action(
+					BUILDING_ICONS[building],
+					building,
+					{ { "gold", tostring(cost) } },
+					Widgets.BUTTON,
+					gold >= cost,
+					function()
+						Intents.build(provinceId, building)
+					end
+				)
 			end
 		end
 		local recruitGold, recruitManpower = Economy.recruitCost(1)
-		button(
-			"⚔ +1 Regiment\n💰" .. recruitGold .. " 👥" .. recruitManpower // 1000 .. "k",
+		action(
+			"sword",
+			"+1 Regiment",
+			{ { "gold", tostring(recruitGold) }, { "manpower", recruitManpower // 1000 .. "k" } },
+			Widgets.GOOD,
 			gold >= recruitGold and me.manpower >= recruitManpower,
 			function()
 				Intents.recruit(provinceId, 1)
@@ -181,11 +200,19 @@ local function render()
 		for _, a in snap.armies do
 			if a.location == provinceId and a.owner == me.id then
 				local armyId = a.id
-				button("➜ Move\n⚔ " .. shortMen(a.men), not a.inBattle and not a.retreating, function()
-					if onSelectArmy then
-						onSelectArmy(armyId)
-					end
-				end)
+				action(
+					"arrow",
+					"Move",
+					{ { "sword", shortMen(a.men) } },
+					Widgets.GOOD,
+					not a.inBattle and not a.retreating,
+					function()
+						if onSelectArmy then
+							onSelectArmy(armyId)
+						end
+					end,
+					"➜ Move"
+				)
 			end
 		end
 	end
@@ -194,26 +221,27 @@ local function render()
 		local target = owner.id
 		if Relations.atWar(me.id, target) then
 			for _, tribute in Config.Diplomacy.PeaceTributes do
-				local caption = if tribute == 0 then "🕊 Peace" else "🕊 Peace\n+💰" .. tribute
-				button(caption, me.gold >= tribute, function()
+				local costs = if tribute == 0 then {} else { { "gold", "+" .. tribute } }
+				action("peace", "Peace", costs, Widgets.BUTTON, me.gold >= tribute, function()
 					Intents.diplomacy("Peace", target, tribute)
-				end)
+				end, "Peace_" .. tribute)
 			end
 		else
 			local canWar = snap.phase ~= "Peace"
 				and not Relations.allied(me.id, target)
 				and not Relations.truce(me.id, target)
 				and Relations.borders(me.id, target)
-			button("⚔ Declare\nwar", canWar, function()
+			action("war", "Declare war", {}, Widgets.DANGER, canWar, function()
 				Intents.diplomacy("War", target)
 			end)
 			if not Relations.allied(me.id, target) then
-				button("🤝 Ally", true, function()
+				action("handshake", "Ally", {}, Widgets.BUTTON, true, function()
 					Intents.diplomacy("Ally", target)
-				end)
+				end, "🤝 Ally")
 			end
 		end
 	end
+	actions.Visible = #actions:GetChildren() > 1
 	sheet.Visible = true
 end
 
@@ -222,73 +250,41 @@ function ProvinceSheet.show(provinceId: number?)
 	render()
 end
 
+local function chipRow(order: number, name: string): Frame
+	local row = Instance.new("Frame")
+	row.Name = name
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, CHIP_HEIGHT)
+	row.LayoutOrder = order
+	row.Parent = sheet
+	Widgets.list(row, true, Theme.space.s)
+	return row
+end
+
 function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) -> ())
 	onClose = closeHandler
 	onSelectArmy = selectArmyHandler
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "ProvinceSheet"
-	gui.ResetOnSpawn = false
+	local gui = Widgets.screen("ProvinceSheet")
 
-	sheet = Instance.new("Frame")
+	sheet = Widgets.sheet(gui, SHEET_WIDTH)
 	sheet.Name = "Sheet"
-	sheet.Active = true -- swallow taps so they don't reach the map
-	sheet.AnchorPoint = Vector2.new(0.5, 1)
-	sheet.Position = UDim2.new(0.5, 0, 1, -8)
-	sheet.Size = UDim2.fromOffset(SHEET_WIDTH, 0)
-	sheet.AutomaticSize = Enum.AutomaticSize.Y
-	sheet.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-	sheet.BackgroundTransparency = 0.1
 	sheet.Visible = false
-	sheet.Parent = gui
-	local constraint = Instance.new("UISizeConstraint")
-	constraint.MaxSize = Vector2.new(SHEET_WIDTH, math.huge)
-	constraint.Parent = sheet
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 14)
-	corner.Parent = sheet
-	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 12)
-	padding.PaddingBottom = UDim.new(0, 12)
-	padding.PaddingLeft = UDim.new(0, 12)
-	padding.PaddingRight = UDim.new(0, 12)
-	padding.Parent = sheet
-	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 8)
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Parent = sheet
+	Widgets.list(sheet, false, Theme.space.m)
 
 	-- header: name on the left, close button on the right
-	local header = Instance.new("Frame")
-	header.Name = "Header"
-	header.BackgroundTransparency = 1
-	header.Size = UDim2.new(1, 0, 0, 44)
-	header.LayoutOrder = 1
-	header.Parent = sheet
-	title = text(header, 20, 44)
-	title.Size = UDim2.new(1, -48, 1, 0)
-
-	local close = Instance.new("TextButton")
-	close.Name = "Close"
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.fromScale(1, 0)
-	close.Size = UDim2.fromOffset(44, 44)
-	close.BackgroundTransparency = 1
-	close.Font = Enum.Font.GothamBold
-	close.TextSize = 20
-	close.TextColor3 = Color3.new(1, 1, 1)
-	close.Text = "✕"
-	close.Parent = header
-	close.Activated:Connect(function()
+	local header
+	header, title = Widgets.header(sheet, "", "flag", function()
 		ProvinceSheet.show(nil)
 		if onClose then
 			onClose()
 		end
 	end)
+	header.Size = UDim2.new(1, 0, 0, 36)
+	header.LayoutOrder = 1
+	titleIcon = title:FindFirstChild("Icon") :: GuiObject
 
-	info = text(sheet, 15, 22)
-	status = text(sheet, 14, 20)
-	status.LayoutOrder = 3
-	info.LayoutOrder = 2
+	info = chipRow(2, "Info")
+	status = chipRow(3, "Status")
 
 	actions = Instance.new("Frame")
 	actions.Name = "Actions"
@@ -298,8 +294,8 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 	actions.LayoutOrder = 4
 	actions.Parent = sheet
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(124, BUTTON_HEIGHT)
-	grid.CellPadding = UDim2.fromOffset(8, 8)
+	grid.CellSize = UDim2.fromOffset(CELL.X, CELL.Y)
+	grid.CellPadding = UDim2.fromOffset(Theme.space.m, Theme.space.m)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = actions
 
