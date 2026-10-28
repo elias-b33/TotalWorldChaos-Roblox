@@ -172,7 +172,14 @@ end
 -- The ProcessReceipt hook for developer products: ShopService's MarketplaceService.ProcessReceipt calls this with
 -- the catalogue item or offer the product sells and its grant function. Grants each purchase id once, records it
 -- in the purchase history, and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
-function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Data) -> ()): Enum.ProductPurchaseDecision
+-- notPurchase: a reward that cost no Robux (a rewarded video's): saved once like any receipt, but kept out of the
+-- purchase history, which lists Robux purchases only.
+function PlayerDataService.processReceipt(
+	receipt: any,
+	item: string,
+	grant: (Data) -> (),
+	notPurchase: boolean?
+): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	local profile = if player then profiles[player] else nil
 	if profile == nil then
@@ -183,10 +190,10 @@ function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Da
 	if data.receipts[id] == nil then
 		grant(data)
 		data.receipts[id] = os.time()
-		table.insert(
-			data.purchaseHistory,
-			{ product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time(), item = item }
-		)
+		if not notPurchase then
+			local record = { product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time(), item = item }
+			table.insert(data.purchaseHistory, record)
+		end
 		trimReceipts(data)
 		profile:Save()
 		if player then

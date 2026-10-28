@@ -70,6 +70,7 @@ Telemetry.CLIENT_SIGNALS = {
 	ShopOpened = true, -- Shop funnel step 1 (a new shop session)
 	ItemViewed = true, -- Shop funnel step 2 (another tab or page of items)
 	OfferOpened = true, -- StarterPack funnel step 2 (the pop-up is on screen)
+	NotificationPrompt = true, -- notification_opt_in: "shown" (Roblox's opt-in prompt opened) or "ineligible"
 } :: { [string]: boolean }
 
 Telemetry.GLORY = "Glory"

@@ -380,9 +380,11 @@ export type Command =
 | `RequestBuy` | client → server | itemId, "Glory" or "Robux" |
 | `RequestEquip` | client → server | itemId |
 | `RequestEmote` | client → server | emote itemId |
-| `RequestTelemetry` | client → server | a UI-only analytics step (`Loaded`, `ShopOpened`, `ItemViewed`, `OfferOpened`), optional short string; no reply, changes nothing |
+| `RequestTelemetry` | client → server | a UI-only analytics step (`Loaded`, `ShopOpened`, `ItemViewed`, `OfferOpened`, `NotificationPrompt`), optional short string; no reply, changes nothing |
 | `RequestDefaultTheme` | client → server | true = always show the classic map (the map-theme opt-out) |
 | `Shop` | server → client | your owned and equipped items, VIP, purchase history, whether Robux purchases are open, the starter-pack offer |
+| `RequestAd` | client → server | the rewarded video placement (`quest_reroll`); the reply comes when the video ends |
+| `NotificationPrompt` | server → client | after your first finished match: ask to turn on experience notifications (once per profile) |
 
 ## UI and controls
 
@@ -538,7 +540,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [ ] Season pass (8 weeks, 50 tiers)
 - [ ] Rotating shop
 - [ ] Weekly, friends and global leaderboards; achievements
-- [ ] Rewarded video quest reroll; experience notifications
+- [x] Rewarded video quest reroll; experience notifications
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 
 ## Open questions

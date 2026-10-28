@@ -66,6 +66,7 @@ local endLogged = false
 local shopSession: { [Player]: string } = {}
 local shopViewed: { [Player]: string } = {} -- the shop session item_viewed was sent for
 local clientLoaded: { [Player]: boolean } = {}
+local notified: { [Player]: boolean } = {} -- notification_opt_in was logged this session
 
 -- Sending -------------------------------------------------------------------------------------------------------
 
@@ -437,14 +438,15 @@ function TelemetryService.adRewarded(player: Player, placement: string, result: 
 	TelemetryService.send(Telemetry.custom("ad_rewarded", 1, { placement, result }, player.UserId), player)
 end
 
-function TelemetryService.notificationOptIn(player: Player, accepted: boolean)
-	local result = if accepted then "accepted" else "declined"
+-- result: shown (Roblox's opt-in prompt opened; Roblox doesn't tell the game which button was pressed) or
+-- ineligible (CanPromptOptInAsync said no: under 13, already opted in, asked in the last 30 days, or it failed)
+function TelemetryService.notificationOptIn(player: Player, result: string)
 	TelemetryService.send(Telemetry.custom("notification_opt_in", 1, { result }, player.UserId), player)
 end
 
 -- Client signals ---------------------------------------------------------------------------------------------------
 
-local function onSignal(player: Player, kind: string, _arg: string?)
+local function onSignal(player: Player, kind: string, arg: string?)
 	if kind == "Loaded" then
 		if not clientLoaded[player] then
 			clientLoaded[player] = true
@@ -461,6 +463,9 @@ local function onSignal(player: Player, kind: string, _arg: string?)
 		end
 	elseif kind == "OfferOpened" then
 		shopStep(player, STARTER, "offer_opened")
+	elseif kind == "NotificationPrompt" and (arg == "shown" or arg == "ineligible") and not notified[player] then
+		notified[player] = true -- once a session: the server asks a client at most once
+		TelemetryService.notificationOptIn(player, arg :: string)
 	end
 end
 
@@ -499,6 +504,7 @@ function TelemetryService.init()
 		end
 		shopSession[player] = nil
 		shopViewed[player] = nil
+		notified[player] = nil
 		clientLoaded[player] = nil
 		lastResults[player.UserId] = nil
 	end)

@@ -4,7 +4,7 @@
 -- seeded with the player and the day or week, so the same player always gets the same quests on the same day.
 -- Unfinished daily quests stay for 2 days (6 at most); a finished quest stays until it is claimed. Progress comes
 -- from the match stats at Results (or when a player leaves), claiming pays XP and Glory, and a daily quest can be
--- rerolled: free ones first (1 a day, +1 VIP, +2 from the rewarded video in Phase 5), then for Glory.
+-- rerolled: free ones first (1 a day, +1 VIP, up to +2 from the rewarded video), then for Glory.
 -- Pure: the services pass in the profile, the UTC day, VIP and the Rng.
 
 local Config = require("../Config")
@@ -288,6 +288,45 @@ function Quests.grantVideoReroll(book: Book): boolean
 	return true
 end
 
+-- The "Quest reroll" developer product bought with Robux (only the experience's store page sells it; the game
+-- itself never offers it): one more free reroll today, outside the rewarded video's daily cap.
+function Quests.grantBoughtReroll(book: Book)
+	book.rerollsUsed -= 1
+end
+
+local function hasRerollable(book: Book): boolean
+	for _, quest in book.daily do
+		if not quest.claimed and not Quests.isDone(quest) then
+			return true
+		end
+	end
+	return false
+end
+
+-- How many rewarded videos the Quests screen may offer right now: none while a free reroll is left or no daily
+-- quest can be rerolled, otherwise what is left of today's Config VideoRerolls.
+function Quests.videoRerollsLeft(book: Book, vip: boolean): number
+	if Quests.freeRerolls(book, vip) > 0 or not hasRerollable(book) then
+		return 0
+	end
+	return math.max(0, Q.VideoRerolls - book.videoRerolls)
+end
+
+-- What pays for the next reroll (analytics): "free", "vip", "ad" (a rewarded video's) or "glory". Free rerolls are
+-- used in that order; a bought one counts as free.
+function Quests.rerollSource(book: Book, vip: boolean): string
+	local used = book.rerollsUsed
+	local vipRerolls = if vip then Config.Shop.VipQuestRerolls else 0
+	if used < Q.FreeRerolls then
+		return "free"
+	elseif used < Q.FreeRerolls + vipRerolls then
+		return "vip"
+	elseif used < Q.FreeRerolls + vipRerolls + book.videoRerolls then
+		return "ad"
+	end
+	return "glory"
+end
+
 -- Swap an unfinished daily quest for another of the same tier that isn't in the list. Free rerolls first, then
 -- Config RerollGlory each. The Rng comes from Quests.rerollRng. Returns ok, or false and a reason: Unknown,
 -- NotDaily, Done, NotEnoughGlory, NoOther.
@@ -372,6 +411,7 @@ function Quests.view(profile: Profile, today: number, vip: boolean, gains: { [st
 		weekly = weekly,
 		freeRerolls = Quests.freeRerolls(book, vip),
 		rerollGlory = Q.RerollGlory,
+		videoRerolls = Quests.videoRerollsLeft(book, vip),
 		calendar = { glory = {}, step = 0, playedToday = false },
 		streak = 0,
 		best = 0,

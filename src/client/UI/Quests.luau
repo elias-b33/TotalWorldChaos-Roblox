@@ -4,15 +4,19 @@
 -- button once finished and a 🔄 reroll on unfinished daily quests (free ones first, then Glory).
 -- Opens from the 📜 button in the Lobby, the 📜 Quests button in the 🌍 Nations drawer during a match, and the
 -- Results screen. No pressure (section 10): no countdowns, no "you'll lose your streak" messages.
--- Rewarded video (Phase 5, 13+ only): its one placement goes in this screen's header, next to the reroll count.
+-- Rewarded video (the game's one ad placement): "📺 Watch an ad · +1 free reroll" in the header, next to the reroll
+-- count, only during the Lobby's map vote, only once the free rerolls are used, and only while Roblox says an ad is
+-- available for this player (Client.Ads), so players it reports as ineligible (under 13) never see it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
+local SimAds = require(ReplicatedStorage.Shared.Sim.Ads)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local Client = script.Parent.Parent
+local Ads = require(Client.Ads)
 local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
@@ -30,6 +34,8 @@ local COLUMN_GAP = 10
 local LEFT_SHARE = 0.54 -- of the panel's width: the daily column
 local REWARD_WIDTH = 66
 local ACTION_WIDTH = 64
+local AD_WIDTH = 176
+local AD_COLOR = Color3.fromRGB(60, 110, 200)
 local STEP_HEIGHT = 46
 local CARD = Color3.fromRGB(32, 35, 50)
 local GOLD = Color3.fromRGB(242, 193, 78)
@@ -73,6 +79,8 @@ local badge: TextLabel
 local panel: Frame
 local gloryLabel: TextLabel
 local rerollLabel: TextLabel
+local adButton: TextButton
+local checkedView: Types.QuestView? = nil -- the quest view Roblox was last asked about an ad for
 local dailyColumn: Frame
 local weeklyColumn: Frame
 
@@ -228,6 +236,32 @@ local function calendar(parent: Instance, view: Types.QuestView, order: number)
 	end
 end
 
+-- The ad button: in the map vote (Sim.Ads.timeOk), with a video to offer (Sim.Quests.videoRerollsLeft) and an ad Roblox says is
+-- available. Asks Roblox once per quest view, when the button could show.
+local function updateAd()
+	if adButton == nil then
+		return
+	end
+	local view = QuestState.view()
+	local voteLeft = if LobbyState.phase() == "Lobby" then LobbyState.secondsLeft() else nil
+	local wanted = panel.Visible and view ~= nil and view.videoRerolls > 0 and SimAds.timeOk(voteLeft)
+	if wanted and checkedView ~= view then
+		checkedView = view
+		Ads.check()
+	end
+	local show = wanted and Ads.available()
+	adButton.Visible = show
+	if show and view then
+		adButton.Text = string.format(
+			"📺 Watch an ad%s\n+1 free reroll · %d left today",
+			if Ads.testMode() then " (test)" else "",
+			view.videoRerolls
+		)
+		Ads.register(adButton)
+	end
+	rerollLabel.Size = UDim2.new(1, if show then -(330 + AD_WIDTH) else -330, 0, HEADER_HEIGHT)
+end
+
 local function render()
 	if panel == nil or not panel.Visible then
 		return
@@ -274,6 +308,7 @@ local function render()
 	line.Name = "Streak"
 	line.TextColor3 = OFF_TEXT
 	line.LayoutOrder = 12
+	updateAd()
 end
 
 local function refreshButton()
@@ -288,7 +323,10 @@ local function setOpen(open: boolean)
 	panel.Visible = open
 	refreshButton()
 	if open then
+		checkedView = nil -- ask Roblox again each time the screen opens
 		render()
+	else
+		updateAd()
 	end
 end
 
@@ -393,6 +431,16 @@ function QuestsUI.init()
 	rerollLabel.Position = UDim2.fromOffset(270, 0)
 	rerollLabel.Size = UDim2.new(1, -330, 0, HEADER_HEIGHT)
 	rerollLabel.TextColor3 = OFF_TEXT
+	adButton = Widgets.button(header, "", AD_WIDTH, AD_COLOR, function()
+		Ads.watch()
+		updateAd()
+	end)
+	adButton.Name = "AdButton"
+	adButton.TextSize = 12
+	adButton.AnchorPoint = Vector2.new(1, 0)
+	adButton.Position = UDim2.new(1, -52, 0, 0)
+	adButton.Size = UDim2.fromOffset(AD_WIDTH, HEADER_HEIGHT)
+	adButton.Visible = false
 	local close = Widgets.button(header, "✕", 44, Widgets.DANGER, function()
 		setOpen(false)
 	end)
@@ -420,7 +468,11 @@ function QuestsUI.init()
 	end)
 	ProfileState.onChange(render)
 	ClientState.onReset(refreshButton)
-	LobbyState.onChange(refreshButton)
+	LobbyState.onChange(function()
+		refreshButton()
+		updateAd()
+	end)
+	Ads.onChange(updateAd)
 end
 
 return QuestsUI

@@ -92,10 +92,21 @@ function ShopService.receipt(receipt: any, id: string): Enum.ProductPurchaseDeci
 	return decision
 end
 
+-- Developer products that aren't shop items (the quest reroll, AdRewardService): their service grants them.
+local productHandlers: { [string]: (any) -> Enum.ProductPurchaseDecision } = {}
+
+function ShopService.onProduct(id: string, handler: (any) -> Enum.ProductPurchaseDecision)
+	productHandlers[id] = handler
+end
+
 local function onReceipt(receipt: any): Enum.ProductPurchaseDecision
 	local id = Catalogue.byProductId(receipt.ProductId)
 	if id == nil then
 		return Enum.ProductPurchaseDecision.NotProcessedYet -- not ours (yet): Roblox retries later
+	end
+	local handler = productHandlers[id]
+	if handler then
+		return handler(receipt)
 	end
 	return ShopService.receipt(receipt, id)
 end

@@ -30,6 +30,7 @@ local TutorialService = require(Server.Services.TutorialService)
 local ShopService = require(Server.Services.ShopService)
 local QuestService = require(Server.Services.QuestService)
 local TelemetryService = require(Server.Services.TelemetryService)
+local AdRewardService = require(Server.Services.AdRewardService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -139,6 +140,7 @@ ShopService.init(function(): string
 	return if state then state.phase else "Lobby"
 end, MatchService.current, MatchService.nationOf)
 QuestService.init()
+AdRewardService.init() -- after QuestService: the quest reroll ad and the notification prompt
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
 nextMatch()

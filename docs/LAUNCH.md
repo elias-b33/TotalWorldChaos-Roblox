@@ -239,10 +239,10 @@ Always pass the ending balance (Robux: 0, since games can't read a player's Robu
 | `ad_rewarded` | 1 | placement | result (completed, failed) | — | Ad health |
 | `emote_used` | 1 | emote_id | — | — | Cosmetic use |
 | `purchase_failed` | 1 | product | reason | — | Shop bugs |
-| `notification_opt_in` | 1 | result (accepted, declined) | — | — | Notification reach |
+| `notification_opt_in` | 1 | result (shown, ineligible) | — | — | Notification reach |
 | `tutorial_skipped` | prompt reached (1–6) | prompt name | — | — | Tutorial completion |
 
-That's 17 custom event names out of 100, so there's room for events and new modes. `nation_start` is logged a minute into the match (or at Results, if sooner), so late joiners count as human; `player_result` is logged for every nation. The quest, reroll, ad and notification events have their `TelemetryService` functions ready for those features.
+That's 17 custom event names out of 100, so there's room for events and new modes. `nation_start` is logged a minute into the match (or at Results, if sooner), so late joiners count as human; `player_result` is logged for every nation. `quest_rerolled` is logged for every reroll with what paid for it (a Glory reroll also logs the `quest_reroll` Glory sink), `ad_rewarded` for every rewarded video and `notification_opt_in` for the notification prompt; `quest_completed` is ready for the quest claim. Roblox doesn't tell the game whether the player accepted the notification prompt, so `notification_opt_in` logs `shown` (the prompt opened) or `ineligible` (Roblox said not to ask); the opt-in count is on the Creator Dashboard (experience notifications analytics, "Opted-in Users").
 
 **Weekly review (every Monday, 30 minutes):**
 

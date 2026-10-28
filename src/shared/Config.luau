@@ -296,4 +296,12 @@ Config.Telemetry = {
 	ClientSignalsPerSecond = 5, -- UI funnel signals one client may send (RequestTelemetry)
 }
 
+-- Rewarded video and experience notifications (docs/MONETIZATION.md 3.7, 7.6). The daily cap on ad rerolls is
+-- Config.Progression.Quests.VideoRerolls.
+Config.Ads = {
+	QuestRerollRobux = 10, -- the "Quest reroll" developer product's price (Roblox wants an ad reward worth 3-10 Robux)
+	MinVoteSecondsLeft = 32, -- ads only start in the map vote with this long left (a video lasts 6-30 s): never the draft
+	NotificationPromptDelaySeconds = 2, -- back in the Lobby after the first finished match, wait this long, then ask
+}
+
 return Config

@@ -297,6 +297,28 @@ function CommandRouter.onTutorial(handler: (Player, string) -> ())
 	end)
 end
 
+-- Rewarded video requests (the placement name, at most MAX_ITEM_ID long): the shape and the rate limit are checked
+-- here, then `handler` runs in its own thread (it yields while the ad plays) and the player gets CommandResult with
+-- its answer. AdRewardService checks the rules (Sim.Ads).
+function CommandRouter.onAd(handler: (Player, string) -> (boolean, string?))
+	Remotes.event("RequestAd").OnServerEvent:Connect(function(player: Player, requestId: unknown, placement: unknown)
+		if not isId(requestId) then
+			return
+		end
+		local id = requestId :: number
+		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+			reply(player, id, false, "TooFast")
+		elseif type(placement) ~= "string" or #placement == 0 or #placement > MAX_ITEM_ID then
+			reply(player, id, false, "BadRequest")
+		else
+			task.spawn(function()
+				local ok, reason = handler(player, placement :: string)
+				reply(player, id, ok, reason)
+			end)
+		end
+	end)
+end
+
 -- Analytics signals for UI-only funnel steps (shop opened, starter pack on screen...): the kind must be one of
 -- Sim.Telemetry.CLIENT_SIGNALS, the argument a short string, and they have their own rate limit so they never use
 -- up a player's command budget. Nothing in the game changes: `handler` only logs. No reply.
