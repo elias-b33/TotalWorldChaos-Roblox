@@ -1,12 +1,13 @@
 --!strict
 -- Bottom sheet while an army is selected (docs/DESIGN.md "Moving armies"): tap the army, tap the destination,
--- see the route and arrival time, tap Go. Built from the UI kit: a title with the army's size, a hint line with an
--- icon, and Go / Cancel buttons.
+-- see the route and arrival time, tap Go. Built from the UI kit: a title with the army's size, its composition as
+-- chips (a troop icon and its men each, docs/DESIGN.md "Troops"), a hint line with an icon, and Go / Cancel buttons.
 
 local Players = game:GetService("Players")
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
+local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
@@ -17,6 +18,7 @@ local ArmySheet = {}
 
 local sheet: Frame
 local title: TextLabel
+local chips: Frame
 local hint: TextLabel
 local hintIcon: GuiObject
 local buttons: Frame
@@ -35,9 +37,17 @@ local function render()
 	if sel == nil or army == nil or map == nil then
 		sheet.Visible = false
 		Widgets.clear(buttons) -- rebuilt when it opens
+		Widgets.clear(chips)
 		return
 	end
 	title.Text = string.format("%s at %s", shortMen(army.men), map.provinces[army.location].name)
+	-- the composition: one chip per troop type in the stack
+	Widgets.clear(chips)
+	for i, part in RaceInfo.composition(army.troops) do
+		local chip = Widgets.chip(chips, RaceInfo.icon(part.troop), shortMen(part.men) .. " " .. part.troop, nil, 26)
+		chip.Name = "Troop_" .. part.troop
+		chip.LayoutOrder = i
+	end
 	Widgets.clear(buttons)
 	local dest, path = sel.dest, sel.path
 	local icon = "arrow"
@@ -46,7 +56,7 @@ local function render()
 		hint.Text = string.format("Retreating to %s: no orders till it arrives", home)
 		icon = "retreat"
 	elseif dest and path then
-		hint.Text = string.format("%s  ·  %d s march", map.provinces[dest].name, Relations.travelTime(path))
+		hint.Text = string.format("%s  ·  %d s march", map.provinces[dest].name, Relations.travelTime(path, army))
 		icon = "clock"
 		local armyId = sel.army
 		Widgets.iconTextButton(buttons, "check", "Go", 120, Widgets.GOOD, function()
@@ -88,14 +98,21 @@ function ArmySheet.init(goHandler: (number, number) -> (), cancelHandler: () -> 
 	title = Widgets.title(sheet, "", Theme.text.title, 30)
 	title.LayoutOrder = 1
 	Widgets.leadIcon(title, "sword", Theme.size.iconButton)
+	chips = Instance.new("Frame")
+	chips.Name = "Troops"
+	chips.BackgroundTransparency = 1
+	chips.Size = UDim2.new(1, 0, 0, 26)
+	chips.LayoutOrder = 2
+	chips.Parent = sheet
+	Widgets.list(chips, true, Theme.space.s)
 	hint = Widgets.label(sheet, "", Theme.text.body, 22)
-	hint.LayoutOrder = 2
+	hint.LayoutOrder = 3
 	hintIcon = Widgets.leadIcon(hint, "arrow", Theme.size.icon)
 	buttons = Instance.new("Frame")
 	buttons.Name = "Buttons"
 	buttons.BackgroundTransparency = 1
 	buttons.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
-	buttons.LayoutOrder = 3
+	buttons.LayoutOrder = 4
 	buttons.Parent = sheet
 	Widgets.list(buttons, true, 8)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

@@ -29,7 +29,7 @@ local BAR_GAP = 8 -- between items
 local BAR_BUTTON = 40 -- icon buttons in the bar (the bar's full height is the touch target)
 local TOAST_SECONDS = 2.5
 local TOAST_WIDTH = 340 -- clear of the tutorial card at the top left
-local LEFT_PANELS = 258 -- the nations drawer (8 + 250 px) and the tutorial card (8 + 236 px) stay left of the toasts
+local LEFT_PANELS = 264 -- the nations drawer (8 + 256 px) and the tutorial card (8 + 236 px) stay left of the toasts
 
 local Hud = {}
 

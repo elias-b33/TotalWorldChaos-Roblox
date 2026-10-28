@@ -1,16 +1,21 @@
 --!strict
 -- Battles (tick order step 3): when hostile armies share a province they fight Config.Battle.Rounds rounds,
 -- one per tick. Each round, each side kills enemy men equal to KillRatePerRound × its own strength × modifiers.
--- Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at normal
--- speed, can't take orders, and doesn't fight, block or besiege on the way (Army.retreating). Armies under
+-- A side's strength is the sum of its men × each troop's attack (attackers) or defence (defenders); losses split
+-- over an army's troop types in proportion to their men (Army.shrinkTo). Race bonuses (Sim.Races) add to the
+-- modifier. Then the side with fewer men retreats: it walks to its nearest owned province (Pathing.retreatPath) at
+-- its own speed, can't take orders, and doesn't fight, block or besiege on the way (Army.retreating). Armies under
 -- MinArmyMen are destroyed, and so is a loser with no way home.
 
+local Army = require("./Army")
 local CatchUp = require("./CatchUp")
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Events = require("./Events")
 local Pathing = require("./Pathing")
+local Races = require("./Races")
 local Rng = require("./Rng")
+local Troops = require("./Troops")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
@@ -68,6 +73,15 @@ local function men(side: { Army }): number
 	return n
 end
 
+-- A side's combat strength before modifiers: each troop's men × its defence (defenders) or attack (attackers).
+function Battle.strength(side: { Army }, defending: boolean): number
+	local s = 0
+	for _, a in side do
+		s += Troops.strength(a.troops, defending)
+	end
+	return s
+end
+
 local function owners(side: { Army }): { number }
 	local out = {}
 	for _, a in side do
@@ -84,7 +98,7 @@ local function takeLosses(side: { Army }, losses: number)
 		return
 	end
 	for _, a in side do
-		a.men = math.max(0, math.floor(a.men - losses * a.men / total + 0.5))
+		Army.shrinkTo(a, math.floor(a.men - losses * a.men / total + 0.5)) -- every troop type loses its share
 	end
 end
 
@@ -106,6 +120,7 @@ function Battle.modifier(state: MatchState, provinceId: number, sides: Sides, de
 	end
 	local mine = owners(if defending then sides.defenders else sides.attackers)
 	local theirs = owners(if defending then sides.attackers else sides.defenders)
+	m += Races.battleBonus(state, province, mine, defending) -- Elves in forest, Dwarves defending hills
 	return math.max(0.1, m + Battle.bonus(state, mine, theirs, defending))
 end
 
@@ -190,10 +205,10 @@ function Battle.step(state: MatchState, rng: Rng.Rng)
 			for _, a in sides.attackers do
 				a.inBattle = true
 			end
-			local defKills = men(sides.defenders)
+			local defKills = Battle.strength(sides.defenders, true)
 				* Config.Battle.KillRatePerRound
 				* Battle.modifier(state, provinceId, sides, true, battle.defenderRoll)
-			local attKills = men(sides.attackers)
+			local attKills = Battle.strength(sides.attackers, false)
 				* Config.Battle.KillRatePerRound
 				* Battle.modifier(state, provinceId, sides, false, battle.attackerRoll)
 			takeLosses(sides.attackers, defKills)

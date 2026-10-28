@@ -26,7 +26,7 @@ function Match.phaseAt(tick: number, setup: Types.MatchSetup?): Phase
 	return "Results"
 end
 
--- A fresh match on a map: start territories, capitals, start gold and manpower. Every nation starts as a bot.
+-- A fresh match on a map: start territories, capitals, races, start gold and manpower. Every nation starts as a bot.
 -- `setup` carries a private server's settings (nil = a public server's defaults); Settings.prepare applies the
 -- bot count and teams once the players are seated.
 function Match.new(map: MapDef, setup: Types.MatchSetup?): MatchState
@@ -52,6 +52,7 @@ function Match.new(map: MapDef, setup: Types.MatchSetup?): MatchState
 			id = def.slot,
 			name = def.name,
 			colorIndex = def.colorIndex,
+			race = def.race,
 			controller = "Bot",
 			userId = nil,
 			capital = def.capital,

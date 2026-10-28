@@ -9,9 +9,14 @@
 --   lune run tools/harness/tournament 20 all Easy/Player   # Easy bots against Normal-bot stand-ins for players
 --   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
 --   lune run tools/harness/tournament 200 eldmoor     # start-position balance (docs/BALANCE.md section 16)
+--   RACES=shuffle lune run tools/harness/tournament 100   # races dealt out at random each match (the map's mix):
+--                                                         # race strength without the start positions in it
+--   FIRST_SEED=101 lune run tools/harness/tournament 100 earth   # seeds 101-200: split a long run over processes
 --
 -- "share" is a slot's wins over the fair share (all wins / 10). Win counts are noisy: at 200 seeds one slot's count
 -- moves by about ±5 (±0.2× share) from seed to seed, so judge start positions on 200 seeds per map, not 20.
+-- Races (docs/DESIGN.md "Races"): each map also prints the wins by race against the race's fair share (all wins ×
+-- its nations / 10) and the regiments bots recruited of each troop type.
 
 local process = require("@lune/process")
 
@@ -20,11 +25,14 @@ local Commands = require("../../src/shared/Sim/Commands")
 local Config = require("../../src/shared/Config")
 local Maps = require("../../src/shared/Maps")
 local Match = require("../../src/shared/Sim/Match")
+local Races = require("../../src/shared/Sim/Races")
 local Rng = require("../../src/shared/Sim/Rng")
 local Tick = require("../../src/shared/Sim/Tick")
+local Troops = require("../../src/shared/Sim/Troops")
 local Types = require("../../src/shared/Types")
 
 local seeds = tonumber(process.args[1]) or 20
+local firstSeed = tonumber(process.env.FIRST_SEED) or 1 -- plays seeds firstSeed .. firstSeed + seeds - 1
 local mapArg = process.args[2] or "all"
 local difficultyArg = process.args[3] or "Normal"
 local groupA, groupB = string.match(difficultyArg, "^(%a+)/(%a+)$")
@@ -32,6 +40,10 @@ local mixed = groupA ~= nil
 local difficulty = (if mixed then groupA else difficultyArg) :: Bot.Difficulty
 local STAND_IN_PLAN_TICKS = Config.Bots.Normal.planTicks -- "Player" stand-ins plan like Normal bots
 local mapIds = if mapArg == "all" then Maps.ids else { mapArg }
+local shuffleRaces = process.env.RACES == "shuffle"
+if shuffleRaces then
+	print("races: dealt out at random every match (each map keeps its mix)")
+end
 
 local overrides = process.env.SET
 if overrides and overrides ~= "" then
@@ -67,20 +79,46 @@ type MatchStats = {
 	earlyWars: { [string]: number }, -- mixed mode: "AB" = wars A declared on B before Easy's no-player-war time
 	earlyTaken: { [string]: number }, -- mixed mode: "AB" = provinces A took from B before that time
 	taken: { [string]: number }, -- mixed mode: "AB" = provinces A took from B in the whole match
+	races: { [number]: string }, -- nation -> its race this match
+	recruits: { [string]: number }, -- troop type -> regiments bots recruited
 }
 
--- Nations' armies at one moment: how many, how many men, the biggest nation's men, and standing armies that share
--- a province with another standing army of the same owner (overlapping tokens).
-type ArmyStats = { armies: number, men: number, maxMen: number, stacked: number }
+-- Nations' armies at one moment: how many, how many men, the biggest nation's men, standing armies that share
+-- a province with another standing army of the same owner (overlapping tokens), the gold living nations hold
+-- (median) and the share of all men in each troop type.
+type ArmyStats = {
+	armies: number,
+	men: number,
+	maxMen: number,
+	stacked: number,
+	gold: number,
+	manpower: number,
+	troops: { [string]: number },
+}
 
 local function armyStats(state: Types.MatchState): ArmyStats
-	local out = { armies = 0, men = 0, maxMen = 0, stacked = 0 }
+	local out =
+		{ armies = 0, men = 0, maxMen = 0, stacked = 0, gold = 0, manpower = 0, troops = {} :: { [string]: number } }
+	local golds, manpowers = {}, {}
+	for _, nation in state.nations do
+		if not nation.eliminated then
+			table.insert(golds, nation.gold)
+			table.insert(manpowers, nation.manpower)
+		end
+	end
+	table.sort(golds)
+	table.sort(manpowers)
+	out.gold = golds[(#golds + 1) // 2] or 0
+	out.manpower = manpowers[(#manpowers + 1) // 2] or 0
 	local perNation: { [number]: number } = {}
 	local standing: { [string]: number } = {}
 	for _, a in state.armies do
 		if a.owner ~= 0 then
 			out.armies += 1
 			out.men += a.men
+			for troop, n in a.troops do
+				out.troops[troop] = (out.troops[troop] or 0) + n
+			end
 			perNation[a.owner] = (perNation[a.owner] or 0) + a.men
 			if #a.path == 0 and not a.inBattle then
 				local key = a.owner .. ":" .. a.location
@@ -101,6 +139,25 @@ end
 
 local function runMatch(mapId: string, seed: number): MatchStats
 	local state = Match.new(Maps.get(mapId))
+	if shuffleRaces then
+		local deck = {}
+		for id = 1, #state.nations do
+			table.insert(deck, state.nations[id].race)
+		end
+		local raceRng = Rng.new(seed * 104729 + 7)
+		for i = #deck, 2, -1 do
+			local j = Rng.int(raceRng, 1, i)
+			deck[i], deck[j] = deck[j], deck[i]
+		end
+		for id = 1, #state.nations do
+			state.nations[id].race = deck[id]
+		end
+	end
+	local races: { [number]: string } = {}
+	for id, nation in state.nations do
+		races[id] = nation.race
+	end
+	local recruits: { [string]: number } = {}
 	local battleRng = Rng.new(seed)
 	local botRng = Rng.new(seed * 7919 + 13)
 	local schedule = Bot.newSchedule()
@@ -145,6 +202,10 @@ local function runMatch(mapId: string, seed: number): MatchStats
 			local ok, reason = Commands.apply(state, order.nation, order.command)
 			if ok and order.command.kind == "Power" then
 				stats.powers += 1
+			end
+			local command = order.command
+			if ok and command.kind == "Recruit" then
+				recruits[command.troop] = (recruits[command.troop] or 0) + command.regiments
 			end
 			if not ok then
 				stats.rejected += 1
@@ -225,6 +286,8 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		earlyWars = earlyWars,
 		earlyTaken = earlyTaken,
 		taken = taken,
+		races = races,
+		recruits = recruits,
 	}
 end
 
@@ -248,6 +311,9 @@ end
 local started = os.clock()
 local grandRejected, grandCommands = 0, 0
 print(string.format("Bot tournament: %d seeds × %d maps, %s bots", seeds, #mapIds, difficultyArg))
+if firstSeed ~= 1 then
+	print(string.format("seeds %d to %d", firstSeed, firstSeed + seeds - 1))
+end
 -- mixed mode, every map together: wins and final provinces by group
 local mixedTotals = {
 	wins = { A = 0, B = 0 },
@@ -259,6 +325,11 @@ local mixedTotals = {
 	earlyTaken = {} :: { [string]: number },
 	taken = {} :: { [string]: number },
 }
+-- every map together: wins and nations by race, regiments by troop type
+local allRaceWins: { [string]: number } = {}
+local allRaceNations: { [string]: number } = {}
+local allWins = 0
+local allRecruits: { [string]: number } = {}
 for _, mapId in mapIds do
 	local map = Maps.get(mapId)
 	local mapStart = os.clock()
@@ -270,16 +341,29 @@ for _, mapId in mapIds do
 	local rejected, commands, wars, conquests, leaderChanges, powers = 0, 0, 0, 0, 0, 0
 	local atMinute: { [number]: { [string]: { number } } } = {}
 	for _, m in { 15, 25 } do
-		atMinute[m] = { armies = {}, men = {}, maxMen = {}, stacked = {} }
+		atMinute[m] = { armies = {}, men = {}, maxMen = {}, stacked = {}, gold = {}, manpower = {} }
 	end
 	local reasons: { [string]: number } = {}
 	for m = 1, MINUTES do
 		perMinute[m] = {}
 	end
-	for seed = 1, seeds do
+	local troopMenAt: { [number]: { [string]: number } } = { [15] = {}, [25] = {} }
+	local raceWins: { [string]: number } = {}
+	local raceNations: { [string]: number } = {}
+	local raceProvinces: { [string]: number } = {}
+	local recruits: { [string]: number } = {}
+	for seed = firstSeed, firstSeed + seeds - 1 do
 		local s = runMatch(mapId, seed)
 		for _, w in s.result.winners do
 			wins[w] = (wins[w] or 0) + 1
+			raceWins[s.races[w]] = (raceWins[s.races[w]] or 0) + 1
+		end
+		for id, race in s.races do
+			raceNations[race] = (raceNations[race] or 0) + 1
+			raceProvinces[race] = (raceProvinces[race] or 0) + (s.finalProvinces[id] or 0)
+		end
+		for troop, n in s.recruits do
+			recruits[troop] = (recruits[troop] or 0) + n
 		end
 		if mixed then
 			mixedTotals.matches += 1
@@ -318,6 +402,12 @@ for _, mapId in mapIds do
 				table.insert(lists.men, a.men)
 				table.insert(lists.maxMen, a.maxMen)
 				table.insert(lists.stacked, a.stacked)
+				table.insert(lists.gold, a.gold)
+				table.insert(lists.manpower, a.manpower)
+				for troop, n in a.troops do
+					troopMenAt[m][troop] = (troopMenAt[m][troop] or 0) + n
+				end
+				troopMenAt[m].all = (troopMenAt[m].all or 0) + a.men
 			end
 		end
 		rejected += s.rejected
@@ -425,20 +515,87 @@ for _, mapId in mapIds do
 		local lists = atMinute[m]
 		print(
 			string.format(
-				"armies at %d:00 (median): %d armies, %dk men in all, biggest nation %dk men, %d stacked tokens",
+				"armies at %d:00 (median): %d armies, %dk men in all, biggest nation %dk men, %d stacked tokens, %d gold and %dk manpower banked per nation",
 				m,
 				median(lists.armies),
 				median(lists.men) // 1000,
 				median(lists.maxMen) // 1000,
-				median(lists.stacked)
+				median(lists.stacked),
+				median(lists.gold),
+				median(lists.manpower) // 1000
 			)
 		)
+		local mix = {}
+		for _, troop in Troops.LIST do
+			local share = (troopMenAt[m][troop] or 0) / math.max(troopMenAt[m].all or 0, 1)
+			table.insert(mix, string.format("%s %d%%", troop, math.floor(100 * share + 0.5)))
+		end
+		print(string.format("  men by troop at %d:00: %s", m, table.concat(mix, ", ")))
 	end
+	-- races: wins against each race's fair share (all wins × its share of the nations)
+	local nationsTotal = 0
+	for _, n in raceNations do
+		nationsTotal += n
+	end
+	print("race      nations/match  wins  share  avg final provinces")
+	for _, race in Races.LIST do
+		local n = raceNations[race] or 0
+		local fairRace = math.max(totalWins, 1) * n / math.max(nationsTotal, 1)
+		print(
+			string.format(
+				"%-8s  %13.1f  %4d  %4.2fx  %6.1f",
+				race,
+				n / seeds,
+				raceWins[race] or 0,
+				(raceWins[race] or 0) / math.max(fairRace, 1e-9),
+				(raceProvinces[race] or 0) / math.max(n, 1)
+			)
+		)
+		allRaceWins[race] = (allRaceWins[race] or 0) + (raceWins[race] or 0)
+		allRaceNations[race] = (allRaceNations[race] or 0) + n
+	end
+	allWins += totalWins
+	local troopLine, troopTotal = {}, 0
+	for _, n in recruits do
+		troopTotal += n
+	end
+	for _, troop in Troops.LIST do
+		local n = recruits[troop] or 0
+		allRecruits[troop] = (allRecruits[troop] or 0) + n
+		table.insert(
+			troopLine,
+			string.format("%s %.1f (%d%%)", troop, n / seeds, math.floor(100 * n / math.max(troopTotal, 1) + 0.5))
+		)
+	end
+	print("regiments recruited per match: " .. table.concat(troopLine, ", "))
 	print(string.format("bot commands %d, rejected %d", commands, rejected))
 	for k, v in reasons do
 		print(string.format("  rejected %s × %d", k, v))
 	end
 	print(string.format("(%.1f s)", os.clock() - mapStart))
+end
+if #mapIds > 1 then
+	local nationsTotal = 0
+	for _, n in allRaceNations do
+		nationsTotal += n
+	end
+	print("\n== every map: wins by race ==")
+	for _, race in Races.LIST do
+		local fairRace = math.max(allWins, 1) * (allRaceNations[race] or 0) / math.max(nationsTotal, 1)
+		print(
+			string.format(
+				"%-8s  wins %4d  share %4.2fx",
+				race,
+				allRaceWins[race] or 0,
+				(allRaceWins[race] or 0) / math.max(fairRace, 1e-9)
+			)
+		)
+	end
+	local parts = {}
+	for _, troop in Troops.LIST do
+		table.insert(parts, string.format("%s %d", troop, allRecruits[troop] or 0))
+	end
+	print("regiments recruited in all: " .. table.concat(parts, ", "))
 end
 if mixed then
 	local m = mixedTotals

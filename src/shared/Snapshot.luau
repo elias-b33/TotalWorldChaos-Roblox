@@ -3,6 +3,7 @@
 -- Records are flat arrays of plain values because RemoteEvents mangle sparse or mixed tables.
 -- Neutral owner and "no player" are sent as 0 instead of nil for the same reason. Pure Luau (tested with Lune).
 
+local Troops = require("./Sim/Troops")
 local Types = require("./Types")
 
 type MatchState = Types.MatchState
@@ -24,6 +25,7 @@ export type NationRecord = {
 	id: number,
 	name: string,
 	colorIndex: number,
+	race: string, -- Types.Race: picking the nation picks it
 	controller: string,
 	userId: number, -- 0 = bot
 	capital: number,
@@ -42,6 +44,7 @@ export type ArmyRecord = {
 	owner: number,
 	location: number,
 	men: number,
+	troops: string, -- its composition, Sim.Troops.encode ("Infantry:3000,Archers:1000"); Troops.decode reads it
 	next: number, -- next province on its route, 0 = standing still
 	dest: number, -- end of its route, 0 = standing still
 	inBattle: boolean,
@@ -129,6 +132,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 			id = n.id,
 			name = n.name,
 			colorIndex = n.colorIndex,
+			race = n.race,
 			controller = n.controller,
 			userId = n.userId or 0,
 			capital = n.capital,
@@ -150,6 +154,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 			owner = a.owner,
 			location = a.location,
 			men = a.men,
+			troops = Troops.encode(a.troops),
 			next = a.path[1] or 0,
 			dest = a.path[#a.path] or 0,
 			inBattle = a.inBattle,
@@ -203,8 +208,9 @@ function Snapshot.diplomacy(state: MatchState): DiplomacyData
 	return { wars = wars, alliances = alliances, truces = truces, offers = offers }
 end
 
--- Moving armies, for the unreliable ArmyPositions remote. `progress` is 0..1 towards `to`.
-function Snapshot.positions(state: MatchState, ticksToEnter: (number) -> number): { ArmyPosition }
+-- Moving armies, for the unreliable ArmyPositions remote. `progress` is 0..1 towards `to`. ticksToEnter(province,
+-- army): the ticks that army takes to step into that province (Sim.Movement.moveTicks).
+function Snapshot.positions(state: MatchState, ticksToEnter: (number, Types.Army) -> number): { ArmyPosition }
 	local out = {}
 	for _, id in sortedKeys(state.armies) do
 		local a = state.armies[id]
@@ -214,7 +220,7 @@ function Snapshot.positions(state: MatchState, ticksToEnter: (number) -> number)
 				id = a.id,
 				from = a.location,
 				to = nextId,
-				progress = math.clamp(a.moveProgress / ticksToEnter(nextId), 0, 1),
+				progress = math.clamp(a.moveProgress / ticksToEnter(nextId, a), 0, 1),
 			})
 		end
 	end

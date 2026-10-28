@@ -172,7 +172,7 @@ end)
 
 T.test("the whole set is small in memory", function()
 	-- each icon is its own 16×16 RGBA EditableImage when shown: 1 KB
-	T.expect(#IconArt.names() * 16 * 16 * 4 <= 64 * 1024, "under 64 KB even if every icon is on screen")
+	T.expect(#IconArt.names() * 16 * 16 * 4 <= 96 * 1024, "under 96 KB even if every icon is on screen")
 end)
 
 T.finish()

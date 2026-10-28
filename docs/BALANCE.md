@@ -11,7 +11,8 @@ Every number below comes from `Config.luau` as of this document or from one of t
 | `lune run tools/balance/conquest` | Time and cost to take a neutral province, through `Sim/Tick` (section 7) |
 | `lune run tools/balance/catchup` | Overextension by size, where the thresholds sit, break-even ratios; writes `data/catchup.csv` (section 9) |
 | `lune run tools/balance/expansion` | Whole matches with a greedy planner: Peace income, best-case domination, free-for-all; writes `data/expansion_*.csv` (sections 10–12). About 3 minutes (`MAP=earth` for one map). `SET="Siege.TicksPerDevelopment=20"` runs a what-if (section 14) |
-| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 17: use 200 seeds per map, about 12 min each). Takes `SET="…"` too |
+| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 17: use 200 seeds per map, about 12 min each), wins per race, regiments recruited per troop type and the troop mix (section 18). Takes `SET="…"` too, and `RACES=shuffle` deals the map's races out to the nations at random every match |
+| `lune run tools/balance/troops` | Troop matchups through `Sim/Battle`: how many attackers of one troop type beat a defender of another, and what each troop gives per gold of upkeep (section 18) |
 | `python3 tools/balance/charts.py` | The four charts in `docs/images/balance_*.png`, from the CSVs (Pillow; matplotlib isn't installed) |
 
 `tools/balance/Planner.luau` is the greedy player used by `expansion`. It is **not** the bot AI: it sends ordinary commands through `Sim/Commands`, so it obeys every rule, and it plays close to the fastest possible expansion. It never defends on purpose (armies standing in their own provinces still fight), so its matches are faster and bloodier than real ones. The bot tournament is the other bracket: Normal bots defend, keep a reserve and only attack at 1.3× strength, so their matches are slower than real players'. A real match sits between the two.
@@ -435,3 +436,135 @@ Garrisons were the weakest lever and a cliff: 2,000 men on all of Oceania barely
 - **Yangtze (0.33×)** is Earth's weakest slot. Once Mekong lost its extra Oceania province, Mekong became Yangtze's "weakest neighbour", and Yangtze declares war on it about 75 times in 100 matches; the war through hills, jungle and sea lanes goes nowhere while Ganges and Volga attack Yangtze. Cutting Bengal–Sichuan (what-if) only moved it to 0.44×, within noise, so it was left alone. A bot that weighed terrain and straits when picking its war target would help here; the spec says "weakest neighbour", so that is a design question, not a map fix.
 - **Mississippi (0.43×)** now fights Amazon, its only neighbour in the Americas.
 - Player behaviour differs from bots: once real matches run, use the "win rate by start position" analytics event (`docs/LAUNCH.md`) and redo this with the same levers.
+
+## 18. Races and troops
+
+Phase 4 gave every nation one of four races and the regiment seven troop types (`docs/DESIGN.md` "Races" and "Troops"). Two questions for the bot tournament: does any race win far more often than its share, and do bots recruit every troop type? Rules: `Sim/Races.luau`, `Sim/Troops.luau`; tests: `tests/races.spec.luau`. The planner and sections 1–14 still use infantry only, the old regiment at the old price: `Army.RegimentGold`, `RegimentManpower` and `UpkeepPerRegiment` are now `Config.Troops.Infantry.gold`, `.manpower` and `.upkeep`.
+
+**How it was measured.** `lune run tools/harness/tournament 100 <map>` on each map, twice for every tuning step:
+
+- **Map races:** every nation keeps its race from the map data, so a race's result includes the start positions it was given. This is what players get.
+- **Races shuffled** (`RACES=shuffle`): every match deals the map's races out to the ten nations at random, so start positions average out and only the race is left.
+
+A race's **share** is its wins over its fair share: all wins (alliance co-winners included) × its nations / 10, so 1.00× is fair. It is noisy. With 2–3 nations per race, one race's share on one map moves by about ±0.15 between batches of 100 seeds, and by up to ±0.3 for a two-nation race: Skyshards' ten shards are identical, yet its Dwarves got 0.97× on the first hundred seeds and 1.40× on the second. The three maps together move by about ±0.08. The final numbers use 200 seeds per map and mode (`FIRST_SEED=101` plays the second hundred in a second process).
+
+**Troop matchups** (`lune run tools/balance/troops`: an attacking stack of one type against 3,000 defending men of another on plains, with the random ±10% switched off; each number is how many attackers it takes per defender, so below 1 the attacker's troop is the better fighter)
+
+| Attacker \ defender | Infantry | Archers | Cavalry | Knights | Rangers | Berserkers | Ironguard |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Infantry | 1.00 | 1.15 | 1.00 | 1.07 | 1.22 | 0.93 | 1.29 |
+| Archers | 1.08 | 1.24 | 1.08 | 1.16 | 1.32 | 1.00 | 1.40 |
+| Cavalry | 0.87 | 1.00 | 0.87 | 0.94 | 1.06 | 0.81 | 1.12 |
+| Knights | 0.78 | 0.89 | 0.78 | 0.84 | 0.95 | 0.72 | 1.00 |
+| Rangers | 0.93 | 1.07 | 0.93 | 1.00 | 1.14 | 0.86 | 1.20 |
+| Berserkers | 0.82 | 0.94 | 0.82 | 0.88 | 1.00 | 0.76 | 1.06 |
+| Ironguard | 0.87 | 1.00 | 0.87 | 0.94 | 1.06 | 0.81 | 1.12 |
+
+| Troop | Gold | Manpower | Upkeep | Attack | Defence | Attacking infantry: worth per gold of upkeep | Defending against infantry: worth per gold of upkeep |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Infantry | 10 | 1,000 | 1.5 | 1.00 | 1.00 | 1.00 | 1.00 |
+| Archers | 15 | 1,000 | 2 | 0.75 | 1.50 | 0.69 | 0.86 |
+| Cavalry | 25 | 1,000 | 3 | 1.50 | 1.00 | 0.57 | 0.50 |
+| Knights | 35 | 1,000 | 4 | 2.00 | 1.25 | 0.48 | 0.40 |
+| Rangers | 20 | 1,000 | 2.5 | 1.25 | 1.75 | 0.64 | 0.73 |
+| Berserkers | 12 | 750 | 1.5 | 1.75 | 0.75 | 1.22 | 0.93 |
+| Ironguard | 25 | 1,000 | 2 | 1.50 | 2.00 | 0.86 | 0.97 |
+
+What the matchups say:
+
+- **Men are the hit points as well as the damage**, and the side with more men left wins, so a regiment is worth roughly its men whatever its type. Upkeep is what limits armies (section 15), and per gold of upkeep infantry is the best defender and, after Berserkers, the best attacker. Every other troop trades quantity for quality: better per regiment at its job, worse per gold.
+- **Archers** are the defenders: infantry needs 1.15 men per archer to take a province from them, and archers need 1.08 men per infantry to take one.
+- **Berserkers** are the one troop that beats infantry per gold in attack (attack 1.75 at infantry's upkeep), and the worst defenders.
+- **Ironguard** are close to infantry per gold in battle, and their sieges run 1.5× as fast. A siege is an army standing still for minutes, so that is worth more than the table shows.
+- **Cavalry and Knights** cost the most per man (upkeep 3 and 4); what they buy is speed (3 s per plains province instead of 5) and, for Knights, the strongest regiment.
+
+**What was wrong** (step by step; the numbers are in the step table below)
+
+1. **Bots bought too many dear troops** (step 0, the spec's numbers). The first troop logic raised archers at every threat and bought cavalry or the elite in every war it could pay for. Upkeep per man rose, so the same gold kept fewer men: 122–137k men in all armies at 25:00 against 179–236k before races, and only 34–42% of the regiments recruited were infantry. **Fix:** archers only while they are under 30% of the bot's men (`Bots.ArcherShare`), cavalry and the elite only while those are under 30% (`Bots.AttackShare`). Armies came back to 145–158k at 25:00 with 60–63% infantry.
+2. **Gold is the binding resource, manpower is not.** The median nation banks 260–280k manpower by 15:00 and 560–580k by 25:00, against about 165 gold (its upkeep reserve). So the Orcs' +20% manpower does nothing for a bot after the first minutes, while the Humans' +10% gold is about +10% army. Raising the Orcs' bonus to +50% (step 2) was tried and dropped; the Orcs are carried by the Berserkers instead (upkeep 2 → 1.5).
+3. **Defence doesn't win matches.** The Dwarves were the weakest race until Ironguard became worth buying: +40% defending in hills (step 2) moved them nowhere (0.85× → 0.81× shuffled), while a cheaper Ironguard (25 gold, upkeep 2, attack 1.5) with 1.5× sieges (step 3) took them to 1.08×.
+4. **Elves at home in forests.** With +20% in forest battles (step 2) the Elves won 1.31× with map races and 1.63× on Eldmoor, where both Elven kingdoms are wildwoods, against 0.98× shuffled. At +10% their forest homes stay an advantage (1.38× on Eldmoor, see Still to watch), and shuffled they are fair.
+5. **Bots and the elite.** A bot at war now buys its elite before cavalry when the elite costs no more upkeep than cavalry (Rangers, Berserkers, Ironguard), otherwise whichever of the two it has fewer men of (the Humans: Knights or cavalry). Before, every race split its attack share about evenly between cavalry and its elite, though for the Elves, Orcs and Dwarves the elite is the better buy.
+6. **Start positions per race.** The first draft gave Eldmoor's Orcs Frostmarch and Wyrmcoast, its two strongest kingdoms (section 17), and its Dwarves Ironholds, the weakest; on Earth the Humans held Yangtze and Niger, two of the weakest starts, and the Dwarves Zambezi, one of the strongest. Step 2 spread strong and weak starts over the races (Earth: Yangtze and Zambezi swapped; Eldmoor: Frostmarch to the Humans, Wyrmcoast to the Dwarves, Ashen Dominion and the Corsairs to the Orcs), and the final step swapped Greenvale and the Corsairs: on the same 100 seeds Eldmoor's Humans went from 0.61× to 0.79× (0.93× over 200 seeds). The tables are in `docs/MAPS.md`.
+
+**Tuning steps** (shares on all three maps together; 100 seeds per map, the final row 200)
+
+| Step | What changed | Map races: Humans / Elves / Orcs / Dwarves | Lowest–highest race per map, map races (Earth / Eldmoor / Skyshards) | Shuffled: Humans / Elves / Orcs / Dwarves | Men at 25:00 (Earth / Eldmoor / Skyshards) |
+| --- | --- | --- | --- | --- | --- |
+| 0 | The spec's numbers, the first bot troop rules, the first map races | 0.92 / 1.20 / 0.98 / 0.87 | 0.67–1.36 / 0.67–1.28 / 0.58–1.36 | 1.14 / 1.07 / 0.91 / 0.80 | 130k / 126k / 125k |
+| 1 | Bots: archers under 30% of their men, cavalry and the elite under 30% | – | – | 1.08 / 1.13 / 0.89 / 0.85 | 158k / 145k / 158k (shuffled) |
+| 2 | Map races spread over strong and weak starts; Berserkers' upkeep 1.5, Ironguard's 2.5; Elves +20%, Orcs +50%, Dwarves +40% | 1.06 / 1.31 / 0.89 / 0.63 | 0.77–1.27 / 0.53–1.63 / 0.59–1.42 | 1.17 / 0.98 / 0.97 / 0.81 | 144k / 142k / 163k |
+| 3 | Orcs +20% and Dwarves +25% again, Elves +10%, Humans +5%; Berserkers attack 2.0; Ironguard 25 gold, upkeep 2, attack 1.5, sieges 1.5×; bots buy the elite before cavalry when it costs no more upkeep | 0.82 / 1.12 / 1.14 / 0.96 | 0.76–1.11 / 0.60–1.28 / 0.83–1.29 | 0.81 / 0.98 / 1.19 / 1.08 | 148k / 148k / 161k |
+| 4 | Humans +10% again, Berserkers attack 1.75 again | 0.92 / 1.08 / 1.02 / 0.99 | 0.88–1.23 / 0.61–1.48 / 0.79–1.30 | 0.91 / 0.97 / 1.14 / 1.01 | 148k / 153k / 186k |
+| **Final** | Eldmoor: Greenvale to the Orcs, the Corsairs to the Humans (200 seeds) | **1.00 / 1.10 / 0.92 / 0.96** | **0.87–1.15 / 0.89–1.38 / 0.77–1.20** | **0.85 / 0.95 / 1.16 / 1.10** | 154k / 144k / 184k |
+
+Final numbers (`Config.Troops`, `Config.Races`): the spec's, except Berserkers' upkeep 1.5 (was 2), Ironguard 25 gold (30), upkeep 2 (3), attack 1.5 (1.25) and sieges 1.5× (1.25×), and the Elves' forest bonus +10% (+25%).
+
+**Result** (wins and share; before = step 0: the spec's numbers, the first bot rules and the first map races, 100 seeds per map; after = final, 200 seeds per map)
+
+**Earth**
+
+| Race | Nations | Before: map races | Before: races shuffled | After: map races | After: races shuffled |
+| --- | --- | --- | --- | --- | --- |
+| Humans | 3 | 27 (0.67×) | 40 (0.94×) | 78 (0.92×) | 57 (0.73×) |
+| Elves | 3 | 55 (1.36×) | 48 (1.13×) | 97 (1.15×) | 76 (0.97×) |
+| Orcs | 2 | 20 (0.74×) | 29 (1.02×) | 58 (1.03×) | 66 (1.26×) |
+| Dwarves | 2 | 33 (1.22×) | 25 (0.88×) | 49 (0.87×) | 63 (1.20×) |
+
+**Eldmoor**
+
+| Race | Nations | Before: map races | Before: races shuffled | After: map races | After: races shuffled |
+| --- | --- | --- | --- | --- | --- |
+| Humans | 3 | 39 (0.79×) | 51 (1.16×) | 77 (0.93×) | 70 (0.85×) |
+| Elves | 2 | 40 (1.22×) | 23 (0.79×) | 76 (1.38×) | 48 (0.87×) |
+| Orcs | 3 | 63 (1.28×) | 46 (1.05×) | 74 (0.89×) | 104 (1.26×) |
+| Dwarves | 2 | 22 (0.67×) | 26 (0.89×) | 49 (0.89×) | 53 (0.96×) |
+
+**Skyshards**
+
+| Race | Nations | Before: map races | Before: races shuffled | After: map races | After: races shuffled |
+| --- | --- | --- | --- | --- | --- |
+| Humans | 3 | 53 (1.36×) | 54 (1.32×) | 75 (1.20×) | 64 (1.01×) |
+| Elves | 3 | 42 (1.08×) | 50 (1.23×) | 52 (0.83×) | 65 (1.03×) |
+| Orcs | 2 | 15 (0.58×) | 15 (0.55×) | 32 (0.77×) | 33 (0.78×) |
+| Dwarves | 2 | 20 (0.77×) | 17 (0.62×) | 49 (1.18×) | 49 (1.16×) |
+
+**All three maps**
+
+| Race | Before: map races | Before: races shuffled | After: map races | After: races shuffled |
+| --- | --- | --- | --- | --- |
+| Humans | 0.92× | 1.14× | 1.00× | 0.85× |
+| Elves | 1.20× | 1.07× | 1.10× | 0.95× |
+| Orcs | 0.98× | 0.91× | 0.92× | 1.16× |
+| Dwarves | 0.87× | 0.80× | 0.96× | 1.10× |
+
+- With the map's races (what players get) the four races are between 0.92× and 1.10× on all maps together, and per map between 0.77× (Orcs, Skyshards) and 1.38× (Elves, Eldmoor); before tuning it was 0.58×–1.36× per map. Shuffled, 0.85×–1.16× together.
+- For scale: start positions alone spread 0.33×–1.74× on Earth, and 0.65×–1.16× on the symmetric Skyshards, at 200 seeds (section 17).
+
+**Troops bots recruit** (regiments per match, all nations together, map races, 200 seeds)
+
+| Map | Infantry | Archers | Cavalry | Knights | Rangers | Berserkers | Ironguard |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Earth | 509 (63%) | 192 (24%) | 16 (2%) | 14 (2%) | 48 (6%) | 22 (3%) | 13 (2%) |
+| Eldmoor | 550 (61%) | 234 (26%) | 19 (2%) | 17 (2%) | 31 (3%) | 30 (3%) | 17 (2%) |
+| Skyshards | 620 (60%) | 267 (26%) | 26 (3%) | 23 (2%) | 44 (4%) | 30 (3%) | 30 (3%) |
+
+Every troop type is recruited on every map. Infantry stays the base (about 60% of the men in the field at 25:00), archers come from defending (16–24% of the men at 25:00), and each elite makes up 2–10% of the men at 25:00. Among bots only the Humans buy cavalry: every other race's elite costs no more upkeep and fights better.
+
+**Match feel, before races → now** (map races, 200 seeds; before: the same tournament without races or troop types, 100 seeds)
+
+| Map | Ended before 25:00 (alliance victory) | Wars per match | Provinces taken from nations per match | Men at 15:00 | Men at 25:00 | Biggest nation at 25:00 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Earth | 19% → 21% | 9.6 → 9.9 | 40.4 → 44.8 | 139k → 129k | 188k → 154k | 45k → 34k |
+| Eldmoor | 19% → 19% | 10.5 → 11.0 | 49.7 → 53.1 | 154k → 138k | 179k → 144k | 42k → 32k |
+| Skyshards | 5% → 2% | 9.4 → 9.4 | 36.2 → 35.1 | 123k → 114k | 236k → 184k | 54k → 42k |
+
+Matches flow as before: as many wars, about as many alliance victories (the rest end on score at 25:00), and a few more provinces change hands. Armies at 25:00 are about a fifth smaller, because archers, cavalry and the elites cost more upkeep per man than infantry, so a 3,000-man Rebels or a Meteor weighs a little more.
+
+**Still to watch**
+
+- **Elves on Eldmoor: 1.38× with the map's races, 0.87× shuffled.** Both Elven kingdoms are wildwoods, and in forests Elves fight better and march as fast as on plains, which is what the spec asks for. If players find the Elven kingdoms the easy pick, lower `Races.Elves.forestBonus` (0.1; the spec had 0.25) first.
+- **Shuffled, the Humans are the weakest race (0.85×) and the Orcs (1.16×) and Dwarves (1.10×) the strongest**; with the map's races all four are fair. The next levers are the Knights' upkeep (4: bots buy few), the Berserkers' upkeep (1.5) and the Ironguard's siege speed (1.5×).
+- **The Orcs' passive is weak by construction:** manpower never runs out for bots after the first minutes. If players turn out to be short of manpower (they recruit in bursts and lose armies), it matters more for them; if not, a different passive for the Orcs is a design question.
+- **Cavalry is the Humans' troop in practice** (see above). Players may still buy it for speed.
+- Player behaviour differs from bots. Once real matches run, compare wins by race from the `match_win` event (its start nation gives the race through the map data, `docs/LAUNCH.md`) and redo this with the same levers, `Config.Races` and `Config.Troops`.

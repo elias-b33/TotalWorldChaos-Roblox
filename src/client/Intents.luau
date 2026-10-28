@@ -20,6 +20,8 @@ local REASONS: { [string]: string } = {
 	NoNation = "👀 You're spectating",
 	TooFast = "⏱ Too fast, slow down",
 	BadAmount = "🚫 Bad amount",
+	BadTroop = "🚫 Unknown troop",
+	WrongRace = "🚫 Only its own race can recruit that troop",
 	BadBuilding = "🚫 Unknown building",
 	BadRequest = "🚫 Bad request",
 	UnknownArmy = "🚫 That army is gone",
@@ -109,8 +111,9 @@ function Intents.build(provinceId: number, building: string)
 	send("RequestBuild", provinceId, building)
 end
 
-function Intents.recruit(provinceId: number, regiments: number)
-	send("RequestRecruit", provinceId, regiments)
+-- troop: Infantry | Archers | Cavalry, or the nation's race's elite (Knights | Rangers | Berserkers | Ironguard)
+function Intents.recruit(provinceId: number, regiments: number, troop: string)
+	send("RequestRecruit", provinceId, regiments, troop)
 end
 
 function Intents.move(armyId: number, to: number)

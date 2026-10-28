@@ -191,7 +191,7 @@ local function marchPlan(v: Types.TutorialView): (string, string, string?, numbe
 		return POINT, "Tap your army", nil, idle.location
 	end
 	if findButton("Regiment") then
-		return "sword", "Tap +1 Regiment", "Regiment", nil
+		return "sword", "Tap Infantry", "Regiment", nil
 	end
 	local me = ClientState.nation(ClientState.myNation())
 	return POINT, "Tap your land", nil, if me then me.capital else nil
@@ -204,7 +204,7 @@ local function plan(v: Types.TutorialView): (string, string, string?, number?)
 		return marchPlan(v)
 	elseif step == "Recruit" then
 		if findButton("Regiment") then
-			return "sword", "Tap +1 Regiment", "Regiment", nil
+			return "sword", "Tap Infantry", "Regiment", nil
 		end
 		return POINT, "Tap your land", nil, v.province
 	elseif step == "Ally" then

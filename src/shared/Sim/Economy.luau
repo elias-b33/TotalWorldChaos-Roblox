@@ -1,18 +1,22 @@
 --!strict
--- Income, upkeep and costs (docs/DESIGN.md "Economy"). Paid once per month.
+-- Income, upkeep and costs (docs/DESIGN.md "Economy"). Paid once per month. Races change two numbers: Humans earn
+-- more gold (gross), Orcs more manpower (Sim.Races, Config.Races); every troop type has its own price and upkeep
+-- (Sim.Troops).
 
 local CatchUp = require("./CatchUp")
 local Config = require("../Config")
 local Primordial = require("./Primordial")
+local Races = require("./Races")
+local Troops = require("./Troops")
 local Types = require("../Types")
 
 type MatchState = Types.MatchState
 type Province = Types.Province
 
 export type Income = {
-	gold: number, -- gross gold from provinces and capital, after overextension
+	gold: number, -- gross gold from provinces and capital, after overextension and the race bonus
 	manpower: number,
-	upkeep: number, -- gold paid for regiments
+	upkeep: number, -- gold paid for the armies in the field
 }
 
 local Economy = {}
@@ -21,20 +25,22 @@ function Economy.developCost(level: number): number
 	return Config.Economy.DevelopCostPerLevel * level
 end
 
--- nil for "None" (nothing to build).
-function Economy.buildingCost(building: Types.Building): number?
+-- nil for "None" (nothing to build). `race` (optional): the builder's race (Dwarves pay half for a fort).
+function Economy.buildingCost(building: Types.Building, race: Types.Race?): number?
+	local cost: number? = nil
 	if building == "Farm" then
-		return Config.Buildings.Farm.cost
+		cost = Config.Buildings.Farm.cost
 	elseif building == "Barracks" then
-		return Config.Buildings.Barracks.cost
+		cost = Config.Buildings.Barracks.cost
 	elseif building == "Fort" then
-		return Config.Buildings.Fort.cost
+		cost = Config.Buildings.Fort.cost
 	end
-	return nil
+	return if cost then Races.buildingCost(race, building, cost) else nil
 end
 
-function Economy.recruitCost(regiments: number): (number, number)
-	return regiments * Config.Army.RegimentGold, regiments * Config.Army.RegimentManpower
+-- Gold and manpower for `regiments` regiments of a troop (infantry when none is given).
+function Economy.recruitCost(regiments: number, troop: Types.Troop?): (number, number)
+	return Troops.cost(troop or Troops.BASE, regiments)
 end
 
 -- What one province yields per month, before nation-wide modifiers.
@@ -49,6 +55,7 @@ function Economy.provinceYield(province: Province): (number, number)
 	return gold, manpower
 end
 
+-- A nation's men in the field, in regiments (1,000 men of any troop type).
 function Economy.regiments(state: MatchState, nationId: number): number
 	local men = 0
 	for _, army in state.armies do
@@ -57,6 +64,17 @@ function Economy.regiments(state: MatchState, nationId: number): number
 		end
 	end
 	return men / Config.Army.MenPerRegiment
+end
+
+-- Gold per month a nation pays for its armies: every troop type at its own upkeep.
+function Economy.upkeep(state: MatchState, nationId: number): number
+	local gold = 0
+	for _, army in state.armies do
+		if army.owner == nationId then
+			gold += Troops.upkeep(army.troops)
+		end
+	end
+	return gold
 end
 
 function Economy.monthlyIncome(state: MatchState, nationId: number): Income
@@ -68,17 +86,18 @@ function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 			manpower += m
 		end
 	end
-	manpower *= Primordial.manpowerMultiplier(state, nationId) -- Plague
+	local race = Races.of(state, nationId)
+	manpower *= Primordial.manpowerMultiplier(state, nationId) * Races.manpowerMultiplier(race) -- Plague, Orcs
 	local nation = state.nations[nationId]
 	local capital = nation and state.provinces[nation.capital]
 	if capital and capital.owner == nationId then
 		gold += Config.Economy.CapitalGold
 	end
-	gold *= CatchUp.goldMultiplier(state, nationId) -- overextension
+	gold *= CatchUp.goldMultiplier(state, nationId) * Races.goldMultiplier(race) -- overextension, Humans
 	return {
 		gold = gold,
 		manpower = manpower,
-		upkeep = Economy.regiments(state, nationId) * Config.Army.UpkeepPerRegiment,
+		upkeep = Economy.upkeep(state, nationId),
 	}
 end
 

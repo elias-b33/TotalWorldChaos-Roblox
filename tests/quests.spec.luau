@@ -143,9 +143,9 @@ T.test("a match's stats move the quests; progress caps at the target", function(
 	local q = force(p, "recruit5")
 	local s = stats()
 	for _ = 1, 3 do
-		Progression.recordCommand(s, 10, { kind = "Recruit", province = 1, regiments = 3 }, true)
+		Progression.recordCommand(s, 10, { kind = "Recruit", province = 1, regiments = 3, troop = "Archers" }, true)
 	end
-	Progression.recordCommand(s, 11, { kind = "Recruit", province = 1, regiments = 3 }, false) -- refused
+	Progression.recordCommand(s, 11, { kind = "Recruit", province = 1, regiments = 3, troop = "Infantry" }, false) -- refused
 	T.equal(s.regiments, 9)
 	local gains = Quests.applyMatch(p.quests, s, reward(4))
 	T.equal(q.progress, 5, "capped at 5")

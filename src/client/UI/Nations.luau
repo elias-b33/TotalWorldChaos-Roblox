@@ -1,8 +1,8 @@
 --!strict
 -- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its flag, province count and your relation,
 -- and at the top the way to your quests during a match (the top bar has no room for another button).
--- One row per nation: flag, who plays it, name (in a nameplate frame if they own one), streak flame, VIP badge,
--- then provinces and your relation as pixel icons.
+-- One row per nation: flag, race, who plays it, name (in a nameplate frame if they own one), streak flame, VIP badge,
+-- then provinces and your relation as pixel icons. Under the rows, your race and its one-line bonus.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,13 +13,15 @@ local Catalogue = require(ReplicatedStorage.Shared.Catalogue)
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
+local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local WIDTH = 250
-local ROW_HEIGHT = 24
+local WIDTH = 256 -- the longest name (Ashen Dominion) fits next to its flag and race icon
+local ROW_HEIGHT = 22 -- ten rows, the header and the race line fit a 390 px tall phone
+local RACE_LINE_HEIGHT = 34 -- two lines of small text
 local COUNT_WIDTH = 54
 local TITLE_MAX_WIDTH = 96 -- a worn title after the name, cut with … past this
 
@@ -30,6 +32,7 @@ local FLAMES: { { string } } = { { "fire" }, { "fire", "fire" }, { "fireBlue" },
 
 local drawer: Frame
 local rows: Frame
+local raceLine: TextLabel
 local questsButton: TextButton? = nil
 local questsText: () -> string = function()
 	return "📜 Quests"
@@ -52,9 +55,16 @@ local function render()
 	local snap = ClientState.snapshot()
 	Widgets.clear(rows)
 	if snap == nil then
+		raceLine.Visible = false
 		return
 	end
 	local me = ClientState.myNation()
+	local mine = ClientState.nation(me)
+	raceLine.Visible = mine ~= nil
+	if mine then
+		raceLine.Text = string.format("%s: %s", mine.race, RaceInfo.bonus(mine.race))
+		Icons.set(raceLine:FindFirstChild("Icon") :: GuiObject, RaceInfo.icon(mine.race))
+	end
 	local list = table.clone(snap.nations)
 	table.sort(list, function(a, b)
 		return Relations.score(a.id) > Relations.score(b.id)
@@ -75,7 +85,10 @@ local function render()
 		-- the nation's flag (cosmetic), in its colour
 		local looks = Cosmetics.of(n.id)
 		local flag = Cosmetics.flagLabel(left, looks.flag, n.colorIndex, UDim2.fromOffset(20, 15))
-		flag.LayoutOrder = 1
+		flag.LayoutOrder = 0
+		local race = Widgets.icon(left, RaceInfo.icon(n.race), 16) -- the nation's race
+		race.Name = "Race"
+		race.LayoutOrder = 1
 		local who = if n.id == me then "star" elseif n.controller == "Player" then "manpower" else nil
 		if who then
 			Widgets.icon(left, who, 16).LayoutOrder = 2
@@ -178,7 +191,15 @@ function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?)
 	rows.AutomaticSize = Enum.AutomaticSize.Y
 	rows.LayoutOrder = 1
 	rows.Parent = drawer
-	Widgets.list(rows, false, 2)
+	Widgets.list(rows, false, 1)
+	raceLine = Widgets.label(drawer, "", Theme.text.small, RACE_LINE_HEIGHT)
+	raceLine.Name = "RaceLine"
+	raceLine.TextColor3 = Theme.color.goldPale
+	raceLine.TextYAlignment = Enum.TextYAlignment.Top
+	raceLine.TextTruncate = Enum.TextTruncate.AtEnd
+	raceLine.LayoutOrder = 2
+	raceLine.Visible = false
+	Widgets.leadIcon(raceLine, "humans", 16, Theme.space.xs)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	ClientState.onReset(render)
 	ClientState.onDelta(function(delta)

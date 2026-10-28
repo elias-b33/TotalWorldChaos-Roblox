@@ -1,7 +1,8 @@
 --!strict
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
--- who is standing there; one-tap actions on your own provinces (develop, build, recruit, move an army) and
--- diplomacy on foreign ones (war, ally, peace). Every button shows its price; the server decides.
+-- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each troop
+-- your race can raise, move an army) and diplomacy on foreign ones (war, ally, peace). Every button shows its
+-- price; the server decides.
 -- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
 
 local Players = game:GetService("Players")
@@ -18,6 +19,7 @@ local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local Palette = require(Client.Palette)
+local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
@@ -169,7 +171,7 @@ local function render()
 		end
 		if record.building == "None" then
 			for _, building in BUILDABLE do
-				local cost = Economy.buildingCost(building) or 0
+				local cost = Economy.buildingCost(building, me.race :: Types.Race) or 0 -- Dwarves: cheaper forts
 				action(
 					BUILDING_ICONS[building],
 					building,
@@ -182,17 +184,25 @@ local function render()
 				)
 			end
 		end
-		local recruitGold, recruitManpower = Economy.recruitCost(1)
-		action(
-			"sword",
-			"+1 Regiment",
-			{ { "gold", tostring(recruitGold) }, { "manpower", recruitManpower // 1000 .. "k" } },
-			Widgets.GOOD,
-			gold >= recruitGold and me.manpower >= recruitManpower,
-			function()
-				Intents.recruit(provinceId, 1)
-			end
-		)
+		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite. The
+		-- infantry button keeps the name "Regiment" (the tutorial and the harness look for it)
+		for _, troop in RaceInfo.troops(me.race) do
+			local recruitGold, recruitManpower = Economy.recruitCost(1, troop)
+			local manpowerText = if recruitManpower % 1000 == 0
+				then recruitManpower // 1000 .. "k"
+				else tostring(recruitManpower) -- Berserkers: 750
+			action(
+				RaceInfo.icon(troop),
+				troop,
+				{ { "gold", tostring(recruitGold) }, { "manpower", manpowerText } },
+				Widgets.GOOD,
+				gold >= recruitGold and me.manpower >= recruitManpower,
+				function()
+					Intents.recruit(provinceId, 1, troop)
+				end,
+				if troop == "Infantry" then "Regiment" else "Recruit_" .. troop
+			)
+		end
 	end
 	-- your armies standing here: tap to pick one up and send it somewhere
 	local snap = ClientState.snapshot()

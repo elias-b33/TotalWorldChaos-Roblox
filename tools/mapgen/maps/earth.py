@@ -298,6 +298,13 @@ WRAP_STRAITS = [("Chukotka", "Alaska")]  # Bering Strait, across the map edge
 # Neutral garrisons above the 1,000-man default. Volga and Zambezi had quiet backyards no other nation reaches early
 # (western Siberia; the Horn, Abyssinia and Madagascar) and won about twice their share: these wilds hold out longer.
 GARRISONS = {"Ob": 2000, "Yenisei": 2000, "Madagascar": 2000, "Horn": 2000, "Abyssinia": 2000}
+# Races (docs/DESIGN.md "Races"; docs/MAPS.md): Elves in the great forests (taiga, jungles), Dwarves in the hills of
+# Mesopotamia and China, Humans and Orcs on the plains. Orcs go to Western Europe and North America, so no race reads
+# as a jab at a real people. Each race gets strong and weak start positions alike (docs/BALANCE.md section 18).
+RACES = {
+    "Rhine": "Orcs", "Volga": "Elves", "Tigris": "Dwarves", "Ganges": "Humans", "Yangtze": "Dwarves",
+    "Mekong": "Elves", "Niger": "Humans", "Zambezi": "Humans", "Mississippi": "Orcs", "Amazon": "Elves",
+}
 
 TERRAIN = {
     "grassland": "Plains", "steppe": "Plains", "savanna": "Plains", "desert": "Plains", "tundra": "Plains",
@@ -321,7 +328,7 @@ def build() -> Layout:
     finalize(lay)
     curated_straits(lay, STRAITS, WRAP_STRAITS)
     auto_connect(lay)
-    assign_start_territories(lay)
+    assign_start_territories(lay, races=RACES)
     balance_start_development(lay)
     return lay
 

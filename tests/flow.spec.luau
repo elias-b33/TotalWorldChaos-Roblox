@@ -29,7 +29,13 @@ local function greedyIntent(state, nationId: number)
 			return { kind = "Build", province = id, building = if state.tick % 2 == 0 then "Farm" else "Barracks" }
 		end
 	end
-	return { kind = "Recruit", province = state.nations[nationId].capital, regiments = 1 }
+	-- recruit with the gold left over after saving for the next development (recruiting every spare coin piles up
+	-- upkeep until income can never pay for a development again)
+	local saving = if best then Economy.developCost(state.provinces[best].development) else 0
+	if state.nations[nationId].gold >= saving + Config.Troops.Infantry.gold then
+		return { kind = "Recruit", province = state.nations[nationId].capital, regiments = 1, troop = "Infantry" }
+	end
+	return { kind = "Develop", province = best or state.nations[nationId].capital }
 end
 
 local function sameView(a: Snapshot.SnapshotData, b: Snapshot.SnapshotData): boolean

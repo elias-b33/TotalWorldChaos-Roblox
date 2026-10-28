@@ -4,18 +4,26 @@ local Config = require("../src/shared/Config")
 local Economy = require("../src/shared/Sim/Economy")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
+local Races = require("../src/shared/Sim/Races")
 local T = require("./TestKit")
 
 local function fresh()
 	return Match.new(Maps.get("skyshards"))
 end
 
-T.test("a starting nation earns 17 development + capital per month", function()
+T.test("a starting nation earns 17 development + capital per month (and its race's bonus)", function()
 	local state = fresh()
-	local income = Economy.monthlyIncome(state, 1)
-	T.equal(income.gold, 17 * Config.Economy.GoldPerDevelopment + Config.Economy.CapitalGold)
-	T.equal(income.manpower, 17 * Config.Economy.ManpowerPerDevelopment)
-	T.equal(income.upkeep, 0)
+	for id, nation in state.nations do
+		local income = Economy.monthlyIncome(state, id)
+		local gold = 17 * Config.Economy.GoldPerDevelopment + Config.Economy.CapitalGold
+		T.near(income.gold, gold * Races.goldMultiplier(nation.race), 1e-9, nation.name)
+		T.near(
+			income.manpower,
+			17 * Config.Economy.ManpowerPerDevelopment * Races.manpowerMultiplier(nation.race),
+			1e-9
+		)
+		T.equal(income.upkeep, 0)
+	end
 end)
 
 T.test("a farm adds 50% gold and barracks 50% manpower in that province", function()
@@ -38,13 +46,14 @@ T.test("losing the capital loses the capital bonus", function()
 	local capital = state.provinces[state.nations[1].capital]
 	capital.owner = 2
 	local after = Economy.monthlyIncome(state, 1).gold
-	T.equal(before - after, capital.development + Config.Economy.CapitalGold)
+	local lost = capital.development + Config.Economy.CapitalGold
+	T.near(before - after, lost * Races.goldMultiplier(state.nations[1].race), 1e-9)
 end)
 
 T.test("regiments cost upkeep", function()
 	local state = fresh()
 	Army.spawn(state, 1, state.nations[1].capital, 4000)
-	T.equal(Economy.monthlyIncome(state, 1).upkeep, 4 * Config.Army.UpkeepPerRegiment)
+	T.equal(Economy.monthlyIncome(state, 1).upkeep, 4 * Config.Troops.Infantry.upkeep)
 	T.equal(Economy.monthlyIncome(state, 2).upkeep, 0)
 end)
 
@@ -52,8 +61,9 @@ T.test("payMonth pays every living nation and skips the eliminated", function()
 	local state = fresh()
 	state.nations[3].eliminated = true
 	Economy.payMonth(state)
-	T.equal(state.nations[1].gold, Config.StartGold + 17 + Config.Economy.CapitalGold)
-	T.equal(state.nations[1].manpower, Config.StartManpower + 1700)
+	local income = Economy.monthlyIncome(state, 1)
+	T.equal(state.nations[1].gold, Config.StartGold + income.gold)
+	T.equal(state.nations[1].manpower, Config.StartManpower + income.manpower)
 	T.equal(state.nations[3].gold, Config.StartGold)
 end)
 

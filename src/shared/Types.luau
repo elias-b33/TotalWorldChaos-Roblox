@@ -10,6 +10,12 @@ export type Building = "None" | "Farm" | "Barracks" | "Fort"
 export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
 export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
 
+-- Races and troops (docs/DESIGN.md "Races", "Troops"; numbers in Config.Races and Config.Troops).
+export type Race = "Humans" | "Elves" | "Orcs" | "Dwarves"
+export type Troop = "Infantry" | "Archers" | "Cavalry" | "Knights" | "Rangers" | "Berserkers" | "Ironguard"
+-- An army's composition: men per troop type (only types it has). It always adds up to Army.men (Army.setTroops).
+export type Composition = { [Troop]: number }
+
 export type Province = {
 	id: ProvinceId,
 	name: string,
@@ -29,6 +35,7 @@ export type Nation = {
 	id: NationId,
 	name: string,
 	colorIndex: number, -- palette index, so game logic stays Roblox-free and testable
+	race: Race, -- from the map data: picking the nation picks its race
 	controller: "Player" | "Bot",
 	userId: number?, -- nil for bots
 	capital: ProvinceId,
@@ -46,7 +53,8 @@ export type Army = {
 	id: ArmyId,
 	owner: NationId, -- 0 = neutral (garrisons, Rebels)
 	location: ProvinceId,
-	men: number,
+	men: number, -- the total; change it only through Army.setTroops, which keeps it in step with `troops`
+	troops: Composition, -- men per troop type (garrisons and Rebels are infantry)
 	path: { ProvinceId }, -- remaining route
 	moveProgress: number, -- ticks spent toward next province
 	inBattle: boolean,
@@ -206,7 +214,7 @@ export type ProvinceDef = {
 	garrison: number?, -- neutral garrison override, men
 }
 
-export type NationDef = { slot: number, name: string, capital: ProvinceId, colorIndex: number }
+export type NationDef = { slot: number, name: string, capital: ProvinceId, colorIndex: number, race: Race }
 
 export type StraitDef = { a: ProvinceId, b: ProvinceId, from: Point, to: Point, wrap: boolean }
 
@@ -232,7 +240,8 @@ export type DiplomacyAction = "War" | "Ally" | "AcceptAlly" | "Peace" | "AcceptP
 export type Command =
 	{ kind: "Develop", province: ProvinceId }
 	| { kind: "Build", province: ProvinceId, building: Building }
-	| { kind: "Recruit", province: ProvinceId, regiments: number }
+	-- regiments of one troop type (quests, achievements and the tutorial count every troop as a regiment)
+	| { kind: "Recruit", province: ProvinceId, regiments: number, troop: Troop }
 	| { kind: "Move", army: ArmyId, to: ProvinceId }
 	| { kind: "Diplomacy", action: DiplomacyAction, target: NationId, gold: number }
 	-- target is an army, nation or province id, depending on the power (Sim.Primordial.TARGETS)

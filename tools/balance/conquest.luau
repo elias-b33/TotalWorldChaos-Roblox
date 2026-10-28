@@ -52,7 +52,7 @@ local function attempt(terrain: Types.Terrain, dev: number, garrison: number, re
 	Army.spawn(state, 0, target, garrison)
 	state.nations[1].gold = 1000
 	state.nations[1].manpower = 100000
-	assert(Commands.apply(state, 1, { kind = "Recruit", province = home, regiments = regiments }))
+	assert(Commands.apply(state, 1, { kind = "Recruit", province = home, regiments = regiments, troop = "Infantry" }))
 	local army = assert(Army.idleAt(state, 1, home))
 	assert(Commands.apply(state, 1, { kind = "Move", army = army.id, to = target }))
 	local rng = Rng.new(seed)
@@ -99,8 +99,8 @@ for _, terrain in { "Plains", "Forest" } :: { Types.Terrain } do
 					first = regiments
 				end
 				if first and regiments <= first + 1 and (dev == 2 or regiments == first) then
-					local gold = o.lost / Config.Army.MenPerRegiment * Config.Army.RegimentGold
-					local manpower = o.lost / Config.Army.MenPerRegiment * Config.Army.RegimentManpower
+					local gold = o.lost / Config.Army.MenPerRegiment * Config.Troops.Infantry.gold
+					local manpower = o.lost / Config.Army.MenPerRegiment * Config.Troops.Infantry.manpower
 					local value = dev
 						* (Config.Economy.GoldPerDevelopment + Config.Economy.ManpowerPerDevelopment / 100)
 					print(

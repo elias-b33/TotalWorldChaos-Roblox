@@ -150,7 +150,11 @@ T.test("prompts finish in order, never ahead of time", function()
 	T.equal(Tutorial.update(state, tut), nil)
 	T.equal(tut.step, 1)
 	-- a recruit made early counts once its prompt comes up
-	Tutorial.recordCommand(tut, { kind = "Recruit", province = state.nations[SLOT].capital, regiments = 1 }, true)
+	Tutorial.recordCommand(
+		tut,
+		{ kind = "Recruit", province = state.nations[SLOT].capital, regiments = 1, troop = "Infantry" },
+		true
+	)
 	Tutorial.recordCommand(tut, { kind = "Power", power = "Blessing", target = 1 }, false)
 	T.equal(tut.actions.Power, nil, "a refused command doesn't count")
 	state.provinces[assert(Tutorial.neutralTarget(state, SLOT))].owner = SLOT
@@ -178,7 +182,7 @@ T.test("all six prompts through the real rules, with the bots' help", function()
 	-- 2. Recruit, at the capital the arrow points at
 	view = Tutorial.view(state, tut)
 	T.equal(view.province, state.nations[SLOT].capital)
-	player(state, tut, { kind = "Recruit", province = view.province, regiments = 1 })
+	player(state, tut, { kind = "Recruit", province = view.province, regiments = 1, troop = "Infantry" })
 	run(state, tut, 2)
 	T.equal(tut.step, 3)
 

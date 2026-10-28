@@ -49,12 +49,44 @@ Config.Buildings = {
 
 Config.Army = {
 	MenPerRegiment = 1000,
-	RegimentGold = 10,
-	RegimentManpower = 1000,
-	UpkeepPerRegiment = 1.5, -- gold per month: income / 1.5 is the army a nation can keep (docs/BALANCE.md 15)
 	MaxRecruitPerCommand = 10, -- regiments in one Recruit intent
-	MoveTicks = { Plains = 5, Forest = 8, Hills = 8 },
+	MoveTicks = { Plains = 5, Forest = 8, Hills = 8 }, -- normal troops
+	FastMoveTicks = { Plains = 3, Forest = 6, Hills = 6 }, -- fast troops (Config.Troops: fast = true)
 	MinArmyMen = 500, -- smaller armies are destroyed after a battle
+}
+
+-- Troops (docs/DESIGN.md "Troops"): what one regiment (1,000 men) of each type costs, its upkeep in gold per month,
+-- and how it fights: in a battle a side's strength is its men × attack (attackers) or × defence (defenders). An army
+-- marches at its slowest troop's speed. race: only nations of that race recruit it (one elite per race); the rest
+-- every race recruits. Infantry is the old regiment: neutral garrisons and Rebels are infantry. Upkeep is what limits
+-- armies (income / upkeep is the army a nation can keep). Tuned with bot tournaments: docs/BALANCE.md section 18.
+Config.Troops = {
+	Infantry = { gold = 10, manpower = 1000, upkeep = 1.5, attack = 1.0, defence = 1.0 },
+	Archers = { gold = 15, manpower = 1000, upkeep = 2, attack = 0.75, defence = 1.5 },
+	Cavalry = { gold = 25, manpower = 1000, upkeep = 3, attack = 1.5, defence = 1.0, fast = true },
+	Knights = { gold = 35, manpower = 1000, upkeep = 4, attack = 2.0, defence = 1.25, fast = true, race = "Humans" },
+	Rangers = { gold = 20, manpower = 1000, upkeep = 2.5, attack = 1.25, defence = 1.75, race = "Elves" },
+	Berserkers = { gold = 12, manpower = 750, upkeep = 1.5, attack = 1.75, defence = 0.75, race = "Orcs" },
+	-- siegeSpeed: an army with Ironguard in it besieges this much faster (siege progress per tick)
+	Ironguard = {
+		gold = 25,
+		manpower = 1000,
+		upkeep = 2,
+		attack = 1.5,
+		defence = 2.0,
+		race = "Dwarves",
+		siegeSpeed = 1.5,
+	},
+}
+
+-- Races (docs/DESIGN.md "Races"): every nation has one (map data); neutral garrisons and Rebels have none. Combat
+-- bonuses add to the battle modifier like the others (a side with a nation of that race on it gets them). Tuned with
+-- bot tournaments: docs/BALANCE.md section 18.
+Config.Races = {
+	Humans = { goldBonus = 0.1 }, -- gross gold income (provinces + capital, before upkeep)
+	Elves = { forestBonus = 0.1 }, -- combat strength in battles in forest provinces; forest costs plains move time
+	Orcs = { manpowerBonus = 0.2 },
+	Dwarves = { hillsDefenceBonus = 0.25, fortCostMultiplier = 0.5 }, -- defending in hills; forts cost half
 }
 
 Config.Battle = {
@@ -489,6 +521,11 @@ Config.Bots = {
 	RecruitBatch = 3, -- regiments per Recruit when topping up (defending recruits what the threat needs)
 	PeaceLossShare = 0.3, -- accept (and offer) white peace after losing this share of my provinces in a war
 	UpkeepReserveMonths = 2, -- build only with gold left over after this many months of upkeep
+	-- the troop mix (docs/DESIGN.md "Bot AI"): infantry is the base; a threatened province raises archers while they
+	-- are under ArcherShare of the bot's men, and at war it buys cavalry or its race's elite (when it can pay and keep
+	-- UpkeepReserveMonths) while those are under AttackShare
+	ArcherShare = 0.3,
+	AttackShare = 0.3,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
 }
