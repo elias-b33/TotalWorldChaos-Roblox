@@ -1414,7 +1414,11 @@ function Emulator.addClient(name: string, viewport: any?, userId: number?): Mach
 	end)
 	-- Roblox's top-bar row on a phone: 58 px tall, its menu buttons in the first 104 px (docs/UI_DIRECTION.md 7.9)
 	local guiService = dm:GetService("GuiService")
-	guiService.TopbarInset = roblox.Rect.new(104, 0, client.viewport.X, 58)
+	-- TOPBAR=X0,Y0,X1,Y1 sets another free row (e.g. TOPBAR=104,0,400,58: too narrow, the top bar's fallback row)
+	local x0, y0, x1, y1 = string.match(process.env.TOPBAR or "", "^(%d+),(%d+),(%d+),(%d+)$")
+	guiService.TopbarInset = if x0
+		then roblox.Rect.new(tonumber(x0), tonumber(y0), tonumber(x1), tonumber(y1))
+		else roblox.Rect.new(104, 0, client.viewport.X, 58)
 	guiService.ReducedMotionEnabled = false
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 70
@@ -1593,16 +1597,6 @@ function Emulator.shutdown(seconds: number?)
 end
 
 function Emulator.assertClean(label: string)
-	-- NO_EDITABLE_IMAGE=1 turns the game setting off on purpose: the map's warning about it is expected then
-	if process.env.NO_EDITABLE_IMAGE then
-		local kept = {}
-		for _, w in warnings do
-			if not string.find(w, "no EditableImage", 1, true) then
-				table.insert(kept, w)
-			end
-		end
-		warnings = kept
-	end
 	if #errors > 0 or #warnings > 0 then
 		stdio.ewrite(string.format("\n%s: %d errors, %d warnings\n", label, #errors, #warnings))
 		for _, e in errors do
