@@ -405,8 +405,11 @@ end)
 roblox.implementMethod("RunService", "IsClient", function(rs)
 	return not machineOf(rs).isServer
 end)
+-- The emulator runs as Studio. A scenario may set Emulator.studio = false for a moment to see what a live server
+-- would answer (set it back before the game runs on: services read IsStudio all the time).
+Emulator.studio = true
 roblox.implementMethod("RunService", "IsStudio", function()
-	return true
+	return Emulator.studio ~= false
 end)
 
 -- Players.LocalPlayer, Workspace.CurrentCamera and Camera.ViewportSize already exist in the API, and Lune can't

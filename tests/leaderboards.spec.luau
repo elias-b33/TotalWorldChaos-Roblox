@@ -41,6 +41,11 @@ T.test("points by placement: 10, 7, 5, 3, 3, then 1; nothing for AFK, leaving or
 	T.equal(Leaderboards.points(reward(1, true)), 0, "AFK")
 	T.equal(Leaderboards.points(reward(nil, false, false)), 0, "left early")
 	T.equal(Leaderboards.points(reward(nil)), 0, "a Primordial or spectator at Results")
+	local late = reward(1)
+	late.share = Config.Progression.PlacementMinShare - 0.01
+	T.equal(Leaderboards.points(late), 0, "seated into a winning nation too late to own the win")
+	late.share = Config.Progression.PlacementMinShare
+	T.equal(Leaderboards.points(late), 10, "half the match is enough")
 end)
 
 T.test("only public matches with 4+ real players count; private servers never", function()

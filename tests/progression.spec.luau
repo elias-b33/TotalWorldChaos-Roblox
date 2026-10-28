@@ -191,10 +191,12 @@ T.test("a player who joined late gets the share of the match they played", funct
 	local share = 300 / (END - P.LateJoinGraceTicks)
 	T.equal((line(r, "Finish") :: Types.RewardLine).xp, math.floor(100 * share + 0.5))
 	T.equal((line(r, "Placement") :: Types.RewardLine).xp, math.floor(150 * share + 0.5))
+	T.equal(r.share, share, "the share is on the reward (leaderboard points and win achievements need half)")
 	-- joining in the first minute counts as the whole match
 	local early = Progression.matchReward(state, busy(101, 50), STANDARD)
 	T.equal((line(early, "Finish") :: Types.RewardLine).xp, 100)
 	T.equal((line(early, "Placement") :: Types.RewardLine).xp, 150)
+	T.equal(early.share, 1)
 end)
 
 T.test("a short match (early domination) pays in full", function()

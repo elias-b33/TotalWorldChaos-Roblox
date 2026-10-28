@@ -240,7 +240,8 @@ function Season.needsSync(profile: Profile, def: Def?): boolean
 end
 
 -- Move the profile to the season running now (nil between seasons). The season it leaves grants what was earned and
--- not claimed first. Returns true if the season changed (and the rewards and Glory that finishing it paid).
+-- not claimed first. A pass whose purchase finished with no season running (its season ended while the prompt was
+-- open) is the next season's. Returns true if the season changed (and the rewards and Glory that finishing it paid).
 function Season.sync(profile: Profile, def: Def?): (boolean, number, number)
 	local state = profile.season :: any
 	if state == nil then
@@ -258,7 +259,11 @@ function Season.sync(profile: Profile, def: Def?): (boolean, number, number)
 		return false, 0, 0
 	end
 	local count, glory = Season.claimAll(profile, Season.def(state.id))
-	profile.season = Season.newState(id)
+	local fresh = Season.newState(id)
+	if state.id == "" then
+		fresh.premium, fresh.bundle = state.premium, state.bundle -- paid for between seasons: never lost
+	end
+	profile.season = fresh
 	return true, count, glory
 end
 

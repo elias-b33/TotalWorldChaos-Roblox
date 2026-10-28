@@ -201,6 +201,19 @@ T.test("Domination pays a title; a private match with custom rules counts no win
 	T.expect(not Shop.equip(profile, "title_unbroken", false), "only owned titles")
 end)
 
+T.test("a late joiner's placement counts for nothing: no win, no top 3", function()
+	local state = match()
+	finish(state, { 1 }, "Domination")
+	local late = reward(1)
+	late.share = Config.Progression.PlacementMinShare - 0.01
+	local earned = check(state, Progression.newProfile(), stats(), late)
+	T.expect(table.find(earned, "domination") == nil, "no Domination")
+	T.expect(table.find(earned, "podium") == nil, "no top 3")
+	late.share = Config.Progression.PlacementMinShare
+	earned = check(state, Progression.newProfile(), stats(), late)
+	T.expect(table.find(earned, "domination") ~= nil, "half the match owns the win")
+end)
+
 T.test("an alliance victory, Comeback and Kingmaker", function()
 	local profile = Progression.newProfile()
 	local state = match()

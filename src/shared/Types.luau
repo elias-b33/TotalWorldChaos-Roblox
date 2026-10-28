@@ -294,6 +294,7 @@ export type MatchReward = {
 	placement: number?, -- nil without a nation or after leaving early
 	stayed: boolean, -- stayed to Results
 	afk: boolean, -- sent no command for Config.Progression.AfkTicks in a row: paid nothing
+	share: number?, -- the part of the match played, 0..1 (Config.Progression.PlacementMinShare); nil = all of it
 }
 
 -- Quests, login calendar and play streak (docs/MONETIZATION.md 5.4–5.6). The pool is Config.Progression.Quests,

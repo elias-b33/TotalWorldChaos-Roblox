@@ -124,7 +124,9 @@ function Achievements.tally(
 	standard: boolean
 ): ({ [string]: number }, string?)
 	local finished = reward.stayed and stats.seated and not reward.afk
-	local place = if finished then reward.placement else nil
+	-- a placement (top 3, a win) counts only for a player who played enough of the match to own it
+	local played = (reward.share or 1) >= Config.Progression.PlacementMinShare
+	local place = if finished and played then reward.placement else nil
 	local result = state.result
 	local won = place == 1 and standard and result ~= nil
 	local kind = if result then result.kind else ""

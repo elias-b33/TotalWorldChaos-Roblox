@@ -88,11 +88,12 @@ local function onReward(
 	end
 end
 
--- A claim or reroll from CommandRouter (shape already checked). May yield (saves).
+-- A claim or reroll from CommandRouter (shape already checked). May yield (saves). A refused request writes nothing
+-- (a flood of them never floods the DataStore); a claim or reroll that goes through is saved at once.
 function QuestService.apply(player: Player, intent: Types.QuestIntent): (boolean, string?)
 	local vip = ShopService.isVip(player)
 	local day = today()
-	local result = PlayerDataService.update(player, function(data)
+	local result = PlayerDataService.edit(player, function(data)
 		Quests.refresh(data.quests, player.UserId, day)
 		local ok, reason
 		local source: string? = nil
@@ -104,6 +105,9 @@ function QuestService.apply(player: Player, intent: Types.QuestIntent): (boolean
 		end
 		return { ok = ok, reason = reason, source = source }
 	end)
+	if result and result.ok then
+		PlayerDataService.save(player)
+	end
 	QuestService.sendView(player)
 	if result == nil then
 		return false, "NotLoaded"

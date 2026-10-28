@@ -8,12 +8,14 @@
 -- level board), plus one GetAsync per joining player (their own points) and one sorted read of last week's board per
 -- week. Fair play (section 10): boards show display names only, and the friends list API is called only for each
 -- player's own friends. Without DataStore access (Studio with API access off) the boards live in this server's
--- memory, so a Studio match still shows them moving.
+-- memory, so a Studio match still shows them moving. With it on, Studio keeps its own boards ("Conquest_Studio",
+-- "Level_Studio"), like its saves (PlayerDataService), so test matches never reach the live boards.
 -- Thin wrapper: the rules are in Shared.Sim.Leaderboards.
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserService = game:GetService("UserService")
 
 ReplicatedStorage:WaitForChild("Shared")
@@ -31,8 +33,9 @@ local ShopService = require(script.Parent.ShopService)
 type Entry = Leaderboards.Entry
 
 local L = Config.Leaderboards
-local CONQUEST_STORE = "Conquest" -- one scope per week (Leaderboards.weekKey)
-local LEVEL_STORE = "Level"
+local STORE_SUFFIX = if RunService:IsStudio() then "_Studio" else "" -- Studio never reads or writes the live boards
+local CONQUEST_STORE = "Conquest" .. STORE_SUFFIX -- one scope per week (Leaderboards.weekKey)
+local LEVEL_STORE = "Level" .. STORE_SUFFIX
 local PAGE_SIZE = 100 -- the largest page GetSortedAsync returns
 local NAME_BATCH = 100 -- user ids per UserService:GetUserInfosByUserIdsAsync call
 
@@ -45,6 +48,9 @@ type Board = {
 }
 
 local LeaderboardService = {}
+
+LeaderboardService.CONQUEST_STORE = CONQUEST_STORE
+LeaderboardService.LEVEL_STORE = LEVEL_STORE
 
 local remote: RemoteEvent
 local live = false -- the real DataStores answer
@@ -340,9 +346,12 @@ function LeaderboardService.init()
 		knownXp[player.UserId] = nil
 	end)
 	task.spawn(function()
-		live = pcall(function()
-			DataStoreService:GetOrderedDataStore(LEVEL_STORE):GetAsync("0")
-		end)
+		-- only Studio can lack DataStore access (API access off); a live server always has it, so one failed call at
+		-- startup (an outage) never leaves its boards in memory for good: every call is pcalled on its own
+		live = not RunService:IsStudio()
+			or pcall(function()
+				DataStoreService:GetOrderedDataStore(LEVEL_STORE):GetAsync("0")
+			end)
 		if not live then
 			print("[leaderboards] no DataStore access: the boards live in this server's memory")
 		end

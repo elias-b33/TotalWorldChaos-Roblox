@@ -167,6 +167,26 @@ T.test("a new season: unclaimed rewards of the last one are granted, then everyt
 	T.equal(Season.needsSync(p, S1), true)
 end)
 
+T.test("a pass whose purchase finishes after its season ended, with none running, is the next season's", function()
+	-- the prompt opened on Season 1's last day; at midnight the season ended (no next one yet) and the profile moved on
+	local p = profileIn(S1)
+	p.season.xp = 4 * C.XpPerTier
+	Season.sync(p, nil)
+	T.equal(p.season.id, "")
+	-- then the receipt: SeasonService grants the pass with no season running
+	Season.buyPass(p, true)
+	local S2 = { id = "S2", name = "Next", startDay = S1.endDay + 7, endDay = S1.endDay + 63, tiers = S1.tiers }
+	Season.sync(p, S2)
+	T.equal(p.season.id, "S2")
+	T.expect(p.season.premium and p.season.bundle, "paid for: the pass and the bundle's tiers are the next season's")
+	-- a pass bought during a season stays that season's
+	local q = profileIn(S1)
+	Season.buyPass(q, false)
+	Season.sync(q, nil)
+	Season.sync(q, S2)
+	T.equal(q.season.premium, false, "a pass is for one season")
+end)
+
 T.test("an older save without the new season fields is filled in", function()
 	local p = Progression.newProfile()
 	p.season = { id = "S1", xp = 1200, premium = true, claimed = {} } :: any

@@ -208,13 +208,13 @@ local function buyRobux(player: Player, id: string): (boolean, string?)
 	if not ShopRotation.onSale(id, DevService.today()) then
 		return false, "NotInShop" -- a rotating item outside its days (Sim.ShopRotation)
 	end
-	if product and product.prompted then
-		product.prompted(player)
-	end
 	local productId = Catalogue.productId(id)
 	if productId == 0 then
 		if not RunService:IsStudio() then
 			return false, "NotForSale" -- the owner hasn't created this product yet
+		end
+		if product and product.prompted then
+			product.prompted(player) -- analytics: test mode's free purchase stands in for the prompt
 		end
 		-- test mode: the same receipt path, with a made-up receipt
 		local item = Catalogue.item(id)
@@ -240,6 +240,9 @@ local function buyRobux(player: Player, id: string): (boolean, string?)
 			MarketplaceService:PromptProductPurchase(player, productId)
 		end
 	end)
+	if prompted and product and product.prompted then
+		product.prompted(player) -- analytics: only once the prompt is really open
+	end
 	return prompted, if prompted then nil else "TryAgain"
 end
 

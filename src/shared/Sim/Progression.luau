@@ -266,6 +266,7 @@ function Progression.matchReward(state: MatchState, stats: Stats, options: Rewar
 	local matchTicks = if stayed and result then result.endedAt else Settings.timing(state.setup).matchEnd
 	local played = stats.playedTicks + endTick - stats.joinedAt
 	local share = math.clamp(played / math.max(1, matchTicks - P.LateJoinGraceTicks), 0, 1)
+	reward.share = share
 	local seated = stats.seated or seatedNow(state, stats.userId)
 	if seated then
 		add(reward, "Finish", round(P.FinishXp * share), round(P.FinishGlory * share))

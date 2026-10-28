@@ -145,6 +145,9 @@ Config.Progression = {
 	CustomRulesShare = 0.5, -- private servers with custom rules pay half
 	AfkTicks = 5 * 60, -- no command for this long in a row: the match pays nothing
 	LateJoinGraceTicks = 60, -- joining in the first minute still counts as playing the whole match
+	-- leaderboard points and placement achievements (top 3, wins) need at least this part of the match played: a
+	-- late joiner seated into a winning nation gets prorated XP and Glory, not the win
+	PlacementMinShare = 0.5,
 	LevelBaseXp = 300, -- XP from level L to L+1 = LevelBaseXp + LevelStepXp × (L − 1)
 	LevelStepXp = 60,
 	MaxLevel = 100,

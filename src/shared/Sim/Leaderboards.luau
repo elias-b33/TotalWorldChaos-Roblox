@@ -28,10 +28,14 @@ function Leaderboards.counts(state: Types.MatchState): boolean
 	return not state.setup.private and Settings.humans(state) >= L.MinHumans
 end
 
--- The points a finished match gives a player: by placement, for staying to Results with a nation, never AFK.
+-- The points a finished match gives a player: by placement, for staying to Results with a nation, never AFK, and
+-- having played at least Config.Progression.PlacementMinShare of the match.
 function Leaderboards.points(reward: Types.MatchReward): number
 	if reward.afk or not reward.stayed or reward.placement == nil then
 		return 0
+	end
+	if (reward.share or 1) < Config.Progression.PlacementMinShare then
+		return 0 -- joined too late for the placement to be theirs
 	end
 	return L.Points[reward.placement] or 0
 end

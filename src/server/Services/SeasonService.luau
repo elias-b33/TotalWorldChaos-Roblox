@@ -169,7 +169,9 @@ local function addPass(id: string, robux: number, bundle: boolean)
 			if def then
 				Season.sync(data, def)
 			end
-			Season.buyPass(data, bundle) -- paid for: always granted, even if the season ended a moment ago
+			-- paid for: always granted, even if the season ended a moment ago (on the season the profile is still on,
+			-- else, with no season running, the next one: Season.sync)
+			Season.buyPass(data, bundle)
 		end,
 		prompted = function(player: Player)
 			local def = current()
