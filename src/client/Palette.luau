@@ -40,6 +40,8 @@ local Palette = {
 	nations = nations,
 	background = background,
 	garrison = Color3.fromHex("#9a9aa2"), -- neutral garrison tokens
+	rebel = Color3.fromHex("#1c1c1c"), -- Rebels' tokens: a black flag...
+	rebelEdge = Color3.fromHex("#ff3b30"), -- ...with a red edge, so they never pass for the charcoal nation
 	strait = Color3.fromHex("#ffffff"), -- sea lanes
 	energyLink = Color3.fromHex("#7cfbef"), -- Skyshards' bridges between platforms
 }

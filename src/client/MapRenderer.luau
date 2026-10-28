@@ -27,6 +27,7 @@ local TOKEN_SIZE = 14 -- army token, screen pixels
 local TOKEN_PICK = 20 -- a tap this close to a token's centre (screen pixels) picks the army
 local TOKEN_SPACING = 4 -- map pixels between tokens standing in one province
 local TOKEN_SMOOTHING = 6 -- higher = tokens catch up with their target faster
+local TOKEN_EDGE = Color3.fromRGB(20, 20, 28) -- army token outline (selected: yellow; Rebels: Palette.rebelEdge)
 local DOT_SPACING = 4 -- map pixels between the dots of a route or strait
 local PIXELATED_FROM = 1.5 -- zoom from which map pixels are drawn hard-edged (smooth below, so thin lines don't flicker)
 local PAINT_SLICE = 0.008 -- seconds of painting per frame while a map is painted for the first time
@@ -39,7 +40,8 @@ type Token = {
 	label: TextLabel,
 	pos: Vector2,
 	target: Vector2,
-	neutral: boolean,
+	neutral: boolean, -- a neutral garrison: hidden below the region zoom
+	rebel: boolean, -- Rebels: owner 0 too, but always shown, with a 🏴
 	province: number,
 }
 
@@ -421,17 +423,18 @@ local function tokenTarget(army: Snapshot.ArmyRecord, slot: number): Vector2
 end
 
 local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
-	local neutral = army.owner == 0
+	local rebel = army.rebel
+	local neutral = army.owner == 0 and not rebel
 	local px = if neutral then TOKEN_SIZE - 4 else TOKEN_SIZE
 	local frame = Instance.new("Frame")
 	frame.Name = "Army" .. army.id
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.Position = at(target)
 	frame.Size = UDim2.fromOffset(px, px)
-	frame.BackgroundColor3 = nationColor(army.owner)
+	frame.BackgroundColor3 = if rebel then Palette.rebel else nationColor(army.owner)
 	frame.BorderSizePixel = 0
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(20, 20, 28)
+	stroke.Color = if rebel then Palette.rebelEdge else TOKEN_EDGE
 	stroke.Thickness = 2
 	stroke.Parent = frame
 	local label = textLabel(frame, "")
@@ -446,6 +449,7 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		pos = target,
 		target = target,
 		neutral = neutral,
+		rebel = rebel,
 		province = army.location,
 	}
 	frame.Visible = not neutral or detailVisible(MapView.zoom())
@@ -470,7 +474,8 @@ local function refreshArmies()
 			tokens[army.id] = token
 		end
 		local t = assert(token, "token")
-		t.label.Text = (if t.neutral then "🛡 " elseif army.inBattle then "💥 " else "⚔ ") .. shortMen(army.men)
+		local icon = if t.rebel then "🏴 " elseif t.neutral then "🛡 " elseif army.inBattle then "💥 " else "⚔ "
+		t.label.Text = icon .. shortMen(army.men)
 		t.target = target
 		t.province = army.location
 	end
@@ -537,7 +542,7 @@ end
 function MapRenderer.selectArmy(armyId: number?)
 	if selectedArmy and tokens[selectedArmy] then
 		local old = tokens[selectedArmy]
-		old.stroke.Color = Color3.fromRGB(20, 20, 28)
+		old.stroke.Color = if old.rebel then Palette.rebelEdge else TOKEN_EDGE
 		old.stroke.Thickness = 2
 	end
 	selectedArmy = armyId

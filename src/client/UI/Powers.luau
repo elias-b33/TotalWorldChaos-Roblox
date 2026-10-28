@@ -54,6 +54,7 @@ local onOpen: () -> () = function() end
 local choosing: Types.PrimordialPower? = nil -- a power picked, waiting for a target
 local target: number? = nil
 local targetText = ""
+local blocked: string? = nil -- why the last tapped target can't be hit (an immune nation), shown in the bar
 local wasPrimordial = false
 local flashes: { [number]: { text: string, untilClock: number } } = {}
 local shownEffects: { [number]: string } = {}
@@ -80,6 +81,7 @@ end
 local function closeAll()
 	choosing = nil
 	target = nil
+	blocked = nil
 	picker.Visible = false
 	bar.Visible = false
 	clearHighlight()
@@ -126,7 +128,7 @@ local function renderBar()
 		return
 	end
 	barTitle.Text = string.format("%s %s  ·  ⚡%d", ICONS[power], power, Primordial.cost(power))
-	barHint.Text = if target then "➜ " .. targetText else HINTS[Primordial.TARGETS[power]]
+	barHint.Text = if target then "➜ " .. targetText else blocked or HINTS[Primordial.TARGETS[power]]
 	Widgets.clear(barButtons)
 	local chosen = target
 	if chosen then
@@ -143,6 +145,7 @@ end
 function Powers.choose(power: Types.PrimordialPower)
 	choosing = power
 	target = nil
+	blocked = nil
 	picker.Visible = false
 	clearHighlight()
 	renderBar()
@@ -182,12 +185,18 @@ function Powers.tap(kind: "Army" | "Province" | nil, id: number?)
 	local province = if army then army.location elseif kind == "Province" then id else nil
 	clearHighlight()
 	target = nil
+	blocked = nil
+	local hit = 0 -- the nation the power would hit (0 = nobody)
 	if want == "Army" then
 		local armyId = if army then army.id elseif province then armyIn(province) else nil
 		local chosen = if armyId then ClientState.army(armyId) else nil
 		if chosen then
 			target = chosen.id
-			local owner = if chosen.owner == 0 then "Neutral" else nationName(chosen.owner)
+			hit = chosen.owner
+			local owner = if chosen.rebel
+				then "Rebels"
+				elseif chosen.owner == 0 then "Neutral"
+				else nationName(chosen.owner)
 			targetText =
 				string.format("%s's army (%s) at %s", owner, shortMen(chosen.men), provinceName(chosen.location))
 			MapRenderer.selectArmy(chosen.id)
@@ -197,16 +206,25 @@ function Powers.tap(kind: "Army" | "Province" | nil, id: number?)
 		if want == "Nation" then
 			if record and record.owner ~= 0 then
 				target = record.owner
+				hit = record.owner
 				targetText = nationName(record.owner)
 				MapRenderer.select(province)
 			end
 		else
 			target = province
+			hit = if record then record.owner else 0
 			targetText = provinceName(province)
 			MapRenderer.select(province)
 		end
 	end
-	if target == nil then
+	-- a harmful power can't hit a nation that is still immune (the server would refuse it): no Confirm
+	local victim = if hit ~= 0 then ClientState.nation(hit) else nil
+	local immuneFor = if victim then victim.powerImmuneUntil - ClientState.tick() else 0
+	if target and Primordial.HARMFUL[power] and immuneFor > 0 then
+		target = nil
+		blocked = string.format("🛡 %s is immune for %d s", nationName(hit), immuneFor)
+		toast(blocked)
+	elseif target == nil then
 		toast(HINTS[want])
 	end
 	renderBar()
@@ -217,7 +235,8 @@ end
 local function powerText(e: Types.MatchEvent): string
 	local power = Primordial.POWERS[e.a] or "?"
 	local icon = ICONS[power] or "✨"
-	local me = ClientState.myNation()
+	local mine = ClientState.myNation()
+	local me = if mine ~= 0 then mine else nil -- 0 is neutral too: a spectator is never "you"
 	local who = if e.b == 0 then "neutral" elseif e.b == me then "your" else nationName(e.b) .. "'s"
 	local text
 	if power == "Meteor" then

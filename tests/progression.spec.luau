@@ -144,7 +144,7 @@ T.test("the average match pays about 245 XP and 49 Glory", function()
 		local stats = busy(101)
 		stats.provincesTaken, stats.battlesWon = 8, 5
 		if place % 2 == 0 then
-			state.primordials[101] = { userId = 101, charges = 0 } -- rose as a Primordial in half the matches
+			state.primordials[101] = { userId = 101, charges = 0, chargeTicks = 0 } -- rose as a Primordial in half the matches
 		end
 		local r = Progression.matchReward(state, stats, STANDARD)
 		xp += r.xp
@@ -170,7 +170,7 @@ end)
 
 T.test("leaving early prorates the finish reward and pays no placement or Primordial bonus", function()
 	local state = finished({ 1 }, scoresFor({ 300, 200 }))
-	state.primordials[101] = { userId = 101, charges = 0 }
+	state.primordials[101] = { userId = 101, charges = 0, chargeTicks = 0 }
 	local stats = busy(101, 0, 700)
 	stats.provincesTaken = 2
 	Progression.leave(stats, 720)
@@ -234,7 +234,7 @@ end)
 T.test("an eliminated player who rose as a Primordial", function()
 	local state = finished({ 1 }, scoresFor({ 300, 0, 100, 90, 80, 70, 60, 50, 40, 30 }))
 	state.nations[2].eliminated = true
-	state.primordials[102] = { userId = 102, charges = 1 }
+	state.primordials[102] = { userId = 102, charges = 1, chargeTicks = 0 }
 	local stats = busy(102)
 	stats.powersUsed = 2
 	local r = Progression.matchReward(state, stats, STANDARD)

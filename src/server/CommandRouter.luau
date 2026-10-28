@@ -212,16 +212,9 @@ function CommandRouter.applyQueued(state: Types.MatchState)
 			nationId = if present then nationOf(item.player) else nil
 			userId = if present then item.player.UserId else nil
 		end
-		local nation = if nationId then state.nations[nationId] else nil
-		local ok, reason
-		if nationId and nation and not nation.eliminated then
-			ok, reason = Commands.apply(state, nationId, item.command)
-		elseif userId and state.primordials[userId] then
-			-- an eliminated player acts as their Primordial
-			ok, reason = Commands.applyPrimordial(state, userId, item.command)
-		else
-			ok, reason = false, "NoNation"
-		end
+		-- Sim decides who acts: the bot's nation, the player's living nation, or their Primordial (a player who left
+		-- has neither and is refused)
+		local ok, reason = Commands.applyFor(state, userId, nationId, item.command)
 		reply(item.player, item.requestId, ok, reason)
 		if item.player and userId then
 			for _, observer in observers do

@@ -8,14 +8,12 @@ type Army = Types.Army
 
 local Army = {}
 
+-- Takes the next army id. Ids count up for the whole match and are never reused, so a client's token, selected
+-- army or route, and a command still in the queue, can't end up meaning a newer army.
 function Army.nextId(state: MatchState): number
-	local maxId = 0
-	for id in state.armies do
-		if id > maxId then
-			maxId = id
-		end
-	end
-	return maxId + 1
+	local id = state.nextArmyId
+	state.nextArmyId = id + 1
+	return id
 end
 
 -- An army of this owner standing still in the province, if there is one.

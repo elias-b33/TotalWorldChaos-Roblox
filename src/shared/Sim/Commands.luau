@@ -100,7 +100,9 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 	if nation == nil or nation.eliminated then
 		return false, "NoNation"
 	end
-	if not ACTIVE_PHASES[state.phase] then
+	if state.phase == "Results" then
+		return false, "MatchOver"
+	elseif not ACTIVE_PHASES[state.phase] then
 		return false, "WrongPhase"
 	end
 	if command.kind == "Develop" then
@@ -139,6 +141,24 @@ function Commands.applyPrimordial(state: MatchState, userId: number, command: Co
 		return false, "Primordial"
 	end
 	return Primordial.use(state, { userId = userId }, command.power, command.target)
+end
+
+-- Who acts on a queued command (CommandRouter, tick order step 1).
+-- A bot (userId nil) acts for its nation while a bot still runs it: once a player has taken the nation over, a
+-- bot command still in the queue is refused (bots get no reply, so it is dropped silently). A player (userId set; nationId is the nation they hold, if any) acts
+-- for their living nation, or as their Primordial once it is eliminated. Anyone else is spectating.
+function Commands.applyFor(state: MatchState, userId: number?, nationId: number?, command: Command): (boolean, string?)
+	local nation = if nationId then state.nations[nationId] else nil
+	if nationId and nation and not nation.eliminated then
+		local mine = if userId then nation.userId == userId else nation.controller == "Bot" and nation.userId == nil
+		if mine then
+			return Commands.apply(state, nationId, command)
+		end
+	end
+	if userId and state.primordials[userId] then
+		return Commands.applyPrimordial(state, userId, command)
+	end
+	return false, "NoNation"
 end
 
 return Commands

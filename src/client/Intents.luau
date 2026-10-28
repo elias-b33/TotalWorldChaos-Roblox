@@ -42,6 +42,7 @@ local REASONS: { [string]: string } = {
 	NoBuilding = "🏚 No building there",
 	OwnTarget = "🚫 Not on yourself",
 	NoPowersYet = "⏳ Powers unlock at 3:00",
+	MatchOver = "🏁 The match is over",
 	Primordial = "✨ Primordials only use powers",
 	Locked = "🔒 This server's map is set",
 	UnknownMap = "🚫 Unknown map",

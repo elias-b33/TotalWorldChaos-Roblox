@@ -144,9 +144,7 @@ function Lobby.current(lobby: LobbyState): number?
 end
 
 local function seat(lobby: LobbyState, match: MatchState, userId: number, nationId: number)
-	local nation = match.nations[nationId]
-	nation.controller = "Player"
-	nation.userId = userId
+	Match.assign(match, nationId, userId)
 	lobby.picks[userId] = nationId
 	lobby.turn += 1
 	lobby.turnTicksLeft = lobby.turnTicks
@@ -228,6 +226,7 @@ function Lobby.leave(lobby: LobbyState, match: MatchState?, userId: number)
 		lobby.picks[userId] = nil
 		if match then
 			Match.unseatPlayer(match, userId)
+			match.seats[userId] = nil -- they gave up their pick: the nation is free for the draft and for others
 		end
 	end
 	if index < lobby.turn then

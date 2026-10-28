@@ -130,8 +130,11 @@ local function provinceName(id: number): string
 end
 
 -- The toast for a world event, from this player's point of view (nil = not worth interrupting for).
+-- Without a nation (spectating, or between seats) myNation is 0, the same id events use for neutral land,
+-- garrisons and Rebels: nil then, so nothing neutral reads as "you".
 local function eventText(e: Types.MatchEvent): string?
-	local me = ClientState.myNation()
+	local mine = ClientState.myNation()
+	local me = if mine ~= 0 then mine else nil
 	if e.kind == "WarDeclared" then
 		if e.b == me then
 			return "⚔ " .. nationName(e.a) .. " declared war on you!"

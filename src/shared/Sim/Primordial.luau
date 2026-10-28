@@ -6,6 +6,8 @@
 -- (MatchState.primordials) with charges of their own. Powers work in War and Cataclysm, never in Peace.
 -- Harmful powers (Meteor, Plague, Rebels, Earthquake) respect the nation's 30 s immunity and start it again;
 -- Blessing and Shield are gifts and ignore it. A Primordial may target anyone, the nation that beat them included.
+-- Meteor targets an army: the army's owner must not be immune and becomes immune. The development level it also
+-- costs the province is skipped while that province's owner is immune, and doesn't start their immunity.
 
 local Army = require("./Army")
 local Config = require("../Config")
@@ -141,11 +143,14 @@ local function strike(state: MatchState, power: Power, target: number, hit: numb
 			state.armies[target] = nil
 		end
 		local province = state.provinces[at]
-		province.development = math.max(1, province.development - p.Meteor.developmentLoss)
+		local owner = province.owner
+		if owner == nil or state.nations[owner].powerImmuneUntil <= state.tick then
+			province.development = math.max(1, province.development - p.Meteor.developmentLoss)
+		end
 	elseif power == "Plague" then
 		state.nations[target].plagueUntil = state.tick + p.Plague.ticks
 	elseif power == "Rebels" then
-		Army.spawn(state, 0, target, p.Rebels.men)
+		Army.spawn(state, 0, target, p.Rebels.men).rebel = true
 	elseif power == "Earthquake" then
 		state.provinces[target].building = "None"
 	elseif power == "Blessing" then
@@ -178,8 +183,12 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 	if Primordial.TARGETS[power] == nil then
 		return false, "BadRequest"
 	end
-	if state.phase ~= "War" and state.phase ~= "Cataclysm" then
+	if state.phase == "Peace" then
 		return false, "NoPowersYet"
+	elseif state.phase == "Results" then
+		return false, "MatchOver"
+	elseif state.phase ~= "War" and state.phase ~= "Cataclysm" then
+		return false, "WrongPhase"
 	end
 	local hit, at, err = Primordial.check(state, power, target)
 	if hit == nil then
@@ -317,7 +326,8 @@ function Primordial.eliminate(state: MatchState, nationId: number)
 		local existing = state.primordials[userId]
 		local charges =
 			math.min(Config.Primordial.MaxCharges, nation.charges + (if existing then existing.charges else 0))
-		state.primordials[userId] = { userId = userId, charges = charges }
+		local chargeTicks = if existing then existing.chargeTicks else 0 -- a fresh Primordial's clock starts now
+		state.primordials[userId] = { userId = userId, charges = charges, chargeTicks = chargeTicks }
 	end
 	nation.charges = 0
 	nation.plagueUntil = nil
@@ -327,12 +337,19 @@ end
 -- Charges, timers and disasters ------------------------------------------------------------------------
 
 local function interval(state: MatchState, ticks: number): number
-	local mult = if state.phase == "Cataclysm" then Config.Primordial.CataclysmChargeMultiplier else 1
-	return math.max(1, math.floor(ticks / mult))
+	return math.max(1, math.floor(ticks / Primordial.chargeSpeed(state)))
+end
+
+-- How fast charges come: twice as fast in the Cataclysm.
+function Primordial.chargeSpeed(state: MatchState): number
+	return if state.phase == "Cataclysm" then Config.Primordial.CataclysmChargeMultiplier else 1
 end
 
 -- Living nations earn a charge every NationChargeTicks, Primordials every PrimordialChargeTicks; twice as fast in
 -- the Cataclysm. Nobody holds more than MaxCharges.
+-- Nations all start at tick 0, so they share the match clock. Primordials rise at any moment, so each runs its
+-- own clock (chargeTicks) from the tick it rose: its first charge comes one full interval later, whatever the
+-- match clock says.
 function Primordial.charge(state: MatchState)
 	local cap = Config.Primordial.MaxCharges
 	if state.tick % interval(state, Config.Primordial.NationChargeTicks) == 0 then
@@ -342,8 +359,11 @@ function Primordial.charge(state: MatchState)
 			end
 		end
 	end
-	if state.tick % interval(state, Config.Primordial.PrimordialChargeTicks) == 0 then
-		for _, primordial in state.primordials do
+	local speed = Primordial.chargeSpeed(state)
+	for _, primordial in state.primordials do
+		primordial.chargeTicks += speed
+		if primordial.chargeTicks >= Config.Primordial.PrimordialChargeTicks then
+			primordial.chargeTicks -= Config.Primordial.PrimordialChargeTicks
 			primordial.charges = math.min(cap, primordial.charges + 1)
 		end
 	end
@@ -411,14 +431,15 @@ function Primordial.disaster(state: MatchState, rng: Rng.Rng): Power?
 	return nil
 end
 
--- Tick order step 6: eliminations, charges, timers, and the Cataclysm's disasters.
+-- Tick order step 6: charges, eliminations, timers, and the Cataclysm's disasters.
+-- Charges come first, so a Primordial rising this tick starts its clock on the next one.
 function Primordial.step(state: MatchState, rng: Rng.Rng)
+	Primordial.charge(state)
 	for _, id in sortedKeys(state.nations) do
 		if Primordial.shouldEliminate(state, id) then
 			Primordial.eliminate(state, id)
 		end
 	end
-	Primordial.charge(state)
 	Primordial.expire(state)
 	if Primordial.disasterDue(state) then
 		Primordial.disaster(state, rng)
