@@ -553,6 +553,7 @@ def layout(node, x, y, w, h, out):
     elif lst:
         gap = lst["padding"][0] * (w if lst["fill"] == "Horizontal" else h) + lst["padding"][1] * SCALE
         cursor = 0.0
+        first = len(out)
         for k in kids:
             kw, kh = udim(k["size"], w, h)
             if lst["fill"] == "Horizontal":
@@ -564,6 +565,13 @@ def layout(node, x, y, w, h, out):
                 rect = place(k, x, y + cursor, kw, kh, out, fixed=True)
                 cursor += (rect[3] - rect[1]) + gap
                 extent = max(extent, cursor - gap)
+        # a horizontal list centred or right-aligned: move the row (and everything inside it) over
+        if lst["fill"] == "Horizontal" and lst.get("halign") in ("Center", "Right") and kids:
+            spare = w - (cursor - gap)
+            shift = spare / 2 if lst["halign"] == "Center" else spare
+            for item in out[first:]:
+                a, b, c, d = item[1]
+                item[1] = (a + shift, b, c + shift, d)
     else:
         for k in sorted(kids, key=lambda c: c.get("zIndex", 1)):
             kw, kh = constrain(k, *udim(k["size"], w, h))
@@ -628,7 +636,7 @@ def place(node, x, y, w, h, out, fixed, anchor=(0, 0)):
 _images: dict = {}
 
 
-def draw_image(img, rect, info, images):
+def draw_image(img, rect, info, images, rotation=0):
     """An EditableImage shown by an ImageLabel: crop to the screen first (a zoomed map can be huge), then scale."""
     path = images[info["index"] - 1]
     if path not in _images:
@@ -649,6 +657,9 @@ def draw_image(img, rect, info, images):
         a[..., :3] *= np.array(tint)
         a[..., 3] *= 1 - fade
         part = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
+    if rotation and (vx0, vy0, vx1, vy1) == (x0, y0, x1, y1):
+        # GuiObject.Rotation turns clockwise round the centre (whole images only, e.g. an icon turned to point down)
+        part = part.rotate(-rotation, resample=Image.NEAREST if info.get("pixelated") else Image.BICUBIC)
     img.alpha_composite(part, (int(vx0), int(vy0)))
 
 
@@ -739,7 +750,7 @@ def draw_nodes(img, out, images=()):
             else:
                 fill(img, rect, node["bg"], alpha, radius)
         if node.get("image") and images:
-            draw_image(img, rect, node["image"], images)
+            draw_image(img, rect, node["image"], images, node.get("rotation", 0))
         stroke = node.get("uiStroke")
         if stroke and not stroke.get("text") and stroke.get("transparency", 0) < 0.99:
             outline(img, rect, stroke["color"], 1 - stroke.get("transparency", 0), stroke["thickness"] * SCALE, radius)

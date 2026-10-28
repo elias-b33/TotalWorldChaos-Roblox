@@ -2,7 +2,8 @@
 -- Map "juice" in the WorldBox pixel style (docs/DESIGN.md "UI and controls", "Sound and effects"): dust puffs and
 -- crossed swords where a battle starts, a burst when it ends (bigger, with a skull, if an army was destroyed), a
 -- ring in the new owner's colour when a province changes hands, an effect for each Primordial power, and a flash
--- and banner when the phase changes. Sounds for the same moments come from Sounds.
+-- and banner when the phase changes (the UI kit's look: a coloured plate, a pixel icon, Fredoka One). Sounds for the
+-- same moments come from Sounds.
 --
 -- Power-effect cosmetics: a power is drawn in its caster's equipped look (Cosmetics.powerEffect, PowerFx.LOOKS).
 -- A look only picks colours and particle shapes; the area (PowerFx.AREA), the timing (POWER_SECONDS) and the
@@ -31,6 +32,10 @@ local MapView = require(Client.MapView)
 local Palette = require(Client.Palette)
 local PowerFx = require(Client.PowerFx)
 local Sounds = require(Client.Sounds)
+local Icons = require(Client.UI.Icons)
+local Widgets = require(Client.UI.Widgets)
+
+local Theme = Widgets.Theme
 
 local MAX_PARTICLES = 240 -- pooled frames, all effects together (the map's GUI budget is 2,000 objects)
 local MAX_MINOR = 8 -- other nations' battles and captures running at once
@@ -44,6 +49,9 @@ local SYNC_SECONDS = 0.5 -- how often shield domes are checked
 local FADE = 0.35 -- seconds a sprite takes to fade out
 local METEOR_FALL = 0.7 -- seconds from the sky to the ground
 local BANNER_SECONDS = 1.8
+local BANNER_HEIGHT = 56
+local BANNER_POP = 0.6 -- the banner pops in from this scale
+local BANNER_FADE = 0.4 -- seconds it takes to fade out
 
 local fx = Palette.fx
 
@@ -56,11 +64,18 @@ local FLAG = { "PFFF", "PFFF", "P...", "P...", "P..." }
 local FLAG_COLORS: { [string]: Color3 } = { P = fx.pole, F = fx.ink }
 local CRATER = { ".CCC.", "CDDDC", "CDDDC", ".CCC." }
 
--- Phase banners: icon and a few words, and the flash colour.
-local PHASES: { [string]: { text: string, color: Color3, sound: Sounds.SoundName } } = {
-	War = { text = "⚔ WAR!", color = fx.fireRed, sound = "War" },
-	Cataclysm = { text = "☄ CATACLYSM!", color = fx.fireOrange, sound = "Cataclysm" },
-	Results = { text = "🏁 MATCH OVER", color = fx.gold, sound = "Results" },
+-- Phase banners: a pixel icon and a few words on a plate in the kit's colours, and the flash colour.
+type Phase = { text: string, icon: string, plate: Color3, color: Color3, sound: Sounds.SoundName }
+local PHASES: { [string]: Phase } = {
+	War = { text = "WAR!", icon = "war", plate = Theme.color.danger, color = fx.fireRed, sound = "War" },
+	Cataclysm = {
+		text = "CATACLYSM!",
+		icon = "meteor",
+		plate = Theme.color.special,
+		color = fx.fireOrange,
+		sound = "Cataclysm",
+	},
+	Results = { text = "MATCH OVER", icon = "flag", plate = Theme.color.gold, color = fx.gold, sound = "Results" },
 }
 
 local Effects = {}
@@ -86,6 +101,9 @@ local seed = 20240611
 
 local flash: Frame
 local banner: TextLabel
+local bannerIcon: GuiObject
+local bannerStroke: UIStroke
+local bannerScale: UIScale
 local bannerSerial = 0
 
 -- Helpers ------------------------------------------------------------------------------------------------
@@ -737,19 +755,29 @@ local function phaseChanged(name: string)
 	bannerSerial += 1
 	local serial = bannerSerial
 	banner.Text = def.text
-	banner.TextColor3 = def.color
-	banner.TextSize = 12
+	banner.BackgroundColor3 = def.plate
+	banner.TextColor3 = if def.plate == Theme.color.gold then Theme.color.textDark else Theme.color.text
 	banner.TextTransparency = 0
-	banner.BackgroundTransparency = 0.15
+	banner.BackgroundTransparency = 0
+	bannerStroke.Transparency = 0
+	Icons.set(bannerIcon, def.icon)
+	Icons.dim(bannerIcon, false)
+	bannerScale.Scale = BANNER_POP
 	banner.Visible = true
-	TweenService:Create(banner, TweenInfo.new(0.35, Enum.EasingStyle.Back), { TextSize = 34 }):Play()
+	TweenService:Create(bannerScale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	task.delay(BANNER_SECONDS, function()
 		if bannerSerial == serial then
-			local info = TweenInfo.new(0.4, Enum.EasingStyle.Quad)
+			local info = TweenInfo.new(BANNER_FADE, Enum.EasingStyle.Quad)
 			TweenService:Create(banner, info, { TextTransparency = 1, BackgroundTransparency = 1 }):Play()
+			TweenService:Create(bannerStroke, info, { Transparency = 1 }):Play()
+			if bannerIcon:IsA("ImageLabel") then
+				TweenService:Create(bannerIcon, info, { ImageTransparency = 1 }):Play()
+			elseif bannerIcon:IsA("TextLabel") then
+				TweenService:Create(bannerIcon, info, { TextTransparency = 1 }):Play()
+			end
 		end
 	end)
-	task.delay(BANNER_SECONDS + 0.45, function()
+	task.delay(BANNER_SECONDS + BANNER_FADE + 0.05, function()
 		if bannerSerial == serial then
 			banner.Visible = false
 			flash.Visible = false
@@ -863,19 +891,30 @@ function Effects.init()
 	flash.BackgroundTransparency = 1
 	flash.Visible = false
 	flash.Parent = gui
+	-- the phase banner: a plate in the phase's colour with an ink outline and a darker bottom edge (like the kit's
+	-- buttons), a 32 px pixel icon and Fredoka One, as wide as its words; it pops in and fades out
 	banner = Instance.new("TextLabel")
 	banner.Name = "Banner"
 	banner.AnchorPoint = Vector2.new(0.5, 0.5)
 	banner.Position = UDim2.fromScale(0.5, 0.36)
-	banner.Size = UDim2.fromOffset(320, 60)
-	banner.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-	banner.Font = Enum.Font.GothamBlack
-	banner.TextStrokeTransparency = 0.3
+	banner.Size = UDim2.fromOffset(0, BANNER_HEIGHT)
+	banner.AutomaticSize = Enum.AutomaticSize.X
+	banner.BackgroundColor3 = Theme.color.danger
+	banner.BorderSizePixel = 0
+	banner.FontFace = Theme.font.display
+	banner.TextSize = Theme.text.hero
+	banner.TextColor3 = Theme.color.text
 	banner.Visible = false
 	banner.Parent = gui
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = banner
+	Widgets.corner(banner, Theme.radius.l)
+	bannerStroke = Widgets.stroke(banner)
+	Widgets.bevel(banner)
+	local pad = Widgets.padding(banner, Theme.space.xl, 0)
+	pad.PaddingBottom = UDim.new(0, math.floor(BANNER_HEIGHT * Theme.bevel)) -- the words sit above the darker edge
+	pad.PaddingRight = UDim.new(0, Theme.space.xl + Theme.space.s)
+	bannerIcon = Widgets.leadIcon(banner, "war", Theme.size.iconLarge, Theme.space.m)
+	bannerScale = Instance.new("UIScale")
+	bannerScale.Parent = banner
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ClientState.onReset(onReset)
