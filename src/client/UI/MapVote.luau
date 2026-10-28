@@ -286,6 +286,7 @@ function MapVote.init()
 	row.Size = UDim2.new(1, -24, 1, -82)
 	row.Parent = root
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	LobbyState.onChange(function()
 		MapVote.render()

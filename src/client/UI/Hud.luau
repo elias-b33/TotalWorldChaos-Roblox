@@ -1,6 +1,10 @@
 --!strict
--- Top bar (your nation, gold, manpower, rank, phase and timer) and toasts for what happens in the world.
--- Icons and numbers, no paragraphs: each value is a chip with a pixel icon (Widgets.chip).
+-- The top bar (docs/UI_DIRECTION.md 7.9): floating plates in Roblox's own top-bar row, no band. Your nation (a
+-- slate gem with your flag: tap to re-centre on your capital), gold and manpower counters with their icons riding
+-- over them, the clock in a medallion ringed in the phase's colour, your rank and level, and gem buttons for the
+-- nations drawer, the shop and the sound. A scrim behind keeps them readable over snow and sea. On a narrow screen
+-- the least important items step aside (fitBar); on a wide one the groups spread out. Also the toasts for what
+-- happens in the world, under the bar.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,66 +19,66 @@ local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
-local Palette = require(Client.Palette)
+local Cosmetics = require(Client.Cosmetics)
+local LobbyState = require(Client.LobbyState)
 local ProfileState = require(Client.ProfileState)
 local Relations = require(Client.Relations)
 local Sounds = require(Client.Sounds)
+local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local BAR_HEIGHT = Theme.size.bar
-local BAR_PADDING = 12 -- left and right
-local BAR_GAP = 8 -- between items
-local BAR_BUTTON = 40 -- icon buttons in the bar (the bar's full height is the touch target)
+local ITEM = HudLayout.ITEM -- a gem button's height; every plate centres on its face line
+local FACE = 17 -- a gem button's face centre, from its top
+local GAP = Theme.space.m -- between items in a group
+local GROUP_GAP = Theme.space.l -- between groups
+local MAX_SPREAD = 24 -- on a wide screen, at most this much more between two groups
+local NATION_MAX = 140 -- the nation button at most
+local NATION_FLAG = 48 -- the nation button with its flag only (a small phone)
+local FLAG_SIZE = Vector2.new(24, 18)
+local RANK_WIDTH = 64 -- "#10": a trophy and two digits
+local LEVEL_WIDTH = 50 -- a medal and two digits
+local COUNTER_OVERHANG = 10 -- a counter's icon rides this far over its left end
+local CLOCK_OVERHANG = 18 -- the clock's medallion, over the clock's left end
+local SCRIM_FADE = 20 -- the scrim reaches this far under the bar
 local TOAST_SECONDS = 2.5
 local TOAST_WIDTH = 340 -- clear of the tutorial card at the top left
-local LEFT_PANELS = 264 -- the nations drawer (8 + 256 px) and the tutorial card (8 + 236 px) stay left of the toasts
+local LEFT_PANELS = 264 -- the nations drawer (8 + 256 px) and the tutorial card stay left of the toasts
 
 local Hud = {}
 
+type Item = {
+	obj: GuiObject,
+	group: number, -- items of a group sit GAP apart; groups GROUP_GAP apart (and more on wide screens)
+	width: number, -- the room it takes, overhangs included
+	offset: number, -- where the object starts in that room
+	height: number, -- the object's height: it centres on the face line (a gem button sits on it)
+	right: boolean?, -- in the right-hand group
+}
+
 local gui: ScreenGui
+local scrim: Frame
+local bar: Frame
+local barScale: UIScale
+local capital: TextButton
+local nationLabel: TextLabel
+local nationIcon: GuiObject
+local flag: GuiObject? = nil
+local flagKey = ""
 local goldLabel: TextLabel
 local manpowerLabel: TextLabel
 local clockLabel: TextLabel
+local clockMedallion: ImageLabel
 local clockIcon: GuiObject
 local rankLabel: TextLabel
-local nationLabel: TextLabel
-local nationSwatch: Frame
-local nationIcon: GuiObject
 local levelLabel: TextLabel
+local items: { Item } = {}
+local nationWidth = NATION_MAX
 local toastLabel: TextLabel
 local toastUntil = 0
 local toastQueue: { string } = {}
 local MAX_QUEUED_TOASTS = 4
-
--- On narrow screens (small or notched phones) the least important items step aside, in this order, so the bar
--- never runs off the screen.
-local function fitBar(bar: Frame, optional: { GuiObject })
-	local available = bar.AbsoluteSize.X - 2 * BAR_PADDING
-	if available <= 0 then
-		return -- not laid out yet
-	end
-	local function needed(): number
-		local total, count = 0, 0
-		for _, child in bar:GetChildren() do
-			if child:IsA("GuiObject") and child.Visible then
-				total += child.Size.X.Offset
-				count += 1
-			end
-		end
-		return total + math.max(count - 1, 0) * BAR_GAP
-	end
-	for _, item in optional do
-		item.Visible = true
-	end
-	for _, item in optional do
-		if needed() <= available then
-			break
-		end
-		item.Visible = false
-	end
-end
 
 local function formatNumber(n: number): string
 	if math.abs(n) >= 10000 then
@@ -95,28 +99,173 @@ local PHASE_ICONS: { [string]: string } = {
 	Results = "flag",
 }
 
+-- The phase medallion's ring: green in Peace, red at War, purple in the Cataclysm, gold on Results.
+local PHASE_STYLES: { [string]: string } = {
+	Peace = "peace",
+	War = "war",
+	Cataclysm = "cataclysm",
+	Results = "gold",
+}
+
+-- Where Hud.contentTop() starts and the bar's own row: see HudLayout.
+function Hud.contentTop(): number
+	return HudLayout.contentTop()
+end
+
+-- The nation button's width for a name: the flag, the name in Fredoka One 18 (about 10 px a letter), the padding.
+local function nationButtonWidth(name: string): number
+	local w = 42 + (utf8.len(name) or #name) * 10 + 8
+	return math.min(NATION_MAX, w + w % 2)
+end
+
+-- Lay the bar out (docs/UI_DIRECTION.md 7.9): the groups from the left, the buttons at the right end; on a narrow
+-- screen the level, then the rank, then the nation's name step aside; on a wide one the groups spread out.
+local function place()
+	local row = HudLayout.row()
+	local k = row.scale
+	local width = (row.x1 - row.x0) / k
+	bar.Position = UDim2.fromOffset(row.x0, row.top)
+	bar.Size = UDim2.fromOffset(width, ITEM)
+	barScale.Scale = k
+	scrim.Size = UDim2.new(1, 0, 0, row.top + ITEM * k + SCRIM_FADE)
+
+	-- what fits: drop the optional items in order until the rest does
+	local alive = goldLabel.Visible
+	local showLevel, showRank, showName = true, alive, true
+	local function needed(): number
+		local total, lastGroup, rightWidth = 0, nil :: number?, 0
+		for _, item in items do
+			local shown = item.obj.Visible
+			if item.obj == levelLabel then
+				shown = showLevel
+			elseif item.obj == rankLabel then
+				shown = showRank
+			end
+			if shown then
+				local w = if item.obj == capital then (if showName then nationWidth else NATION_FLAG) else item.width
+				if item.right then
+					rightWidth += w + (if rightWidth > 0 then GAP else 0)
+				else
+					total += w + (if lastGroup == nil then 0 elseif lastGroup == item.group then GAP else GROUP_GAP)
+					lastGroup = item.group
+				end
+			end
+		end
+		return total + GROUP_GAP + rightWidth
+	end
+	if needed() > width then
+		showLevel = false
+	end
+	if needed() > width then
+		showRank = false
+	end
+	if needed() > width then
+		showName = false
+	end
+	levelLabel.Visible = showLevel
+	rankLabel.Visible = showRank and alive
+	nationLabel.Visible = showName
+	local capitalWidth = if showName then nationWidth else NATION_FLAG
+	capital.Size = UDim2.fromOffset(capitalWidth, ITEM)
+
+	-- the spare width spreads the left groups apart, a little
+	local groups = 0
+	local lastGroup: number? = nil
+	for _, item in items do
+		if item.obj.Visible and not item.right then
+			if lastGroup ~= nil and lastGroup ~= item.group then
+				groups += 1
+			end
+			lastGroup = item.group
+		end
+	end
+	local spare = math.max(0, width - needed())
+	local spread = if groups > 0 then math.min(MAX_SPREAD, spare // (groups + 1)) else 0
+
+	local x = 0
+	lastGroup = nil
+	local rightX = width
+	for i = #items, 1, -1 do -- the right-hand group, from the right end
+		local item = items[i]
+		if item.right and item.obj.Visible then
+			rightX -= item.width
+			item.obj.Position = UDim2.fromOffset(rightX + item.offset, 0)
+			rightX -= GAP
+		end
+	end
+	for _, item in items do
+		if item.obj.Visible and not item.right then
+			if lastGroup ~= nil then
+				x += if lastGroup == item.group then GAP else GROUP_GAP + spread
+			end
+			lastGroup = item.group
+			local w = if item.obj == capital then capitalWidth else item.width
+			-- gem buttons sit on the row's top; everything else centres on their face line
+			local top = if item.height >= ITEM then 0 else FACE - item.height / 2
+			item.obj.Position = UDim2.fromOffset(x + item.offset, top)
+			x += w
+		end
+	end
+	if toastLabel then
+		local toastTop = (HudLayout.barBottom() + HudLayout.GAP * Widgets.uiScale()) / Widgets.uiScale()
+		Widgets.fit(toastLabel, nil, UDim2.new(0.5, LEFT_PANELS // 2, 0, toastTop))
+	end
+end
+
+-- Your flag on the nation button, rebuilt only when it changes.
+local function setFlag(nation: Types.NationState?)
+	local key = if nation then Cosmetics.of(nation.id).flag .. ":" .. nation.colorIndex else ""
+	if key == flagKey then
+		return
+	end
+	flagKey = key
+	if flag then
+		flag:Destroy()
+		flag = nil
+	end
+	if nation then
+		local f = Cosmetics.flagLabel(
+			capital,
+			Cosmetics.of(nation.id).flag,
+			nation.colorIndex,
+			UDim2.fromOffset(FLAG_SIZE.X, FLAG_SIZE.Y)
+		)
+		f.AnchorPoint = Vector2.new(0, 0.5)
+		f.Position = UDim2.new(0, 10, 0.5, 0)
+		f.ZIndex = 3
+		flag = f
+	end
+end
+
 local function refresh()
+	-- the bar is the match's: the lobby and the draft have screens of their own
+	local inMatch = LobbyState.phase() == "None" and ClientState.snapshot() ~= nil
+	bar.Visible = inMatch
+	scrim.Visible = inMatch
 	local me = ClientState.nation(ClientState.myNation())
 	local alive = me ~= nil and not me.eliminated
 	goldLabel.Visible = alive
 	manpowerLabel.Visible = alive
 	rankLabel.Visible = alive
-	nationSwatch.Visible = alive
 	nationIcon.Visible = not alive
 	if me and me.eliminated then
 		nationLabel.Text = "Primordial"
 		Icons.set(nationIcon, "sparkles")
+		setFlag(nil)
 	elseif me then
 		goldLabel.Text = formatNumber(me.gold)
-		goldLabel.TextColor3 = if me.gold < 0 then Theme.color.warn else Theme.color.text
+		goldLabel.TextColor3 = if me.gold < 0 then Theme.color.negative else Theme.color.text
 		manpowerLabel.Text = formatNumber(me.manpower)
 		nationLabel.Text = me.name
-		nationSwatch.BackgroundColor3 = Palette.nation(me.colorIndex)
 		rankLabel.Text = "#" .. Relations.rank(me.id)
+		setFlag(me)
 	else
 		nationLabel.Text = "Spectating"
 		Icons.set(nationIcon, "eye")
+		setFlag(nil)
 	end
+	nationWidth = nationButtonWidth(nationLabel.Text)
+	place()
 end
 
 local function updateClock()
@@ -126,8 +275,11 @@ local function updateClock()
 	local phase = if snap and snap.result then "Results" else Match.phaseAt(tick, setup)
 	local remaining = if phase == "Results" then 0 else Settings.timing(setup).matchEnd - tick
 	clockLabel.Text = formatClock(remaining)
-	clockLabel:SetAttribute("Phase", phase)
-	Icons.set(clockIcon, PHASE_ICONS[phase] or "clock")
+	if clockLabel:GetAttribute("Phase") ~= phase then
+		clockLabel:SetAttribute("Phase", phase)
+		Icons.set(clockIcon, PHASE_ICONS[phase] or "clock")
+		Widgets.setMedallion(clockMedallion, PHASE_STYLES[phase] or "slate")
+	end
 	if os.clock() > toastUntil then
 		local nextText = table.remove(toastQueue, 1)
 		if nextText then
@@ -195,111 +347,125 @@ local function eventText(e: Types.MatchEvent): string?
 	return nil
 end
 
--- A plain icon button in the bar. `name` is what the harness presses.
-local function barButton(parent: Instance, name: string, icon: string, order: number, onPress: () -> ()): TextButton
-	local button = Widgets.iconButton(parent, icon, name, BAR_BUTTON, nil, onPress)
-	button.LayoutOrder = order
+-- A slate gem icon button in the bar. `name` is what the harness presses.
+local function barButton(name: string, icon: string, onPress: () -> ()): TextButton
+	local button = Widgets.iconButton(bar, icon, name, ITEM, Theme.color.slate, onPress)
+	Widgets.shadow(button, "button")
 	return button
+end
+
+local function add(obj: GuiObject, group: number, width: number, offset: number, height: number, right: boolean?)
+	table.insert(items, { obj = obj, group = group, width = width, offset = offset, height = height, right = right })
 end
 
 function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopButton: (() -> ())?)
 	gui = Instance.new("ScreenGui")
 	gui.Name = "Hud"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = false
+	-- the bar sits in Roblox's own top-bar row: this screen's coordinates are the screen's
+	gui.IgnoreGuiInset = true
+	gui.ScreenInsets = Enum.ScreenInsets.None
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-	local bar = Instance.new("Frame")
+	-- an ink shade fading down from the top: plates stay readable over snow and sea (it is not a bar)
+	scrim = Instance.new("Frame")
+	scrim.Name = "Scrim"
+	scrim.BackgroundColor3 = Theme.color.ink
+	scrim.BorderSizePixel = 0
+	scrim.ZIndex = 0
+	scrim.Parent = gui
+	local fade = Instance.new("UIGradient")
+	fade.Rotation = 90
+	fade.Transparency = NumberSequence.new(0.4, 1)
+	fade.Parent = scrim
+
+	bar = Instance.new("Frame")
 	bar.Name = "TopBar"
-	bar.Active = true -- swallow taps so they don't reach the map
-	bar.Size = UDim2.new(1, 0, 0, BAR_HEIGHT)
-	bar.BackgroundColor3 = Theme.color.navy
-	bar.BackgroundTransparency = 0 -- solid: map names behind it would read as clutter
-	bar.BorderSizePixel = 0
+	bar.Active = true -- swallow taps on the row so they don't reach the map
+	bar.BackgroundTransparency = 1
 	bar.Parent = gui
-	Widgets.stroke(bar)
-	Widgets.bevel(bar, true)
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, BAR_PADDING)
-	padding.PaddingRight = UDim.new(0, BAR_PADDING)
-	padding.Parent = bar
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, BAR_GAP)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = bar
+	barScale = Instance.new("UIScale")
+	barScale.Name = "DeviceScale"
+	barScale.Parent = bar
 
-	-- capital button: recentres the camera on your capital (stands in for double-tapping it)
-	barButton(bar, "Capital", "castle", 1, onCapitalButton)
-
-	-- your nation: its colour (a Primordial or a spectator gets an icon instead) and its name
-	nationSwatch = Instance.new("Frame")
-	nationSwatch.Name = "Swatch"
-	nationSwatch.Size = UDim2.fromOffset(16, 16)
-	nationSwatch.BorderSizePixel = 0
-	nationSwatch.LayoutOrder = 2
-	nationSwatch.Parent = bar
-	Widgets.corner(nationSwatch, Theme.radius.s)
-	Widgets.stroke(nationSwatch)
-	nationIcon = Widgets.icon(bar, "eye", Theme.size.icon)
-	nationIcon.LayoutOrder = 2
-	nationIcon.Visible = false
-
-	nationLabel = Widgets.label(bar, "", Theme.text.heading, BAR_HEIGHT)
+	-- your nation: tap to re-centre on your capital (stands in for double-tapping it)
+	capital = Widgets.button(bar, "", NATION_MAX, Theme.color.slate, onCapitalButton)
+	capital.Name = "Capital"
+	Widgets.shadow(capital, "button")
+	nationLabel = Widgets.label(capital, "", Theme.text.heading, 30)
 	nationLabel.Name = "Nation"
 	nationLabel.FontFace = Theme.font.display
-	nationLabel.Size = UDim2.fromOffset(110, BAR_HEIGHT)
+	nationLabel.AnchorPoint = Vector2.new(0, 0.5)
+	nationLabel.Position = UDim2.new(0, 42, 0.5, 0)
+	nationLabel.Size = UDim2.new(1, -44, 0, 30)
 	nationLabel.TextWrapped = false
 	nationLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	nationLabel.LayoutOrder = 3
+	nationLabel.ZIndex = 3
+	Widgets.textStroke(nationLabel)
+	nationIcon = Widgets.icon(capital, "eye", Theme.size.icon)
+	nationIcon.AnchorPoint = Vector2.new(0, 0.5)
+	nationIcon.Position = UDim2.new(0, 14, 0.5, 0)
+	nationIcon.ZIndex = 3
+	nationIcon.Visible = false
+	add(capital, 1, NATION_MAX, 0, ITEM)
 
-	goldLabel = Widgets.chip(bar, "gold", "", 80)
+	goldLabel = Widgets.counter(bar, "gold", "", 80)
 	goldLabel.Name = "Gold"
-	goldLabel.LayoutOrder = 4
-	manpowerLabel = Widgets.chip(bar, "manpower", "", 84)
+	add(goldLabel, 2, COUNTER_OVERHANG + 80, COUNTER_OVERHANG, Theme.size.counter)
+	manpowerLabel = Widgets.counter(bar, "manpower", "", 86)
 	manpowerLabel.Name = "Manpower"
-	manpowerLabel.LayoutOrder = 5
-	rankLabel = Widgets.chip(bar, "trophy", "", 62)
-	rankLabel.Name = "Rank"
-	rankLabel.LayoutOrder = 6
-	clockLabel = Widgets.chip(bar, "peace", "", 86)
-	clockLabel.Name = "Clock"
-	clockLabel.LayoutOrder = 7
-	clockIcon = clockLabel:FindFirstChild("Icon") :: GuiObject
+	add(manpowerLabel, 2, COUNTER_OVERHANG + 86, COUNTER_OVERHANG, Theme.size.counter)
 
-	barButton(bar, "NationsButton", "globe", 8, onNationsButton)
+	-- the clock: the phase in a medallion ringed in its colour, over the left end of the time's counter
+	clockLabel = Widgets.counter(bar, nil, "", 80)
+	clockLabel.Name = "Clock"
+	clockMedallion, clockIcon = Widgets.medallion(clockLabel, "normal", "peace", "peace")
+	clockMedallion.AnchorPoint = Vector2.new(0, 0.5)
+	clockMedallion.Position = UDim2.new(0, -(CLOCK_OVERHANG + 26), 0.5, 0)
+	clockLabel:SetAttribute("Phase", "Peace")
+	local clockPad = clockLabel:FindFirstChildOfClass("UIPadding") :: UIPadding
+	clockPad.PaddingLeft = UDim.new(0, 26) -- "24:56" just clear of the medallion
+	clockPad.PaddingRight = UDim.new(0, Theme.space.xs)
+	add(clockLabel, 3, CLOCK_OVERHANG + 80, CLOCK_OVERHANG, Theme.size.counter)
+
+	rankLabel = Widgets.chip(bar, "trophy", "", RANK_WIDTH, Theme.size.counter)
+	rankLabel.Name = "Rank"
+	rankLabel.TextTruncate = Enum.TextTruncate.None -- "#10" fits
+	local rankLabelPad = rankLabel:FindFirstChildOfClass("UIPadding") :: UIPadding
+	rankLabelPad.PaddingRight = UDim.new(0, Theme.space.xs)
+	Widgets.shadow(rankLabel, "counter")
+	add(rankLabel, 4, RANK_WIDTH, 0, Theme.size.counter)
 
 	-- your account level (MONETIZATION.md 5.2), from the saved profile
-	levelLabel = Widgets.chip(bar, "medal", "", 52)
+	levelLabel = Widgets.chip(bar, "medal", "", LEVEL_WIDTH, Theme.size.counter)
 	levelLabel.Name = "Level"
-	levelLabel.LayoutOrder = 9
+	levelLabel.TextTruncate = Enum.TextTruncate.None
+	local levelLabelPad = levelLabel:FindFirstChildOfClass("UIPadding") :: UIPadding
+	levelLabelPad.PaddingRight = UDim.new(0, Theme.space.xs)
+	Widgets.shadow(levelLabel, "counter")
+	add(levelLabel, 4, LEVEL_WIDTH, 0, Theme.size.counter)
 	ProfileState.onChange(function()
 		local summary = ProfileState.summary()
 		levelLabel.Text = if summary then tostring(summary.level) else ""
 	end)
 
+	add(barButton("NationsButton", "globe", onNationsButton), 5, ITEM, 0, ITEM, true)
 	-- the shop (MONETIZATION.md 3): cosmetics only, Robux purchases open after the match
 	if onShopButton then
-		barButton(bar, "ShopButton", "cart", 10, onShopButton)
+		add(barButton("ShopButton", "cart", onShopButton), 5, ITEM, 0, ITEM, true)
 	end
-
 	-- sound on and off for the session (docs/DESIGN.md "Sound and effects")
-	local mute = barButton(bar, "Mute", "soundOn", 11, function() end)
+	local mute = barButton("Mute", "soundOn", function() end)
+	add(mute, 5, ITEM, 0, ITEM, true)
 	local muteIcon = mute:FindFirstChild("Icon") :: GuiObject
 	Sounds.attachMuteButton(mute, function(muted: boolean)
 		Icons.set(muteIcon, if muted then "soundOff" else "soundOn")
 		mute:SetAttribute("Muted", muted)
 	end)
 
-	local optional: { GuiObject } = { levelLabel, rankLabel, nationSwatch }
-	bar:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		fitBar(bar, optional)
-	end)
-	fitBar(bar, optional)
-
-	toastLabel = Widgets.toast(gui, BAR_HEIGHT + 10, TOAST_WIDTH)
-	-- centred in the room right of the top-left panels, so a toast never covers them, even on a 667 px phone
-	toastLabel.Position = UDim2.new(0.5, LEFT_PANELS // 2, 0, BAR_HEIGHT + 10)
+	toastLabel = Widgets.toast(gui, 0, TOAST_WIDTH)
+	place()
+	HudLayout.onChange(place)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -315,10 +481,13 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 			end
 		end
 	end)
+	LobbyState.onChange(refresh)
+	Cosmetics.onChange(refresh)
 	Remotes.event("Notify").OnClientEvent:Connect(function(_kind: string, text: string)
 		Hud.toast(text)
 	end)
 	RunService.Heartbeat:Connect(updateClock)
+	refresh()
 end
 
 return Hud

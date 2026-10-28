@@ -4,7 +4,7 @@
 
 Parts are projected with the client's real camera (perspective, field of view, viewport). GUI layout covers
 what this game uses: UDim2 size/position/anchor, UIListLayout, UIGridLayout, UIPadding, UICorner,
-UISizeConstraint and AutomaticSize. It is a debugging view, not a pixel-perfect Roblox.
+UISizeConstraint, AutomaticSize and UIScale (a scaled object and everything in it grow round its anchor point). It is a debugging view, not a pixel-perfect Roblox.
 """
 
 from __future__ import annotations
@@ -527,15 +527,17 @@ def gui_children(node):
     return [c for c in node["children"] if "size" in c and c.get("visible", True)]
 
 
-def udim(u, parent_w, parent_h):
-    return u[0] * parent_w + u[1] * SCALE, u[2] * parent_h + u[3] * SCALE
+def udim(u, parent_w, parent_h, k=1.0):
+    """A UDim2 in render pixels; k is the UIScale its parent is drawn at (offsets grow with it)."""
+    return u[0] * parent_w + u[1] * SCALE * k, u[2] * parent_h + u[3] * SCALE * k
 
 
-def layout(node, x, y, w, h, out):
-    """Lay out node's GUI children inside the content box (x, y, w, h); append (node, rect) to out in draw order."""
+def layout(node, x, y, w, h, out, k=1.0):
+    """Lay out node's GUI children inside the content box (x, y, w, h); append (node, rect) to out in draw order.
+    k: the UIScale node is drawn at (every UIScale above it multiplied)."""
     pad = child_of(node, "UIPadding")
     if pad:
-        t, b, l, r = (v * SCALE for v in pad["pad"])
+        t, b, l, r = (v * SCALE * k for v in pad["pad"])
         x, y, w, h = x + l, y + t, w - l - r, h - t - b
     kids = sorted(gui_children(node), key=lambda c: c["layoutOrder"])
     lst = child_of(node, "UIListLayout")
@@ -544,33 +546,33 @@ def layout(node, x, y, w, h, out):
     first_out = len(out)
     segments = []  # (zIndex, start, end) of each laid-out child's subtree in `out`, for the draw order
     if grid:
-        cw, ch = udim(grid["cell"], w, h)
-        px, py = udim(grid["cellPadding"], w, h)
+        cw, ch = udim(grid["cell"], w, h, k)
+        px, py = udim(grid["cellPadding"], w, h, k)
         per_row = max(1, int((w + px) // (cw + px)))
-        for i, k in enumerate(kids):
+        for i, kid in enumerate(kids):
             cx = x + (i % per_row) * (cw + px)
             cy = y + (i // per_row) * (ch + py)
             start = len(out)
-            place(k, cx, cy, cw, ch, out, fixed=True)
-            segments.append((k.get("zIndex", 1), start, len(out)))
+            place(kid, cx, cy, cw, ch, out, fixed=True, k=k)
+            segments.append((kid.get("zIndex", 1), start, len(out)))
             extent = max(extent, cy + ch - y)
     elif lst:
-        gap = lst["padding"][0] * (w if lst["fill"] == "Horizontal" else h) + lst["padding"][1] * SCALE
+        gap = lst["padding"][0] * (w if lst["fill"] == "Horizontal" else h) + lst["padding"][1] * SCALE * k
         cursor = 0.0
         first = len(out)
-        for k in kids:
-            kw, kh = udim(k["size"], w, h)
+        for kid in kids:
+            kw, kh = udim(kid["size"], w, h, k)
             start = len(out)
             if lst["fill"] == "Horizontal":
                 ky = y + ((h - kh) / 2 if lst["valign"] == "Center" else 0)
-                rect = place(k, x + cursor, ky, kw, kh, out, fixed=True)
+                rect = place(kid, x + cursor, ky, kw, kh, out, fixed=True, k=k)
                 cursor += (rect[2] - rect[0]) + gap
                 extent = max(extent, rect[3] - y)
             else:
-                rect = place(k, x, y + cursor, kw, kh, out, fixed=True)
+                rect = place(kid, x, y + cursor, kw, kh, out, fixed=True, k=k)
                 cursor += (rect[3] - rect[1]) + gap
                 extent = max(extent, cursor - gap)
-            segments.append((k.get("zIndex", 1), start, len(out)))
+            segments.append((kid.get("zIndex", 1), start, len(out)))
         # a horizontal list centred or right-aligned: move the row (and everything inside it) over
         if lst["fill"] == "Horizontal" and lst.get("halign") in ("Center", "Right") and kids:
             spare = w - (cursor - gap)
@@ -579,57 +581,63 @@ def layout(node, x, y, w, h, out):
                 a, b, c, d = item[1]
                 item[1] = (a + shift, b, c + shift, d)
     else:
-        for k in sorted(kids, key=lambda c: c.get("zIndex", 1)):
-            kw, kh = constrain(k, *udim(k["size"], w, h))
-            px, py = udim(k["position"], w, h)
-            ax, ay = k["anchor"]
-            rect = place(k, x + px - ax * kw, y + py - ay * kh, kw, kh, out, fixed=False, anchor=(ax, ay))
+        for kid in sorted(kids, key=lambda c: c.get("zIndex", 1)):
+            kw, kh = constrain(kid, *udim(kid["size"], w, h, k), k)
+            px, py = udim(kid["position"], w, h, k)
+            ax, ay = kid["anchor"]
+            rect = place(kid, x + px - ax * kw, y + py - ay * kh, kw, kh, out, fixed=False, anchor=(ax, ay), k=k)
             extent = max(extent, rect[3] - y)
     # Roblox draws siblings by ZIndex (ZIndexBehavior Sibling), whatever order a layout puts them in
     if segments and any(z != segments[0][0] for z, _, _ in segments):
         chunks = [out[a:b] for _, a, b in sorted(segments, key=lambda seg: seg[0])]
         out[first_out:] = [item for chunk in chunks for item in chunk]
-    return extent + (pad["pad"][1] * SCALE if pad else 0) + (pad["pad"][0] * SCALE if pad else 0)
+    return extent + ((pad["pad"][1] + pad["pad"][0]) * SCALE * k if pad else 0)
 
 
-def constrain(node, w, h):
+def constrain(node, w, h, k=1.0):
     """A UISizeConstraint's limits, applied before the anchor point places the object (as Roblox does)."""
     cons = child_of(node, "UISizeConstraint")
     if cons:
         mx, my = cons["maxSize"]  # null = math.huge
         if mx is not None:
-            w = min(w, mx * SCALE)
+            w = min(w, mx * SCALE * k)
         if my is not None:
-            h = min(h, my * SCALE)
+            h = min(h, my * SCALE * k)
     return w, h
 
 
-def text_width(node) -> float:
+def text_width(node, k=1.0) -> float:
     """Width a text object needs for its text plus padding (AutomaticSize X), in render pixels."""
-    size = int(node["textSize"] * SCALE)
+    size = int(node["textSize"] * SCALE * k)
     face = face_key(node.get("font"))
     w = max((measure_line(line, size, face) for line in node["text"].split("\n")), default=0)
     pad = child_of(node, "UIPadding")
     if pad:
-        w += (pad["pad"][2] + pad["pad"][3]) * SCALE
+        w += (pad["pad"][2] + pad["pad"][3]) * SCALE * k
     return w + 2
 
 
-def place(node, x, y, w, h, out, fixed, anchor=(0, 0)):
+def place(node, x, y, w, h, out, fixed, anchor=(0, 0), k=1.0):
     if node.get("autoSize") in ("X", "XY") and node.get("text") is not None:
-        grown = max(w, text_width(node))
+        grown = max(w, text_width(node, k))
         x -= (grown - w) * anchor[0]
         w = grown
     cons = child_of(node, "UISizeConstraint")
     if cons:
         mx, my = cons["maxSize"]  # null = math.huge
         if mx is not None:
-            w = min(w, mx * SCALE)
+            w = min(w, mx * SCALE * k)
         if my is not None:
-            h = min(h, my * SCALE)
+            h = min(h, my * SCALE * k)
+    # a UIScale: the object and everything in it grow round its anchor point
+    f = node.get("scale", 1) or 1
+    if f != 1:
+        x, y = x + (w - w * f) * anchor[0], y + (h - h * f) * anchor[1]
+        w, h = w * f, h * f
+    node["_k"] = k * f
     index = len(out)
     out.append([node, (x, y, x + w, y + h)])
-    content_h = layout(node, x, y, w, h, out)
+    content_h = layout(node, x, y, w, h, out, k * f)
     if node.get("autoSize") in ("Y", "XY") and content_h > h:
         grow = content_h - h
         # anchored at the bottom: grow upwards, and move everything already laid out inside
@@ -646,7 +654,7 @@ def place(node, x, y, w, h, out, fixed, anchor=(0, 0)):
 _images: dict = {}
 
 
-def draw_image(img, rect, info, images, rotation=0):
+def draw_image(img, rect, info, images, rotation=0, k=1.0):
     """An EditableImage shown by an ImageLabel: crop to the screen first (a zoomed map can be huge), then scale."""
     path = images[info["index"] - 1]
     if path not in _images:
@@ -655,7 +663,7 @@ def draw_image(img, rect, info, images, rotation=0):
     src = _images[path]
     x0, y0, x1, y1 = rect
     if info.get("slice"):
-        draw_slice(img, rect, src, info)
+        draw_slice(img, rect, src, info, k)
         return
     if info.get("fit") and x1 > x0 and y1 > y0:
         # ScaleType.Fit: the largest box with the image's shape, centred in the label
@@ -687,8 +695,8 @@ def nine_slice(src, sl, scale, w, h):
     nine_slice): corners keep scale x their size, edges stretch along one axis, the centre both ways."""
     x0, y0, x1, y1 = (int(v) for v in sl)
     iw, ih = src.size
-    left, right = x0 * scale, (iw - x1) * scale
-    top, bottom = y0 * scale, (ih - y1) * scale
+    left, right = int(round(x0 * scale)), int(round((iw - x1) * scale))
+    top, bottom = int(round(y0 * scale)), int(round((ih - y1) * scale))
     if left + right > w:  # smaller than its borders: the borders shrink to fit
         k = w / max(left + right, 1)
         left, right = int(left * k), w - int(left * k)
@@ -710,12 +718,12 @@ def nine_slice(src, sl, scale, w, h):
     return out
 
 
-def draw_slice(img, rect, src, info):
+def draw_slice(img, rect, src, info, k=1.0):
     x0, y0, x1, y1 = (int(round(v)) for v in rect)
     w, h = x1 - x0, y1 - y0
     if w < 1 or h < 1 or x1 < 0 or y1 < 0 or x0 > img.width or y0 > img.height:
         return
-    part = nine_slice(src, info["slice"], int(info.get("sliceScale", 1) * SCALE), w, h)
+    part = nine_slice(src, info["slice"], info.get("sliceScale", 1) * SCALE * k, w, h)
     tint, fade = info.get("color", [1, 1, 1]), info.get("transparency", 0)
     if tint != [1, 1, 1] or fade > 0:
         a = np.asarray(part, dtype=np.float64).copy()
@@ -726,14 +734,14 @@ def draw_slice(img, rect, src, info):
     img.alpha_composite(part.crop((left, top, w, h)), (x0 + left, y0 + top))
 
 
-def draw_shadow(img, rect, sh, radius):
+def draw_shadow(img, rect, sh, radius, k=1.0):
     """A UIShadow: the object's rounded rectangle, offset and spread, blurred by BlurRadius (0 = a hard pixel
     shadow), in its colour, behind the object."""
     x0, y0, x1, y1 = rect
-    ox, oy = sh["offset"][0] * SCALE, sh["offset"][1] * SCALE
-    sx, sy = sh["spread"][0] * SCALE, sh["spread"][1] * SCALE
+    ox, oy = sh["offset"][0] * SCALE * k, sh["offset"][1] * SCALE * k
+    sx, sy = sh["spread"][0] * SCALE * k, sh["spread"][1] * SCALE * k
     r = (x0 + ox - sx, y0 + oy - sy, x1 + ox + sx, y1 + oy + sy)
-    blur = sh.get("blur", 0) * SCALE
+    blur = sh.get("blur", 0) * SCALE * k
     pad = int(blur * 2) + 2
     lx, ly = int(r[0]) - pad, int(r[1]) - pad
     w, h = int(math.ceil(r[2])) - lx + pad, int(math.ceil(r[3])) - ly + pad
@@ -833,24 +841,25 @@ def draw_nodes(img, out, images=()):
         if x1 < 0 or y1 < 0 or x0 > img.width or y0 > img.height:
             continue
         alpha = 1 - node.get("bgT", 0)
+        k = node.get("_k", 1)
         corner = child_of(node, "UICorner")
         radius = 0
         if corner:
-            radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE
+            radius = min((x1 - x0), (y1 - y0)) * corner["radius"][0] + corner["radius"][1] * SCALE * k
             radius = min(radius, min(x1 - x0, y1 - y0) / 2)
         for sh in node.get("shadows", []):
-            draw_shadow(img, rect, sh, radius)
+            draw_shadow(img, rect, sh, radius, k)
         if alpha > 0.01:
             if node.get("gradient"):
                 gradient_fill(img, rect, node["bg"], alpha, radius, node["gradient"])
             else:
                 fill(img, rect, node["bg"], alpha, radius)
         if node.get("image") and images:
-            draw_image(img, rect, node["image"], images, node.get("rotation", 0))
+            draw_image(img, rect, node["image"], images, node.get("rotation", 0), k)
         strokes = node.get("uiStrokes") or ([node["uiStroke"]] if node.get("uiStroke") else [])
         for st in sorted(strokes, key=lambda st: st.get("zIndex", 1)):
             if not st.get("text") and st.get("transparency", 0) < 0.99:
-                outline(img, rect, st["color"], 1 - st.get("transparency", 0), st["thickness"] * SCALE, radius,
+                outline(img, rect, st["color"], 1 - st.get("transparency", 0), st["thickness"] * SCALE * k, radius,
                         st.get("position", "Outer"))
         text_strokes = [st for st in strokes if st.get("text")]
         stroke = text_strokes[-1] if text_strokes else None
@@ -858,19 +867,19 @@ def draw_nodes(img, out, images=()):
             text_stroke = None
             if stroke and stroke.get("text"):
                 text_stroke = (rgba(stroke["color"], 1 - stroke.get("transparency", 0)),
-                               max(1, int(round(stroke["thickness"] * SCALE))))
+                               max(1, int(round(stroke["thickness"] * SCALE * k))))
             elif node.get("stroke"):
-                text_stroke = (rgba(node.get("strokeColor", [0, 0, 0]), 1 - node.get("strokeT", 0)), SCALE)
+                text_stroke = (rgba(node.get("strokeColor", [0, 0, 0]), 1 - node.get("strokeT", 0)), int(SCALE * k))
             pad = child_of(node, "UIPadding")
             box = rect
             if pad:
-                t, b, l, r = (v * SCALE for v in pad["pad"])
+                t, b, l, r = (v * SCALE * k for v in pad["pad"])
                 box = (x0 + l, y0 + t, x1 - r, y1 - b)
             draw_text_block(
                 img,
                 box,
                 node["text"],
-                int(node["textSize"] * SCALE),
+                int(node["textSize"] * SCALE * k),
                 rgba(node["textColor"], 1 - node.get("textT", 0)),
                 align=node.get("textXAlign", "Center"),
                 valign=node.get("textYAlign", "Center"),

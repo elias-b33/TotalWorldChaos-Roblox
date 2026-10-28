@@ -1589,6 +1589,16 @@ function Emulator.shutdown(seconds: number?)
 end
 
 function Emulator.assertClean(label: string)
+	-- NO_EDITABLE_IMAGE=1 turns the game setting off on purpose: the map's warning about it is expected then
+	if process.env.NO_EDITABLE_IMAGE then
+		local kept = {}
+		for _, w in warnings do
+			if not string.find(w, "no EditableImage", 1, true) then
+				table.insert(kept, w)
+			end
+		end
+		warnings = kept
+	end
 	if #errors > 0 or #warnings > 0 then
 		stdio.ewrite(string.format("\n%s: %d errors, %d warnings\n", label, #errors, #warnings))
 		for _, e in errors do

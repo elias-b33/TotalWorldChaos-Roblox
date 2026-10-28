@@ -65,7 +65,7 @@ local MAX_QUEST_LINES = 3 -- quests the match moved, shown under the scores
 local MATCH_WIDTH = 316
 local REWARD_WIDTH = 280
 local COLUMN_GAP = Theme.space.xl
-local PANEL_WIDTH = MATCH_WIDTH + COLUMN_GAP + REWARD_WIDTH + 2 * Theme.space.l -- Widgets.panel's padding
+local PANEL_WIDTH = MATCH_WIDTH + COLUMN_GAP + REWARD_WIDTH + 2 * Widgets.PANEL_PAD -- inside the frame
 local ROW_HEIGHT = 26 -- a nation's row in the standings
 local LINE_HEIGHT = 18 -- a breakdown or quest line
 local LEVEL_HEIGHT = 24 -- the level line over the level bar
@@ -455,7 +455,7 @@ function Results.init(showHandler: () -> ())
 	dim.BorderSizePixel = 0
 	dim.Visible = false
 	dim.Parent = gui
-	panel = Widgets.panel(dim, PANEL_WIDTH)
+	panel = Widgets.panel(dim, PANEL_WIDTH, "brass")
 	panel.Name = "Panel"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
@@ -497,6 +497,7 @@ function Results.init(showHandler: () -> ())
 	footer.LayoutOrder = 1
 	footer.Parent = panel
 	Widgets.list(footer, true, Theme.space.m)
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	ClientState.onReset(render)
 	ClientState.onDelta(function(delta)

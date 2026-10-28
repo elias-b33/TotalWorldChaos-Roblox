@@ -828,17 +828,16 @@ local setOpen: (boolean) -> ()
 -- The panel's contents, built when it opens: header (title, Glory, VIP, test mode, pager, close), tabs, the
 -- page of cards and a footer line.
 local function build(): Refs
+	-- the title plate on the window's top edge, the close gem on its corner
+	Widgets.header(panel, "Shop", "cart", function()
+		setOpen(false)
+	end)
 	local header = Instance.new("Frame")
-	header.Name = "Header"
+	header.Name = "Info"
 	header.BackgroundTransparency = 1
 	header.Size = UDim2.new(1, 0, 0, BAR)
 	header.LayoutOrder = 1
 	header.Parent = panel
-	local close = Widgets.iconButton(header, "close", "✕", BAR, nil, function()
-		setOpen(false)
-	end)
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.fromScale(1, 0)
 	local pager, pageLabel = Widgets.pager(header, function()
 		page -= 1
 		Intents.signal("ItemViewed", tab) -- analytics
@@ -849,19 +848,13 @@ local function build(): Refs
 		render()
 	end)
 	pager.AnchorPoint = Vector2.new(1, 0)
-	pager.Position = UDim2.new(1, -(BAR + Theme.space.m), 0, 0)
+	pager.Position = UDim2.fromScale(1, 0)
 	local info = Instance.new("Frame")
-	info.Name = "Info"
+	info.Name = "Values"
 	info.BackgroundTransparency = 1
-	info.Size = UDim2.new(1, -(BAR + pager.Size.X.Offset + 2 * Theme.space.m), 1, 0)
+	info.Size = UDim2.new(1, -(pager.Size.X.Offset + Theme.space.m), 1, 0)
 	info.Parent = header
 	Widgets.list(info, true, Theme.space.m)
-	local title = Widgets.title(info, "Shop", Theme.text.title, BAR)
-	title.Size = UDim2.fromOffset(0, BAR)
-	title.AutomaticSize = Enum.AutomaticSize.X
-	title.TextTruncate = Enum.TextTruncate.None
-	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "cart", Theme.icon.small)
 	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
 	glory.Name = "Glory"
 	glory.LayoutOrder = 2
@@ -885,7 +878,7 @@ local function build(): Refs
 	local content = Instance.new("Frame")
 	content.Name = "Content"
 	content.BackgroundTransparency = 1
-	content.Size = UDim2.new(1, 0, 1, -(2 * BAR + FOOTER_HEIGHT + 3 * Theme.space.s))
+	content.Size = UDim2.new(1, 0, 1, -(2 * BAR + FOOTER_HEIGHT + 4 * Theme.space.s)) -- four gaps: the header's too
 	content.LayoutOrder = 3
 	content.Parent = panel
 
@@ -942,10 +935,7 @@ local function showStarterOffer()
 		return
 	end
 	Widgets.clear(offerPanel)
-	local title = Widgets.title(offerPanel, offer.name, Theme.text.title, TITLE_HEIGHT)
-	title.Name = "Title"
-	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "gift", Theme.icon.small)
+	Widgets.header(offerPanel, offer.name, "gift")
 	-- what's inside, two columns, each with its slot's icon
 	local items = Instance.new("Frame")
 	items.Name = "Items"
@@ -1039,13 +1029,14 @@ function ShopUI.init(showToast: (string) -> ())
 	panel = Widgets.window(gui, "ShopPanel")
 	Widgets.list(panel, false, Theme.space.s)
 
-	offerPanel = Widgets.panel(gui, 400)
+	offerPanel = Widgets.panel(gui, 400, "brass")
 	offerPanel.Name = "StarterOffer"
 	offerPanel.AnchorPoint = Vector2.new(0.5, 0.5)
 	offerPanel.Position = UDim2.fromScale(0.5, 0.5)
 	offerPanel.Visible = false
 	Widgets.list(offerPanel, false, Theme.space.s)
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ShopState.onChange(function(offer: boolean)

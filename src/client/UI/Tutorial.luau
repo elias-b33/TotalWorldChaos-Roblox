@@ -24,13 +24,13 @@ local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
+local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
 local Powers = require(script.Parent.Powers)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local CARD_WIDTH = 236 -- clear of the toasts in the middle of the top (Hud TOAST_WIDTH)
-local CARD_TOP = 52 -- under the top bar
 local STEP_WIDTH = 40 -- the "2/6" pill
 local TITLE_HEIGHT = 24
 local SKIP_WIDTH = 60
@@ -396,7 +396,6 @@ function Tutorial.init(selectedArmy: () -> number?)
 	cardGui = Widgets.screen("Tutorial", 5)
 	card = Widgets.panel(cardGui, CARD_WIDTH)
 	card.Name = "Card"
-	card.Position = UDim2.fromOffset(Theme.space.m, CARD_TOP)
 	card.Visible = false
 	local outline = card:FindFirstChild("Outline")
 	if outline and outline:IsA("UIStroke") then
@@ -446,11 +445,10 @@ function Tutorial.init(selectedArmy: () -> number?)
 		Intents.tutorial("Leave")
 	end)
 	leaveButton.Name = "PlayOnline"
-	leaveButton.Position = UDim2.fromOffset(Theme.space.m, CARD_TOP)
 	leaveButton.Visible = false
 
 	-- the end: a card in the middle of the screen
-	doneCard = Widgets.panel(cardGui, 340)
+	doneCard = Widgets.panel(cardGui, 340, "brass")
 	doneCard.Name = "Done"
 	doneCard.AnchorPoint = Vector2.new(0.5, 0.5)
 	doneCard.Position = UDim2.fromScale(0.5, 0.5)
@@ -470,6 +468,15 @@ function Tutorial.init(selectedArmy: () -> number?)
 
 	-- the arrow over a glowing button
 	buttonArrow = arrow(cardGui, "ButtonArrow")
+	-- the card (and the way out that replaces it) at the top left, under the top bar
+	local function place()
+		local top = UDim2.fromOffset(Theme.space.m, HudLayout.contentTop())
+		Widgets.fit(card, nil, top)
+		Widgets.fit(leaveButton, nil, top)
+	end
+	place()
+	HudLayout.onChange(place)
+	Widgets.fitScreen(cardGui) -- tablets: the screen's roots grow with the UI's scale
 	cardGui.Parent = playerGui
 
 	Remotes.event("Tutorial").OnClientEvent:Connect(function(newView: Types.TutorialView?)

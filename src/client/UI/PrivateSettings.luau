@@ -159,37 +159,29 @@ end
 -- The settings sheet, built the first time the owner opens it (most servers are public and never need its
 -- 150 or so GUI objects).
 local function buildPanel()
-	local p = Instance.new("Frame")
+	-- an iron sheet over the vote screen, its title on a plate on its top edge
+	local p = Widgets.panel(sheetGui, 0)
 	panel = p
 	p.Name = "SettingsPanel"
-	p.Active = true
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
-	p.Position = UDim2.fromScale(0.5, 0.5)
-	p.Size = UDim2.new(1, -16, 1, -16)
-	p.BackgroundColor3 = Widgets.PANEL
-	p.BorderSizePixel = 0
+	p.Position = UDim2.new(0.5, 0, 0.5, Theme.space.xs)
+	p.Size = UDim2.new(1, -2 * Theme.space.m, 1, -3 * Theme.space.m)
+	p.AutomaticSize = Enum.AutomaticSize.None
 	p.Visible = false
-	p.Parent = sheetGui
-	Widgets.corner(p, Theme.radius.l)
-	Widgets.stroke(p)
-	Widgets.bevel(p, true)
-	Widgets.padding(p, Theme.space.l, Theme.space.m)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(900, 600)
 	limit.Parent = p
+	Widgets.header(p, "Private server settings", "gear")
+	Widgets.fit(p)
 
 	local header = Instance.new("Frame")
 	header.Name = "Header"
 	header.BackgroundTransparency = 1
 	header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 	header.Parent = p
-	local title = Widgets.title(header, "Private server settings", Theme.text.heading, HEADER_HEIGHT)
-	title.Size = UDim2.fromScale(0.45, 1)
-	Widgets.leadIcon(title, "gear", Theme.icon.small)
 	rewardLabel = Widgets.hint(header, "", TEXT_SIZE, HEADER_HEIGHT)
 	rewardLabel.Name = "Rewards"
-	rewardLabel.Position = UDim2.fromScale(0.45, 0)
-	rewardLabel.Size = UDim2.new(0.55, -116, 1, 0)
+	rewardLabel.Size = UDim2.new(1, -116, 1, 0)
 	local done = Widgets.iconTextButton(header, "check", "Done", 104, Widgets.GOOD, function()
 		open = false
 		PrivateSettings.render()
@@ -355,6 +347,7 @@ function PrivateSettings.init()
 	openButton.Position = UDim2.new(1, -12, 1, -12)
 	openButton.Visible = false
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	sheetGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	LobbyState.onChange(function()

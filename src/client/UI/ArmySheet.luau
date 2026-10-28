@@ -13,6 +13,7 @@ local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
+local SHEET_WIDTH = 444
 
 local ArmySheet = {}
 
@@ -91,13 +92,13 @@ function ArmySheet.init(goHandler: (number, number) -> (), cancelHandler: () -> 
 	onGo = goHandler
 	onCancel = cancelHandler
 	local gui = Widgets.screen("ArmySheet", 2)
-	sheet = Widgets.sheet(gui, 440)
+	sheet = Widgets.sheet(gui, SHEET_WIDTH)
 	sheet.Name = "Sheet"
 	sheet.Visible = false
-	Widgets.list(sheet, false, Theme.space.s)
-	title = Widgets.title(sheet, "", Theme.text.title, 30)
-	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "sword", Theme.icon.small)
+	Widgets.list(sheet, false, Theme.space.m)
+	-- "3k at Aurora Landing" on a title plate on the sheet's top edge
+	local _, plate = Widgets.header(sheet, "", "sword")
+	title = plate
 	chips = Instance.new("Frame")
 	chips.Name = "Troops"
 	chips.BackgroundTransparency = 1
@@ -115,6 +116,7 @@ function ArmySheet.init(goHandler: (number, number) -> (), cancelHandler: () -> 
 	buttons.LayoutOrder = 4
 	buttons.Parent = sheet
 	Widgets.list(buttons, true, 8)
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ClientState.onDelta(function(delta)
