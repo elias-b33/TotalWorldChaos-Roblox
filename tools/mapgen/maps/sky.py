@@ -23,10 +23,12 @@ import numpy as np
 from layout import (
     Layout,
     Seed,
+    ZoneSeed,
     add_strait,
     assign_start_territories,
     balance_start_development,
     build_regions,
+    build_sea_zones,
     closest_points,
     edge_points,
     finalize,
@@ -64,6 +66,15 @@ HOME_RING = [
 ]
 
 TERRAIN = {"skymeadow": "Plains", "heartruins": "Plains", "crystalgrove": "Forest", "crags": "Hills", "stormspire": "Mountain"}
+
+# Navies (docs/DESIGN.md "Navies"): spaceships, and ten space zones in the void: one 36° wedge round each home shard,
+# cut by angle from the centre (not grown over pixels) so the map stays exactly symmetric. Each zone holds its
+# shard's Gate bridge, the bridge from its Windward to the drift isle ahead and the bridge into its Leeward from the
+# drift isle behind: the wedges meet in the middle of the drift isles. A zone's name and fleets stand between the
+# Heartstone and the shard, a little off the Gate bridge.
+SHIP = "Starship"
+SPACE_ZONES = ["Vega Drift", "Lyra Reach", "Orion Span", "Draco Rift", "Cygnus Deep", "Altair Gulf", "Rigel Void", "Sirius Verge", "Nova Expanse", "Polaris Abyss"]
+SPACE_ZONE_SPOT = (440, 10)  # where a zone's name and fleets stand: distance from the centre, degrees past its shard
 
 
 def home_angle(k: int) -> float:
@@ -157,6 +168,18 @@ def build() -> Layout:
         bridge(f"{DRIFTS[k]} Reach", f"{NATIONS[(k + 1) % 10]} Leeward")
     assign_start_territories(lay, allowed=lambda slot, q: lay.seeds[q].name.startswith(NATIONS[slot] + " "), races=RACES)
     balance_start_development(lay)
+    zones = []
+    r, past = SPACE_ZONE_SPOT
+    for k, name in enumerate(SPACE_ZONES):
+        th = home_angle(k) + math.radians(past)
+        zones.append(ZoneSeed(name, [(CX + r * math.cos(th), CY + r * math.sin(th))]))
+
+    def wedge(xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
+        turn = (np.arctan2(ys - CY, xs - CX) - home_angle(0) + math.radians(18)) % (2 * math.pi)
+        return (turn // math.radians(36)).astype(np.int32) % len(SPACE_ZONES)
+
+    build_sea_zones(lay, zones, zone_range=(8, 12), assign=wedge)
+    lay.ship = SHIP
     return lay
 
 

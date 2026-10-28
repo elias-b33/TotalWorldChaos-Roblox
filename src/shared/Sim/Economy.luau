@@ -55,7 +55,7 @@ function Economy.provinceYield(province: Province): (number, number)
 	return gold, manpower
 end
 
--- A nation's men in the field, in regiments (1,000 men of any troop type).
+-- A nation's men in the field (aboard its fleets too), in regiments (1,000 men of any troop type).
 function Economy.regiments(state: MatchState, nationId: number): number
 	local men = 0
 	for _, army in state.armies do
@@ -63,18 +63,31 @@ function Economy.regiments(state: MatchState, nationId: number): number
 			men += army.men
 		end
 	end
+	for _, fleet in state.fleets or {} do
+		if fleet.owner == nationId then
+			men += fleet.men
+		end
+	end
 	return men / Config.Army.MenPerRegiment
 end
 
--- Gold per month a nation pays for its armies: every troop type at its own upkeep, less for an Upkeep race.
+-- Gold per month a nation pays for its armies (every troop type at its own upkeep, aboard ships too; less for an
+-- Upkeep race) and its ships (Config.Navy.ShipUpkeep a ship, for what is left of a damaged fleet's hull; the same
+-- for every race).
 function Economy.upkeep(state: MatchState, nationId: number): number
-	local gold = 0
+	local troops, ships = 0, 0
 	for _, army in state.armies do
 		if army.owner == nationId then
-			gold += Troops.upkeep(army.troops)
+			troops += Troops.upkeep(army.troops)
 		end
 	end
-	return gold * Races.upkeepMultiplier(Races.of(state, nationId))
+	for _, fleet in state.fleets or {} do
+		if fleet.owner == nationId then
+			troops += Troops.upkeep(fleet.troops)
+			ships += fleet.hull / Config.Navy.ShipHull * Config.Navy.ShipUpkeep
+		end
+	end
+	return troops * Races.upkeepMultiplier(Races.of(state, nationId)) + ships
 end
 
 function Economy.monthlyIncome(state: MatchState, nationId: number): Income
@@ -83,6 +96,9 @@ function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 		if province.owner == nationId then
 			local g, m = Economy.provinceYield(province)
 			gold += g * Primordial.goldMultiplier(state, province) -- Blessing
+			if province.blockade ~= nil then
+				gold -= g * Config.Navy.BlockadeGoldLoss -- an enemy fleet off its coast (Sim.Navy)
+			end
 			manpower += m
 		end
 	end

@@ -15,7 +15,7 @@ A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and pla
 
 | Source | Keep | Cut |
 | --- | --- | --- |
-| EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
+| EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, ship types and admirals (navies are one ship per map), war score, most modifiers |
 | WorldBox | World powers (here: Primordial powers), disasters, the four classic races (and a cast of peoples for every map), watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
 
 ## Match structure
@@ -66,7 +66,7 @@ Two resources (gold and manpower), a cast of five races on every map (fifteen in
 - ~150 land provinces, each with terrain, development (1–5) and at most one building.
 - Terrain: plains (normal), forest and hills (+25% defence, slower movement), mountains (impassable, used to make chokepoints).
 - About 40% of provinces start **neutral** with a small garrison (one regiment, `Config.NeutralGarrison`; a map can set a bigger one per province), so the first minutes are about expansion, not PvP.
-- No sea in v1. Islands connect through "straits": extra neighbour links drawn as bridges or sea lanes.
+- Islands connect through "straits": extra neighbour links drawn as bridges or sea lanes. The water itself is split into sea zones that fleets sail (see "Navies").
 - Three maps: **Earth** (real world), **Eldmoor** (fantasy continent) and **Skyshards** (floating islands). Every nation starts with 8 provinces and 17 total development on every map. Details, art and data pipeline: `docs/MAPS.md`.
 
 ### Races
@@ -135,6 +135,7 @@ Income is paid every month (10 s). A nation starts with 100 gold and 3,000 manpo
 | Farm | 50 gold | +50% gold from this province |
 | Barracks | 40 gold | +50% manpower from this province |
 | Fort | 60 gold (Hills races 30) | +50% defence, siege time ×2 |
+| Ship (the map's one type, see Navies) | 25 gold | Upkeep 1 gold per month; fights at sea and carries one regiment |
 
 ### Troops
 
@@ -189,14 +190,33 @@ One elite per race (Knights are both the Kingdom's and the Humans'):
 - An army alone in an enemy or neutral province starts a siege: 10 s × development, ×2 with a fort, ×3 for a capital. Army size doesn't matter, but an army with siege troops in it (Ironguard or Legionaries; the holder's or an ally's) besieges 1.5× as fast (a third less time).
 - One siege per province. Whoever started it keeps it while one of its (or an ally's) armies stands there; another besieger at peace with it waits instead of blocking, and takes over (from zero) once the first one leaves.
 - An interrupted siege (a battle there, a defending army, the besieger stepping out) keeps its progress for 10 s, then resets. Peace with the owner, or the province changing hands, ends it at once.
+- A province the besieger's side blockades from the sea (see Navies) falls 1.25× as fast, on top of siege troops.
 - When the siege completes, the province flips to the attacker immediately. No war score and no haggling over provinces in peace deals.
 
 ### Diplomacy
 
-- **War:** declare on any nation you border. Your allies join automatically.
+- **War:** declare on any nation you border, by land or by sea: holding a coast of the same sea zone counts (see Navies). Your allies join automatically.
 - **Alliance:** request and accept; max 3 nations per alliance.
 - **Peace:** white peace, or peace plus a gold tribute. A 3-minute truce follows.
 - **Coalition:** a nation holding 20%+ of the ownable provinces gets a crown on the map, and every other nation gets +30% combat strength against it.
+
+### Navies
+
+Each map's water is split into named **sea zones** (on Skyshards, **space zones** in the void around the shards). Nations build ships in their coastal provinces, carry armies across the water, fight at sea, close straits and blockade coasts. Rules: `Sim/Navy.luau`; numbers: `Config.Navy`; the zones of each map: `docs/MAPS.md` "Sea zones"; balance: measured with bot tournaments once bots sail (stage 3).
+
+- **Sea zones:** Earth has 22 (the oceans and seas, such as the North Atlantic and the Mediterranean), Eldmoor 10 round its coasts, Skyshards 10 (one wedge of space round each home shard). A zone lists its neighbouring zones and its coasts: the provinces it touches. A province touching several zones is a coast of each; the one it shares the most shore with is its **port**. Every strait lies in one zone. Lakes (the Caspian, Moonmere) have no zone. Zones are tappable: the map data's sea grid gives every water pixel its zone id (`MapGrid.decodeSea`), as the province grid does for land.
+- **Ships:** one ship type per map: a sailing **Galleon** on Earth, a **Dragonship** on Eldmoor, a **Starship** on Skyshards, with the same numbers everywhere. A ship costs 25 gold (no manpower) and 1 gold upkeep a month, fights with a hull of 1,000 (like a regiment's 1,000 men, attack and defence 1) and carries one regiment: 1,000 men of any troop type. Ships are built 1–5 at a time in an owned coastal province and launch into its port zone, joining the nation's fleet standing there or forming a new one. A blockaded province can't launch ships.
+- **Fleets:** a nation's ships standing still in one zone are one fleet, one token, merging like armies. A fleet sails from zone to zone (8 s a zone, along the fewest zones) with the men aboard. A damaged fleet still counts its hull in whole ships, rounded up: 2,550 hull is 3 ships that carry 3 regiments.
+- **Embarking:** order an army onto one of your fleets. It walks to the nearest coast of the fleet's zone (or of the zone the fleet is sailing to) and boards when the fleet is there; as many men as there is room for go aboard (every troop type in proportion), and the rest stay ashore as the same army. The men aboard are no army while at sea: they can't fight, besiege or be hit by a Meteor, and they still cost upkeep.
+- **Landing:** order a fleet to a coastal province. It sails to the nearest zone off it and lands everyone aboard there as one army, which fights and besieges as usual. Landing needs land your armies could walk into (yours, an ally's, neutral, or an enemy's at war); if peace closes it before the fleet arrives, the men stay aboard.
+- **Sea battles:** fleets of nations at war in the same zone fight with the land rule: 3 rounds of 1 s, each side killing 15% of its hull × modifiers (the random ±10%, the underdog and coalition bonuses; no terrain or forts at sea). Nobody owns the sea, so the zone's first fleet (lowest id) with an enemy there defends. Then the side with less hull retreats: each of its fleets sails, men aboard and all, to the nearest other zone off a friendly coast, taking no orders and fighting nobody on the way. A fleet with nowhere to go, or left under 500 hull, sinks with everyone aboard. Each winner gets +1 battle won.
+- **Straits:** an enemy fleet (at war with you, not retreating) in a strait's zone stops your armies crossing that strait; an army already on it stops at its edge. Skyshards' bridges are straits, so a space fleet off a shard cuts it off from the Heartstone and its drift isles.
+- **Blockades:** your coastal province is blockaded while an enemy fleet is in one of its zones and no fleet of yours or an ally's is there. It earns 50% less gold, can't launch ships, and sieges of it by the blockader's side run 1.25× as fast. You get a toast when a blockade starts.
+- **War reach:** you may declare war on a nation you share a sea zone with (both hold a coast of it), not only on one you border by land, because fleets make wars across water real.
+- **Races at sea:** race passives are about armies. At sea there is no Attack, Forest or Hills bonus, every fleet sails at the same speed (Swift is for marching), and an Upkeep race pays less for the men aboard but full price for its ships.
+- **Who sees fleets:** everyone sees every fleet for now. One helper decides it (`Navy.visible`), so fog of war can hide fleets later without touching the rules.
+- **Controls** (the same flow as moving an army): tap your fleet, then a sea zone to sail there or a coastal province to land there, then Confirm. To embark, tap an army, then one of your fleets, then Confirm. Ships are built from an owned coastal province's sheet.
+- An eliminated nation's fleets disband with everyone aboard.
 
 ### Primordial powers
 
@@ -281,8 +301,8 @@ tools/mapgen/                  -- Python generator for everything in assets/
 ### Tick order
 
 1. Apply queued commands.
-2. Move armies (retreating armies walk home too), then merge a nation's armies standing in the same province.
-3. Resolve battles.
+2. Sail fleets, board armies standing on a coast onto their fleets, land fleets that arrived and merge a nation's fleets standing in one zone; then move armies (retreating armies walk home too) and merge a nation's armies standing in the same province.
+3. Resolve battles on land, then at sea; then mark the blockaded provinces.
 4. Advance sieges and flip provinces.
 5. Every 10th tick: pay income and upkeep.
 6. Update Primordial-power charges and timers.
@@ -351,6 +371,8 @@ All match state is a handful of tables keyed by id inside one `MatchState`. This
 export type ProvinceId = number
 export type NationId = number
 export type ArmyId = number
+export type FleetId = number
+export type ZoneId = number                -- a sea zone (a space zone on Skyshards)
 
 export type Terrain = "Plains" | "Forest" | "Hills" | "Mountain"
 export type Building = "None" | "Farm" | "Barracks" | "Fort"
@@ -372,6 +394,7 @@ export type Province = {
     siege: { by: NationId, progress: number, required: number, lastTick: number }?, -- lastTick: last progress (grace period)
     shieldUntil: number?,      -- tick when a Shield ends
     buffs: { [string]: number }, -- buff name -> tick it ends
+    blockade: NationId?,       -- an enemy fleet off its coast blockades it: the blockading nation
 }
 
 export type Nation = {
@@ -401,6 +424,21 @@ export type Army = {
     inBattle: boolean,
     rebel: boolean?,           -- raised by the Rebels power (drawn apart from garrisons)
     retreating: boolean?,      -- beaten and walking home: no orders, no fighting, no sieges
+    boardFleet: FleetId?,      -- walking to the coast to board this fleet
+}
+
+export type Fleet = {
+    id: FleetId,
+    owner: NationId,
+    zone: ZoneId,
+    hull: number,              -- 1,000 per ship; ships = hull ÷ 1,000 rounded up
+    troops: Composition,       -- the men aboard, per troop type
+    men: number,               -- the total aboard; changes only through Navy.setCargo
+    path: { ZoneId },          -- remaining route
+    moveProgress: number,
+    inBattle: boolean,
+    retreating: boolean?,      -- beaten: sailing to a zone off a friendly coast
+    landAt: ProvinceId?,       -- land the men aboard here on arrival
 }
 
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
@@ -421,6 +459,11 @@ export type MatchState = {
     primordials: { [number]: Primordial }, -- keyed by userId
     seats: { [number]: NationId }, -- userId -> the nation that player last held (rejoins)
     nextArmyId: ArmyId,        -- army ids count up and are never reused
+    zones: { [ZoneId]: SeaZone },  -- from the map: name, neighbouring zones, coasts
+    shores: { [ProvinceId]: { ZoneId } }, -- the zones each coastal province touches, its port first
+    straits: { [ProvinceId]: { [ProvinceId]: ZoneId } }, -- the zone each strait crosses
+    fleets: { [FleetId]: Fleet },
+    nextFleetId: FleetId,
 }
 ```
 
@@ -441,6 +484,13 @@ export type ProvinceDef = {
     startOwner: number?,       -- start slot 1..10, nil = neutral
     isCapital: boolean,
     garrison: number?,         -- neutral garrison override, men
+    zones: { ZoneId }?,        -- the sea zones it is a coast of, its port first; nil inland
+}
+
+-- A sea zone: its name and fleets stand at `center`; `coasts` are the provinces it touches.
+export type SeaZoneDef = {
+    id: ZoneId, name: string, center: { x: number, y: number }, area: number,
+    neighbors: { ZoneId }, coasts: { ProvinceId },
 }
 
 -- Which province each pixel of the 2D map belongs to (0 = sea or space), run-length encoded (see MapGrid).
@@ -451,10 +501,14 @@ export type MapDef = {
     title: string,
     theme: string,             -- texture set: "earth" | "fantasy" | "sky"
     imageSize: { x: number, y: number },
+    ship: string,              -- the map's ship type: "Galleon" | "Dragonship" | "Starship"
     nations: { { slot: number, name: string, capital: ProvinceId, colorIndex: number, race: Race } },
     provinces: { ProvinceDef },
-    straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean } },
+    -- zone: the sea zone the strait crosses
+    straits: { { a: ProvinceId, b: ProvinceId, from: { x: number, y: number }, to: { x: number, y: number }, wrap: boolean, zone: ZoneId } },
+    seaZones: { SeaZoneDef },
     grid: GridDef,
+    seaGrid: GridDef,          -- which sea zone each pixel of the 2D map belongs to (0 = land or a lake)
 }
 ```
 
@@ -465,6 +519,10 @@ export type Command =
     { kind: "Develop", province: ProvinceId }
     | { kind: "Build", province: ProvinceId, building: Building }
     | { kind: "Recruit", province: ProvinceId, regiments: number, troop: Troop }
+    | { kind: "BuildShips", province: ProvinceId, ships: number } -- launched into the province's port zone
+    | { kind: "Sail", fleet: FleetId, zone: ZoneId }
+    | { kind: "Land", fleet: FleetId, province: ProvinceId }      -- sail to a zone off it, land everyone there
+    | { kind: "Embark", army: ArmyId, fleet: FleetId }            -- walk to the fleet's coast and board
 ```
 
 ### Remotes
@@ -686,6 +744,9 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Weekly, friends and global leaderboards; achievements
 - [x] Rewarded video quest reroll; experience notifications
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
+- [x] Navies, stage 1: sea and space zones in the map data (generator, validator, `MapData`), the rules for ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades and war across the sea (`Sim/Navy.luau`, tests in `tests/navy.spec.luau`)
+- [ ] Navies, stage 2: the orders through `CommandRouter`, fleets in the snapshot, the ship art for each map, fleet tokens and sea zones on the map, the fleet sheet, toasts, a harness scenario
+- [ ] Navies, stage 3: bots at sea, bot tournaments and balance (Earth's Americas), a `docs/STUDIO.md` recipe
 
 ## Open questions
 

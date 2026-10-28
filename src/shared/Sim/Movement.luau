@@ -53,6 +53,7 @@ function Movement.order(state: MatchState, nationId: number, armyId: number, to:
 		army.moveProgress = 0
 	end
 	army.path = path
+	army.boardFleet = nil -- a new order replaces boarding a fleet (Sim.Navy)
 	return true, nil
 end
 
@@ -73,15 +74,21 @@ function Movement.ticksToNext(state: MatchState, army: Types.Army): number
 	return Movement.moveTicks(state, army, nextId) - army.moveProgress
 end
 
--- A nation's armies standing still together (no route, not fighting, not retreating) become one army: the
--- lowest id keeps the men of the others (their compositions add up), which are removed. Each merge is remembered
--- (state.mergedInto, so orders for the removed id reach the stack) and sent as a "Merged" event (a = the army that
--- stays, b = the one removed), so clients don't take the removed token for an army destroyed.
+-- A nation's armies standing still together (no route, not fighting, not retreating, not about to board a fleet)
+-- become one army: the lowest id keeps the men of the others (their compositions add up), which are removed. Each
+-- merge is remembered (state.mergedInto, so orders for the removed id reach the stack) and sent as a "Merged" event
+-- (a = the army that stays, b = the one removed), so clients don't take the removed token for an army destroyed.
 function Movement.mergeStacks(state: MatchState)
 	local keeper: { [string]: Types.Army } = {}
 	for _, id in sortedIds(state.armies) do
 		local army = state.armies[id]
-		if army.owner ~= 0 and #army.path == 0 and not army.inBattle and not army.retreating then
+		if
+			army.owner ~= 0
+			and #army.path == 0
+			and not army.inBattle
+			and not army.retreating
+			and not army.boardFleet
+		then
 			local key = army.owner .. ":" .. army.location
 			local first = keeper[key]
 			if first == nil then
@@ -97,12 +104,21 @@ function Movement.mergeStacks(state: MatchState)
 end
 
 function Movement.step(state: MatchState)
+	local blocked: { [number]: { [number]: boolean } } = {} -- each owner's blocked sea zones, worked out once a tick
 	for _, id in sortedIds(state.armies) do
 		local army = state.armies[id]
 		local nextId = army.path[1]
 		if nextId and not army.inBattle and army.owner ~= 0 then
-			if not Diplomacy.canEnter(state, army.owner, nextId) then
-				-- the way closed (peace was made, an ally left): stop here
+			local zones = blocked[army.owner]
+			if zones == nil then
+				zones = Diplomacy.blockedZones(state, army.owner)
+				blocked[army.owner] = zones
+			end
+			if
+				not Diplomacy.canEnter(state, army.owner, nextId)
+				or not Diplomacy.crossable(state, zones, army.location, nextId)
+			then
+				-- the way closed (peace was made, an ally left, an enemy fleet blocks the strait): stop here
 				army.path = {}
 				army.moveProgress = 0
 			else

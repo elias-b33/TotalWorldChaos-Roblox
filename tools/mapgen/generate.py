@@ -84,12 +84,16 @@ def make_map(key: str) -> None:
     save(terrain, out, "terrain.jpg")
     save(political, out, "political.jpg")
     save(render.atlas(terrain, lay), out, "atlas.jpg")
+    save(render.zone_view(political, lay), out, "zones.jpg")
     save(render.id_map(lay), out, "province_ids.png")
-    export_luau.write(to_json(lay))  # after province_ids.png: the Luau module carries its grid
+    save(render.sea_id_map(lay), out, "sea_ids.png")
+    export_luau.write(to_json(lay))  # after province_ids.png and sea_ids.png: the Luau module carries both grids
     save(render.vote_card(political, title, subtitle), out, "vote_card.jpg")
     small = political.resize((1024, int(1024 * political.height / political.width)), Image.LANCZOS)
     save(small, SHEETS, f"map_{key}.jpg")
-    print(f"map: {key} ({len(lay.seeds)} provinces, {time.time() - t0:.0f}s)", flush=True)
+    print(
+        f"map: {key} ({len(lay.seeds)} provinces, {len(lay.zone_names)} sea zones, {time.time() - t0:.0f}s)", flush=True
+    )
     for n in lay.notes:
         print(f"  note: {n}")
     for p in problems:

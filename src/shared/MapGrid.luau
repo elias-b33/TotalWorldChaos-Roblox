@@ -1,7 +1,8 @@
 --!strict
--- The 2D map's province grid: which province every pixel of the pixel-art map belongs to (0 = sea or sky).
--- MapData stores it run-length encoded (Types.GridDef); decode it once per match. Pure Luau, so it loads in
--- Roblox and Lune alike.
+-- The 2D map's province grid: which province every pixel of the pixel-art map belongs to (0 = sea or sky), and its
+-- sea grid: which sea zone (space zone on Skyshards) every pixel belongs to (0 = land or a lake), so taps on the water
+-- find a zone (docs/DESIGN.md "Navies"). MapData stores both run-length encoded (Types.GridDef); decode them once per
+-- match. Pure Luau, so it loads in Roblox and Lune alike.
 
 local Types = require("./Types")
 
@@ -38,8 +39,7 @@ local function fromBase64(s: string): buffer
 	return out
 end
 
-function MapGrid.decode(map: Types.MapDef): Grid
-	local def = map.grid
+local function decodeDef(def: Types.GridDef, imageWidth: number, what: string): Grid
 	local runs = fromBase64(def.rle)
 	local ids = buffer.create(def.width * def.height)
 	local o = 0
@@ -48,8 +48,18 @@ function MapGrid.decode(map: Types.MapDef): Grid
 		buffer.fill(ids, o, buffer.readu8(runs, i), n)
 		o += n
 	end
-	assert(o == def.width * def.height, "province grid has the wrong size")
-	return { width = def.width, height = def.height, ids = ids, scale = map.imageSize.x / def.width }
+	assert(o == def.width * def.height, what .. " grid has the wrong size")
+	return { width = def.width, height = def.height, ids = ids, scale = imageWidth / def.width }
+end
+
+-- The province grid.
+function MapGrid.decode(map: Types.MapDef): Grid
+	return decodeDef(map.grid, map.imageSize.x, "province")
+end
+
+-- The sea grid: MapGrid.at reads a sea zone id (0 = land or a lake) from it.
+function MapGrid.decodeSea(map: Types.MapDef): Grid
+	return decodeDef(map.seaGrid, map.imageSize.x, "sea")
 end
 
 -- The same grid at 1/factor of the resolution (every factor-th pixel), for devices that can't hold a full one.
@@ -65,7 +75,7 @@ function MapGrid.downsample(grid: Grid, factor: number): Grid
 	return { width = w, height = h, ids = ids, scale = grid.scale * factor }
 end
 
--- The province at grid pixel (x, y), 0-based; 0 for sea, sky or outside the map.
+-- The province (or, on the sea grid, the sea zone) at grid pixel (x, y), 0-based; 0 for none or outside the map.
 function MapGrid.at(grid: Grid, x: number, y: number): number
 	x, y = math.floor(x), math.floor(y)
 	if x < 0 or y < 0 or x >= grid.width or y >= grid.height then
