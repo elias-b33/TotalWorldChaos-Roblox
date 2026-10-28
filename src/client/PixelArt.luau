@@ -190,7 +190,6 @@ local SHADE = { 1.07, 1, 0.93 } -- lit, flat, shaded
 -- Skyshards floats in space (WorldBox's night sky), on platforms with crystal-glow rims and iron hulls.
 local SPACE = { top = 0x05003f, bottom = 0x0e165b, star = 0xddfcff, grid = 0x152770, rim = 0x7cfbef, hull = 0x494949 }
 local HULL = 6 -- pixels of platform hull drawn below Skyshards land
-
 -- Kingdoms like WorldBox's: the nation colour over the terrain at this opacity, and a 1-pixel border in the
 -- nation's darker colour at BORDER_ALPHA.
 local NATION_ALPHA = 0.587
@@ -225,17 +224,46 @@ local SPACING: { [string]: { number } } = {
 }
 
 -- Capitals (docs/MAPS.md "Capitals and armies by race"): each race builds its own, flying its owner's flag F (grey
--- while neutral). A capital keeps the look of the nation it is the capital of; its flag follows whoever holds it. On
--- the whole map they are 5 × 6 pixels round the capital's centre; the close-up has detailed ones (DETAIL_CAPITALS).
--- Skyshards builds them of its sci-fi materials (SKY_CAPITAL_COLOURS), and the Humans' castle as a glowing dome.
+-- while neutral) and with roofs and banners R in the owner's colour. A capital keeps the look of the nation it is the
+-- capital of; its flag follows whoever holds it. On the whole map they are 5 × 6 pixels round the capital's centre;
+-- the close-up has detailed ones (DETAIL_CAPITALS). Skyshards' peoples build of its sci-fi materials (SCI_FI:
+-- SKY_CAPITAL_COLOURS), and so would any other race standing on Skyshards (the Humans' castle as a glowing dome).
 -- Colours: M D stone and its shade, W lit windows, C glow, G g e leaves, T t bark, H h hide, X wood, B bone,
--- K a dark doorway, Q q k rock, S snow, O fire.
+-- K a dark doorway, Q q k rock, S snow, O fire; a building's own colours are in KIND_COLOURS.
 local CAPITALS: { [string]: { string } } = {
+	-- Eldmoor's fantasy peoples
 	Humans = { "F....", "FF...", "M.M.M", "MMMMM", "MDWDM", "MDDDM" }, -- a stone castle
 	Elves = { "F.GG.", "FFGGG", "GGGge", "egeee", ".tTt.", ".TWT." }, -- a tree hall
 	Orcs = { "F.X.X", "FFXHX", ".HHh.", "BHHhB", "XHKhX", "XHOhX" }, -- a spiked war camp
 	Dwarves = { "F.S..", "FFSq.", ".QQqk", "QQqqk", "QMKMk", "QMOMk" }, -- a stone hall in a mountain
-	dome = { "F....", "FF...", ".CCC.", "CWWWC", "MMMMM", "MDCDM" }, -- the Humans' castle on Skyshards
+	Lizardfolk = { "F.R..", "FFq..", ".qCq.", ".gqq.", "gqqqk", "qqqqk" }, -- a stepped pyramid with a glowing door
+	-- Earth's civilisations
+	Kingdom = { "F.R.R", "FFRMR", "M.MMM", "MMMMM", "MWMWM", "MMDMM" }, -- a castle of towers under tall cones
+	Empire = { "F.R..", "FRRR.", "RMMMR", "MDMDM", "MDMDM", "MMMMM" }, -- a marble palace of columns
+	Nomads = { "F....", "FF.Vx", ".VVVx", "VVVVx", "RRRRx", "VVOVx" }, -- a great felt tent and a horse-tail standard
+	Republic = { "F.O..", "FFM..", "RRMRR", "MWMWM", "MKMKM", "AAAAA" }, -- a harbour: a lantern tower, a hall
+	Clans = { "F.M..", "FFMM.", ".MKM.", "XqQqX", "QQqqk", "QqQqk" }, -- a tower house on a crag
+	-- Skyshards' sci-fi peoples (the Marines build the dome)
+	dome = { "F....", "FF...", ".CCC.", "CWWWC", "MMMMM", "MDCDM" }, -- a glowing dome on a steel base
+	Robots = { "F...O", "FF..x", "MMM.x", "MRRMx", "MWKMx", "MMKMx" }, -- a factory and its mast
+	Insectoids = { "F.P..", "FFp..", ".pAp.", ".RRR.", "PpAnn", "PpKnn" }, -- a hive spire with glowing cells
+	Crystals = { "F.C..", "FFC..", "VCCV.", "VCCVC", "MRRRM", "MMMMM" }, -- a cluster of glowing shards
+	Energy = { "F.Y..", "FYWY.", ".YEY.", "C.X.C", ".MRM.", "MMMMM" }, -- an orb of light over a pylon
+}
+-- Races whose capital is another kind's building.
+local CAPITAL_OF: { [string]: string } = { Marines = "dome" }
+-- Buildings made of Skyshards' materials wherever they stand.
+local SCI_FI: { [string]: boolean } = { Robots = true, Insectoids = true, Crystals = true, Energy = true }
+-- A building's own colours, looked up before the shared ones.
+local KIND_COLOURS: { [string]: { [string]: number } } = {
+	Lizardfolk = { q = 0x8e9690, g = 0x5f9a3a, k = 0x5d6160 }, -- mossy stone
+	Nomads = { V = 0xf2e9d3, x = 0x5a3a20 }, -- felt, the standard's pole
+	Republic = { A = 0x4084e2 }, -- the harbour's water
+	Clans = { X = 0x5e3e22 },
+	Robots = { x = 0x3a4250 },
+	Insectoids = { P = 0xa47be0, p = 0x7650b8, n = 0x4a2e80, A = 0xffb02e, K = 0x2b1a40 }, -- chitin, amber light
+	Crystals = { V = 0xb38cff, C = 0x7cfbef },
+	Energy = { Y = 0xffc83d, E = 0xfff07a, W = 0xffffff, C = 0x7cfbef, X = 0x3a4250 },
 }
 local CAPITAL_COLOURS: { [string]: number } = {
 	M = 0xe4ded2,
@@ -282,8 +310,14 @@ local SKY_CAPITAL_COLOURS: { [string]: number } = {
 
 -- The capital a race builds on a map of this texture set (MapDef.theme): its own, the castle without a race.
 local function capitalKind(theme: string, race: string?): string
-	local kind = if race and CAPITALS[race] then race else "Humans"
-	return if kind == "Humans" and theme == "sky" then "dome" else kind
+	local kind = if race then CAPITAL_OF[race] or (if CAPITALS[race] then race else nil) else nil
+	local built = kind or "Humans"
+	return if built == "Humans" and theme == "sky" then "dome" else built
+end
+
+-- Is this capital drawn in Skyshards' materials (a sci-fi building, or any but the dome on a sky map)?
+local function sciFi(theme: string, kind: string): boolean
+	return SCI_FI[kind] == true or (theme == "sky" and kind ~= "dome")
 end
 
 ------------------------------------------------------------------------------------------------- colour maths
@@ -328,6 +362,89 @@ end
 -- Deterministic noise in [0, 1) for a pixel.
 local function noise(x: number, y: number, salt: number): number
 	return hash32(x, y, salt) / 4294967296
+end
+
+-- The deep-space backdrop behind the shards: the soft glow of a nebula, bright stars with a cross of light, and a few
+-- distant planets in the empty corners, a ringed giant among them. Positions are shares of the map's size, so a vote
+-- card's small painting shows them too. x, y: the centre; r: the radius as a share of the width; ring: a tilted ring.
+local NEBULA = { violet = 0x5a2a9a, teal = 0x1f6a8a, strength = 0.32 }
+local BRIGHT_STAR_CELL = 26 -- one candidate bright star per cell of this many map pixels
+local PLANETS: { { x: number, y: number, r: number, body: number, shade: number, light: number, band: number?, ring: number? } } =
+	{
+		{
+			x = 0.1,
+			y = 0.15,
+			r = 0.034,
+			body = 0xd98c4a,
+			shade = 0x7a3a24,
+			light = 0xffd09a,
+			band = 0xb86a3a,
+			ring = 0xd8c39a,
+		},
+		{ x = 0.915, y = 0.865, r = 0.017, body = 0x6f9cd0, shade = 0x2c4a80, light = 0xd4ecff },
+		{ x = 0.925, y = 0.12, r = 0.008, body = 0xc8586a, shade = 0x6a2236, light = 0xffb4c0 },
+	}
+
+-- The nebula's strength (0 to 1) and colour at a point (u, v in shares of the map), smooth and deterministic.
+local function nebulaAt(u: number, v: number): (number, number)
+	local a = math.sin(u * 7.1 + 1.3) * math.cos(v * 5.3 - 0.4)
+	local b = math.sin((u + v) * 4.7 + 2.1) * 0.6 + math.cos((u - v * 1.3) * 9.2) * 0.4
+	local t = math.clamp((a * 0.55 + b * 0.45 - 0.18) * 1.6, 0, 1)
+	local hue = (math.sin(u * 3.1 - v * 2.3 + 0.7) + 1) / 2
+	return t * t * NEBULA.strength, mix(NEBULA.violet, NEBULA.teal, hue)
+end
+
+-- A distant planet's colour at map point (x, y) of a map w × h, or nil where no planet is. Lit from the north-west,
+-- with bands on the giant and its ring passing in front of its lower half.
+local function planetAt(x: number, y: number, w: number, h: number): number?
+	for _, p in PLANETS do
+		local r = p.r * w
+		local dx, dy = (x - p.x * w) / r, (y - p.y * h) / r
+		local ring = p.ring
+		if ring then
+			-- a thin tilted ellipse round the planet: in front of it below its middle, behind it above
+			local rx, ry = dx * 0.92 + dy * 0.39, -dx * 0.39 + dy * 0.92
+			local e = (rx / 2.1) ^ 2 + (ry / 0.5) ^ 2
+			if e >= 0.62 and e <= 1 and (ry > 0 or dx * dx + dy * dy > 1) then
+				return if e > 0.86 then mix(ring, 0x000000, 0.25) else ring
+			end
+		end
+		local d2 = dx * dx + dy * dy
+		if d2 <= 1 then
+			local lit = -(dx * 0.62 + dy * 0.78) + (1 - d2) * 0.35
+			local band = p.band
+			if band and math.floor((dy + 1) * 4.5) % 2 == 1 and lit > -0.25 then
+				return if lit > 0.45 then mix(band, p.light, 0.35) else band
+			end
+			return if lit > 0.5 then p.light elseif lit < -0.3 then p.shade else p.body
+		end
+	end
+	return nil
+end
+
+-- A bright star's light at map pixel (x, y): 1 at its centre, 0.55 on the arms of its cross, else 0.
+local function brightStarAt(x: number, y: number): number
+	local cx, cy = x // BRIGHT_STAR_CELL, y // BRIGHT_STAR_CELL
+	local hsh = hash32(cx, cy, 515)
+	if bit32.band(hsh, 7) ~= 0 then -- one cell in eight has one
+		return 0
+	end
+	local sx = cx * BRIGHT_STAR_CELL + 2 + bit32.band(bit32.rshift(hsh, 8), 15)
+	local sy = cy * BRIGHT_STAR_CELL + 2 + bit32.band(bit32.rshift(hsh, 16), 15)
+	local d = math.abs(x - sx) + math.abs(y - sy)
+	return if d == 0 then 1 elseif d == 1 and (x == sx or y == sy) then 0.55 else 0
+end
+
+-- The backdrop's colour at map point (x, y) of a map w × h (fractions for the close-up): a planet, or the sky's
+-- gradient with the nebula's glow. Stars and grid lines go on top elsewhere.
+local function spaceAt(x: number, y: number, w: number, h: number): (number, boolean)
+	local planet = planetAt(x, y, w, h)
+	if planet then
+		return planet, true
+	end
+	local c = mix(SPACE.top, SPACE.bottom, math.clamp(y / h, 0, 1))
+	local t, glow = nebulaAt(x / w, y / h)
+	return if t > 0 then mix(c, glow, t) else c, false
 end
 
 ------------------------------------------------------------------------------------------------- cosmetics
@@ -941,11 +1058,17 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield
 					end
 				end
 			elseif sky then
-				c = mix(SPACE.top, SPACE.bottom, y / h)
-				if n > 0.997 then
-					c = SPACE.star
-				elseif x % 32 == 0 or y % 32 == 0 then
-					c = mix(c, SPACE.grid, 0.6)
+				local planet
+				c, planet = spaceAt(x + 0.5, y + 0.5, w, h) -- the nebula's glow, or a distant planet
+				if not planet then
+					local bright = brightStarAt(x, y)
+					if bright > 0 then
+						c = mix(c, SPACE.star, bright)
+					elseif n > 0.997 then
+						c = SPACE.star
+					elseif x % 32 == 0 or y % 32 == 0 then
+						c = mix(c, SPACE.grid, 0.6)
+					end
 				end
 				-- the hull of a platform hangs below its land, with a glowing rim at the bottom
 				for k = 1, HULL do
@@ -1114,12 +1237,22 @@ local function paintProvince(art: Art, pid: number)
 	markDirty(art, box[1], box[2], box[3], box[4])
 end
 
+-- The colour of one pixel of a capital on the whole map: the owner's flag and roofs (F R), the building's own
+-- colours, then Skyshards' materials or the classic ones.
+local function capitalColour(kind: string, sky: boolean, ch: string, flag: number): number
+	if ch == "F" or ch == "R" then
+		return flag
+	end
+	local own = KIND_COLOURS[kind]
+	return (own and own[ch]) or (if sky then SKY_CAPITAL_COLOURS[ch] else nil) or CAPITAL_COLOURS[ch]
+end
+
 -- Capitals (each race's own, CAPITALS) go on top of everything, after any repaint, since they overlap neighbours.
 local function drawCapitals(art: Art)
 	for pid, capital in art.capitals do
 		local sprite = CAPITALS[capital.kind]
 		local h, w = #sprite, #sprite[1]
-		local sky = art.theme == "sky" and capital.kind ~= "dome"
+		local sky = sciFi(art.theme, capital.kind)
 		local o = art.owner[pid] or 0
 		local flag = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0
 		local x0, y0 = capital.x - 2, capital.y - 3
@@ -1128,9 +1261,7 @@ local function drawCapitals(art: Art)
 				local ch = string.sub(sprite[j], i, i)
 				local x, y = x0 + i - 1, y0 + j - 1
 				if ch ~= "." and x >= 0 and y >= 0 and x < art.width and y < art.height then
-					local c = if ch == "F"
-						then flag
-						else (if sky then SKY_CAPITAL_COLOURS[ch] else nil) or CAPITAL_COLOURS[ch]
+					local c = capitalColour(capital.kind, sky, ch, flag)
 					buffer.writeu32(art.pixels, (y * art.width + x) * 4, rgba(c))
 				end
 			end
@@ -1575,6 +1706,267 @@ local DETAIL_CAPITALS: { [string]: { string } } = {
 	Elves = buildTreeHall(),
 	Orcs = buildWarCamp(),
 	Dwarves = buildStoneHall(),
+	-- The other peoples' buildings, drawn straight as rows (CAPITAL_W × CAPITAL_H; the same codes, the flag on its
+	-- pole at x = 10, and DETAIL_KIND_COLOURS for each one's own colours).
+	-- a castle: round towers under tall cones in the owner's colour, a keep with a pointed roof, a gate
+	Kingdom = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..R.......p.......R..",
+		".RRr......p......RRr.",
+		".RRr.....RRr.....RRr.",
+		"RRRrr...RRRrr...RRRrr",
+		"RRRrr..RRRRrrr..RRRrr",
+		"RRRrr..MmmmmmD..RRRrr",
+		"DDDDD..MmmmmmD..DDDDD",
+		"MmmmD..MmWmWmD..MmmmD",
+		"MmmmD..MmWmWmD..MmmmD",
+		"MmWmD..MmmmmmD..MmWmD",
+		"MmWmD..MmmmmmD..MmWmD",
+		"MmmmDM.MmmmmmD.DMmmmD",
+		"MmmmDmmMmmmmmDmmMmmmD",
+		"MmmmDmmMmmmmmDmmMmmmD",
+		"MmmmDmmMmmKmmDmmMmmmD",
+		"MmmmDmmMmKKKmDmmMmmmD",
+		"MmmmDmmMmKKKmDmmMmmmD",
+		"MmmmDmmMmKKKmDmmMmmmD",
+		"MmmmDmmMmKKKmDmmMmmmD",
+		"DDDDDDDDDDDDDDDDDDDDD",
+	},
+	-- a marble palace: steps, columns before a shaded portico, a pediment roofed in the owner's colour
+	Empire = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p..........",
+		"..........p..........",
+		"..........R..........",
+		".........Rrr.........",
+		".......RRMMMrr.......",
+		".....RRMMYYYMMrr.....",
+		"...RRMMMMMYMMMMMrr...",
+		"..MMMMMMMMMMMMMMMMM..",
+		"..mmmmmmmmmmmmmmmmm..",
+		"...DDDDDDDDDDDDDDD...",
+		"...MmDDMmDDDMmDDMm...",
+		"...MmDDMmYYYMmDDMm...",
+		"...MmDDMmKKKMmDDMm...",
+		"...MmDDMmKKKMmDDMm...",
+		"...MmDDMmKKKMmDDMm...",
+		"...MmDDMmKKKMmDDMm...",
+		"..DDDDDDDDDDDDDDDDD..",
+		".MMMMMMMMMMMMMMMMMMM.",
+		"mmmmmmmmmmmmmmmmmmmmm",
+		"DDDDDDDDDDDDDDDDDDDDD",
+	},
+	-- a great felt tent with a band in the owner's colour and a painted door, a horse-tail standard
+	Nomads = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p..........",
+		"..........p..........",
+		"..........p..........",
+		"..........p..........",
+		"..........p........H.",
+		"..........p.......hhh",
+		".........VVV......hhh",
+		"........VvVwV.....hhh",
+		".......VvVVVwv....hxh",
+		".....VVvVVVVVwvv...x.",
+		"....VVvVVVVVVvwvv..x.",
+		"..vvvvvvvvvvvvvvvvvx.",
+		"..VVVVVVVVVVVVvvvvvx.",
+		"..VVVVVVVVVVVVvvvvvx.",
+		"..RRRRRRRRRRRRrrrrrx.",
+		"..RRRRRRRRRRRRrrrrrx.",
+		"..VVVVVVVXXXVVvvvvvx.",
+		"..VVVVVVVXOXVVvvvvvx.",
+		"..VVVVVVVXOXVVvvvvvx.",
+		"..wwwwwwwwwwwwwwwwwx.",
+	},
+	-- a harbour: a lantern tower, a merchants' hall roofed in the owner's colour, a boat, the water
+	Republic = {
+		"..R.......pFFFf......",
+		"RRRrr.....pFF........",
+		".OOO......p..........",
+		".OWO......p..........",
+		".OOO......p..........",
+		"MmmmD.....p..........",
+		"MmmmD.....p..........",
+		"MmmmD.....p..........",
+		"MmWmD.RRRRRrrrrr.....",
+		"MmWmDRRRRRRrrrrrr....",
+		"MmmmDRRRRRRrrrrrr....",
+		"MmmmDMmmmmmmmmmmD....",
+		"MmWmDMmWWmWWmWWmD.x..",
+		"MmWmDMmWWmWWmWWmD.xrR",
+		"MmmmDMmmmmmmmmmmD.xrR",
+		"MmmmDMmKKmKKmKKmD.xrR",
+		"MmmmDMmKKmKKmKKmD.xrR",
+		"MmmmDMmKKmKKmKKmD.x..",
+		"MmmmDDDDDDDDDDDDXXXXX",
+		"wwwwwwwwwwwwwwwwwxxxw",
+		"aAAAaAAAaAAAaAAAaAAAa",
+		"AAaAAAaAAAaAAAaAAAaAA",
+	},
+	-- a tower house with the owner's banner on a crag, a palisade of stakes round it
+	Clans = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p..........",
+		".......M.MpM.D.......",
+		".......MmmmmmD.......",
+		".......MmmmmmD.......",
+		".......MmWmWmD.......",
+		".......MmWmWmD.......",
+		".......MRmmmrD.......",
+		".......MRmmmrD.......",
+		".......MRmKmrD.......",
+		".......MRKKKrD.......",
+		".......MmKKKmD.......",
+		".......MmKKKmD.......",
+		"..B.B.BMmKKKmDB.B.B..",
+		"..X.XQXQkqqqqqxkx.x..",
+		"..X.XQXQqqkqqqxkx.x..",
+		"..xxxxxqqqqqkqxxxxx..",
+		"..XkXQXQQqqqqqxkxkx..",
+		"..XQXkXQqqqqqqxkxkx..",
+		".QQQQQQkqqqqqqkkkkkk.",
+		"QQQQQQQQQkqqqqqkkkkkk",
+	},
+	-- a stepped pyramid of mossy stone, a stair, a shrine with a glowing door and a crest
+	Lizardfolk = {
+		"..........pFFFf......",
+		"..........pFF........",
+		".......RRRprrr.......",
+		"........Qqqqk........",
+		"........QqCqk........",
+		"........QqCqk........",
+		".......ggqqqgg.......",
+		".......eQQQQek.......",
+		".......QQqqqkk.......",
+		".......QQQQQkk.......",
+		".....ggggqqqgggg.....",
+		".....eQqqQQQqqke.....",
+		".....QQqqqqqqqkk.....",
+		".....QQqqQQQqqkk.....",
+		"...ggggggqqqgggggg...",
+		"...eQqqqeQQQqeqqkk...",
+		"g..QQqqqqqqqqqqqkk..g",
+		"e..QQqqqqQQQqqqqkk..e",
+		"eggggggggqqqgggggggge",
+		"egQqqqeqqQQQqqqqeqkke",
+		"eQQqqqqqqqqqqqqqqqkke",
+		"eQQqqqqqqQQQqqqqqqkke",
+	},
+	-- a factory block with cyan windows and a red-lit bay, a radar dish, a mast with red lights
+	Robots = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p......O...",
+		"..........p.....Xxx..",
+		".......O..p.....Xxx..",
+		"....MMM...p.....DDD..",
+		"...MMMMM..p.....Xxx..",
+		"...mmmmm..p.....Xxx..",
+		"....mmm...p.....Xxx..",
+		".....D....p.....DDD..",
+		".DDDDDDDDDDDDDDDXxx..",
+		".MmmmmmmmmmmmmmDXxx..",
+		".MmmmmmmmmmmmmmDXxx..",
+		".RRRRRRRRRRrrrrrDDD..",
+		".MmmmmmmmmmmmmmDXxx..",
+		".MmWWmWWKKKmWWmDXxx..",
+		".MmWWmWWKOKmWWmDXxx..",
+		".MmmmmmmKOKmmmmDDDD..",
+		".MmmmmmmKKKmmmmDXxx..",
+		".MmmmmmmKKKmmmmDXxx..",
+		".MmmmmmmKKKmmmmDXxx..",
+		"DDDDDDDDDDDDDDDDDDDDD",
+	},
+	-- a ridged hive spire of chitin with glowing amber cells and spikes
+	Insectoids = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p..........",
+		"..........p..........",
+		".........Ppn.........",
+		"........PPppn........",
+		"........PPpnn........",
+		"........Pappn........",
+		".......PPAppnn.......",
+		".......PPpppnn.......",
+		"......PPPppapnn......",
+		"......PPPppAnnn......",
+		"....B.PPappppnn.B....",
+		".....PPPAppppnnn.....",
+		".....PPPppppannn.....",
+		"...PPPPPppppApnnnn...",
+		"....RRRRRRRrrrrrr....",
+		"...PPPPAppapppnnnn...",
+		"...PPPPPppAppannnn...",
+		"..BPPPaPpKKKpAannnB..",
+		".PPPPPAppKKKppAnnnnn.",
+		".PPPPPPppKKKpppnnnnn.",
+	},
+	-- a cluster of glowing cyan and violet shards on a steel platform
+	Crystals = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p..........",
+		"..........p..........",
+		"..........W..........",
+		".........WCc.........",
+		"........WWCcc........",
+		"........WWCcc........",
+		"........WWCcc..U.....",
+		".....U..WWCcc.UVv....",
+		"....UVv.WWCccUUVvv...",
+		"...UUVvvWWCccUUVvv...",
+		"...UUVvvWWCccWUVvv...",
+		"...UUVvWWWCcWCcVvv...",
+		"...WUVWCcWCcWCcVvU...",
+		"..WCcVWCcWCcWCcVUVv..",
+		"..WCcVWCcWCcWCcVUVv..",
+		"..WCcVWCcWCcWCcVUVv..",
+		"..WCcVWCcWCcWCcVUVv..",
+		"..MmmmmmmmmmmmmmmmD..",
+		"..RRRRRRRRRrrrrrrrr..",
+		"..MmmmmmmmmmmmmmmmD..",
+	},
+	-- a floating orb of light over a lattice pylon, a ring and arcs
+	Energy = {
+		"..........pFFFf......",
+		"..........pFF........",
+		"..........p..........",
+		"..........Y..........",
+		"....C...YEEEY........",
+		".....C.YEEWEEY..C....",
+		"....C..YEWWWEY.C.....",
+		".......YEEWEEY..C....",
+		"........YEEEY........",
+		"..........Y..........",
+		".....cCCCCCCCCCc.....",
+		".........M.D.........",
+		"......C.XXXXX........",
+		"........M...D.C......",
+		"........XXXXX........",
+		"........M...D........",
+		".......XXXXXXX.......",
+		".......M.....D.......",
+		"....MmmmmmmmmmmmD....",
+		"....RRRRRRRrrrrrr....",
+		"....MmmmmmmmmmmmD....",
+		"....MmmmmmmmmmmmD....",
+	},
+}
+-- A close-up building's own colours, looked up before the shared ones.
+local DETAIL_KIND_COLOURS: { [string]: { [string]: number } } = {
+	Empire = { Y = 0xf2c14e }, -- gold
+	Nomads = { V = 0xf2e9d3, v = 0xc9b994, w = 0x9c8c6a }, -- felt, its shade, the seams
+	Republic = { A = 0x4084e2, a = 0x3370cc, w = 0xd4f0fc }, -- the harbour's water and foam
+	Insectoids = { P = 0xa47be0, p = 0x7650b8, n = 0x4a2e80, A = 0xffb02e, a = 0xc97a1e, B = 0xe8edf3 },
+	Crystals = { V = 0xb38cff, v = 0x7a55d0, U = 0xe2d4ff, c = 0x3fb3aa, C = 0x7cfbef, W = 0xe6fffc },
+	Energy = { E = 0xfff07a, Y = 0xffc83d, W = 0xffffff, C = 0x7cfbef, c = 0x3fb3aa },
 }
 local DETAIL_CAPITAL_COLOURS: { [string]: number } = {
 	M = 0xf2ede4,
@@ -1930,8 +2322,8 @@ local function subColour(ctx: Ctx, cell: Cell, q: number, shade: number, sx: num
 	local fx, fy = (sx + 0.5) * step - 0.5, (sy + 0.5) * step - 0.5
 	if q == 0 then
 		if art.theme == "sky" then
-			local c = mix(SPACE.top, SPACE.bottom, math.clamp(gy / (art.height * f), 0, 1))
-			if gx % (32 * f) == 0 or gy % (32 * f) == 0 then
+			local c, planet = spaceAt((gx + 0.5) / f, (gy + 0.5) / f, art.width, art.height)
+			if not planet and (gx % (32 * f) == 0 or gy % (32 * f) == 0) then
 				c = mix(c, SPACE.grid, 0.6)
 			end
 			return tc(ctx, c, 3)
@@ -2112,11 +2504,31 @@ local function detailGround(ctx: Ctx, yield: Yield?)
 						end
 					end
 				elseif sky then
+					if
+						planetAt(cx + 0.5, cy + 0.5, W, H)
+						or planetAt(cx, cy, W, H)
+						or planetAt(cx + 1, cy + 1, W, H)
+					then
+						-- a planet's edge runs through this map pixel: every sub-pixel on its own
+						for sy = 0, f - 1 do
+							local o = base + sy * ew
+							for sx = 0, f - 1 do
+								buffer.writeu8(sub, o + sx, 0)
+								buffer.writeu32(terr, (o + sx) * 4, subColour(ctx, cell, 0, shade, sx, sy))
+							end
+						end
+						continue
+					end
+					-- the nebula changes slowly: one glow for the whole map pixel, the sky's gradient row by row
+					local t, glow = nebulaAt((cx + 0.5) / W, (cy + 0.5) / H)
 					local spaceH = H * f
 					for sy = 0, f - 1 do
 						local o = base + sy * ew
 						local gy = gy0 + sy
 						local c = mix(SPACE.top, SPACE.bottom, math.clamp(gy / spaceH, 0, 1))
+						if t > 0 then
+							c = mix(c, glow, t)
+						end
 						local onGrid = gy % (32 * f) == 0
 						local flat = tc(ctx, if onGrid then mix(c, SPACE.grid, 0.6) else c, 3)
 						local line = tc(ctx, mix(c, SPACE.grid, 0.6), 3)
@@ -2381,7 +2793,7 @@ local function detailSprites(ctx: Ctx, yield: Yield?)
 			local ax = ex * f + bit32.band(bit32.rshift(h, 16), f - 1)
 			local ay = ey * f + bit32.band(bit32.rshift(h, 20), f - 1)
 			if pid == 0 then
-				if sky and bit32.band(h, 0xff) < 2 then
+				if sky and bit32.band(h, 0xff) < 2 and not planetAt(cx + 0.5, cy + 0.5, W, H) then
 					local o = ay * ew + ax
 					if buffer.readu8(sub, o) == 0 and buffer.readu8(flags, o) == 0 then
 						buffer.writeu32(terr, o * 4, star)
@@ -2610,6 +3022,18 @@ local function detailPolitics(ctx: Ctx, cx0: number, cy0: number, cx1: number, c
 	end
 end
 
+-- The owner's colours on a close-up capital: its flag (F f) and its roofs and banners (R r).
+local function ownerColours(flag: number): { [string]: number }
+	return { F = flag, f = scale(flag, 0.75), R = flag, r = scale(flag, 0.72) }
+end
+
+-- The colour of one sub-pixel of a close-up capital: the owner's, the building's own, then Skyshards' materials or
+-- the classic ones.
+local function detailCapitalColour(kind: string, sky: boolean, ch: string, owner: { [string]: number }): number
+	local own = DETAIL_KIND_COLOURS[kind]
+	return owner[ch] or (own and own[ch]) or (if sky then DETAIL_SKY_COLOURS[ch] else nil) or DETAIL_CAPITAL_COLOURS[ch]
+end
+
 -- Capitals (each race's own, DETAIL_CAPITALS) in the close-up, on top of everything. Returns the sub-pixel rectangles
 -- drawn.
 local function detailCapitals(ctx: Ctx, within: { number }?)
@@ -2626,17 +3050,17 @@ local function detailCapitals(ctx: Ctx, within: { number }?)
 			continue
 		end
 		local sprite = DETAIL_CAPITALS[capital.kind]
-		local sky = art.theme == "sky" and capital.kind ~= "dome"
+		local sky = sciFi(art.theme, capital.kind)
 		local o = art.owner[pid] or 0
 		local flag = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0
-		local owner: { [string]: number } = { F = flag, f = scale(flag, 0.75), R = flag, r = scale(flag, 0.72) }
+		local owner = ownerColours(flag)
 		for j = 1, h do
 			local row = sprite[j]
 			for i = 1, w do
 				local ch = string.sub(row, i, i)
 				local x, y = x0 + i - 1, y0 + j - 1
 				if ch ~= "." and x >= 0 and y >= 0 and x < d.width and y < d.height then
-					local c = owner[ch] or (if sky then DETAIL_SKY_COLOURS[ch] else nil) or DETAIL_CAPITAL_COLOURS[ch]
+					local c = detailCapitalColour(capital.kind, sky, ch, owner)
 					buffer.writeu32(d.pixels, (y * d.width + x) * 4, rgba(c))
 				end
 			end
@@ -3006,6 +3430,48 @@ end
 -- The colour of one pixel, 0xRRGGBB (for tests and debugging).
 function PixelArt.pixel(art: Art, x: number, y: number): number
 	return unrgba(buffer.readu32(art.pixels, (y * art.width + x) * 4))
+end
+
+-- A race's capital as a map of this texture set (MapDef.theme) draws it, flying `flag` (0xRRGGBB): the whole map's
+-- 5 × 6 sprite and the close-up's 21 × 22 building, as RGBA buffers (transparent round the building), each with its
+-- width and height. For art previews and tests (tools/harness/race_sheet.luau, tests/pixelart.spec.luau).
+function PixelArt.capitalArt(
+	theme: string,
+	race: string?,
+	flag: number
+): (buffer, number, number, buffer, number, number)
+	local kind = capitalKind(theme, race)
+	local sky = sciFi(theme, kind)
+	local whole = CAPITALS[kind]
+	local ww, wh = #whole[1], #whole
+	local wholePixels = buffer.create(ww * wh * 4)
+	for j = 1, wh do
+		for i = 1, ww do
+			local ch = string.sub(whole[j], i, i)
+			if ch ~= "." then
+				buffer.writeu32(wholePixels, ((j - 1) * ww + i - 1) * 4, rgba(capitalColour(kind, sky, ch, flag)))
+			end
+		end
+	end
+	local close = DETAIL_CAPITALS[kind]
+	local closePixels = buffer.create(CAPITAL_W * CAPITAL_H * 4)
+	local owner = ownerColours(flag)
+	for j = 1, CAPITAL_H do
+		for i = 1, CAPITAL_W do
+			local ch = string.sub(close[j], i, i)
+			if ch ~= "." then
+				local c = detailCapitalColour(kind, sky, ch, owner)
+				buffer.writeu32(closePixels, ((j - 1) * CAPITAL_W + i - 1) * 4, rgba(c))
+			end
+		end
+	end
+	return wholePixels, ww, wh, closePixels, CAPITAL_W, CAPITAL_H
+end
+
+-- The kind of capital a race builds on a map of this texture set (its own; the Marines' dome; the castle, or the
+-- dome on Skyshards, without a race), for tests.
+function PixelArt.capitalKind(theme: string, race: string?): string
+	return capitalKind(theme, race)
 end
 
 return PixelArt

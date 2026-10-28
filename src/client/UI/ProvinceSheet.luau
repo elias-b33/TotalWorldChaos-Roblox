@@ -1,8 +1,8 @@
 --!strict
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
 -- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each troop
--- your race can raise, move an army) and diplomacy on foreign ones (war, ally, peace). Every button shows its
--- price; the server decides.
+-- your race can raise, under the names and icons the map gives them, move an army) and diplomacy on foreign ones
+-- (war, ally, peace). Every button shows its price; the server decides.
 -- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
 
 local Players = game:GetService("Players")
@@ -179,7 +179,7 @@ local function render()
 		end
 		if record.building == "None" then
 			for _, building in BUILDABLE do
-				local cost = Economy.buildingCost(building, me.race :: Types.Race) or 0 -- Dwarves: cheaper forts
+				local cost = Economy.buildingCost(building, me.race :: Types.Race) or 0 -- Hills races: cheaper forts
 				action(
 					BUILDING_ICONS[building],
 					building,
@@ -192,16 +192,17 @@ local function render()
 				)
 			end
 		end
-		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite. The
-		-- infantry button keeps the name "Regiment" (the tutorial and the harness look for it)
+		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite, as the map
+		-- names them (Skyshards: troopers, gunners, hover bikes). The infantry button keeps the name "Regiment" (the
+		-- tutorial and the harness look for it), the others "Recruit_<troop id>"
 		for _, troop in RaceInfo.troops(me.race) do
 			local recruitGold, recruitManpower = Economy.recruitCost(1, troop)
 			local manpowerText = if recruitManpower % 1000 == 0
 				then recruitManpower // 1000 .. "k"
 				else tostring(recruitManpower) -- Berserkers: 750
 			action(
-				RaceInfo.icon(troop),
-				troop,
+				RaceInfo.troopIcon(troop),
+				RaceInfo.troopName(troop),
 				{ { "gold", tostring(recruitGold) }, { "manpower", manpowerText } },
 				Widgets.GOOD,
 				gold >= recruitGold and me.manpower >= recruitManpower,

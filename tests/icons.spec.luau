@@ -170,9 +170,41 @@ T.test("the previous-page arrow mirrors the next-page one", function()
 	end
 end)
 
+T.test("every map's races and every troop as each map draws it have an icon", function()
+	local Maps = require("../src/shared/Maps")
+	local Races = require("../src/shared/Sim/Races")
+	local Troops = require("../src/shared/Sim/Troops")
+	for _, race in Races.LIST do
+		T.expect(IconArt.rows(string.lower(race)) ~= nil, race .. " has an icon")
+	end
+	for _, mapId in Maps.ids do
+		for _, troop in Troops.LIST do
+			local icon = Troops.icon(mapId, troop)
+			T.expect(IconArt.rows(icon) ~= nil, mapId .. ": " .. troop .. " has an icon (" .. icon .. ")")
+		end
+	end
+	-- the races' heads and the troops' icons all differ
+	local seen: { [string]: string } = {}
+	local names = {}
+	for _, race in Races.LIST do
+		table.insert(names, string.lower(race))
+	end
+	for _, mapId in Maps.ids do
+		for _, troop in Troops.LIST do
+			table.insert(names, Troops.icon(mapId, troop))
+		end
+	end
+	for _, name in names do
+		local key = table.concat(IconArt.rows(name) :: { string })
+		T.expect(seen[key] == nil or seen[key] == name, name .. " looks like " .. tostring(seen[key]))
+		seen[key] = name
+	end
+end)
+
 T.test("the whole set is small in memory", function()
-	-- each icon is its own 16×16 RGBA EditableImage when shown: 1 KB
-	T.expect(#IconArt.names() * 16 * 16 * 4 <= 96 * 1024, "under 96 KB even if every icon is on screen")
+	-- each icon is its own 16×16 RGBA EditableImage when shown: 1 KB. Every map's peoples, their elites and
+	-- Skyshards' troop names brought the set to about 100 icons; a match shows at most its own map's few dozen.
+	T.expect(#IconArt.names() * 16 * 16 * 4 <= 128 * 1024, "under 128 KB even if every icon is on screen")
 end)
 
 T.finish()

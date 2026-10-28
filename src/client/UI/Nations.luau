@@ -62,7 +62,7 @@ local function render()
 	local mine = ClientState.nation(me)
 	raceLine.Visible = mine ~= nil
 	if mine then
-		raceLine.Text = string.format("%s: %s", mine.race, RaceInfo.bonus(mine.race))
+		raceLine.Text = string.format("%s: %s", RaceInfo.name(mine.race), RaceInfo.bonus(mine.race))
 		Icons.set(raceLine:FindFirstChild("Icon") :: GuiObject, RaceInfo.icon(mine.race))
 	end
 	local list = table.clone(snap.nations)

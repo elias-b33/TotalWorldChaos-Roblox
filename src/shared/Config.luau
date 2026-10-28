@@ -57,36 +57,135 @@ Config.Army = {
 
 -- Troops (docs/DESIGN.md "Troops"): what one regiment (1,000 men) of each type costs, its upkeep in gold per month,
 -- and how it fights: in a battle a side's strength is its men × attack (attackers) or × defence (defenders). An army
--- marches at its slowest troop's speed. race: only nations of that race recruit it (one elite per race); the rest
--- every race recruits. Infantry is the old regiment: neutral garrisons and Rebels are infantry. Upkeep is what limits
--- armies (income / upkeep is the army a nation can keep). Tuned with bot tournaments: docs/BALANCE.md section 18.
+-- marches at its slowest troop's speed (fast = true: Config.Army.FastMoveTicks). siegeSpeed: an army with this troop
+-- in it besieges that much faster (siege progress per tick). name: what the UI calls it (Config.Casts can rename a
+-- shared role on one map). Infantry, Archers and Cavalry are the three shared roles every nation recruits; every
+-- other troop is an elite, recruited only by the races whose `elite` it is (Config.Races). Infantry is the old
+-- regiment: neutral garrisons and Rebels are infantry. Upkeep is what limits armies (income / upkeep is the army a
+-- nation can keep). Ids are letters only (the network encodes a composition as "Infantry:3000,Archers:1000").
+-- Tuned with bot tournaments: docs/BALANCE.md sections 18 and 19.
 Config.Troops = {
-	Infantry = { gold = 10, manpower = 1000, upkeep = 1.5, attack = 1.0, defence = 1.0 },
-	Archers = { gold = 15, manpower = 1000, upkeep = 2, attack = 0.75, defence = 1.5 },
-	Cavalry = { gold = 25, manpower = 1000, upkeep = 3, attack = 1.5, defence = 1.0, fast = true },
-	Knights = { gold = 35, manpower = 1000, upkeep = 4, attack = 2.0, defence = 1.25, fast = true, race = "Humans" },
-	Rangers = { gold = 20, manpower = 1000, upkeep = 2.5, attack = 1.25, defence = 1.75, race = "Elves" },
-	Berserkers = { gold = 12, manpower = 750, upkeep = 1.5, attack = 1.75, defence = 0.75, race = "Orcs" },
-	-- siegeSpeed: an army with Ironguard in it besieges this much faster (siege progress per tick)
+	-- the shared roles (every map)
+	Infantry = { name = "Infantry", gold = 10, manpower = 1000, upkeep = 1.5, attack = 1.0, defence = 1.0 },
+	Archers = { name = "Archers", gold = 15, manpower = 1000, upkeep = 2, attack = 0.75, defence = 1.5 },
+	Cavalry = { name = "Cavalry", gold = 25, manpower = 1000, upkeep = 3, attack = 1.5, defence = 1.0, fast = true },
+	-- Earth's elites (historical) and Eldmoor's Humans' (Knights)
+	Knights = { name = "Knights", gold = 35, manpower = 1000, upkeep = 4, attack = 2.0, defence = 1.25, fast = true },
+	Legionaries = {
+		name = "Legionaries",
+		gold = 25,
+		manpower = 1000,
+		upkeep = 2,
+		attack = 1.5,
+		defence = 1.75,
+		siegeSpeed = 1.5,
+	},
+	HorseArchers = {
+		name = "Horse archers",
+		gold = 25,
+		manpower = 1000,
+		upkeep = 2.5,
+		attack = 1.5,
+		defence = 1.25,
+		fast = true,
+	},
+	Crossbowmen = { name = "Crossbowmen", gold = 20, manpower = 1000, upkeep = 2.5, attack = 1.5, defence = 1.5 },
+	Pikemen = { name = "Pikemen", gold = 15, manpower = 1000, upkeep = 1.75, attack = 1.25, defence = 2.0 },
+	-- Eldmoor's elites (fantasy)
+	Rangers = { name = "Rangers", gold = 20, manpower = 1000, upkeep = 2.5, attack = 1.25, defence = 1.75 },
+	Berserkers = { name = "Berserkers", gold = 12, manpower = 750, upkeep = 1.5, attack = 1.75, defence = 0.75 },
 	Ironguard = {
+		name = "Ironguard",
 		gold = 25,
 		manpower = 1000,
 		upkeep = 2,
 		attack = 1.5,
 		defence = 2.0,
-		race = "Dwarves",
 		siegeSpeed = 1.5,
+	},
+	RaptorRiders = {
+		name = "Raptor riders",
+		gold = 20,
+		manpower = 750,
+		upkeep = 2.5,
+		attack = 1.75,
+		defence = 1.0,
+		fast = true,
+	},
+	-- Skyshards' elites (sci-fi)
+	Mechs = { name = "Mechs", gold = 40, manpower = 1000, upkeep = 4, attack = 2.25, defence = 2.0 },
+	Drones = { name = "Drones", gold = 15, manpower = 750, upkeep = 2, attack = 1.25, defence = 0.75, fast = true },
+	HiveWarriors = { name = "Hive warriors", gold = 12, manpower = 750, upkeep = 1.5, attack = 1.75, defence = 0.75 },
+	Golems = { name = "Golems", gold = 25, manpower = 1000, upkeep = 2, attack = 1.25, defence = 2.25 },
+	StormWisps = {
+		name = "Storm wisps",
+		gold = 30,
+		manpower = 1000,
+		upkeep = 3,
+		attack = 2.0,
+		defence = 1.0,
+		fast = true,
 	},
 }
 
--- Races (docs/DESIGN.md "Races"): every nation has one (map data); neutral garrisons and Rebels have none. Combat
--- bonuses add to the battle modifier like the others (a side with a nation of that race on it gets them). Tuned with
--- bot tournaments: docs/BALANCE.md section 18.
+-- Races, the peoples nations belong to (docs/DESIGN.md "Races"): every nation has one (map data: picking a nation
+-- picks its race); neutral garrisons and Rebels have none. Each race has one passive, a kind from Sim.Races.PASSIVES
+-- with its numbers here, and one elite troop (Config.Troops). name: what the UI calls it.
+--   Gold      goldBonus: more gross gold income (provinces and capital, before upkeep)
+--   Manpower  manpowerBonus: more manpower income
+--   Forest    forestBonus: more combat strength in battles in forest provinces; forest costs plains move time
+--   Hills     hillsDefenceBonus: more combat strength defending in hills; fortCostMultiplier: forts cost less
+--   Upkeep    upkeepMultiplier: armies cost less gold a month
+--   Swift     moveMultiplier: armies march faster (each step's ticks × this, rounded, at least 1)
+--   Attack    attackBonus: more combat strength when attacking
+-- Combat bonuses add to the battle modifier like the terrain, fort and catch-up bonuses, for the whole side. Tuned
+-- with bot tournaments: docs/BALANCE.md sections 18 and 19.
 Config.Races = {
-	Humans = { goldBonus = 0.1 }, -- gross gold income (provinces + capital, before upkeep)
-	Elves = { forestBonus = 0.1 }, -- combat strength in battles in forest provinces; forest costs plains move time
-	Orcs = { manpowerBonus = 0.2 },
-	Dwarves = { hillsDefenceBonus = 0.25, fortCostMultiplier = 0.5 }, -- defending in hills; forts cost half
+	-- Earth (realistic): human civilisations, given to nations by terrain and balance
+	Kingdom = { name = "Kingdom", passive = "Gold", goldBonus = 0.1, elite = "Knights" },
+	Empire = { name = "Empire", passive = "Attack", attackBonus = 0.1, elite = "Legionaries" },
+	Nomads = { name = "Nomads", passive = "Swift", moveMultiplier = 0.8, elite = "HorseArchers" },
+	Republic = { name = "Republic", passive = "Upkeep", upkeepMultiplier = 0.85, elite = "Crossbowmen" },
+	Clans = {
+		name = "Clans",
+		passive = "Hills",
+		hillsDefenceBonus = 0.25,
+		fortCostMultiplier = 0.5,
+		elite = "Pikemen",
+	},
+	-- Eldmoor (fantasy)
+	Humans = { name = "Humans", passive = "Gold", goldBonus = 0.1, elite = "Knights" },
+	Elves = { name = "Elves", passive = "Forest", forestBonus = 0.1, elite = "Rangers" },
+	Orcs = { name = "Orcs", passive = "Manpower", manpowerBonus = 0.2, elite = "Berserkers" },
+	Dwarves = {
+		name = "Dwarves",
+		passive = "Hills",
+		hillsDefenceBonus = 0.25,
+		fortCostMultiplier = 0.5,
+		elite = "Ironguard",
+	},
+	Lizardfolk = { name = "Lizardfolk", passive = "Attack", attackBonus = 0.1, elite = "RaptorRiders" },
+	-- Skyshards (sci-fi in space)
+	Marines = { name = "Marines", passive = "Gold", goldBonus = 0.1, elite = "Mechs" },
+	Robots = { name = "Robots", passive = "Upkeep", upkeepMultiplier = 0.85, elite = "Drones" },
+	Insectoids = { name = "Insectoids", passive = "Manpower", manpowerBonus = 0.2, elite = "HiveWarriors" },
+	Crystals = { name = "Crystal folk", passive = "Forest", forestBonus = 0.1, elite = "Golems" },
+	Energy = { name = "Energy beings", passive = "Swift", moveMultiplier = 0.8, elite = "StormWisps" },
+}
+
+-- Each map's cast (docs/MAPS.md): its five races, two nations each (the map data says which nation is which), and
+-- what it calls the three shared troop roles when not their default names (same stats; icon: an IconArt name).
+Config.Casts = {
+	earth = { races = { "Kingdom", "Empire", "Nomads", "Republic", "Clans" } },
+	eldmoor = { races = { "Humans", "Elves", "Orcs", "Dwarves", "Lizardfolk" } },
+	skyshards = {
+		races = { "Marines", "Robots", "Insectoids", "Crystals", "Energy" },
+		troops = {
+			Infantry = { name = "Troopers", icon = "troopers" },
+			Archers = { name = "Gunners", icon = "gunners" },
+			Cavalry = { name = "Hover bikes", icon = "hoverbikes" },
+		},
+	},
 }
 
 Config.Battle = {

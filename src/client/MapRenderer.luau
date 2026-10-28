@@ -1300,7 +1300,8 @@ local function refreshArmies()
 			t.troops = army.troops
 			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon
 		end
-		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating, t.troop)
+		local troopIcon = if t.troop then RaceInfo.troopIcon(t.troop) else nil -- as this map draws it
+		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating, troopIcon)
 		local text = MapBadges.shortMen(army.men)
 		if t.icon ~= icon or t.text ~= text then
 			t.icon, t.text = icon, text

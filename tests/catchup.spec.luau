@@ -160,6 +160,7 @@ T.test("underdog bonus reaches Battle.modifier and adds to terrain", function()
 	local state, ids = withCounts({ 10, 10, 10, 10, 10, 10, 10, 2, 10, 10 })
 	local home = ids[71] -- one of nation 8's provinces
 	T.equal(state.provinces[home].owner, 8)
+	state.nations[8].race, state.nations[1].race = "Marines", "Marines" -- a race with no combat bonus anywhere
 	state.provinces[home].terrain = "Forest"
 	state.provinces[home].building = "None"
 	local def = Army.spawn(state, 8, home, 1000)

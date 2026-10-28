@@ -120,7 +120,7 @@ function Battle.modifier(state: MatchState, provinceId: number, sides: Sides, de
 	end
 	local mine = owners(if defending then sides.defenders else sides.attackers)
 	local theirs = owners(if defending then sides.attackers else sides.defenders)
-	m += Races.battleBonus(state, province, mine, defending) -- Elves in forest, Dwarves defending hills
+	m += Races.battleBonus(state, province, mine, defending) -- Forest in forest, Hills defending hills, Attack
 	return math.max(0.1, m + Battle.bonus(state, mine, theirs, defending))
 end
 

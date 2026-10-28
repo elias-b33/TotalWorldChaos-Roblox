@@ -15,8 +15,9 @@
 --
 -- "share" is a slot's wins over the fair share (all wins / 10). Win counts are noisy: at 200 seeds one slot's count
 -- moves by about ±5 (±0.2× share) from seed to seed, so judge start positions on 200 seeds per map, not 20.
--- Races (docs/DESIGN.md "Races"): each map also prints the wins by race against the race's fair share (all wins ×
--- its nations / 10) and the regiments bots recruited of each troop type.
+-- Races (docs/DESIGN.md "Races"): each map also prints the wins by race (its own cast of five) against the race's
+-- fair share (all wins × its nations / 10) and the regiments bots recruited of each troop type the map has (the
+-- shared roles under the map's names, and its races' elites).
 
 local process = require("@lune/process")
 
@@ -62,6 +63,21 @@ if overrides and overrides ~= "" then
 end
 
 local MINUTES = Config.Phases.MatchEndTick // 60
+
+-- The troop types a map's nations can recruit: the shared roles, then its races' elites (Troops.LIST order).
+local function mapTroops(mapId: string): { string }
+	local out = {}
+	for _, troop in Troops.LIST do
+		local used = Troops.isShared(troop)
+		for _, race in Races.forMap(mapId) do
+			used = used or Troops.elite(race) == troop
+		end
+		if used then
+			table.insert(out, troop)
+		end
+	end
+	return out
+end
 
 type MatchStats = {
 	result: Types.MatchResult,
@@ -526,9 +542,9 @@ for _, mapId in mapIds do
 			)
 		)
 		local mix = {}
-		for _, troop in Troops.LIST do
+		for _, troop in mapTroops(mapId) do
 			local share = (troopMenAt[m][troop] or 0) / math.max(troopMenAt[m].all or 0, 1)
-			table.insert(mix, string.format("%s %d%%", troop, math.floor(100 * share + 0.5)))
+			table.insert(mix, string.format("%s %d%%", Troops.name(mapId, troop), math.floor(100 * share + 0.5)))
 		end
 		print(string.format("  men by troop at %d:00: %s", m, table.concat(mix, ", ")))
 	end
@@ -537,13 +553,13 @@ for _, mapId in mapIds do
 	for _, n in raceNations do
 		nationsTotal += n
 	end
-	print("race      nations/match  wins  share  avg final provinces")
-	for _, race in Races.LIST do
+	print("race          nations/match  wins  share  avg final provinces")
+	for _, race in Races.forMap(mapId) do
 		local n = raceNations[race] or 0
 		local fairRace = math.max(totalWins, 1) * n / math.max(nationsTotal, 1)
 		print(
 			string.format(
-				"%-8s  %13.1f  %4d  %4.2fx  %6.1f",
+				"%-12s  %13.1f  %4d  %4.2fx  %6.1f",
 				race,
 				n / seeds,
 				raceWins[race] or 0,
@@ -559,12 +575,17 @@ for _, mapId in mapIds do
 	for _, n in recruits do
 		troopTotal += n
 	end
-	for _, troop in Troops.LIST do
+	for _, troop in mapTroops(mapId) do
 		local n = recruits[troop] or 0
 		allRecruits[troop] = (allRecruits[troop] or 0) + n
 		table.insert(
 			troopLine,
-			string.format("%s %.1f (%d%%)", troop, n / seeds, math.floor(100 * n / math.max(troopTotal, 1) + 0.5))
+			string.format(
+				"%s %.1f (%d%%)",
+				Troops.name(mapId, troop),
+				n / seeds,
+				math.floor(100 * n / math.max(troopTotal, 1) + 0.5)
+			)
 		)
 	end
 	print("regiments recruited per match: " .. table.concat(troopLine, ", "))
@@ -584,7 +605,7 @@ if #mapIds > 1 then
 		local fairRace = math.max(allWins, 1) * (allRaceNations[race] or 0) / math.max(nationsTotal, 1)
 		print(
 			string.format(
-				"%-8s  wins %4d  share %4.2fx",
+				"%-12s  wins %4d  share %4.2fx",
 				race,
 				allRaceWins[race] or 0,
 				(allRaceWins[race] or 0) / math.max(fairRace, 1e-9)
@@ -593,7 +614,9 @@ if #mapIds > 1 then
 	end
 	local parts = {}
 	for _, troop in Troops.LIST do
-		table.insert(parts, string.format("%s %d", troop, allRecruits[troop] or 0))
+		if allRecruits[troop] then
+			table.insert(parts, string.format("%s %d", troop, allRecruits[troop]))
+		end
 	end
 	print("regiments recruited in all: " .. table.concat(parts, ", "))
 end

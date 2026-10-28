@@ -27,7 +27,7 @@
    "name": "Saltmarsh",
    "capital": 53,
    "colorIndex": 2,
-   "race": "Humans"
+   "race": "Lizardfolk"
   },
   {
    "slot": 3,
@@ -69,7 +69,7 @@
    "name": "Sunscorch",
    "capital": 126,
    "colorIndex": 8,
-   "race": "Orcs"
+   "race": "Lizardfolk"
   },
   {
    "slot": 9,

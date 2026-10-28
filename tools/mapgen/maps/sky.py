@@ -40,11 +40,13 @@ ISLE_RX, ISLE_RY = 56, 38
 HEART_R = 280
 
 NATIONS = ["Aurora", "Zephyr", "Nimbus", "Tempest", "Halo", "Solace", "Ember", "Rime", "Verdance", "Umbra"]
-# Races (docs/DESIGN.md "Races"): every shard has the same land, so the races just alternate round the ring and no
-# two neighbouring shards share one (3 Humans, 3 Elves, 2 Orcs, 2 Dwarves).
+# Races (docs/DESIGN.md "Races"): Skyshards is the sci-fi map, so its cast is five peoples of space: human marines,
+# robots, an insectoid hive, crystal folk and energy beings. Every shard has the same land, so each race holds two
+# shards on opposite sides of the ring and no two neighbouring shards share one.
+CAST = ("Marines", "Robots", "Insectoids", "Crystals", "Energy")
 RACES = {
-    "Aurora": "Humans", "Zephyr": "Orcs", "Nimbus": "Elves", "Tempest": "Dwarves", "Halo": "Humans",
-    "Solace": "Elves", "Ember": "Dwarves", "Rime": "Humans", "Verdance": "Elves", "Umbra": "Orcs",
+    "Aurora": "Marines", "Zephyr": "Insectoids", "Nimbus": "Crystals", "Tempest": "Robots", "Halo": "Energy",
+    "Solace": "Marines", "Ember": "Insectoids", "Rime": "Crystals", "Verdance": "Robots", "Umbra": "Energy",
 }
 DRIFTS = ["Cinder", "Feather", "Lantern", "Thistle", "Comet", "Willow", "Copper", "Echo", "Ivory", "Storm"]
 SANCTUMS = ["Dawn", "Storms", "Stars", "Embers", "Tides", "Echoes", "Crowns", "Thorns", "Mirrors", "Ashes"]
@@ -139,7 +141,7 @@ def build() -> Layout:
     land = land_mask()
     notes: list[str] = []
     labels, sd = build_regions(land, seeds(), notes)
-    lay = Layout("skyshards", "Skyshards", "sky", W, H, labels, land, sd, TERRAIN, notes=notes)
+    lay = Layout("skyshards", "Skyshards", "sky", W, H, labels, land, sd, TERRAIN, notes=notes, cast=CAST)
     finalize(lay)
     idx = {s.name: i for i, s in enumerate(lay.seeds)}
     edges = edge_points(lay.labels, len(lay.seeds))

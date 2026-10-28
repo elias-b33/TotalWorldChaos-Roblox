@@ -48,15 +48,22 @@ end)
 T.test(
 	"the badge shows the main troop's icon, unless the army is fighting, retreating, Rebels or a garrison",
 	function()
-		T.equal(MapBadges.armyIcon(false, false, false, false, "Archers"), "archers")
-		T.equal(MapBadges.armyIcon(false, false, true, false, "Archers"), "battle", "a battle's burst first")
-		T.equal(MapBadges.armyIcon(false, false, false, true, "Archers"), "retreat", "then the retreat flag")
-		T.equal(MapBadges.armyIcon(true, false, false, false, "Infantry"), "rebels", "Rebels keep their flag")
-		T.equal(MapBadges.armyIcon(false, true, false, false, "Infantry"), "shield", "garrisons keep their shield")
-		for _, troop in Troops.LIST do
-			local icon = MapBadges.armyIcon(false, false, false, false, troop)
-			T.expect(IconArt.rows(icon) ~= nil, troop .. "'s badge icon " .. icon .. " is a painted icon")
+		T.equal(MapBadges.armyIcon(false, false, false, false, "archers"), "archers")
+		T.equal(MapBadges.armyIcon(false, false, true, false, "archers"), "battle", "a battle's burst first")
+		T.equal(MapBadges.armyIcon(false, false, false, true, "archers"), "retreat", "then the retreat flag")
+		T.equal(MapBadges.armyIcon(true, false, false, false, "infantry"), "rebels", "Rebels keep their flag")
+		T.equal(MapBadges.armyIcon(false, true, false, false, "infantry"), "shield", "garrisons keep their shield")
+		-- every troop's icon as each map draws it (Skyshards' troopers, gunners and hover bikes) is a painted icon
+		local Maps = require("../src/shared/Maps")
+		for _, mapId in Maps.ids do
+			for _, troop in Troops.LIST do
+				local icon = MapBadges.armyIcon(false, false, false, false, Troops.icon(mapId, troop))
+				T.expect(IconArt.rows(icon) ~= nil, mapId .. ": " .. troop .. "'s badge icon " .. icon .. " is painted")
+			end
 		end
+		T.equal(Troops.icon("skyshards", "Infantry"), "troopers", "Skyshards draws its infantry as troopers")
+		T.equal(Troops.icon("earth", "Infantry"), "infantry")
+		T.equal(Troops.icon("earth", "HorseArchers"), "horsearchers", "an elite's icon is its id in lower case")
 	end
 )
 

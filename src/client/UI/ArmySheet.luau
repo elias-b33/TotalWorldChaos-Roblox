@@ -44,7 +44,8 @@ local function render()
 	-- the composition: one chip per troop type in the stack
 	Widgets.clear(chips)
 	for i, part in RaceInfo.composition(army.troops) do
-		local chip = Widgets.chip(chips, RaceInfo.icon(part.troop), shortMen(part.men) .. " " .. part.troop, nil, 26)
+		local name = RaceInfo.troopName(part.troop) -- as the map calls it
+		local chip = Widgets.chip(chips, RaceInfo.troopIcon(part.troop), shortMen(part.men) .. " " .. name, nil, 26)
 		chip.Name = "Troop_" .. part.troop
 		chip.LayoutOrder = i
 	end

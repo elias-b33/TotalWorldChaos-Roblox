@@ -1,16 +1,18 @@
 --!strict
--- What the UI says and shows about races and troops (docs/DESIGN.md "Races", "Troops"): each race's pixel icon and
--- one-line bonus, each troop's icon, and an army's composition and main troop type from its record. Numbers come
--- from Config, so the text follows a balance change.
+-- What the UI says and shows about races and troops (docs/DESIGN.md "Races", "Troops"): each race's name, pixel icon
+-- and one-line bonus, each troop's name and icon on the current map (a map can rename the shared roles: Skyshards'
+-- troopers, gunners and hover bikes), and an army's composition and main troop type from its record. Numbers come
+-- from Config, so the text follows a balance change (Sim.Races.bonusText, tested under Lune).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
-local Config = require(Shared.Config)
+local Races = require(Shared.Sim.Races)
 local Troops = require(Shared.Sim.Troops)
 local Types = require(Shared.Types)
 
+local ClientState = require(script.Parent.ClientState)
 local MapBadges = require(script.Parent.MapBadges)
 
 local RaceInfo = {}
@@ -19,31 +21,34 @@ local function goldPerRegiment(troop: string): number
 	return Troops.stats(troop :: Types.Troop).gold
 end
 
-local function pct(x: number): string
-	return string.format("%d%%", math.floor(x * 100 + 0.5))
+local function mapId(): string?
+	local map = ClientState.map()
+	return if map then map.id else nil
 end
 
--- The pixel icon of a race or a troop type (src/client/IconArt.luau: "humans", "archers"...).
-function RaceInfo.icon(raceOrTroop: string): string
-	return string.lower(raceOrTroop)
+-- What the UI calls a race ("Kingdom", "Crystal folk").
+function RaceInfo.name(race: string): string
+	return Races.name(race :: Types.Race)
+end
+
+-- The pixel icon of a race (src/client/IconArt.luau: "humans", "kingdom"...).
+function RaceInfo.icon(race: string): string
+	return string.lower(race)
 end
 
 -- A race's passive in one short line.
 function RaceInfo.bonus(race: string): string
-	local r = Config.Races
-	if race == "Humans" then
-		return "+" .. pct(r.Humans.goldBonus) .. " gold"
-	elseif race == "Elves" then
-		return "Fast in forests, +" .. pct(r.Elves.forestBonus) .. " in forest battles"
-	elseif race == "Orcs" then
-		return "+" .. pct(r.Orcs.manpowerBonus) .. " manpower"
-	elseif race == "Dwarves" then
-		return "+"
-			.. pct(r.Dwarves.hillsDefenceBonus)
-			.. " defending hills, forts -"
-			.. pct(1 - r.Dwarves.fortCostMultiplier)
-	end
-	return ""
+	return Races.bonusText(race :: Types.Race)
+end
+
+-- What a troop is called on the map being played (Troops.name: Skyshards calls infantry "Troopers").
+function RaceInfo.troopName(troop: string): string
+	return Troops.name(mapId(), troop :: Types.Troop)
+end
+
+-- A troop's pixel icon on the map being played (Troops.icon).
+function RaceInfo.troopIcon(troop: string): string
+	return Troops.icon(mapId(), troop :: Types.Troop)
 end
 
 -- What a nation of this race can recruit, in button order: infantry, archers, cavalry, its elite.
@@ -61,7 +66,7 @@ end
 -- The icon for an army record in the province sheet's chips: its main troop type's, or a sword.
 function RaceInfo.mainTroopIcon(troops: string): string
 	local main = RaceInfo.mainTroop(troops)
-	return if main then RaceInfo.icon(main) else "sword"
+	return if main then RaceInfo.troopIcon(main) else "sword"
 end
 
 -- An army record's composition, as { troop, men } in LIST order (the army sheet's chips).

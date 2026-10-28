@@ -86,13 +86,16 @@ SLOTS = [
     "Mistborn", "Saltmarsh", "Ironholds", "Frostmarch", "Greenvale",
     "Elderwood", "Wyrmcoast", "Sunscorch", "Ashen Dominion", "Corsairs",
 ]
-# Races (docs/DESIGN.md "Races"): Elves in the wildwoods (the Isle of Mists, Elderwood), Dwarves in the highlands
-# (Ironholds, Wyrmcoast), Orcs in the desert, the ash wastes round Mount Cinder and the western breadbasket, Humans on
-# the southwest coast, the frostfields and the Corsair Isles. Each race gets strong and weak start positions alike
-# (docs/BALANCE.md section 18).
+# Races (docs/DESIGN.md "Races"): Eldmoor is the fantasy map: WorldBox's four classic races and the Lizardfolk.
+# Elves in the wildwoods (the Isle of Mists, Elderwood), Dwarves in the highlands (Ironholds, Wyrmcoast), Orcs in the
+# ash wastes round Mount Cinder and the western breadbasket, Humans on the frostfields and the Corsair Isles, and the
+# Lizardfolk in the salt marshes of the southwest coast and the southern dunes. Each race gets strong and weak start
+# positions alike (docs/BALANCE.md sections 18 and 19).
+CAST = ("Humans", "Elves", "Orcs", "Dwarves", "Lizardfolk")
 RACES = {
-    "Mistborn": "Elves", "Saltmarsh": "Humans", "Ironholds": "Dwarves", "Frostmarch": "Humans", "Greenvale": "Orcs",
-    "Elderwood": "Elves", "Wyrmcoast": "Dwarves", "Sunscorch": "Orcs", "Ashen Dominion": "Orcs", "Corsairs": "Humans",
+    "Mistborn": "Elves", "Saltmarsh": "Lizardfolk", "Ironholds": "Dwarves", "Frostmarch": "Humans",
+    "Greenvale": "Orcs", "Elderwood": "Elves", "Wyrmcoast": "Dwarves", "Sunscorch": "Lizardfolk",
+    "Ashen Dominion": "Orcs", "Corsairs": "Humans",
 }
 
 # name, centre, biome mix, nation (None = neutral zone)
@@ -261,7 +264,7 @@ def build() -> Layout:
             cap.dev = 3
     notes: list[str] = [f"province spacing {r:.1f}px"]
     labels, seeds = build_regions(land, seeds, notes)
-    lay = Layout("eldmoor", "Eldmoor", "fantasy", W, H, labels, land, seeds, TERRAIN, notes=notes)
+    lay = Layout("eldmoor", "Eldmoor", "fantasy", W, H, labels, land, seeds, TERRAIN, notes=notes, cast=CAST)
     finalize(lay)
     auto_connect(lay)
     extra_straits(lay)
