@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
+local Config = require(ReplicatedStorage.Shared.Config)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local Client = script.Parent.Parent
@@ -16,8 +17,11 @@ local ProfileState = require(Client.ProfileState)
 local Widgets = require(script.Parent.Widgets)
 
 local HOW = {
-	Domination = "👑 Domination: 40% of the world",
-	Alliance = "🤝 Alliance victory: 55% together",
+	Domination = string.format(
+		"👑 Domination: %d%% of the world",
+		math.floor(Config.Win.DominationShare * 100 + 0.5)
+	),
+	Alliance = string.format("🤝 Alliance victory: %d%% together", math.floor(Config.Win.AllianceShare * 100 + 0.5)),
 	Score = "🏆 Best score when time ran out",
 }
 

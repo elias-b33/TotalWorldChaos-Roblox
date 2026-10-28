@@ -44,10 +44,10 @@ for n = 8, 80 do
 end
 
 print("\n### Where the thresholds sit on each map\n")
-print("| Map | Crown at (25%) | Gold multiplier at the crown | Domination at (40%) | Gold multiplier at 40% |")
+print("| Map | Crown at | Gold multiplier at the crown | Domination at | Gold multiplier at domination |")
 print("| --- | --- | --- | --- | --- |")
 for _, id in Maps.ids do
-	local total = #Maps.get(id).provinces
+	local total = CatchUp.ownableCount(Maps.get(id).provinces) -- shares count ownable provinces only
 	local crown = math.ceil(Config.Diplomacy.CoalitionThreshold * total)
 	local win = math.ceil(Config.Win.DominationShare * total)
 	print(

@@ -25,6 +25,7 @@ local REASONS: { [string]: string } = {
 	UnknownArmy = "🚫 That army is gone",
 	NotYourArmy = "🚫 Not your army",
 	InBattle = "💥 It's in a battle",
+	Retreating = "🏳 It's retreating home",
 	NoPath = "🚫 Can't get there",
 	BadTarget = "🚫 Not possible",
 	PeaceTime = "🕊 No wars until 3:00",

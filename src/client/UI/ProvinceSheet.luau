@@ -181,7 +181,7 @@ local function render()
 		for _, a in snap.armies do
 			if a.location == provinceId and a.owner == me.id then
 				local armyId = a.id
-				button("➜ Move\n⚔ " .. shortMen(a.men), not a.inBattle, function()
+				button("➜ Move\n⚔ " .. shortMen(a.men), not a.inBattle and not a.retreating, function()
 					if onSelectArmy then
 						onSelectArmy(armyId)
 					end

@@ -46,6 +46,7 @@ export type ArmyRecord = {
 	dest: number, -- end of its route, 0 = standing still
 	inBattle: boolean,
 	rebel: boolean, -- an owner-0 army raised by the Rebels power (else owner 0 is a neutral garrison)
+	retreating: boolean, -- beaten and walking home: takes no orders
 }
 
 -- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes.
@@ -151,6 +152,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 			dest = a.path[#a.path] or 0,
 			inBattle = a.inBattle,
 			rebel = a.rebel == true,
+			retreating = a.retreating == true,
 		})
 	end
 	return {

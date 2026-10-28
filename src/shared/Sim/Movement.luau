@@ -1,5 +1,7 @@
 --!strict
 -- Army orders and movement (tick order step 2): one province per 5 s on plains, 8 s on forest and hills.
+-- After moving, a nation's armies that stand still in the same province merge into one (the lowest id stays):
+-- an army is a stack of regiments shown as one token. Retreating armies walk on and take no orders.
 
 local Diplomacy = require("./Diplomacy")
 local Pathing = require("./Pathing")
@@ -30,6 +32,9 @@ function Movement.order(state: MatchState, nationId: number, armyId: number, to:
 	if army.inBattle then
 		return false, "InBattle"
 	end
+	if army.retreating then
+		return false, "Retreating"
+	end
 	if state.provinces[to] == nil then
 		return false, "UnknownProvince"
 	end
@@ -54,6 +59,25 @@ function Movement.ticksToNext(state: MatchState, army: Types.Army): number
 	return Pathing.moveTicks(state.provinces[nextId].terrain) - army.moveProgress
 end
 
+-- A nation's armies standing still together (no route, not fighting, not retreating) become one army: the
+-- lowest id keeps the men of the others, which are removed.
+function Movement.mergeStacks(state: MatchState)
+	local keeper: { [string]: Types.Army } = {}
+	for _, id in sortedIds(state.armies) do
+		local army = state.armies[id]
+		if army.owner ~= 0 and #army.path == 0 and not army.inBattle and not army.retreating then
+			local key = army.owner .. ":" .. army.location
+			local first = keeper[key]
+			if first == nil then
+				keeper[key] = army
+			else
+				first.men += army.men
+				state.armies[id] = nil
+			end
+		end
+	end
+end
+
 function Movement.step(state: MatchState)
 	for _, id in sortedIds(state.armies) do
 		local army = state.armies[id]
@@ -72,7 +96,11 @@ function Movement.step(state: MatchState)
 				end
 			end
 		end
+		if army.retreating and #army.path == 0 then
+			army.retreating = nil -- home (or the way closed): a normal army again
+		end
 	end
+	Movement.mergeStacks(state)
 end
 
 return Movement

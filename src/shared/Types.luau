@@ -19,7 +19,8 @@ export type Province = {
 	development: number, -- 1..5
 	building: Building,
 	isCapital: boolean,
-	siege: { by: NationId, progress: number, required: number }?,
+	-- lastTick: the last tick it progressed (or waited under a shield); kept Config.Siege.GraceTicks after that
+	siege: { by: NationId, progress: number, required: number, lastTick: number }?,
 	shieldUntil: number?, -- tick when Divine Shield ends
 	buffs: { [string]: number }, -- buff name -> tick it ends
 }
@@ -50,6 +51,7 @@ export type Army = {
 	moveProgress: number, -- ticks spent toward next province
 	inBattle: boolean,
 	rebel: boolean?, -- true for the neutral army a Rebels power raised (clients draw it apart from garrisons)
+	retreating: boolean?, -- beaten: walking home on its path; takes no orders, doesn't fight, block or besiege
 }
 
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }

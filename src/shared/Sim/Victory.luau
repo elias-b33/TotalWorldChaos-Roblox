@@ -1,7 +1,9 @@
 --!strict
--- Win conditions (docs/DESIGN.md "Win conditions"): domination (40% of provinces), alliance victory
--- (55% between up to 3 allies), or the best score at 25:00.
+-- Win conditions (docs/DESIGN.md "Win conditions"): domination (Config.Win.DominationShare of the ownable provinces),
+-- alliance victory (AllianceShare between up to 3 allies), or the best score at 25:00. Mountains can't be owned, so
+-- they don't count.
 
+local CatchUp = require("./CatchUp")
 local Config = require("../Config")
 local Events = require("./Events")
 local Types = require("../Types")
@@ -44,7 +46,9 @@ local function provinceCounts(state: MatchState): ({ [number]: number }, number)
 	local counts: { [number]: number } = {}
 	local total = 0
 	for _, p in state.provinces do
-		total += 1
+		if CatchUp.ownable(p.terrain) then
+			total += 1
+		end
 		if p.owner then
 			counts[p.owner] = (counts[p.owner] or 0) + 1
 		end

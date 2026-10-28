@@ -195,8 +195,8 @@ local function run(case: Case, ratio: number, rng: Rng.Rng): Row
 			Battle.step(state, rng)
 		end
 		local att, def = state.armies[2], state.armies[1]
-		-- the attacker won if it still stands on the battlefield
-		if att and att.location == 1 then
+		-- the attacker won if it still stands on the battlefield (a beaten army walks off: Army.retreating)
+		if att and not att.retreating then
 			wins += 1
 		end
 		attGone += if att then 0 else 1

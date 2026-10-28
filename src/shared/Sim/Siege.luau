@@ -2,6 +2,9 @@
 -- Sieges (tick order step 4): an army standing alone in an enemy or neutral province besieges it for
 -- TicksPerDevelopment × development ticks, ×2 with a fort, ×3 for a capital. Then the province flips.
 -- Rebels (a neutral army standing in a nation's province) besiege it too; it turns neutral when they finish.
+-- One siege per province: whoever started it keeps it while one of its armies (or an ally's) stands there; a rival
+-- besieger at peace with it waits instead of blocking. An interrupted siege (a battle, a defender, the besieger
+-- leaving) keeps its progress for Config.Siege.GraceTicks, then resets. Retreating armies are ignored.
 
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
@@ -24,6 +27,14 @@ function Siege.required(province: Province): number
 	return t
 end
 
+-- A siege only lasts while its holder may still besiege the province (peace or a flip ends it at once).
+local function stillValid(state: MatchState, province: Province, by: number): boolean
+	if by == 0 then
+		return province.owner ~= nil -- Rebels only besiege a nation's land
+	end
+	return province.owner == nil or Diplomacy.atWar(state, by, province.owner)
+end
+
 function Siege.step(state: MatchState)
 	local here: { [number]: { Types.Army } } = {}
 	local ids = {}
@@ -33,47 +44,59 @@ function Siege.step(state: MatchState)
 	table.sort(ids)
 	for _, id in ids do
 		local a = state.armies[id]
-		here[a.location] = here[a.location] or {}
-		table.insert(here[a.location], a)
+		if not a.retreating then
+			here[a.location] = here[a.location] or {}
+			table.insert(here[a.location], a)
+		end
 	end
 
 	for provinceId, province in state.provinces do
-		local armies = here[provinceId] or {}
-		local leader: number? = nil
+		local besiegers: { number } = {} -- owners of armies standing here that may besiege it, in army id order
 		local blocked = false
-		for _, a in armies do
+		for _, a in here[provinceId] or {} do
 			local hostileToOwner = province.owner == nil or Diplomacy.atWar(state, a.owner, province.owner)
 			local defending = province.owner ~= nil and Diplomacy.friendly(state, a.owner, province.owner)
 			local rebels = a.owner == 0 and province.owner ~= nil -- Rebels besiege the province they rose in
 			if a.inBattle or (a.owner == 0 and not rebels) or defending then
 				blocked = true -- a fight, a neutral garrison or the owner's own army holds the province
 			elseif #a.path == 0 and (hostileToOwner or rebels) then
-				if leader == nil then
-					leader = a.owner
-				elseif not Diplomacy.friendly(state, leader, a.owner) then
-					blocked = true -- two rival besiegers: nobody makes progress
+				table.insert(besiegers, a.owner)
+			end
+		end
+		local current = province.siege
+		if current and not stillValid(state, province, current.by) then
+			province.siege = nil
+			current = nil
+		end
+		-- the holder of the siege keeps it while it (or an ally) is here; otherwise the first besieger leads
+		local leader: number? = nil
+		if current then
+			for _, owner in besiegers do
+				if Diplomacy.friendly(state, current.by, owner) then
+					leader = current.by
 				end
 			end
 		end
-		if leader == nil or blocked then
-			province.siege = nil
-		elseif province.shieldUntil and province.shieldUntil > state.tick then
-			-- Divine shield: the siege waits
-			if province.siege and province.siege.by ~= leader then
-				province.siege = nil
-			end
-		else
-			local current = province.siege
+		leader = leader or besiegers[1]
+		local shielded = province.shieldUntil ~= nil and province.shieldUntil > state.tick
+		if leader ~= nil and not blocked and not shielded then
 			local siege = if current and current.by == leader
 				then current
-				else { by = leader, progress = 0, required = Siege.required(province) }
+				else { by = leader, progress = 0, required = Siege.required(province), lastTick = state.tick }
 			province.siege = siege
 			siege.progress += 1
+			siege.lastTick = state.tick
 			if siege.progress >= siege.required then
 				local old = province.owner
 				province.owner = if leader == 0 then nil else leader -- Rebels leave neutral land behind
 				province.siege = nil
 				Events.push(state, "ProvinceTaken", leader, old or 0, provinceId)
+			end
+		elseif current then
+			if shielded and leader == current.by and not blocked then
+				current.lastTick = state.tick -- Divine shield: the siege waits without losing progress
+			elseif state.tick - current.lastTick > Config.Siege.GraceTicks then
+				province.siege = nil -- interrupted for too long: progress is lost
 			end
 		end
 	end

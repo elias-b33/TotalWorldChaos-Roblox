@@ -146,25 +146,88 @@ T.test("a round kills 15% of the enemy's strength, more for a defender in hills"
 	)
 end)
 
-T.test("the loser retreats to its nearest province; tiny armies are destroyed", function()
+T.test("the loser walks back to its nearest province; tiny armies are destroyed", function()
 	local state, rng = fresh()
 	warPhase(state)
 	state.provinces[id("Cinder Rock")].owner = AURORA
 	state.provinces[id("Cinder Reach")].owner = ZEPHYR
 	T.expect((Diplomacy.declareWar(state, AURORA, ZEPHYR)))
 	local field = id("Cinder Reach")
-	local strong = Army.spawn(state, ZEPHYR, field, 6000)
+	for _, a in state.armies do
+		state.armies[a.id] = nil -- no garrisons in the way
+	end
+	local strong = Army.spawn(state, ZEPHYR, field, 5000)
 	local weak = Army.spawn(state, AURORA, field, 3000)
 	run(state, rng, Config.Battle.Rounds)
 	T.expect(state.armies[strong.id] ~= nil, "winner stays")
 	T.expect(state.armies[weak.id] ~= nil, "loser survives the retreat")
-	T.equal(weak.location, id("Cinder Rock"), "loser fell back to its nearest owned province")
 	T.equal(state.nations[ZEPHYR].battlesWon, 1)
+	-- no teleport: it is still on the field, walking home, and takes no orders
+	T.equal(weak.location, field)
+	T.expect(weak.retreating == true, "retreating")
+	T.equal(weak.path[#weak.path], id("Cinder Rock"), "heading for its nearest owned province")
+	local ok, err = Commands.apply(state, AURORA, { kind = "Move", army = weak.id, to = field })
+	T.expect(not ok)
+	T.equal(err, "Retreating")
+	-- it doesn't fight the winner standing beside it, and arrives at normal speed
+	local men = weak.men
+	run(state, rng, Movement.ticksToNext(state, weak) - 1)
+	T.equal(state.battles[field], nil, "no new battle with a retreating army")
+	T.equal(weak.men, men)
+	T.equal(weak.location, field)
+	run(state, rng, 1)
+	T.equal(weak.location, id("Cinder Rock"))
+	T.equal(weak.retreating, nil, "home: a normal army again")
+	T.expect((Commands.apply(state, AURORA, { kind = "Move", army = weak.id, to = field })), "orders work again")
 
 	-- a 400-man army that loses is simply destroyed
 	local tiny = Army.spawn(state, AURORA, field, 400)
 	run(state, rng, Config.Battle.Rounds)
 	T.equal(state.armies[tiny.id], nil)
+end)
+
+T.test("a retreating army walks past enemies and doesn't block a siege of its own province", function()
+	local state, rng = fresh()
+	warPhase(state)
+	local rock, reach = id("Cinder Rock"), id("Cinder Reach")
+	state.provinces[rock].owner = AURORA
+	state.provinces[reach].owner = ZEPHYR
+	T.expect((Diplomacy.declareWar(state, AURORA, ZEPHYR)))
+	local g = garrisonAt(state, rock)
+	if g then
+		state.armies[g.id] = nil
+	end
+	local besieger = Army.spawn(state, ZEPHYR, rock, 2000)
+	local runner = Army.spawn(state, AURORA, rock, 3000)
+	runner.retreating = true
+	runner.path = { id("Aurora Windward") }
+	run(state, rng, 1)
+	T.equal(state.battles[rock], nil, "no battle")
+	local siege = assert(state.provinces[rock].siege, "the siege goes on")
+	T.equal(siege.by, ZEPHYR)
+	T.expect(state.armies[besieger.id] ~= nil and state.armies[runner.id] ~= nil)
+end)
+
+T.test("a beaten army with no way home is destroyed", function()
+	local state, rng = fresh()
+	warPhase(state)
+	local rock = id("Cinder Rock")
+	state.provinces[rock].owner = ZEPHYR
+	state.wars[1] = { id = 1, attackers = { AURORA }, defenders = { ZEPHYR }, startedAt = state.tick }
+	-- Aurora holds nothing it can walk to
+	for _, p in state.provinces do
+		if p.owner == AURORA then
+			p.owner = NIMBUS
+		end
+	end
+	local g = garrisonAt(state, rock)
+	if g then
+		state.armies[g.id] = nil
+	end
+	Army.spawn(state, ZEPHYR, rock, 6000)
+	local lost = Army.spawn(state, AURORA, rock, 3000)
+	run(state, rng, Config.Battle.Rounds)
+	T.equal(state.armies[lost.id], nil)
 end)
 
 T.test("allies and nations at peace share provinces without fighting", function()
@@ -210,16 +273,107 @@ T.test("forts double and capitals triple siege time", function()
 	T.equal(Siege.required(p), base * Config.Siege.CapitalMultiplier * Config.Buildings.Fort.siegeMultiplier)
 end)
 
-T.test("defenders at home stop a siege, and leaving resets it", function()
+T.test("an interrupted siege keeps its progress for a grace period, then resets", function()
 	local state, rng = fresh()
 	local rock = id("Cinder Rock")
 	state.armies[assert(garrisonAt(state, rock)).id] = nil
 	local army = Army.spawn(state, AURORA, rock, 3000)
 	run(state, rng, 3)
-	T.expect(state.provinces[rock].siege ~= nil)
+	local siege = assert(state.provinces[rock].siege)
+	T.equal(siege.progress, 3)
+	-- step out and back: the progress waits
 	assert(Movement.order(state, AURORA, army.id, id("Aurora Windward")))
-	run(state, rng, Config.Army.MoveTicks.Hills)
-	T.equal(state.provinces[rock].siege, nil, "siege reset when the army left")
+	run(state, rng, 2)
+	assert(Movement.order(state, AURORA, army.id, rock))
+	T.equal(state.provinces[rock].siege, siege, "kept while away")
+	T.equal(siege.progress, 3, "no progress while away")
+	run(state, rng, 1)
+	T.equal(siege.progress, 4, "it picks up where it stopped")
+	-- gone for longer than the grace period: progress is lost
+	assert(Movement.order(state, AURORA, army.id, id("Aurora Windward")))
+	run(state, rng, Config.Siege.GraceTicks)
+	T.expect(state.provinces[rock].siege ~= nil, "still kept on the last grace tick")
+	run(state, rng, 1)
+	T.equal(state.provinces[rock].siege, nil, "siege reset after the grace period")
+end)
+
+T.test("a defender stops a siege; once it is beaten, the siege resumes where it was", function()
+	local state, rng = fresh()
+	warPhase(state)
+	local rock = id("Cinder Rock")
+	state.provinces[rock].owner = ZEPHYR
+	state.provinces[rock].development = 3
+	state.wars[1] = { id = 1, attackers = { AURORA }, defenders = { ZEPHYR }, startedAt = state.tick }
+	local g = garrisonAt(state, rock)
+	if g then
+		state.armies[g.id] = nil
+	end
+	Army.spawn(state, AURORA, rock, 3000)
+	run(state, rng, 5)
+	local siege = assert(state.provinces[rock].siege)
+	local before = siege.progress
+	local relief = Army.spawn(state, ZEPHYR, rock, 1000)
+	run(state, rng, Config.Battle.Rounds - 1)
+	T.equal(siege.progress, before, "no progress during the battle")
+	run(state, rng, 1) -- the battle ends this tick and the relief army walks away
+	local r = state.armies[relief.id]
+	T.expect(r == nil or r.retreating == true, "relief beaten")
+	T.equal(state.provinces[rock].siege, siege, "progress kept through the battle")
+	T.equal(siege.progress, before + 1)
+end)
+
+T.test("rival besiegers at peace: the first keeps the siege, the second waits instead of blocking", function()
+	local state, rng = fresh()
+	local rock = id("Cinder Rock")
+	state.armies[assert(garrisonAt(state, rock)).id] = nil
+	Army.spawn(state, AURORA, rock, 1000)
+	run(state, rng, 2)
+	local siege = assert(state.provinces[rock].siege)
+	T.equal(siege.by, AURORA)
+	-- Zephyr (at peace with Aurora: it's the Peace phase) arrives with a bigger army: no deadlock, no fight
+	local rival = Army.spawn(state, ZEPHYR, rock, 5000)
+	run(state, rng, siege.required - 2)
+	T.equal(state.provinces[rock].owner, AURORA, "the first besieger finished its siege")
+	T.expect(state.armies[rival.id] ~= nil)
+	T.equal(state.battles[rock], nil)
+end)
+
+T.test("rival besiegers: when the first one leaves, the other takes over from zero", function()
+	local state, rng = fresh()
+	local rock = id("Cinder Rock")
+	state.armies[assert(garrisonAt(state, rock)).id] = nil
+	local first = Army.spawn(state, AURORA, rock, 1000)
+	Army.spawn(state, ZEPHYR, rock, 1000)
+	run(state, rng, 3)
+	T.equal(assert(state.provinces[rock].siege).by, AURORA, "the lower army id started first")
+	assert(Movement.order(state, AURORA, first.id, id("Aurora Windward")))
+	run(state, rng, 1)
+	local siege = assert(state.provinces[rock].siege)
+	T.equal(siege.by, ZEPHYR)
+	T.equal(siege.progress, 1)
+end)
+
+T.test("a nation's armies standing in the same province merge into one", function()
+	local state, rng = fresh()
+	local home = id("Aurora Landing")
+	local a = Army.spawn(state, AURORA, home, 2000)
+	local b = Army.spawn(state, AURORA, home, 3000)
+	local walker = Army.spawn(state, AURORA, id("Aurora Meadows"), 1000)
+	local guest = Army.spawn(state, ZEPHYR, home, 1000)
+	assert(Movement.order(state, AURORA, walker.id, home))
+	run(state, rng, 1)
+	T.equal(state.armies[b.id], nil, "the higher id joined the lower")
+	T.equal(a.men, 5000)
+	T.expect(state.armies[walker.id] ~= nil, "a moving army stays apart")
+	T.expect(state.armies[guest.id] ~= nil, "other nations' armies stay apart")
+	for _ = 1, 60 do
+		if state.armies[walker.id] == nil then
+			break
+		end
+		run(state, rng, 1)
+	end
+	T.equal(state.armies[walker.id], nil, "it merges on arrival")
+	T.equal(a.men, 6000)
 end)
 
 -- Diplomacy ---------------------------------------------------------------------------------------
@@ -288,9 +442,31 @@ end)
 
 -- Win conditions ----------------------------------------------------------------------------------
 
-T.test("holding 40% of all provinces wins on the spot", function()
+local function ownable(): number
+	local n = 0
+	for _, p in map.provinces do
+		if p.terrain ~= "Mountain" then
+			n += 1
+		end
+	end
+	return n
+end
+
+T.test("holding DominationShare of the ownable provinces wins on the spot", function()
 	local state, rng = fresh()
-	local need = math.ceil(Config.Win.DominationShare * #map.provinces)
+	local need = math.ceil(Config.Win.DominationShare * ownable())
+	T.expect(need < Config.Win.DominationShare * #map.provinces, "mountains don't count")
+	local short = 0
+	for _, p in state.provinces do
+		if short < need - 1 and p.terrain ~= "Mountain" then
+			p.owner = AURORA
+			short += 1
+		elseif p.owner == AURORA then
+			p.owner = nil
+		end
+	end
+	run(state, rng, 1)
+	T.equal(state.result, nil, "one province short")
 	local given = 0
 	for _, p in state.provinces do
 		if given < need and p.terrain ~= "Mountain" then
@@ -309,11 +485,11 @@ T.test("holding 40% of all provinces wins on the spot", function()
 	T.equal(state.phase, "Results", "the world stands still in Results")
 end)
 
-T.test("an alliance holding 55% together wins together", function()
+T.test("an alliance holding AllianceShare together wins together", function()
 	local state, rng = fresh()
 	assert(Diplomacy.propose(state, "Ally", AURORA, ZEPHYR, 0))
 	assert(Diplomacy.accept(state, "Ally", ZEPHYR, AURORA))
-	local need = math.ceil(Config.Win.AllianceShare * #map.provinces)
+	local need = math.ceil(Config.Win.AllianceShare * ownable())
 	local given = 0
 	for _, p in state.provinces do
 		if given < need and p.terrain ~= "Mountain" then
