@@ -9,7 +9,6 @@ local Config = require("../../../src/shared/Config")
 local Emulator = require("../Emulator")
 local H = require("../H")
 local shown = H.shown
-local within = H.within
 
 local function run()
 	local Login = require("../../../src/shared/Sim/Login")

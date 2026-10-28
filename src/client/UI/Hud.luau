@@ -127,7 +127,7 @@ local function place()
 	bar.Position = UDim2.fromOffset(row.x0, row.top)
 	bar.Size = UDim2.fromOffset(width, ITEM)
 	barScale.Scale = k
-	scrim.Size = UDim2.new(1, 0, 0, row.top + ITEM * k + SCRIM_FADE)
+	scrim.Size = UDim2.new(1, 0, 0, math.max(row.rowBottom, row.top + ITEM * k) + SCRIM_FADE)
 
 	-- what fits: drop the optional items in order until the rest does
 	local alive = goldLabel.Visible
@@ -466,8 +466,27 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	toastLabel = Widgets.toast(gui, 0, TOAST_WIDTH)
 	place()
 	HudLayout.onChange(place)
+	Widgets.onScale(place) -- the toast's line is in the UI's scale, which may change after the row does
 
-	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	gui.Parent = playerGui
+	-- the device's safe area (clear of a notch), for the fallback row: an empty screen that keeps to it
+	local safe = Instance.new("ScreenGui")
+	safe.Name = "SafeArea"
+	safe.IgnoreGuiInset = true
+	safe.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	safe.Parent = playerGui
+	local function measureSafe()
+		local ok, left, width = pcall(function()
+			return safe.AbsolutePosition.X, safe.AbsoluteSize.X
+		end)
+		if ok and typeof(left) == "number" and typeof(width) == "number" and width > 0 then
+			HudLayout.setSafeArea(left, left + width)
+		end
+	end
+	safe:GetPropertyChangedSignal("AbsoluteSize"):Connect(measureSafe)
+	safe:GetPropertyChangedSignal("AbsolutePosition"):Connect(measureSafe)
+	measureSafe()
 
 	ClientState.onReset(refresh)
 	ClientState.onDelta(function(delta)

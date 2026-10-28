@@ -22,7 +22,13 @@ export type Row = {
 	top: number, -- the plates' top, screen px
 	scale: number, -- the bar's scale: the UI's, but never taller than Roblox's row
 	inRow: boolean, -- in Roblox's row (false: the fallback row under it)
+	rowBottom: number, -- the bottom of Roblox's row, screen px (the scrim reaches past it and past the bar)
 }
+
+-- The device's safe area across the screen (left of a notch to right of the other), screen px: Hud measures it
+-- with a ScreenGui that keeps to it. nil until measured: the whole width.
+local safeLeft = 0
+local safeRight: number? = nil
 
 -- The bar's row for a top-bar inset (screen px), a screen size and the UI's scale.
 function HudLayout.compute(inset: Rect, screen: Vector2, uiScale: number): Row
@@ -35,14 +41,16 @@ function HudLayout.compute(inset: Rect, screen: Vector2, uiScale: number): Row
 			top = inset.Min.Y + math.floor((inset.Height - item * k) / 2),
 			scale = k,
 			inRow = true,
+			rowBottom = inset.Max.Y,
 		}
 	end
 	return {
-		x0 = HudLayout.EDGE,
-		x1 = screen.X - HudLayout.EDGE,
+		x0 = safeLeft + HudLayout.EDGE,
+		x1 = (safeRight or screen.X) - HudLayout.EDGE,
 		top = inset.Max.Y + 4,
 		scale = uiScale,
 		inRow = false,
+		rowBottom = inset.Max.Y,
 	}
 end
 
@@ -90,6 +98,15 @@ local function changed()
 	for _, fn in listeners do
 		task.spawn(fn)
 	end
+end
+
+-- Hud tells where the device's safe area runs (screen px); the fallback row keeps inside it.
+function HudLayout.setSafeArea(left: number, right: number)
+	if left == safeLeft and right == safeRight then
+		return
+	end
+	safeLeft, safeRight = left, right
+	changed()
 end
 
 GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(changed)

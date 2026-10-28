@@ -31,6 +31,7 @@ local Types = require(Shared.Types)
 
 local ClientState = require(script.Parent.ClientState)
 local Cosmetics = require(script.Parent.Cosmetics)
+local HudLayout = require(script.Parent.UI.HudLayout)
 local Icons = require(script.Parent.UI.Icons)
 local LabelLayout = require(script.Parent.LabelLayout)
 local MapBadges = require(script.Parent.MapBadges)
@@ -151,6 +152,7 @@ local grids: { [string]: MapGrid.Grid } = {} -- decoded grids by map id
 local arts: { [string]: PixelArt.Art } = {} -- painted maps by map id and resolution (one theme each), reused
 local painting: { map: Types.MapDef, grid: MapGrid.Grid }? = nil -- what the current map is painted from
 local warned = false
+local artOffNotice: TextLabel? = nil -- the "map art is off" notice, kept under the top bar when the bar moves
 local closeUp: PixelArt.Detail? = nil -- the close-up, its image and the label showing it (nil when zoomed out)
 local detailImage: EditableImage? = nil
 local detailLabel: ImageLabel? = nil
@@ -1185,6 +1187,7 @@ local function build(map: Types.MapDef)
 		-- the kit's toast look, standing for good under the line where toasts come and go (a full-screen GUI)
 		local notice = Widgets.toast(canvas.Parent or canvas, MapView.topBand() + NOTICE_TOP, NOTICE_WIDTH)
 		notice.Name = "MapArtOff"
+		artOffNotice = notice
 		Widgets.setIconText(notice, "🗺 Map art is off: turn on Allow Mesh / Image APIs", "map")
 		notice.Visible = true
 		if not warned then
@@ -1801,6 +1804,12 @@ end
 
 function MapRenderer.init()
 	MapView.onZoom(onZoom)
+	HudLayout.onChange(function()
+		local notice = artOffNotice
+		if notice and notice.Parent then
+			notice.Position = UDim2.new(0.5, 0, 0, MapView.topBand() + NOTICE_TOP)
+		end
+	end)
 	ClientState.onReset(function()
 		local map = ClientState.map()
 		if map then
