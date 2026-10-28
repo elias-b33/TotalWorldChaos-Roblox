@@ -14,6 +14,10 @@ Config.MonthTicks = 10 -- income and upkeep are paid every month
 
 Config.Phases = {
 	LobbyTicks = 60, -- the map vote (also after Results, for the next map)
+	-- a server's first match has no vote: the first player to choose Play online picks the map within this long
+	-- (the clock starts when they choose it), else a random map. Under Config.Ads.MinVoteSecondsLeft, so no rewarded
+	-- video starts during it (the pick can end at any second).
+	FirstPickTicks = 20,
 	PickTicks = 30, -- the whole nation draft; whoever is still waiting when it runs out gets a random nation
 	PickTurnMaxTicks = 8, -- one player's turn in the draft: PickTicks / players, within these bounds
 	PickTurnMinTicks = 3,

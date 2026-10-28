@@ -24,6 +24,7 @@ local LobbyState = require(Client.LobbyState)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
 local MapVote = require(Client.UI.MapVote)
+local Menu = require(Client.UI.Menu)
 local Nations = require(Client.UI.Nations)
 local Offers = require(Client.UI.Offers)
 local Powers = require(Client.UI.Powers)
@@ -330,6 +331,7 @@ end)
 MapVote.init()
 PrivateSettings.init()
 Draft.init()
+Menu.init() -- the start menu: above every other screen while the server shows it
 ClientState.onReset(function()
 	selectedArmy = nil
 	selectedFleet = nil

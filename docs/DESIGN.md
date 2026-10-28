@@ -33,7 +33,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 
 **Phases**
 
-1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, teams, map and theme.
+1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, teams, map and theme. A public server's first match has no vote: the first player to choose Play online picks the map ("Start menu" below).
 2. **Pick (up to 30 s):** the chosen map shows every nation's start territory, and players pick a start nation one at a time in a random draft order, by tapping its land (then confirming) or its name in the list. Each turn lasts 30 s ÷ players (3–8 s); a turn that runs out picks a random free nation. Someone who joins during the draft goes to the end of the order. Bots take the rest. The match clock starts at 0:00 when the draft ends.
 3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
 4. **Open war (3–20 min):** everything unlocked.
@@ -41,6 +41,19 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 6. **Results (30 s):** winner, stats and XP. Then the Lobby opens again to vote on the next map; everyone stays in the server.
 
 Joining mid-match takes over a bot's nation. For Studio solo tests (and the harness) the Workspace attribute `SkipLobby` starts every match straight in Peace.
+
+**Start menu**
+
+A player arriving on a public or private server first sees a brass window over the map (or the Lobby) with three big tiles, **Play online** (gold), **Singleplayer** and **How to play**, and under them one line saying what the server is doing: who is picking the map, the vote's clock, the draft, or a match on. New players still go to the tutorial first, as before (`TutorialService`); the menu is for everyone else. Tutorial and sandbox servers have no menu.
+
+- **Play online** (`RequestMenu "Online"` through `CommandRouter`, then `MenuService`, at once): the server closes the menu and the player joins this server's matches: the first pick's line, the vote, the end of the draft, or mid-match a bot's nation straight away (as joining did before). Until then the player only watches: not drafted, not seated, and a bot keeps playing the nation they will get.
+- **Singleplayer:** three map cards (Earth, Eldmoor, Skyshards, with their thumbnails): tap one, tap it again, and `Intents.enterSandbox(map)` sends the player to a world of their own ("Sandbox"). Studio can't teleport: the menu's line says so.
+- **How to play:** five pages of three steps, each an icon and one short line: Grow (recruit, march, win the siege), War and sieges, Allies, Primordial powers, How to win. A pager turns the pages; ✕ goes back. Its numbers come from `Config`. There is no "Play the tutorial" button: a tutorial match pays like any match, against 5 Easy bots, so replaying it would be an easy Glory farm until a replayed tutorial pays nothing.
+- **First pick:** a public server's first Lobby is a first pick instead of a vote. Players who choose Play online get in line, and the first in line picks the map on the vote's three cards (tap, tap again); the pick starts the draft at once, with everyone in line. The clock (`Config.Phases.FirstPickTicks`, 20 s) runs only while someone is in line; when it runs out the map is random. A chooser who leaves passes the pick to the next in line with a full clock. Everyone else in line sees "Alice is picking the map" on the cards (and the menu's line says it too), and everyone hears the result: "Alice picked Eldmoor", or "Time's up: Eldmoor it is". The server keeps the line and refuses anyone else's pick (`NotYourTurn`; `Sim/Lobby`). Later matches vote as before.
+- **Private servers and locked maps:** the menu shows, but a private server (the owner's settings and map, the owner's flow) and a server locked to a map (`MapId`) keep the usual Lobby for every match, the first included.
+- **Studio:** `SkipLobby` turns the menu off too. The Workspace attribute `Menu` decides it: `true` shows it even with `SkipLobby` (an arrival during a solo match), `false` hides it and the first match votes. The harness boots every scenario with `Menu` = false except `menu`.
+- **Analytics:** `menu_shown`, `menu_choice` and `first_pick` (`docs/LAUNCH.md`).
+- **UI:** `UI/Menu` above every other screen, the screen dimmed behind it; every decision two taps, text at least 14 px, buttons at least 44 px; it fits 844×390, 667×375 and the tablets (`Widgets.fit`). The first pick reuses the vote screen (`UI/MapVote`).
 
 **Win conditions**
 
@@ -577,6 +590,8 @@ export type Command =
 | `RequestAd` | client → server | the rewarded video placement (`quest_reroll`); the reply comes when the video ends |
 | `NotificationPrompt` | server → client | after your first finished match: ask to turn on experience notifications (once per profile) |
 | `RequestSandbox` | client → server | `Enter` map (from any server: off to a new sandbox world), `Leave`, `Speed` 0/1/2/4, `Play` nation (0 = watch), `Disasters` on, `NewWorld` map; all but `Enter` only on a sandbox server ("Sandbox") |
+| `RequestMenu` | client → server | `Online`: the start menu's Play online (join this server's matches) |
+| `Menu` | server → client | true = show your start menu, false = close it |
 
 ## UI and controls
 
@@ -775,6 +790,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Weekly, friends and global leaderboards; achievements
 - [x] Rewarded video quest reroll; experience notifications
 - [x] Singleplayer sandbox ("Sandbox"): a reserved server of your own, all ten nations as bots, Play as any nation, free powers, pause to 4×, no end and no rewards (harness scenario `sandbox`)
+- [x] Start menu ("Match structure"): Play online, Singleplayer (three map cards, then the sandbox) and How to play (five pages); a server's first match on the first player's map pick, with no vote; later matches vote (harness scenario `menu`)
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 - [x] Navies, stage 1: sea and space zones in the map data (generator, validator, `MapData`), the rules for ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades and war across the sea (`Sim/Navy.luau`, tests in `tests/navy.spec.luau`)
 - [x] Navies, stage 2: the orders through `CommandRouter`, fleets in the snapshot, the ship art for each map, fleet tokens and sea zones on the map, the fleet sheet, toasts, a harness scenario (`tools/harness/scenarios/navy.luau`), a `docs/STUDIO.md` recipe
