@@ -2424,6 +2424,21 @@ function scenarios.saves()
 	H.expect(#answers == 10 and tooFast == 10 - Config.Net.MaxShopIntentsPerSecond, "the shop's own rate limit")
 	H.expect(H.writes(userId) == before, "refused shop requests write nothing to the DataStore")
 
+	-- quest requests too: claims and rerolls of a quest that doesn't exist are refused and write nothing; a reroll
+	-- that goes through is saved at once
+	answers = {}
+	for _ = 1, 4 do
+		Intents.claimQuest("no-such-quest")
+		Intents.rerollQuest("no-such-quest")
+	end
+	Emulator.run(1.5)
+	H.expect(#answers == 8 and table.find(answers, "TooFast") == nil, "every quest request was answered")
+	H.expect(H.writes(userId) == before, "refused quest requests write nothing to the DataStore")
+	Intents.rerollQuest(data.quests.daily[1].key)
+	Emulator.run(1.5)
+	H.expect(H.writes(userId) == before + 1, "a free reroll saves at once")
+	before = H.writes(userId)
+
 	-- an equip changes the profile but waits for the autosave; Glory spent is saved at once
 	Data.edit(player, function(d)
 		d.glory = 1000
@@ -2932,6 +2947,12 @@ function scenarios.season()
 	H.expect(view ~= nil and view.id == "S1" and view.tier == 1, "Alice is on Season 1, tier 1")
 	H.expect(view.daysLeft == 52, "with 52 days left")
 	H.expect(view.ready == 1, "tier 1's free reward is ready at once")
+	-- a live server whose pass product id isn't set yet refuses the pass, and logs no prompt that never opened
+	Emulator.studio = false
+	local live, liveReason = await(ShopService.apply, player, { kind = "Buy", item = "season_pass", currency = "Robux" })
+	Emulator.studio = true
+	H.expect(live == false and liveReason == "NotForSale", "a live server without the pass product refuses it")
+	H.expect(not string.find(funnel("SeasonPass", player.UserId), "purchase_prompted", 1, true), "and logs no purchase prompt")
 	local lobbyButton
 	for _, d in alice.localPlayer.PlayerGui:GetDescendants() do
 		if d:IsA("TextButton") and d.Name == "SeasonButton" then
@@ -3141,8 +3162,10 @@ function scenarios.leaderboards()
 	local week = Login.weekOf(H.server("Services.ProgressionService").today())
 	local ALICE, BOB, CAROL, DAVE, ZED, STRANGER = 7001, 7002, 7003, 7004, 9001, 9002
 	-- last week: Alice made the top 100; this week, before the match: Zed (Alice's friend) and a stranger have points
-	Emulator.orderedStores["Conquest/W" .. (week - 1)] = { [tostring(ALICE)] = 25 }
-	Emulator.orderedStores["Conquest/W" .. week] = { [tostring(ZED)] = 12, [tostring(STRANGER)] = 30 }
+	local Boards = H.server("Services.LeaderboardService")
+	local CONQUEST, LEVEL = Boards.CONQUEST_STORE, Boards.LEVEL_STORE
+	Emulator.orderedStores[CONQUEST .. "/W" .. (week - 1)] = { [tostring(ALICE)] = 25 }
+	Emulator.orderedStores[CONQUEST .. "/W" .. week] = { [tostring(ZED)] = 12, [tostring(STRANGER)] = 30 }
 	Emulator.displayNames[ZED] = "Zed"
 	Emulator.displayNames[STRANGER] = "Stranger"
 	Emulator.friends[ALICE] = { BOB, ZED }
@@ -3152,6 +3175,10 @@ function scenarios.leaderboards()
 	local carol = Emulator.addClient("Carol", nil, CAROL)
 	local dave = Emulator.addClient("Dave", nil, DAVE)
 	Emulator.run(3)
+	-- Studio keeps its own boards, like its saves: a test session never opens the live ones
+	for id in Emulator.orderedStores do
+		H.expect(string.find(id, "^Conquest/") == nil and string.find(id, "^Level/") == nil, "Studio never touches the live boards (" .. id .. ")")
+	end
 	local trophies = H.client(alice, "TrophyState")
 	H.expect(trophies.achievements() ~= nil and #trophies.achievements().list == 30, "Alice sees her 30 achievements")
 	local boards = trophies.boards()
@@ -3220,13 +3247,13 @@ function scenarios.leaderboards()
 
 	-- the weekly board: one batch of writes at Results, then a fresh read
 	Emulator.run(2)
-	local scores = Emulator.orderedStores["Conquest/W" .. week]
+	local scores = Emulator.orderedStores[CONQUEST .. "/W" .. week]
 	H.expect(scores[tostring(ALICE)] == 10, "Alice won: 10 conquest points on this week's board")
 	for _, client in { bob, carol, dave } do
 		H.expect((scores[tostring(client.serverPlayer.UserId)] or 0) >= 1, client.name .. " got points for their place")
 	end
 	H.expect(Emulator.orderedCalls.IncrementAsync == 4, "one write per player (" .. tostring(Emulator.orderedCalls.IncrementAsync) .. ")")
-	H.expect(Emulator.orderedStores["Level/global"][tostring(ALICE)] == data.xp, "the level board has Alice's XP")
+	H.expect(Emulator.orderedStores[LEVEL .. "/global"][tostring(ALICE)] == data.xp, "the level board has Alice's XP")
 	boards = trophies.boards()
 	H.expect(boards.myPoints == 10 and boards.myRank == 3, "Alice: 10 points, 3rd behind the stranger (30) and Zed (12)")
 	H.expect(row(boards.weekly, "Alice") ~= nil and row(boards.weekly, "Carol") ~= nil, "everyone is on the weekly board")

@@ -304,4 +304,16 @@ T.test("product ids: unset ids never match a receipt", function()
 	T.equal(Catalogue.productId("flag_banner"), 0, "free items have no product")
 end)
 
+T.test("product ids: every id that is set belongs to one product only (a receipt grants what was bought)", function()
+	local owner: { [number]: string } = {}
+	for id, pid in Catalogue.PRODUCT_IDS do
+		if pid ~= 0 then
+			T.expect(owner[pid] == nil, string.format("%s and %s share product id %d", id, owner[pid] or "", pid))
+			T.expect(pid ~= Catalogue.VIP_PASS_ID, id .. " has the VIP pass's id")
+			owner[pid] = id
+			T.equal(Catalogue.byProductId(pid), id)
+		end
+	end
+end)
+
 T.finish()
