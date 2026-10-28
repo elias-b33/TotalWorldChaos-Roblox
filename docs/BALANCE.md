@@ -171,7 +171,7 @@ Where defence bonuses really bite is **losses**: at 1.25 : 1 the attacker wins e
 
 **One siege per province.** Whoever started it keeps it while one of its armies (or an ally's) stands there; a besieger at peace with it waits instead of blocking (no deadlock, no fight in Peace), and starts its own siege from zero once the first one is gone. When two arrive on the same tick, the lower army id starts first.
 
-**Grace period.** An interrupted siege (a battle, a defending army walking in, the besieger stepping out) keeps its progress for `Siege.GraceTicks` = 10 s, then resets; a besieger that comes back or wins the battle in time carries on where it stopped. Peace with the owner, or the province changing hands, ends the siege at once. A Divine shield pauses it without the grace clock running.
+**Grace period.** An interrupted siege (a battle, a defending army walking in, the besieger stepping out) keeps its progress for `Siege.GraceTicks` = 10 s, then resets; a besieger that comes back or wins the battle in time carries on where it stopped. Peace with the owner, or the province changing hands, ends the siege at once. A Shield pauses it without the grace clock running.
 
 Required ticks = 10 × development, ×2 with a fort, ×3 for a capital:
 

@@ -36,7 +36,7 @@ local REQUIRED = {
 	"rebels",
 	"earthquake",
 	"blessing",
-	"divineShield",
+	"powerShield",
 	"close",
 	"check",
 	"arrow",

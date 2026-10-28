@@ -548,7 +548,7 @@ function scenarios.look()
 		table.sort(out)
 		return table.concat(out, " ")
 	end
-	H.expect(string.match(pills(capital), "^blessing:%d+ divineShield:%d+$") ~= nil, "the capital's status row: blessing and shield with their seconds (" .. pills(capital) .. ")")
+	H.expect(string.match(pills(capital), "^blessing:%d+ powerShield:%d+$") ~= nil, "the capital's status row: blessing and shield with their seconds (" .. pills(capital) .. ")")
 	H.expect(string.match(pills(siegeAt), "^hourglass:%d+%%$") ~= nil, "the siege shows its progress (" .. pills(siegeAt) .. ")")
 end
 

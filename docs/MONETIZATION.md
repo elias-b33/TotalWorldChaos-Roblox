@@ -412,7 +412,7 @@ Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: pl
 | Prosperity | Develop a province to level 5 | 100 Glory |
 | Diplomat | Form an alliance | 50 Glory |
 | Risen | Rise as a Primordial and stay to Results | 100 Glory |
-| Wrath of the Gods | Use 5 Primordial powers in one match | 100 Glory |
+| Primordial Wrath | Use 5 Primordial powers in one match | 100 Glory |
 | Hand of Fate | Use 100 Primordial powers (lifetime) | 200 Glory, title "the Fateful" |
 | Drill Sergeant | Recruit 30 regiments in one match | 50 Glory |
 | Podium | Finish in the top 3 | 50 Glory |
@@ -465,15 +465,15 @@ Season 1's new items are catalogue entries marked `season = "S1"` (never sold, s
 | 32, 45 | Premium, Free | Void Plague, Cinder Plague (Rare) | the same colours as Common |
 | 35 | Premium | Lava Rebels effect (Epic) | Lava Meteor (Epic, comet style) |
 | 37 | Premium | Worldsplitter Earthquake effect (Epic) | Worldsplitter Rays Blessing (Epic) |
-| 44 | Premium | Sunfire Divine Shield effect (Epic) | Sunfire Blessing (Epic, rays) |
+| 44 | Premium | Sunfire Shield effect (Epic) | Sunfire Blessing (Epic, rays) |
 | 45 | Premium | Ember shade set (Rare) | Royal shades (Rare, also in the shop) |
 | 49 | Premium | Primordial Rift border (Legendary) | Primordial Rift nameplate frame (Legendary) |
 
-New border patterns, a shade set and the Ember theme need code in `PixelArt` (and the theme a pass of `tests/themes.spec.luau`); Rebels, Earthquake and Divine Shield looks need `PowerFx` styles and `Effects` support. Each is a small follow-up task; swap the row in `Config.Season.Rewards` when its art lands.
+New border patterns, a shade set and the Ember theme need code in `PixelArt` (and the theme a pass of `tests/themes.spec.luau`); Rebels, Earthquake and Shield looks need `PowerFx` styles and `Effects` support. Each is a small follow-up task; swap the row in `Config.Season.Rewards` when its art lands.
 
 ### Season 1: Rise of the Primordials
 
-Theme: molten earth, ember and the old gods waking. Map theme: Ember Eldmoor.
+Theme: molten earth, ember and the Primordials waking. Map theme: Ember Eldmoor.
 
 | Tier | Free | Premium |
 | ---: | --- | --- |
@@ -520,7 +520,7 @@ Theme: molten earth, ember and the old gods waking. Map theme: Ember Eldmoor.
 | 41 | — | Meteor Shower emote (animated) |
 | 42 | — | 250 Glory |
 | 43 | 300 Glory | Primordial Eye nameplate frame (Epic) |
-| 44 | — | Sunfire Divine Shield effect (Epic) |
+| 44 | — | Sunfire Shield effect (Epic) |
 | 45 | Cinder Plague colour (Rare) | Ember shade set (Rare) |
 | 46 | — | 300 Glory |
 | 47 | — | Obsidian Crown flag (Legendary) |

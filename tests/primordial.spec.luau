@@ -238,7 +238,7 @@ T.test("Blessing doubles one province's gold for 60 s", function()
 	T.equal(state.provinces[where].buffs.Blessing, nil)
 end)
 
-T.test("Divine shield stops a siege for 30 s", function()
+T.test("Shield stops a siege for 30 s", function()
 	local state = fresh()
 	state.nations[A].charges = 1
 	local target = plainProvince(state, A)

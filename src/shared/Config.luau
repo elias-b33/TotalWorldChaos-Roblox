@@ -362,7 +362,7 @@ Config.Achievements = {
 		{ id = "prosperity", name = "Prosperity", stat = "DevLevel", kind = "Best", target = 5, glory = 100 },
 		{ id = "diplomat", name = "Diplomat", stat = "Alliances", kind = "Best", target = 1, glory = 50 },
 		{ id = "risen", name = "Risen", stat = "Risen", kind = "Best", target = 1, glory = 100 },
-		{ id = "wrath", name = "Wrath of the Gods", stat = "Powers", kind = "Best", target = 5, glory = 100 },
+		{ id = "wrath", name = "Primordial Wrath", stat = "Powers", kind = "Best", target = 5, glory = 100 },
 		{
 			id = "hand_of_fate",
 			name = "Hand of Fate",

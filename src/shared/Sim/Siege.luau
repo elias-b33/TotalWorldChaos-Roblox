@@ -106,7 +106,7 @@ function Siege.step(state: MatchState)
 			end
 		elseif current then
 			if shielded and leader == current.by and not blocked then
-				current.lastTick = state.tick -- Divine shield: the siege waits without losing progress
+				current.lastTick = state.tick -- a Shield (Primordial power): the siege waits without losing progress
 			elseif state.tick - current.lastTick > Config.Siege.GraceTicks then
 				province.siege = nil -- interrupted for too long: progress is lost
 			end

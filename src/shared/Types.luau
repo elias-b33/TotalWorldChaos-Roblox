@@ -27,7 +27,7 @@ export type Province = {
 	isCapital: boolean,
 	-- lastTick: the last tick it progressed (or waited under a shield); kept Config.Siege.GraceTicks after that
 	siege: { by: NationId, progress: number, required: number, lastTick: number }?,
-	shieldUntil: number?, -- tick when Divine Shield ends
+	shieldUntil: number?, -- tick when a Shield (Primordial power) ends
 	buffs: { [string]: number }, -- buff name -> tick it ends
 }
 

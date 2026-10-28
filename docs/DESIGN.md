@@ -16,7 +16,7 @@ A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and pla
 | Source | Keep | Cut |
 | --- | --- | --- |
 | EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
-| WorldBox | God powers (here: Primordial powers), disasters, the four classic races, watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
+| WorldBox | World powers (here: Primordial powers), disasters, the four classic races, watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
 
 ## Match structure
 
@@ -155,11 +155,11 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 | Rebels | Spawns a 3,000-man neutral army in one province | 2 |
 | Earthquake | Destroys the building in one province | 1 |
 | Blessing | +100% gold from one province for 60 s | 1 |
-| Divine shield | One province can't be sieged for 30 s | 1 |
+| Shield | One province can't be sieged for 30 s | 1 |
 
-- Targets: Meteor an army; Plague a nation; Rebels, Blessing and Divine shield a nation's province; Earthquake a province with a building. Mountains are never a target.
+- Targets: Meteor an army; Plague a nation; Rebels, Blessing and Shield a nation's province; Earthquake a province with a building. Mountains are never a target.
 - Powers work in War and Cataclysm, not in Peace. Charges stop at `Config.Primordial.MaxCharges` (5).
-- The 30 s limit applies to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Divine shield are gifts and ignore it.
+- The 30 s limit applies to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Shield are gifts and ignore it.
 - Meteor's limit is checked for the army's owner, who then becomes immune. The province it stands in loses its development level only if that province's owner isn't immune, and that loss doesn't make the owner immune.
 - The power picker shows an immune nation as unavailable (with the seconds left) instead of sending a power the server would refuse.
 - Rebels besiege the province they rise in; when the siege ends it turns neutral. On the map they are a black 🏴 token that always shows, unlike neutral garrisons.
@@ -267,7 +267,7 @@ The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. Th
 - **On top:** GUI objects placed on the canvas, in the UI kit's look ("UI style"); `MapBadges` (pure, tested) decides what they say and where they stack.
   - **Names and pips:** province names in Builder Sans with a solid ink outline (gold while the province is selected), shown once a province is about 70 screen pixels wide; a name that would overlap a bigger province's name waits until there's room. From the region zoom inwards a development bar hangs under the name: one pixel cell per level, gold when reached (one small `EditableImage` per level, shared; text pips without `EditableImage`).
   - **Armies:** tokens glide from province to province a little above the centres (the names are below), and armies resting in one province stand side by side. Each has a strength badge: a dark pill with a pixel icon for its state (sword; burst in battle; white flag retreating; black flag for Rebels; shield for neutral garrisons) and its size in Fredoka One, outlined in its nation's colour (gold while selected). The badges of armies in one province stack in a column above them, so none covers another at any zoom. Sizes show from the region zoom inwards; zoomed out, only on your own armies, Rebels and the selected army. An idle neutral garrison's badge is laid out after the names: it shows only where it covers no name and no other garrison's badge (bigger provinces first), and the others keep their grey token until the player zooms in.
-  - **Status row:** on top of the badges, the province's battle (burst, red edge) or siege (hourglass and percent, gold edge), then Primordial-power effects with their seconds left (divine shield, blessing, plague, or a strike's icon; purple edge). Zoomed out, the pills show only their icons unless it is your province or your siege.
+  - **Status row:** on top of the badges, the province's battle (burst, red edge) or siege (hourglass and percent, gold edge), then Primordial-power effects with their seconds left (shield, blessing, plague, or a strike's icon; purple edge). Zoomed out, the pills show only their icons unless it is your province or your siege.
   - **Capitals:** each nation's flag on a pole left of its capital while it holds it; the coalition leader's pixel crown sits on top of the pole.
   - Dotted straits and routes (a route preview in gold).
 - **Requirement:** `EditableImage` works in Studio, but fails by default in a published game.
@@ -316,7 +316,7 @@ export type Province = {
     building: Building,
     isCapital: boolean,
     siege: { by: NationId, progress: number, required: number, lastTick: number }?, -- lastTick: last progress (grace period)
-    shieldUntil: number?,      -- tick when Divine Shield ends
+    shieldUntil: number?,      -- tick when a Shield ends
     buffs: { [string]: number }, -- buff name -> tick it ends
 }
 
@@ -508,7 +508,7 @@ Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): 
 | Rebels | black flags popping up | `Rebels` |
 | Earthquake | map shake and crack lines over the province | `Earthquake` |
 | Blessing | golden sparkles | `Blessing` |
-| Divine shield | a blue dome with a twinkling ring for as long as the shield lasts | `Shield` |
+| Shield | a blue dome with a twinkling ring for as long as the shield lasts | `Shield` |
 | Power-effect cosmetics | Meteor, Plague and Blessing are drawn in the caster's equipped look (`src/client/PowerFx.luau`): Ice Meteor and Violet Plague recolour; Sun Rays adds beams of light and star sparkles; Comet Strike a glittering tail, a glowing head and a star burst. Same area (`PowerFx.AREA`), timing and sound as the default. The `Power` event names the caster (`by`) | the power's own |
 | War, Cataclysm, Results | a screen-wide flash and a short banner | `War`, `Cataclysm`, `Results` |
 | Any button | | `Tap` |

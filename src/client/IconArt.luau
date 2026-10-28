@@ -1218,7 +1218,7 @@ IconArt.ICONS = {
 IconArt.VARIANTS = {
 	rebels = { "flag", { R = "e", r = "R", W = "W", g = "w" } },
 	retreat = { "flag", { R = "W", r = "w", W = "W" } },
-	divineShield = { "shield", { Y = "W", B = "c", b = "B", c = "W" } },
+	powerShield = { "shield", { Y = "W", B = "c", b = "B", c = "W" } },
 	fireBlue = { "fire", { R = "b", F = "B", Y = "c", y = "W" } },
 	teams = { "manpower", { B = "G", b = "n" } },
 } :: { [string]: { any } }
@@ -1273,7 +1273,7 @@ IconArt.FALLBACK = {
 	plus = "+",
 	rebels = "🏴",
 	retreat = "🏳",
-	divineShield = "🛡",
+	powerShield = "🛡",
 	fireBlue = "💙",
 	teams = "👥",
 	-- the meta screens

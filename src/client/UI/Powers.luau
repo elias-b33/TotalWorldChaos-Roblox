@@ -42,7 +42,7 @@ local POWER_ICONS: { [string]: string } = {
 	Rebels = "rebels",
 	Earthquake = "earthquake",
 	Blessing = "blessing",
-	Shield = "divineShield",
+	Shield = "powerShield",
 }
 
 local HINTS: { [string]: string } = {

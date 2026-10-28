@@ -36,8 +36,8 @@ function MapBadges.shortMen(men: number): string
 	return tostring(men)
 end
 
--- A power's shield is the divine shield; the plain shield marks neutral garrisons.
-local EFFECT_ICONS: { [string]: string } = { shield = "divineShield" }
+-- A power's shield is the glowing power shield; the plain shield marks neutral garrisons.
+local EFFECT_ICONS: { [string]: string } = { shield = "powerShield" }
 
 -- The badge text Powers hands to MapRenderer.setEffect, as pills: each word is a power's emoji with the seconds it has
 -- left ("🛡️25 🌟30"), or a strike's emoji alone ("☄️"). Words without a known emoji are left out.
