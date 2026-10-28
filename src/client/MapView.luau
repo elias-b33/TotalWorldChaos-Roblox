@@ -62,6 +62,11 @@ function MapView.topBand(): number
 	return topBand()
 end
 
+-- The size of the whole screen the map covers, for things placed in full-screen GUIs.
+function MapView.screenSize(): Vector2
+	return viewport()
+end
+
 -- The part of the screen the map is framed in (below the top bars), and its centre.
 local function viewArea(): Vector2
 	local vp = viewport()

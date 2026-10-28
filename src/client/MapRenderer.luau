@@ -462,7 +462,7 @@ local function build(map: Types.MapDef)
 	else
 		local notice = textLabel(canvas.Parent or canvas, "🗺️ Map art is off: turn on Allow Mesh / Image APIs")
 		notice.AnchorPoint = Vector2.new(0.5, 0)
-		notice.Position = UDim2.new(0.5, 0, 0, 56)
+		notice.Position = UDim2.new(0.5, 0, 0, MapView.topBand() + 8) -- just under the top bars (a full-screen GUI)
 		notice.Size = UDim2.fromOffset(420, 24)
 		if not warned then
 			warned = true

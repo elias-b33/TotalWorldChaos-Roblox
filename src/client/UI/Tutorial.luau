@@ -276,9 +276,11 @@ local function place()
 		ring.Size = UDim2.fromOffset(2 * radius, 2 * radius)
 		ring.Position = UDim2.fromOffset(screen.X, screen.Y)
 		ring.Visible = true
-		local size = workspace.CurrentCamera.ViewportSize
+		-- kept on screen and below the top bars, in full-screen coordinates (the pointer GUI covers what the map does)
+		local size = MapView.screenSize()
+		local top = ARROW_SIZE + MapView.topBand()
 		local x = math.clamp(screen.X, ARROW_SIZE / 2, math.max(ARROW_SIZE / 2, size.X - ARROW_SIZE / 2))
-		local y = math.clamp(screen.Y - radius - 2, ARROW_SIZE + CARD_TOP, math.max(ARROW_SIZE + CARD_TOP, size.Y))
+		local y = math.clamp(screen.Y - radius - 2, top, math.max(top, size.Y))
 		pointer.Position = UDim2.fromOffset(x, y + bob)
 		pointer.Visible = true
 	else
