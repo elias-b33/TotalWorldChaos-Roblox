@@ -124,6 +124,28 @@ export type LobbyState = {
 -- Lobby intents: CommandRouter checks the shape, Sim/Lobby checks the rules.
 export type LobbyIntent = { kind: "Vote", map: string } | { kind: "Pick", nation: NationId }
 
+-- The tutorial match (Sim.Tutorial): which prompt the new player is on. Lives outside MatchState, like the lobby.
+export type TutorialState = {
+	slot: NationId, -- the player's nation
+	step: number, -- index in Sim.Tutorial.STEPS; #STEPS + 1 = finished
+	startProvinces: { [ProvinceId]: boolean }, -- what the player owned at the start
+	actions: { [string]: boolean }, -- command kinds the player has carried out (Recruit, Power...)
+	friend: NationId?, -- the bot the ally prompt points at
+	rival: NationId?, -- the bot the war prompt points at
+	skipped: boolean,
+	startedAt: number, -- tick the player was seated
+	finishedAt: number?, -- tick
+}
+
+-- What the tutorial player's client is told (the Tutorial remote).
+export type TutorialView = {
+	step: number, -- 1..total; total + 1 = finished; 0 = skipped (nothing to show)
+	total: number,
+	province: ProvinceId, -- where the arrow points (0 = nowhere)
+	nation: NationId, -- the nation the prompt names (0 = none)
+	canLeave: boolean, -- a teleport to a public server works here (not in Studio)
+}
+
 -- Static map definitions (src/shared/MapData, generated from assets/maps/*/layout.json).
 
 export type Point = { x: number, y: number }
@@ -201,7 +223,7 @@ export type MatchReward = {
 	afk: boolean, -- sent no command for Config.Progression.AfkTicks in a row: paid nothing
 }
 
--- The saved profile (ProfileStore data). Version 1.
+-- The saved profile (ProfileStore data). Version 2.
 export type PlayerProfile = {
 	version: number,
 	xp: number, -- total account XP
@@ -218,6 +240,7 @@ export type PlayerProfile = {
 	purchaseHistory: { { product: number, robux: number, at: number } },
 	stats: { matches: number, wins: number, provincesTaken: number, battlesWon: number, powersUsed: number },
 	settings: { [string]: any },
+	tutorialDone: boolean, -- finished or skipped the tutorial match (version 2)
 }
 
 -- What a player sees of their own profile (the Profile remote, the HUD badge, the Results level bar).

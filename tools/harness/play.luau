@@ -20,6 +20,7 @@ local Scene = require("./Scene")
 
 local OUT = "tools/harness/out"
 local LOBBY_SCENARIOS = { lobby = true } -- these run the Lobby; every other scenario boots with SkipLobby
+local TUTORIAL_SCENARIOS = { tutorial = true } -- these boot a tutorial server (Workspace "Tutorial")
 local scenarioName = process.args[1] or "smoke"
 local shotCount = 0
 local shotDir = OUT .. "/" .. scenarioName
@@ -743,6 +744,165 @@ function scenarios.lobby()
 	end
 end
 
+-- Phase 4: the tutorial match. A new player on a tutorial server (Workspace "Tutorial") meets 5 Easy bots on an
+-- otherwise neutral map and follows the six prompts with the normal UI: take a neutral province, recruit, siege,
+-- make an ally, declare war, use a Primordial power. The profile remembers it; the next match's prompts can be
+-- skipped with two taps.
+function scenarios.tutorial()
+	local Config = require("../../src/shared/Config")
+	local Diplomacy = require("../../src/shared/Sim/Diplomacy")
+	local Tutorial = require("../../src/shared/Sim/Tutorial")
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	Emulator.run(2)
+	local state = H.state()
+	local A = H.myNation(alice)
+	local TutorialService = H.server("Services.TutorialService")
+	local tut = TutorialService.current()
+	H.expect(state.mapId == Config.Tutorial.Map and A == Config.Tutorial.PlayerSlot, "Alice plays the tutorial nation")
+	local nations = 0
+	for _, n in state.nations do
+		nations += 1
+	end
+	H.expect(nations == 6, "Alice and 5 bots; the other nations are gone")
+	H.expect(state.phase == "Peace" and state.tick <= 3, "the Lobby was skipped")
+	H.expect(Emulator.findText(alice, "1/6") ~= nil, "the first prompt shows")
+	local capital = state.nations[A].capital
+
+	-- 1. take a neutral province: the arrow is on the army; tap it, Move, the grey province, Go
+	H.expect(Emulator.findText(alice, "Tap your army") ~= nil, "it asks for the army")
+	H.shot(alice, "prompt1_army")
+	tapProvince(alice, capital)
+	H.expect(Emulator.findText(alice, "Tap ➜ Move") ~= nil, "then for Move")
+	H.shot(alice, "prompt1_move")
+	Emulator.press(alice, "Move")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Tap grey land") ~= nil, "then for the grey province")
+	local target = Tutorial.neutralTarget(state, A)
+	H.shot(alice, "prompt1_target")
+	tapProvince(alice, target)
+	H.expect(Emulator.findText(alice, "Tap ✅ Go") ~= nil, "then for Go")
+	H.shot(alice, "prompt1_go")
+	Emulator.press(alice, "Go")
+	Emulator.run(8)
+	H.expect(Emulator.findText(alice, "⏳") ~= nil, "then it says to wait")
+	H.shot(alice, "prompt1_wait")
+	local deadline = Emulator.now() + 120
+	while tut.step == 1 and Emulator.now() < deadline do
+		Emulator.run(1)
+	end
+	H.expect(state.provinces[target].owner == A and tut.step == 2, "taking the province finished prompt 1")
+	Emulator.run(1)
+
+	-- 2. recruit
+	H.expect(Emulator.findText(alice, "2/6") ~= nil and Emulator.findText(alice, "Tap your land") ~= nil, "prompt 2")
+	H.shot(alice, "prompt2_recruit")
+	tapProvince(alice, capital)
+	H.expect(Emulator.findText(alice, "Tap +1 Regiment") ~= nil, "it points at the Recruit button")
+	H.shot(alice, "prompt2_button")
+	Emulator.press(alice, "Regiment")
+	Emulator.run(2)
+	H.expect(tut.step == 3, "recruiting finished prompt 2")
+	Emulator.press(alice, "✕")
+	Emulator.run(0.5)
+
+	-- 3. siege: the army again, the next grey province, Go, and the siege starts
+	H.expect(Emulator.findText(alice, "3/6") ~= nil, "prompt 3")
+	H.shot(alice, "prompt3_siege")
+	local second = Tutorial.neutralTarget(state, A)
+	tapProvince(alice, target)
+	Emulator.press(alice, "Move")
+	Emulator.run(0.5)
+	tapProvince(alice, second)
+	Emulator.press(alice, "Go")
+	deadline = Emulator.now() + 120
+	while tut.step == 3 and Emulator.now() < deadline do
+		Emulator.run(1)
+	end
+	H.expect(tut.step == 4 and state.provinces[second].siege ~= nil, "the siege finished prompt 3")
+	Emulator.run(1)
+
+	-- 4. make an ally: tap the friend's land, Ally; the bot accepts
+	local friend = tut.friend
+	H.expect(Emulator.findText(alice, "Ally with " .. state.nations[friend].name) ~= nil, "prompt 4 names the friend")
+	H.shot(alice, "prompt4_ally")
+	tapProvince(alice, Tutorial.view(state, tut).province)
+	H.expect(Emulator.findText(alice, "Tap 🤝 Ally") ~= nil, "it points at the Ally button")
+	H.shot(alice, "prompt4_button")
+	Emulator.press(alice, "🤝 Ally")
+	Emulator.run(3)
+	H.expect(Diplomacy.allied(state, A, friend), "the friend accepted")
+	H.expect(tut.step == 5, "the alliance finished prompt 4")
+	Emulator.press(alice, "✕")
+	Emulator.run(2)
+
+	-- 5. declare war: Peace ended early
+	local rival = tut.rival
+	H.expect(state.phase == "War", "War came early for the tutorial")
+	H.expect(Emulator.findText(alice, "War on " .. state.nations[rival].name) ~= nil, "prompt 5 names the rival")
+	H.shot(alice, "prompt5_war")
+	tapProvince(alice, Tutorial.view(state, tut).province)
+	H.expect(Emulator.findText(alice, "Tap ⚔ Declare war") ~= nil, "it points at Declare war")
+	H.shot(alice, "prompt5_button")
+	Emulator.press(alice, "Declare")
+	Emulator.run(2)
+	H.expect(Diplomacy.atWar(state, A, rival), "Alice is at war with the rival")
+	H.expect(tut.step == 6, "the war finished prompt 5")
+	Emulator.press(alice, "✕")
+	Emulator.run(1)
+
+	-- 6. a power: the button, Blessing, her own land, Confirm
+	H.expect(state.nations[A].charges >= 1, "Alice has a charge")
+	H.expect(Emulator.findText(alice, "Tap the ✨ button") ~= nil, "prompt 6 points at the power button")
+	H.shot(alice, "prompt6_power")
+	Emulator.press(alice, "✨")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Pick 🌟 Blessing") ~= nil, "then at Blessing")
+	H.shot(alice, "prompt6_blessing")
+	Emulator.press(alice, "Blessing")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Tap your land") ~= nil, "then at her land")
+	tapProvince(alice, capital)
+	H.expect(Emulator.findText(alice, "Tap ✅ Confirm") ~= nil, "then at Confirm")
+	H.shot(alice, "prompt6_confirm")
+	Emulator.press(alice, "Confirm")
+	Emulator.run(2)
+	H.expect(Tutorial.finished(tut), "the power finished the tutorial")
+	H.expect(Emulator.findText(alice, "Tutorial done!") ~= nil, "Alice sees the end card")
+	H.expect(Emulator.findText(alice, "1/6") == nil and Emulator.findText(alice, "6/6") == nil, "the prompt card is gone")
+	local data = H.server("Services.PlayerDataService").data(alice.serverPlayer)
+	H.expect(data and data.tutorialDone == true, "the profile remembers the tutorial is done")
+	H.shot(alice, "done")
+	Emulator.press(alice, "Keep playing")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Tutorial done!") == nil, "the end card closes")
+
+	-- the match ends; in Studio the next tutorial match starts here, and its prompts can be skipped (two taps)
+	local total, given = 0, 0
+	for _, p in state.provinces do
+		total += 1
+		given += if p.owner == A then 1 else 0
+	end
+	for _, p in state.provinces do
+		if given < math.ceil(0.4 * total) and p.owner ~= A and p.terrain ~= "Mountain" then
+			p.owner = A
+			given += 1
+		end
+	end
+	Emulator.run(34)
+	H.expect(H.state() ~= state and TutorialService.current() ~= tut, "a new tutorial match started")
+	Emulator.run(1)
+	H.expect(Emulator.findText(alice, "1/6") ~= nil, "its first prompt shows")
+	Emulator.press(alice, "Skip")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(alice, "Sure?") ~= nil, "the first tap asks to confirm")
+	H.shot(alice, "skip_confirm")
+	Emulator.press(alice, "Sure?")
+	Emulator.run(1.5)
+	H.expect(TutorialService.current().skipped, "the server skipped the tutorial")
+	H.expect(Emulator.findText(alice, "1/6") == nil, "the prompts are gone")
+end
+
 ---------------------------------------------------------------------------------------------- main
 
 local function runScenario(name: string)
@@ -755,11 +915,11 @@ local function runScenario(name: string)
 	fs.writeDir(shotDir)
 	-- scenarios start straight in Peace (Workspace "SkipLobby") unless they test the Lobby itself
 	local withLobby = LOBBY_SCENARIOS[name] == true
-	Emulator.boot(
-		fs.readFile("build/game.rbxlx"),
-		if withLobby then nil else process.env.MAP,
-		{ SkipLobby = not withLobby }
-	)
+	local attributes = { SkipLobby = not withLobby }
+	if TUTORIAL_SCENARIOS[name] then
+		attributes.Tutorial = true
+	end
+	Emulator.boot(fs.readFile("build/game.rbxlx"), if withLobby then nil else process.env.MAP, attributes)
 	if process.env.TEXTURES then
 		-- one variant per pack folder, the way the owner names them in Studio's Material Manager
 		local bases = {

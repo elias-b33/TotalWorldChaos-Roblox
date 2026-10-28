@@ -19,16 +19,18 @@ local AIService = {}
 
 local schedule = Bot.newSchedule()
 local rng = Rng.new(1)
+local difficulty = Config.Bots.Difficulty :: Bot.Difficulty
 
--- A new match: forget every bot's schedule and memory.
-function AIService.reset()
+-- A new match: forget every bot's schedule and memory. `level` overrides Config.Bots.Difficulty for this match
+-- (the tutorial plays Easy).
+function AIService.reset(level: string?)
 	schedule = Bot.newSchedule()
 	rng = Rng.new(os.time() + 1) -- the planner's own random choices; Sim never calls math.random
+	difficulty = (level or Config.Bots.Difficulty) :: Bot.Difficulty
 end
 
 -- The bots due this tick plan and submit their commands.
 function AIService.step(state: Types.MatchState)
-	local difficulty = Config.Bots.Difficulty :: Bot.Difficulty
 	for _, order in Bot.step(schedule, state, rng, difficulty) do
 		CommandRouter.submitForBot(order.nation, order.command)
 	end

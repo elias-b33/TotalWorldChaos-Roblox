@@ -160,6 +160,7 @@ src/
       AIService.luau           -- bot nations
       MatchService.luau        -- phases, win checks, scoring
       PlayerDataService.luau   -- XP, cosmetics (ProfileStore wrapper, Phase 4)
+      TutorialService.luau     -- the tutorial match on a reserved server (Phase 4)
   client/
     MapView.luau               -- the 2D map GUI: pan, pinch zoom, taps
     PixelArt.luau              -- paints the pixel-art map (terrain, owners, borders) into an image buffer
@@ -387,6 +388,12 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 
 **Tutorial:** the first match is against 5 easy bots, with 6 prompts in order: take a neutral province, recruit, siege, make an ally, declare war, use a Primordial power.
 
+- **Where:** a public server's match is shared by up to 12 players, so the tutorial runs on a reserved server of the same place. A player whose profile hasn't finished the tutorial (`tutorialDone`) is teleported to a fresh reserved server; every reserved server plays the tutorial. When its match ends, or the player skips, they go back to a public server. In Studio the Workspace attribute `Tutorial` starts the tutorial match directly (teleports can't run there).
+- **The match:** Earth, the player as Ganges (`Config.Tutorial`), the 5 nations nearest to them as Easy bots, and the other 4 nations gone (their land neutral, with garrisons). No Lobby. The player starts with a 3-regiment army so the first prompt can start at once.
+- **Prompts:** a card under the top bar (step counter, one short line, one hint, Skip), an arrow and ring on the province to tap, and a glowing outline on the button to press. The player does every step with the normal UI. Each prompt ends when the match shows it done: owns a province it didn't start with, recruited, is besieging, is in an alliance, is at war, used a power. A step done early counts when its prompt comes up.
+- **Bots help:** every bot accepts the player's alliance offer; the ally prompt points at the nearest bot, the war prompt at the weakest bot on the player's border. When the war prompt starts, Peace ends at once (the clock jumps to 3:00); the power prompt tops the player up to 1 charge (a Blessing on their own land).
+- **Skip and done:** Skip takes two taps. Finishing or skipping saves `tutorialDone`; players who had already played a match count as done. Each tutorial server prints its funnel (started, finished, skipped) until the Analytics events arrive.
+
 ## Bot AI
 
 Each bot checks a short priority list every few seconds and does the first action that applies, using the same commands as players.
@@ -471,7 +478,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 
 - [x] 2D pixel-art map for Earth, Eldmoor and Skyshards (WorldBox style, painted at runtime)
 - [x] Map vote in the Lobby with the three vote cards
-- [ ] Tutorial match
+- [x] Tutorial match
 - [x] Progression rules in Sim: match XP and Glory, level curve, ranks
 - [ ] `PlayerDataService` (ProfileStore): XP, Glory, items, receipts; Results screen rewards (XP, Glory, saving and the Results rewards are done; items and receipts are connected with the shop)
 - [ ] Daily and weekly quests, login calendar, play streak

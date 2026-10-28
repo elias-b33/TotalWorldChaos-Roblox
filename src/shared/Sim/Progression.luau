@@ -22,7 +22,7 @@ local P = Config.Progression
 
 local Progression = {}
 
-Progression.PROFILE_VERSION = 1
+Progression.PROFILE_VERSION = 2
 
 -- Level curve and ranks ---------------------------------------------------------------------------------
 
@@ -222,11 +222,17 @@ function Progression.newProfile(): Profile
 		purchaseHistory = {},
 		stats = { matches = 0, wins = 0, provincesTaken = 0, battlesWon = 0, powersUsed = 0 },
 		settings = {},
+		tutorialDone = false,
 	}
 end
 
 -- Upgrades from one profile version to the next, keyed by the version they upgrade from.
-local MIGRATIONS: { [number]: (Profile) -> () } = {}
+local MIGRATIONS: { [number]: (Profile) -> () } = {
+	-- 2 adds tutorialDone: someone who has already played a match never gets sent to the tutorial
+	[1] = function(profile: Profile)
+		profile.tutorialDone = profile.tutorialDone == true or profile.stats.matches > 0
+	end,
+}
 
 -- Bring a loaded profile up to date (missing fields are filled from newProfile by ProfileStore's Reconcile first).
 function Progression.migrate(profile: Profile)

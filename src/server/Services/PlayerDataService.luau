@@ -34,6 +34,7 @@ local PlayerDataService = {}
 local store = ProfileStore.New(STORE_NAME, Progression.newProfile())
 local profiles: { [Player]: Profile } = {}
 local leaveHooks: { (Player, Data) -> () } = {}
+local loadHooks: { (Player, Data) -> () } = {}
 local profileRemote: RemoteEvent
 
 local function sendSummary(player: Player, data: Data)
@@ -69,6 +70,9 @@ local function load(player: Player)
 	end
 	profiles[player] = profile
 	sendSummary(player, profile.Data)
+	for _, hook in loadHooks do
+		task.spawn(hook, player, profile.Data)
+	end
 end
 
 local function release(player: Player)
@@ -112,6 +116,11 @@ function PlayerDataService.update<T>(player: Player, change: (Data) -> T): T?
 	profile:Save()
 	sendSummary(player, profile.Data)
 	return result
+end
+
+-- Run `hook` with a player's profile once it has loaded (e.g. sending a new player to the tutorial).
+function PlayerDataService.onLoaded(hook: (Player, Data) -> ())
+	table.insert(loadHooks, hook)
 end
 
 -- Run `hook` with a leaving player's profile just before its final save (e.g. a leaver's prorated reward).

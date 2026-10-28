@@ -76,6 +76,16 @@ function MapRenderer.centerOf(provinceId: number): Vector2
 	return Vector2.new(c.x, c.y) / g.scale
 end
 
+-- A province's rough radius in map pixels (from its area).
+function MapRenderer.radiusOf(provinceId: number): number
+	local map = ClientState.map()
+	local g = grid
+	if map == nil or g == nil then
+		return 0
+	end
+	return math.sqrt(map.provinces[provinceId].area / (g.scale * g.scale) / math.pi)
+end
+
 local function layer(name: string, parent: Frame): Frame
 	local frame = Instance.new("Frame")
 	frame.Name = name

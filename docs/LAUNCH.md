@@ -173,7 +173,7 @@ Retention, session length, playtime and Robux revenue come from Roblox's built-i
 | 11 | `first_match_finished` |
 | 12 | `second_match_started` |
 
-Steps 5–10 follow the tutorial prompts in DESIGN.md.
+Steps 5–10 follow the tutorial prompts in DESIGN.md. Until these events exist, `TutorialService` prints `[tutorial] … started`, `finished in N s` and `skipped at prompt N` lines with the server's counts.
 
 ### Funnels (`LogFunnelStepEvent`, 6 of the 10 allowed)
 
