@@ -78,10 +78,17 @@ local BIOMES: { [string]: Style } = {
 	peaks = style(0x414545, 0x5b5e5c, 0x333333, "rock"),
 	-- Skyshards: sci-fi platforms (WorldBox's flower fields, cyber tile, celestial crystals, grey goo, iron walls)
 	skymeadow = style(0x54cc3a, 0x8cdc6a, 0x39a334, "rows", nil, { R = 0xa8663a }),
-	heartruins = style(0x9ea6a3, 0xd5e2ea, 0x858886, "panels", nil, { R = 0x5b5b5b, C = 0xf55858, E = 0x7cfbef }),
+	heartruins = style(
+		0x9ea6a3,
+		0xd5e2ea,
+		0x858886,
+		"panels",
+		nil,
+		{ R = 0x8a918e, C = 0xf55858, E = 0x7cfbef, P = 0xa9b1ae, Q = 0x949c99 }
+	),
 	crystalgrove = style(0x7f5da2, 0xb573da, 0x564180, "crystals", nil, { C = 0x7cfbef, M = 0x64f1e2, D = 0x56c9bd }),
 	crags = style(0x5d6191, 0x686da3, 0x4f537c, "plates"), -- grey_goo
-	stormspire = style(0x3a485e, 0x597d94, 0x2e363e, "towers", nil, { C = 0xf55858, G = 0xd5e2ea, B = 0xbd8137 }),
+	stormspire = style(0x3a485e, 0x597d94, 0x2e363e, "towers", nil, { C = 0x7cfbef, G = 0x8fa3b3, B = 0x2e363e }),
 }
 local FALLBACK = BIOMES.grassland
 
@@ -435,10 +442,16 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield
 						c = FLOWERS[1 + math.floor(noise(x, y, 8) * #FLOWERS)]
 					elseif s.deco == "rows" and y % 3 == 0 then
 						c = (s.sprite :: { [string]: number }).R -- crop rows
-					elseif s.deco == "panels" and (x % 8 == 0 or y % 8 == 0) then
+					elseif s.deco == "panels" then
+						-- hull plating: 8-pixel panels in three shades, faint seams, a few lit seams
 						local panel = s.sprite :: { [string]: number }
-						local lit = noise(x // 8, y // 8, 9)
-						c = if lit < 0.04 then panel.C elseif lit < 0.08 then panel.E else panel.R -- steel panels
+						if x % 8 == 0 or y % 8 == 0 then
+							local lit = noise(x // 8, y // 8, 9)
+							c = if lit < 0.04 then panel.C elseif lit < 0.08 then panel.E else panel.R
+						elseif c == s.base then
+							local shade = noise(x // 8, y // 8, 10)
+							c = if shade < 0.2 then panel.P elseif shade > 0.8 then panel.Q else c
+						end
 					end
 				end
 			elseif sky then
