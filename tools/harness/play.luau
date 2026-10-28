@@ -162,6 +162,16 @@ function scenarios.smoke()
 	Emulator.run(30)
 	H.expect(nation.gold > gold0, "Income arrives every month")
 	H.expect(ClientState.nation(me).gold == nation.gold, "The client's gold matches the server")
+
+	-- Studio test switches (docs/STUDIO.md): set on Workspace, applied once on the next tick, then removed
+	local workspace = Emulator.server.dm:GetService("Workspace")
+	workspace:SetAttribute("DevTick", 179)
+	workspace:SetAttribute("DevCharges", 3)
+	workspace:SetAttribute("DevGold", 500)
+	Emulator.run(2.5)
+	H.expect(state.phase == "War", "DevTick 179 jumps to War")
+	H.expect(nation.charges == 3 and nation.gold >= 500, "DevCharges and DevGold apply")
+	H.expect(workspace:GetAttribute("DevTick") == nil, "the switches clear themselves")
 end
 
 -- The map's look at three zooms: whole map, region around the capital, the capital close up.

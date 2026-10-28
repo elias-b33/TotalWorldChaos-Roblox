@@ -19,6 +19,7 @@ Players.CharacterAutoLoads = false -- the game is the map; nobody needs an avata
 local Server = script.Parent
 local AIService = require(Server.Services.AIService)
 local CommandRouter = require(Server.CommandRouter)
+local DevService = require(Server.Services.DevService)
 local LobbyService = require(Server.Services.LobbyService)
 local MatchService = require(Server.Services.MatchService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
@@ -143,6 +144,7 @@ end)
 
 local function tick()
 	local state = MatchService.state()
+	DevService.step(state) -- Studio-only test switches (Workspace attributes; docs/STUDIO.md)
 	CommandRouter.applyQueued(state) -- 1. apply queued commands
 	local newPhase = MatchService.advance() -- 2-8. armies, battles, sieges, income, win checks
 	-- 7. bots plan. Sim.Tick runs steps 2-8 in one call, so bots plan right after it; their commands wait in the
