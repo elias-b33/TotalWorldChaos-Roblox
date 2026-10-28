@@ -219,23 +219,28 @@ function Shop.canEmote(profile: Profile, id: string, vip: boolean, lastTick: num
 	return true, nil
 end
 
--- The real sum of an offer's pieces at their current list prices (never a made-up "was" price).
-function Shop.bundleValue(offerId: string): number
+-- The real sum of an offer's pieces at their current prices (never a made-up "was" price). `priceOf` (optional)
+-- gives an item's current price from its id and list price: the client passes the live prices its cards show.
+function Shop.bundleValue(offerId: string, priceOf: ((id: string, listPrice: number) -> number)?): number
 	local offer = Catalogue.offer(offerId)
 	local sum = 0
 	if offer then
 		for _, id in offer.items do
 			local item = Catalogue.item(id)
-			sum += if item and item.robux then item.robux else 0
+			local list = if item and item.robux then item.robux else 0
+			sum += if priceOf and list > 0 then priceOf(id, list) else list
 		end
 	end
 	return sum
 end
 
--- The starter-pack pop-up: from the 2nd finished match, until bought, at most once per session (the service
--- remembers whether it was shown and never asks during a match).
-function Shop.shouldOfferStarter(profile: Profile, shownThisSession: boolean): boolean
-	return not shownThisSession and not profile.owned.starter and profile.stats.matches >= S.StarterPackAfterMatches
+-- The starter-pack pop-up: from the 2nd finished match, until owned (bought, or every piece already owned, as
+-- the purchase checks), at most once per session (the service remembers whether it was shown and never asks
+-- during a match).
+function Shop.shouldOfferStarter(profile: Profile, shownThisSession: boolean, vip: boolean): boolean
+	return not shownThisSession
+		and not Shop.owns(profile, "starter", vip)
+		and profile.stats.matches >= S.StarterPackAfterMatches
 end
 
 -- The player's own shop state, for the Shop remote.

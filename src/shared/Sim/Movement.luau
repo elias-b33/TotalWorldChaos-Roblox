@@ -3,7 +3,9 @@
 -- After moving, a nation's armies that stand still in the same province merge into one (the lowest id stays):
 -- an army is a stack of regiments shown as one token. Retreating armies walk on and take no orders.
 
+local Army = require("./Army")
 local Diplomacy = require("./Diplomacy")
+local Events = require("./Events")
 local Pathing = require("./Pathing")
 local Types = require("../Types")
 
@@ -22,7 +24,7 @@ end
 
 -- Send an army somewhere. Ordering it to where it stands stops it.
 function Movement.order(state: MatchState, nationId: number, armyId: number, to: number): (boolean, string?)
-	local army = state.armies[armyId]
+	local army = state.armies[Army.resolve(state, armyId)] -- an army that just merged: the stack it joined
 	if army == nil then
 		return false, "UnknownArmy"
 	end
@@ -60,7 +62,9 @@ function Movement.ticksToNext(state: MatchState, army: Types.Army): number
 end
 
 -- A nation's armies standing still together (no route, not fighting, not retreating) become one army: the
--- lowest id keeps the men of the others, which are removed.
+-- lowest id keeps the men of the others, which are removed. Each merge is remembered (state.mergedInto, so orders
+-- for the removed id reach the stack) and sent as a "Merged" event (a = the army that stays, b = the one removed),
+-- so clients don't take the removed token for an army destroyed.
 function Movement.mergeStacks(state: MatchState)
 	local keeper: { [string]: Types.Army } = {}
 	for _, id in sortedIds(state.armies) do
@@ -73,6 +77,8 @@ function Movement.mergeStacks(state: MatchState)
 			else
 				first.men += army.men
 				state.armies[id] = nil
+				state.mergedInto[id] = first.id
+				Events.push(state, "Merged", first.id, id, army.location)
 			end
 		end
 	end

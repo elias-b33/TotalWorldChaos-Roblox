@@ -266,4 +266,14 @@ T.test("new profiles still need the tutorial; players with a match behind them d
 	T.equal(new.tutorialDone, false)
 end)
 
+T.test("a public server sends only players who haven't done the tutorial or played a match", function()
+	local p = Progression.newProfile()
+	T.expect(Tutorial.needed(p), "a new player")
+	p.stats.matches = 1 -- played a public match (say the tutorial teleport failed)
+	T.expect(not Tutorial.needed(p), "a player with a match behind them")
+	p.stats.matches = 0
+	p.tutorialDone = true -- finished, skipped, or played the tutorial match to its end
+	T.expect(not Tutorial.needed(p), "a player who did the tutorial")
+end)
+
 T.finish()

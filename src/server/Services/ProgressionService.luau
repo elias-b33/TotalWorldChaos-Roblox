@@ -119,7 +119,10 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 		local due = owed[player.UserId]
 		if due then
 			owed[player.UserId] = nil
-			pay(player, due.state, due.entry)
+			ShopService.awaitVip(player) -- this hook can run before ShopService's VIP check: wait for its +25%
+			if player.Parent == Players then
+				pay(player, due.state, due.entry)
+			end
 		end
 	end)
 	CommandRouter.observe(function(player: Player, command: Types.Command, ok: boolean)

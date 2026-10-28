@@ -189,7 +189,7 @@ Gold, manpower, regiments, buildings, Primordial charges or cooldowns, combat mo
 
 The catalogue is `src/shared/Catalogue.luau`; prices by rarity are in `Config.Shop`. Every Roblox id lives in one place at the top of the catalogue, `Catalogue.PRODUCT_IDS` and `Catalogue.VIP_PASS_ID`, and starts at **0**.
 
-**Test mode.** While an id is 0, Studio grants that purchase free, through the same `ProcessReceipt` path with a made-up receipt (the shop header says "Studio test mode"). A live server refuses it ("Not on sale yet"), so a forgotten id can never give an item away. With "Enable Studio Access to API Services" on, test purchases save to the real DataStore for your own test account.
+**Test mode.** While an id is 0, Studio grants that purchase free, through the same `ProcessReceipt` path with a made-up receipt (the shop header says "Studio test mode"). A live server refuses it ("Not on sale yet"), so a forgotten id can never give an item away. With "Enable Studio Access to API Services" on, Studio saves go to a separate DataStore (`PlayerData_Studio`), so test purchases and test history never reach live servers.
 
 **What the owner creates** (Creator Dashboard → your experience → Monetization):
 
@@ -209,7 +209,7 @@ The catalogue is `src/shared/Catalogue.luau`; prices by rarity are in `Config.Sh
 
 3. Opt in to managed pricing if you want: the shop reads live prices with `MarketplaceService:GetProductInfo`, and the Config numbers are only shown while an id is 0.
 
-**How a purchase flows.** The client asks (`RequestBuy`); `CommandRouter` checks the shape; `ShopService` checks the rules (`Sim/Shop`): Robux prompts only open in the Lobby, the draft and on Results, never during a match. Developer products are granted in `MarketplaceService.ProcessReceipt` → `PlayerDataService.processReceipt`: each purchase id is granted once, recorded in the purchase history and saved before `PurchaseGranted`. VIP is checked with `UserOwnsGamePassAsync` on join and on `PromptGamePassPurchaseFinished`, and the pass is added to the purchase history too.
+**How a purchase flows.** The client asks (`RequestBuy`); `CommandRouter` checks the shape; `ShopService` checks the rules (`Sim/Shop`): Robux prompts only open in the Lobby, the draft and on Results, never during a match. Developer products are granted in `MarketplaceService.ProcessReceipt` → `PlayerDataService.processReceipt`: each purchase id is granted once, recorded in the purchase history and saved before `PurchaseGranted`; a receipt that arrives while the player's profile is still loading (Roblox retries unfinished purchases on join) waits for it. VIP is checked with `UserOwnsGamePassAsync` on join (if that call fails, the saved ownership counts) and again after `PromptGamePassPurchaseFinished` before it is granted, and the pass is added to the purchase history too. Saving: Glory purchases save at once; equips and settings ride on the autosave and the save on leave; a refused request writes nothing, and shop requests have their own rate limit (`Config.Net.MaxShopIntentsPerSecond`).
 
 ## 4. Currency: Glory
 

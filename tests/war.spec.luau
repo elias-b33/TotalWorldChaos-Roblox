@@ -376,6 +376,33 @@ T.test("a nation's armies standing in the same province merge into one", functio
 	T.equal(a.men, 6000)
 end)
 
+T.test("an order or a power for an army that just merged reaches the stack it joined", function()
+	local state, rng = fresh()
+	local home = id("Aurora Landing")
+	local a = Army.spawn(state, AURORA, home, 2000)
+	local b = Army.spawn(state, AURORA, home, 3000)
+	table.clear(state.events)
+	Movement.mergeStacks(state)
+	T.equal(state.armies[b.id], nil, "b merged into a")
+	T.equal(state.mergedInto[b.id], a.id)
+	local event = state.events[#state.events]
+	T.expect(event.kind == "Merged" and event.a == a.id and event.b == b.id, "a Merged event tells clients")
+	T.equal(event.province, home)
+	T.equal(Army.resolve(state, b.id), a.id)
+	T.equal(Army.resolve(state, 9999), 9999, "an id that never merged stays as it is")
+	-- the player's Go for b, sent before they saw the merge, moves the whole stack
+	T.expect(Commands.apply(state, AURORA, { kind = "Move", army = b.id, to = id("Aurora Meadows") }), "Go for b")
+	T.equal(a.path[#a.path], id("Aurora Meadows"))
+	-- a Meteor aimed at b hits a
+	state.tick = Config.Phases.PeaceEndTick + 10
+	state.phase = "War"
+	state.nations[ZEPHYR].charges = 5
+	local ok, err = Commands.apply(state, ZEPHYR, { kind = "Power", power = "Meteor", target = b.id })
+	T.expect(ok, "Meteor on the merged id: " .. tostring(err))
+	T.expect(a.men < 5000, "it hit the stack")
+	run(state, rng, 1)
+end)
+
 -- Diplomacy ---------------------------------------------------------------------------------------
 
 T.test("no wars in the Peace phase", function()

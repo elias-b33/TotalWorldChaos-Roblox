@@ -16,6 +16,18 @@ function Army.nextId(state: MatchState): number
 	return id
 end
 
+-- The army an id means now: an army that merged into another stack (Movement.mergeStacks) lives on in the one
+-- that took its men, so an order or a power aimed at it just before the merge still lands. Ids of armies that
+-- are simply gone come back unchanged (the caller then answers UnknownArmy).
+function Army.resolve(state: MatchState, id: number): number
+	local seen = 0
+	while state.armies[id] == nil and state.mergedInto[id] ~= nil and seen < 100 do
+		id = state.mergedInto[id]
+		seen += 1
+	end
+	return id
+end
+
 -- An army of this owner standing still in the province, if there is one.
 function Army.idleAt(state: MatchState, owner: number, location: number): Army?
 	local found: Army? = nil

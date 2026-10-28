@@ -72,6 +72,30 @@ function H.client(client, path: string)
 	return client.modules[node]
 end
 
+-- A player's save as the DataStore holds it ({ Data, MetaData, ... }): Studio saves go to their own store.
+function H.saved(userId: number)
+	local Data = H.server("Services.PlayerDataService")
+	local entry = Emulator.dataStores[Data.STORE_NAME][Data.KEY_PREFIX .. userId]
+	return entry and entry.value
+end
+
+-- How many times a player's save has been written.
+function H.writes(userId: number): number
+	local Data = H.server("Services.PlayerDataService")
+	local entry = Emulator.dataStores[Data.STORE_NAME][Data.KEY_PREFIX .. userId]
+	return if entry then entry.version else 0
+end
+
+-- Did the server print a line containing `needle`?
+function H.logged(needle: string): boolean
+	for _, line in Emulator.log() do
+		if string.find(line, needle, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 function H.state()
 	return H.server("Services.MatchService").state()
 end
@@ -117,6 +141,7 @@ function scenarios.smoke()
 	H.shot(alice, "joined")
 	local me = H.myNation(alice)
 	H.expect(me == 1, "Alice is seated as nation 1")
+	H.expect(H.logged("Alice is new: off to the tutorial"), "a public server sends a new player to the tutorial")
 	local state = H.state()
 	local nation = state.nations[me]
 	nation.gold = 500 -- enough to try everything
@@ -657,14 +682,15 @@ function scenarios.progression()
 	H.shot(alice, "results_reward")
 
 	Emulator.run(1)
-	local saved = Emulator.dataStores.PlayerData["Player_" .. userId].value
+	local saved = H.saved(userId)
 	H.expect(saved.Data.xp == 460 and saved.Data.glory == 187, "the reward was saved to the DataStore")
 	H.expect(saved.MetaData.ActiveSession ~= nil, "Alice's server holds the session lock")
+	H.expect(Emulator.dataStores.PlayerData == nil, "Studio saves go to their own store, never the live one")
 
 	-- leave, rejoin
 	Emulator.removeClient(alice)
 	Emulator.run(3)
-	saved = Emulator.dataStores.PlayerData["Player_" .. userId].value
+	saved = H.saved(userId)
 	H.expect(saved.MetaData.ActiveSession == nil, "leaving saved the profile and released the session lock")
 	H.expect(saved.Data.xp == 460 and saved.Data.stats.wins == 1, "the save has the XP and the win")
 	local again = Emulator.addClient("Alice", nil, userId)
@@ -681,7 +707,7 @@ function scenarios.progression()
 	-- the finish reward), and no wrong kick message (a kick counts as a warning and fails the scenario)
 	Emulator.run(60)
 	Emulator.shutdown()
-	saved = Emulator.dataStores.PlayerData["Player_" .. userId].value
+	saved = H.saved(userId)
 	H.expect(saved.Data.xp > 460, string.format("the shutdown paid the match so far (%d XP)", saved.Data.xp))
 	H.expect(saved.MetaData.ActiveSession == nil, "and released the session lock")
 end
@@ -1152,7 +1178,11 @@ function scenarios.tutorial()
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "Tutorial done!") == nil, "the end card closes")
 
-	-- the match ends; in Studio the next tutorial match starts here, and its prompts can be skipped (two taps)
+	-- the match ends; in Studio the next tutorial match starts here, and its prompts can be skipped (two taps).
+	-- Playing the tutorial match to its end counts as done, finished or not (nobody loops back to it on every join).
+	H.server("Services.PlayerDataService").update(alice.serverPlayer, function(d)
+		d.tutorialDone = false
+	end)
 	local total, given = 0, 0
 	for _, p in state.provinces do
 		total += 1
@@ -1165,6 +1195,7 @@ function scenarios.tutorial()
 		end
 	end
 	Emulator.run(34)
+	H.expect(data.tutorialDone == true, "the end of the tutorial match marked the tutorial done")
 	H.expect(H.state() ~= state and TutorialService.current() ~= tut, "a new tutorial match started")
 	Emulator.run(1)
 	H.expect(Emulator.findText(alice, "1/6") ~= nil, "its first prompt shows")
@@ -1176,6 +1207,36 @@ function scenarios.tutorial()
 	Emulator.run(1.5)
 	H.expect(TutorialService.current().skipped, "the server skipped the tutorial")
 	H.expect(Emulator.findText(alice, "1/6") == nil, "the prompts are gone")
+	H.expect(Emulator.findText(alice, "Play online") == nil, "no way out in Studio (no teleports)")
+	-- online (canLeave) a skipped player keeps a small 🌍 Play online button: it asks the server to leave
+	local remotes = Emulator.server.dm:GetService("ReplicatedStorage").Remotes
+	remotes.Tutorial:FireClient(alice.serverPlayer, { step = 0, total = 6, province = 0, nation = 0, canLeave = true })
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Play online") ~= nil, "after Skip, 🌍 Play online stays on screen")
+	H.shot(alice, "skipped_play_online")
+	Emulator.press(alice, "Play online")
+	Emulator.run(0.5)
+	H.expect(H.logged("no teleports in Studio: 1 player(s) stay here"), "and the server tries the teleport back")
+
+	-- Studio: the Tutorial attribute is removed; when this match ends the next one is a normal match with a nation
+	Emulator.server.dm:GetService("Workspace"):SetAttribute("Tutorial", nil)
+	local second = H.state()
+	local owned, needed = 0, 0
+	for _, p in second.provinces do
+		needed += 1
+		owned += if p.owner == A then 1 else 0
+	end
+	needed = math.ceil(Config.Win.DominationShare * needed)
+	for _, p in second.provinces do
+		if owned < needed and p.owner ~= A and p.terrain ~= "Mountain" then
+			p.owner = A
+			owned += 1
+		end
+	end
+	Emulator.run(36)
+	H.expect(H.state() ~= second and not TutorialService.active(), "the next match isn't a tutorial")
+	local nationId = H.myNation(alice)
+	H.expect(nationId ~= nil and nationId ~= 0 and H.state().nations[nationId].userId == alice.serverPlayer.UserId, "and Alice has a nation the server knows")
 
 	-- analytics: the six prompts were onboarding steps 5-10, and the skip was logged with its prompt
 	local onboarded, skips = {}, {}
@@ -1300,7 +1361,7 @@ function scenarios.shop()
 	local granted = Emulator.roblox.Enum.ProductPurchaseDecision.PurchaseGranted
 	H.expect(first == granted and second == granted, "both calls answer PurchaseGranted")
 	H.expect(#data.purchaseHistory == 2, "but the purchase was granted and recorded once")
-	local saved = Emulator.dataStores.PlayerData["Player_" .. player.UserId].value.Data
+	local saved = H.saved(player.UserId).Data
 	H.expect(saved.receipts["twice-1"] ~= nil and saved.owned.flag_cross, "and saved before PurchaseGranted")
 	local unknown = await(Emulator.processReceipt, { PurchaseId = "x", PlayerId = player.UserId, ProductId = 123, CurrencySpent = 1 })
 	H.expect(unknown == Emulator.roblox.Enum.ProductPurchaseDecision.NotProcessedYet, "an unknown product is not granted")
@@ -1685,7 +1746,7 @@ function scenarios.quests()
 	Emulator.run(0.5)
 	H.expect(Emulator.findText(alice, "🔥") ~= nil, "Alice's nation shows the streak flame in the nations list")
 	H.shot(alice, "nations_flame")
-	local saved = Emulator.dataStores.PlayerData["Player_" .. player.UserId].value.Data
+	local saved = H.saved(player.UserId).Data
 	H.expect(saved.login.step == 3 and saved.login.streak == 3, "the calendar and streak are saved")
 	H.expect(#firstIds == 3, "the first day's quests: " .. table.concat(firstIds, ", "))
 end
@@ -2255,6 +2316,121 @@ function scenarios.themes()
 	H.expect(impacts >= 3, "every Meteor look lands with the same impact sound")
 end
 
+-- Saves and purchases: shop requests that change nothing write nothing (and have their own rate limit), an equip
+-- waits for the autosave, a Glory purchase saves at once; a receipt Roblox retries while the profile is still
+-- loading waits for it; a VIP whose Results reward waited for a loading profile still gets the +25%.
+function scenarios.saves()
+	-- call a server function that may yield on the emulator's scheduler and wait for its answer
+	local function await(fn, ...)
+		local args = table.pack(...)
+		local result
+		Emulator.task.spawn(function()
+			result = table.pack(fn(table.unpack(args, 1, args.n)))
+		end)
+		local deadline = Emulator.now() + 70
+		while result == nil and Emulator.now() < deadline do
+			Emulator.run(0.1)
+		end
+		assert(result, "timed out")
+		return table.unpack(result, 1, result.n)
+	end
+	Emulator.run(1)
+	local alice = Emulator.addClient("Alice")
+	Emulator.run(3)
+	local Data = H.server("Services.PlayerDataService")
+	local ShopService = H.server("Services.ShopService")
+	local player = alice.serverPlayer
+	local userId = player.UserId
+	local data = Data.data(player)
+	H.expect(data ~= nil, "Alice's profile loaded")
+	H.expect(Emulator.dataStores.PlayerData == nil, "Studio saves go to their own store, never the live one")
+
+	-- ten equips of an item that doesn't exist: no DataStore write, and the shop's rate limit answers most
+	local answers = {}
+	alice.dm:GetService("ReplicatedStorage").Remotes.CommandResult.OnClientEvent:Connect(function(_id, _ok, reason)
+		table.insert(answers, reason)
+	end)
+	local before = H.writes(userId)
+	local Intents = H.client(alice, "Intents")
+	for _ = 1, 10 do
+		Intents.equip("no_such_item")
+	end
+	Emulator.run(1.5)
+	local tooFast = 0
+	for _, reason in answers do
+		tooFast += if reason == "TooFast" then 1 else 0
+	end
+	H.expect(#answers == 10 and tooFast == 10 - Config.Net.MaxShopIntentsPerSecond, "the shop's own rate limit")
+	H.expect(H.writes(userId) == before, "refused shop requests write nothing to the DataStore")
+
+	-- an equip changes the profile but waits for the autosave; Glory spent is saved at once
+	Data.edit(player, function(d)
+		d.glory = 1000
+		d.owned.flag_cross = true
+	end)
+	Intents.equip("flag_cross")
+	Emulator.run(1.5)
+	H.expect(data.equipped.Flag == "flag_cross" and H.writes(userId) == before, "an equip waits for the autosave")
+	Intents.buy("flag_tricolour", "Glory")
+	Emulator.run(1.5)
+	H.expect(data.owned.flag_tricolour and H.writes(userId) == before + 1, "a Glory purchase saves at once")
+	H.expect(H.saved(userId).Data.equipped.Flag == "flag_cross", "with the equip in the same write")
+
+	-- a receipt Roblox retries as Bob joins, before his profile has loaded: it waits for the profile
+	local bob = Emulator.addClient("Bob")
+	local receipt = { PurchaseId = "rejoin-1", PlayerId = bob.serverPlayer.UserId, ProductId = 0, CurrencySpent = 49 }
+	H.expect(Data.data(bob.serverPlayer) == nil, "Bob's profile is still loading")
+	local decision = await(ShopService.receipt, receipt, "flag_cross")
+	H.expect(decision == Emulator.roblox.Enum.ProductPurchaseDecision.PurchaseGranted, "the receipt is granted")
+	H.expect(Data.data(bob.serverPlayer).owned.flag_cross == true, "in the same session")
+
+	-- VIP (Studio test mode: the saved pass) leaves and rejoins while another server still holds her save; the
+	-- match ends while her profile loads, and the reward that waited for it still has the VIP +25%
+	Data.update(player, function(d)
+		d.owned.vip = true
+	end)
+	Emulator.removeClient(alice)
+	Emulator.run(3)
+	local entry = Emulator.dataStores[Data.STORE_NAME][Data.KEY_PREFIX .. userId]
+	entry.value.MetaData.ActiveSession = { 1, "another-server", "x" }
+	entry.value.MetaData.LastUpdate = 1700000000 + math.floor(Emulator.now())
+	alice = Emulator.addClient("Alice", nil, userId)
+	Emulator.run(2)
+	player = alice.serverPlayer
+	H.expect(Data.data(player) == nil, "Alice's profile waits for the other server")
+	local state = H.state()
+	local A = H.myNation(alice)
+	H.expect(A ~= nil and A ~= 0, "Alice has her nation back")
+	local total, given = 0, 0
+	for _, p in state.provinces do
+		total += 1
+		given += if p.owner == A then 1 else 0
+	end
+	for _, p in state.provinces do
+		if given < math.ceil(Config.Win.DominationShare * total) and p.owner ~= A and p.terrain ~= "Mountain" then
+			p.owner = A
+			given += 1
+		end
+	end
+	Emulator.run(2)
+	H.expect(state.result ~= nil and Data.data(player) == nil, "the match ended while her profile loads")
+	local ProfileState = H.client(alice, "ProfileState")
+	local deadline = Emulator.now() + 90
+	while ProfileState.reward() == nil and Emulator.now() < deadline do
+		Emulator.run(1)
+	end
+	local report = ProfileState.reward()
+	H.expect(report ~= nil, "the reward was paid once the profile loaded")
+	local vipLine
+	for _, line in report.reward.lines do
+		if line.kind == "Vip" then
+			vipLine = line
+		end
+	end
+	H.expect(vipLine ~= nil and vipLine.xp > 0, "with the VIP +25%")
+	H.expect(ShopService.isVip(player), "Alice is VIP")
+end
+
 ---------------------------------------------------------------------------------------------- main
 
 -- Phase 4: private server settings. Olivia owns the server (Workspace "PrivateServerOwner"): in the Lobby she sets
@@ -2271,6 +2447,7 @@ function scenarios.private()
 	H.expect(Emulator.findText(olivia, "⚙ Settings") ~= nil, "Olivia, the owner, sees ⚙ Settings")
 	H.expect(Emulator.findText(pete, "⚙ Settings") == nil, "Pete doesn't")
 	H.expect(Emulator.findText(pete, "🔒 Private server") ~= nil, "everyone sees the settings summary")
+	H.expect(not H.logged("off to the tutorial"), "a private server sends nobody to the tutorial (friends stay)")
 	Emulator.run(2)
 	H.shot(pete, "vote_summary")
 

@@ -101,7 +101,7 @@ function Primordial.check(state: MatchState, power: Power, target: number): (num
 	end
 	local hit, at = 0, 0
 	if kind == "Army" then
-		local army = state.armies[target]
+		local army = state.armies[Army.resolve(state, target)] -- an army that just merged: the stack it joined
 		if army == nil then
 			return nil, 0, "UnknownArmy"
 		end
@@ -193,6 +193,9 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 		return false, "MatchOver"
 	elseif state.phase ~= "War" and state.phase ~= "Cataclysm" then
 		return false, "WrongPhase"
+	end
+	if Primordial.TARGETS[power] == "Army" then
+		target = Army.resolve(state, target)
 	end
 	local hit, at, err = Primordial.check(state, power, target)
 	if hit == nil then

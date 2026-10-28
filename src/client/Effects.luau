@@ -787,11 +787,18 @@ local function onDelta(delta: Snapshot.DeltaData)
 	if layer ~= MapRenderer.layer("Effects") then
 		bind()
 	end
-	-- armies gone this tick, by where they stood: a battle there destroyed an army
+	-- armies gone this tick, by where they stood: a battle there destroyed an army (one that merged into another
+	-- stack, a "Merged" event, wasn't destroyed)
+	local merged: { [number]: boolean } = {}
+	for _, e in delta.events do
+		if e.kind == "Merged" then
+			merged[e.b] = true
+		end
+	end
 	local destroyedAt: { [number]: boolean } = {}
 	for _, id in delta.removedArmies do
 		local where = armyAt[id]
-		if where then
+		if where and not merged[id] then
 			destroyedAt[where] = true
 		end
 		armyAt[id] = nil

@@ -84,6 +84,9 @@ function Progression.newStats(userId: number, tick: number): Stats
 		powersUsed = 0,
 		paidXp = 0,
 		paidGlory = 0,
+		paidProvinces = 0,
+		paidBattles = 0,
+		paidPowers = 0,
 		neutralTaken = 0,
 		capitalsTaken = 0,
 		regiments = 0,
@@ -362,7 +365,8 @@ function Progression.addXp(profile: Profile, xp: number, glory: number): (number
 end
 
 -- Apply a match reward to a profile: XP, Glory, levels (50 Glory each) and ranks (+500 Glory each), and the
--- lifetime stats. Returns the report for the Results screen, with the level-up and rank-up lines added.
+-- lifetime stats (only what is new since this match's last payment; an AFK match doesn't count as played).
+-- Returns the report for the Results screen, with the level-up and rank-up lines added.
 function Progression.grant(profile: Profile, stats: Stats, reward: MatchReward, today: number): Types.RewardReport
 	local before = Progression.summary(profile)
 	local full: MatchReward = table.clone(reward)
@@ -375,16 +379,18 @@ function Progression.grant(profile: Profile, stats: Stats, reward: MatchReward, 
 	if reward.stayed and not reward.afk then
 		profile.lastMatchDay = today
 	end
+	-- lifetime stats: an AFK match isn't a match played; a leave and then Results add each capture once
 	local lifetime = profile.stats
-	if reward.stayed then
+	if reward.stayed and not reward.afk then
 		lifetime.matches += 1
 		if reward.placement == 1 then
 			lifetime.wins += 1
 		end
 	end
-	lifetime.provincesTaken += stats.provincesTaken
-	lifetime.battlesWon += stats.battlesWon
-	lifetime.powersUsed += stats.powersUsed
+	lifetime.provincesTaken += stats.provincesTaken - stats.paidProvinces
+	lifetime.battlesWon += stats.battlesWon - stats.paidBattles
+	lifetime.powersUsed += stats.powersUsed - stats.paidPowers
+	stats.paidProvinces, stats.paidBattles, stats.paidPowers = stats.provincesTaken, stats.battlesWon, stats.powersUsed
 	return { reward = full, before = before, after = Progression.summary(profile) }
 end
 

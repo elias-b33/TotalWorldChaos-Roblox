@@ -34,9 +34,14 @@ local getState: () -> Types.MatchState?
 local nationOf: (Player) -> number?
 local shopRemote: RemoteEvent
 local vipCache: { [Player]: boolean } = {}
+local vipChecked: { [Player]: boolean } = {} -- the join check (checkVip) has finished
 local offered: { [Player]: boolean } = {} -- the starter pack was offered this session
 local lastEmote: { [Player]: number } = {} -- match tick of the player's last emote
 local emoteMatch: Types.MatchState? = nil -- the match those ticks belong to
+
+local VIP_WAIT_SECONDS = 15 -- how long a reward waits for a joining player's VIP check
+local PASS_CHECK_TRIES = 3 -- UserOwnsGamePassAsync attempts after a pass purchase
+local PASS_CHECK_RETRY_SECONDS = 2
 
 local function testMode(): boolean
 	return RunService:IsStudio() and Catalogue.hasPlaceholders()
@@ -44,6 +49,24 @@ end
 
 function ShopService.isVip(player: Player): boolean
 	return vipCache[player] == true
+end
+
+-- isVip once the player's join check has finished (waits for it, up to VIP_WAIT_SECONDS): for a reward paid as
+-- soon as a profile loads, which can run before the check.
+function ShopService.awaitVip(player: Player): boolean
+	local deadline = os.clock() + VIP_WAIT_SECONDS
+	while not vipChecked[player] and player.Parent == Players and os.clock() < deadline do
+		task.wait()
+	end
+	return ShopService.isVip(player)
+end
+
+-- Does Roblox say the player owns the VIP pass? nil if the check failed.
+local function ownsPass(player: Player): boolean?
+	local ok, owns = pcall(function()
+		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, Catalogue.VIP_PASS_ID)
+	end)
+	return if ok then owns == true else nil
 end
 
 local function sendView(player: Player, starterOffer: boolean?)
@@ -55,18 +78,27 @@ local function sendView(player: Player, starterOffer: boolean?)
 	shopRemote:FireClient(player, Shop.view(data, ShopService.isVip(player), open, starterOffer == true, testMode()))
 end
 
--- VIP: the game pass from Roblox, or (Studio test mode only, while the pass id is 0) the saved test purchase.
+-- VIP: the game pass from Roblox, or (Studio test mode only, while the pass id is 0) the saved test purchase. If
+-- Roblox can't be asked, the saved ownership (an in-game purchase, or an earlier check that said yes) counts.
 local function checkVip(player: Player, data: Types.PlayerProfile)
 	local vip = vipCache[player] == true
 	if Catalogue.VIP_PASS_ID ~= 0 then
-		local ok, owns = pcall(function()
-			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, Catalogue.VIP_PASS_ID)
-		end)
-		vip = vip or (ok and owns == true)
+		local owns = ownsPass(player)
+		if owns == nil then
+			vip = vip or data.owned.vip == true
+		elseif owns then
+			vip = true
+			if not data.owned.vip then
+				PlayerDataService.edit(player, function(profile) -- remembered for a check that fails later
+					profile.owned.vip = true
+				end)
+			end
+		end
 	elseif RunService:IsStudio() then
 		vip = vip or data.owned.vip == true
 	end
 	vipCache[player] = vip
+	vipChecked[player] = true
 	player:SetAttribute("Vip", vip) -- for the [VIP] chat tag on every client
 	sendView(player)
 end
@@ -186,20 +218,25 @@ local function applyIntent(player: Player, intent: Types.ShopIntent): (boolean, 
 		return buyRobux(player, intent.item)
 	elseif intent.kind == "DefaultTheme" then
 		local on = intent.on
-		local saved = PlayerDataService.update(player, function(data)
+		local changed = PlayerDataService.edit(player, function(data) -- a setting: saved with the autosave
 			Shop.setDefaultTheme(data, on)
 			return true
 		end)
 		sendView(player)
-		return saved ~= nil, if saved then nil else "NotLoaded"
+		return changed ~= nil, if changed then nil else "NotLoaded"
 	else
 		return emote(player, intent.item)
 	end
+	-- a refused request changes nothing and writes nothing; an equip rides on the autosave and the final save;
+	-- Glory spent is saved at once
 	local apply = rule :: (Types.PlayerProfile, string, boolean) -> (boolean, string?)
-	local result = PlayerDataService.update(player, function(data)
+	local result = PlayerDataService.edit(player, function(data)
 		local ok, reason = apply(data, intent.item, vip)
 		return { ok = ok, reason = reason }
 	end)
+	if result and result.ok and intent.kind == "Buy" then
+		PlayerDataService.save(player)
+	end
 	sendView(player)
 	if result == nil then
 		return false, "NotLoaded"
@@ -248,7 +285,9 @@ end
 function ShopService.onPhase(phase: string)
 	for _, player in Players:GetPlayers() do
 		local data = PlayerDataService.data(player)
-		local offer = data ~= nil and Shop.robuxOpen(phase) and Shop.shouldOfferStarter(data, offered[player] == true)
+		local offer = data ~= nil
+			and Shop.robuxOpen(phase)
+			and Shop.shouldOfferStarter(data, offered[player] == true, ShopService.isVip(player))
 		if offer then
 			offered[player] = true
 			TelemetryService.starterOffered(player) -- analytics
@@ -268,16 +307,38 @@ function ShopService.init(
 	shopRemote = Remotes.event("Shop")
 	MarketplaceService.ProcessReceipt = onReceipt
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, passId: number, bought: boolean)
-		if bought and passId == Catalogue.VIP_PASS_ID and passId ~= 0 then
-			ShopService.receipt(passReceipt(player, passId), "vip")
+		if not (bought and passId == Catalogue.VIP_PASS_ID and passId ~= 0) then
+			return
+		end
+		-- Roblox's word for it before granting (a pass bought here shows at once)
+		for try = 1, PASS_CHECK_TRIES do
+			local owns = ownsPass(player)
+			if owns then
+				ShopService.receipt(passReceipt(player, passId), "vip")
+				return
+			elseif owns == false or try == PASS_CHECK_TRIES or player.Parent ~= Players then
+				warn(
+					string.format(
+						"[shop] %s: VIP purchase finished but not confirmed (checked on next join)",
+						player.Name
+					)
+				)
+				return
+			end
+			task.wait(PASS_CHECK_RETRY_SECONDS)
 		end
 	end)
 	PlayerDataService.onLoaded(checkVip)
 	CommandRouter.onShop(ShopService.apply)
 	Players.PlayerRemoving:Connect(function(player)
-		vipCache[player] = nil
 		offered[player] = nil
 		lastEmote[player] = nil
+		-- after every PlayerRemoving handler: the leaver's prorated reward (PlayerDataService's leave hooks) still
+		-- reads their VIP, whichever handler Roblox runs first
+		task.defer(function()
+			vipCache[player] = nil
+			vipChecked[player] = nil
+		end)
 	end)
 end
 

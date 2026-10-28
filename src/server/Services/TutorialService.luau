@@ -4,7 +4,9 @@
 -- tutorial is teleported to a fresh reserved server, which plays the tutorial match (the player and Easy bots, the
 -- Lobby skipped) and sends them back to a public server when it ends or when they skip it.
 -- In Studio (and the harness) teleports can't run: set a "Tutorial" attribute on Workspace to start the tutorial
--- match straight away instead.
+-- match straight away instead. Private servers never send anyone to the tutorial (friends stay together).
+-- A teleport back that fails is tried again (Config.Tutorial.TeleportRetries); a player on their way out is never
+-- seated in the next tutorial match, and keeps a "🌍 Play online" button to try again.
 -- Thin wrapper: the rules are in Shared.Sim.Tutorial; the teleports are the two small functions at the top.
 
 local Players = game:GetService("Players")
@@ -22,7 +24,9 @@ local Types = require(Shared.Types)
 
 local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
+local MatchService = require(script.Parent.MatchService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local Replicator = require(Server.Replicator)
 local TelemetryService = require(script.Parent.TelemetryService)
 
 local TutorialService = {}
@@ -33,12 +37,16 @@ local remote: RemoteEvent
 local sent: { [Player]: string } = {} -- the last view each player was sent, to send only changes
 local counts = { started = 0, finished = 0, skipped = 0 } -- printed for Studio tests; analytics go through TelemetryService
 local seatedAt = 0 -- os.clock() when the tutorial player sat down (match ticks jump when Peace ends early)
+local sentAway: { [Player]: number } = {} -- sent back to a public server -> teleport tries in this round
+local flying: { [Player]: boolean } = {} -- a teleport back is on its way (until it fails)
 
 -- Teleports -------------------------------------------------------------------------------------------------
 
 local function canTeleport(): boolean
 	return not RunService:IsStudio() -- Studio and the harness can't teleport
 end
+
+local retry: (Player) -> () -- below
 
 -- Send players to a fresh reserved server of this place (the tutorial), or back to a public one.
 local function teleport(players: { Player }, toTutorial: boolean)
@@ -49,6 +57,12 @@ local function teleport(players: { Player }, toTutorial: boolean)
 		print(string.format("[tutorial] no teleports in Studio: %d player(s) stay here", #players))
 		return
 	end
+	if not toTutorial then
+		for _, player in players do
+			sentAway[player] = (sentAway[player] or 0) + 1
+			flying[player] = true
+		end
+	end
 	task.spawn(function()
 		local ok, err = pcall(function()
 			local options = Instance.new("TeleportOptions")
@@ -58,8 +72,38 @@ local function teleport(players: { Player }, toTutorial: boolean)
 		end)
 		if not ok then
 			warn("[tutorial] teleport failed: " .. tostring(err))
+			if not toTutorial then
+				for _, player in players do
+					retry(player)
+				end
+			end
 		end
 	end)
+end
+
+-- A teleport back to a public server failed: try again a few times, then leave it to the 🌍 Play online button.
+retry = function(player: Player)
+	local tries = sentAway[player]
+	flying[player] = nil
+	if tries == nil or player.Parent ~= Players then
+		return
+	end
+	if tries > Config.Tutorial.TeleportRetries then
+		sentAway[player] = 0 -- the button starts a new round of tries
+		Replicator.notify(player, "Tutorial", "🌍 No public server yet. Tap 🌍 Play online to try again")
+		return
+	end
+	Replicator.notify(player, "Tutorial", "🌍 Teleport failed, trying again…")
+	task.delay(Config.Tutorial.TeleportRetrySeconds, function()
+		if sentAway[player] and not flying[player] and player.Parent == Players then
+			teleport({ player }, false)
+		end
+	end)
+end
+
+-- Can a player who skipped or finished leave for a public server from here?
+local function canLeave(): boolean
+	return TutorialService.enabled() and canTeleport()
 end
 
 -- Is this a tutorial server? Workspace "Tutorial" in Studio; online, a reserved server (no private-server owner):
@@ -72,6 +116,32 @@ function TutorialService.enabled(): boolean
 		return game.PrivateServerId ~= "" and game.PrivateServerOwnerId == 0
 	end)
 	return ok and reserved == true
+end
+
+local function markDone(player: Player)
+	local data = PlayerDataService.data(player)
+	if data and not data.tutorialDone then
+		PlayerDataService.update(player, function(profile)
+			profile.tutorialDone = true
+		end)
+	end
+end
+
+local function sendView(player: Player, view: Types.TutorialView?)
+	local key = if view
+		then string.format("%d:%d:%d:%d:%s", view.step, view.total, view.province, view.nation, tostring(view.canLeave))
+		else "none"
+	if sent[player] ~= key then
+		sent[player] = key
+		remote:FireClient(player, view)
+	end
+end
+
+-- The player's prompt card, with whether they can leave for a public server.
+local function viewOf(s: Types.MatchState, t: Types.TutorialState): Types.TutorialView
+	local view = Tutorial.view(s, t)
+	view.canLeave = canLeave()
+	return view
 end
 
 -- The match ---------------------------------------------------------------------------------------------------
@@ -94,9 +164,22 @@ function TutorialService.start(newState: Types.MatchState)
 	print(string.format("[tutorial] tutorial match on %s", newState.mapId))
 end
 
+-- The next match isn't a tutorial (Studio: the Workspace "Tutorial" attribute was removed): forget the old one.
+function TutorialService.stop()
+	state = nil
+	tut = nil
+	table.clear(sent)
+end
+
+-- A tutorial match seats its player in the tutorial nation; a player already sent back to a public server sits
+-- out (a fresh tutorial would start its prompts again) with only the 🌍 Play online button.
 function TutorialService.seat(player: Player): number?
 	local s, t = state, tut
 	if s == nil or t == nil then
+		return nil
+	end
+	if sentAway[player] then
+		sendView(player, { step = 0, total = #Tutorial.STEPS, province = 0, nation = 0, canLeave = canLeave() })
 		return nil
 	end
 	local nationId = Tutorial.seat(s, t, player.UserId)
@@ -120,22 +203,6 @@ local function tutorialPlayer(): Player?
 		end
 	end
 	return nil
-end
-
-local function markDone(player: Player)
-	PlayerDataService.update(player, function(data)
-		data.tutorialDone = true
-	end)
-end
-
-local function sendView(player: Player, view: Types.TutorialView?)
-	local key = if view
-		then string.format("%d:%d:%d:%d:%s", view.step, view.total, view.province, view.nation, tostring(view.canLeave))
-		else "none"
-	if sent[player] ~= key then
-		sent[player] = key
-		remote:FireClient(player, view)
-	end
 end
 
 -- After every tick: the next prompt once this one is done, the bots' part, and the player's view.
@@ -168,20 +235,28 @@ function TutorialService.afterTick(s: Types.MatchState)
 		CommandRouter.submitForBot(order.nation, order.command)
 	end
 	if player then
-		local view = Tutorial.view(s, t)
-		view.canLeave = TutorialService.enabled() and canTeleport()
-		sendView(player, view)
+		sendView(player, viewOf(s, t))
 	end
 end
 
--- The tutorial match is over: back to a public server (in Studio, the next tutorial match starts here).
+-- The tutorial match is over: it counts as the tutorial done (finished or not, so nobody comes back to it on every
+-- join), then back to a public server (in Studio, the next tutorial match starts here).
 function TutorialService.matchOver()
 	if tut then
+		for _, player in Players:GetPlayers() do
+			markDone(player)
+		end
 		teleport(Players:GetPlayers(), false)
 	end
 end
 
 local function onRequest(player: Player, action: string)
+	if action == "Leave" and sentAway[player] then
+		if not flying[player] then
+			teleport({ player }, false) -- the 🌍 Play online button after a teleport that failed
+		end
+		return
+	end
 	local s, t = state, tut
 	if s == nil or t == nil or Match.nationOf(s, player.UserId) ~= t.slot then
 		return
@@ -199,7 +274,7 @@ local function onRequest(player: Player, action: string)
 			)
 		)
 		markDone(player)
-		sendView(player, Tutorial.view(s, t))
+		sendView(player, viewOf(s, t))
 		teleport({ player }, false)
 	elseif action == "Leave" and (t.skipped or Tutorial.finished(t)) then
 		teleport({ player }, false)
@@ -215,15 +290,23 @@ function TutorialService.init()
 			Tutorial.recordCommand(t, command, ok)
 		end
 	end)
-	-- a public server sends players who haven't played the tutorial to one
+	-- a public server sends players who haven't played the tutorial (or any match) to one; a private server doesn't
 	PlayerDataService.onLoaded(function(player, data)
-		if not data.tutorialDone and not TutorialService.enabled() then
+		if Tutorial.needed(data) and not TutorialService.enabled() and not MatchService.isPrivate() then
 			print(string.format("[tutorial] %s is new: off to the tutorial", player.Name))
 			teleport({ player }, true)
 		end
 	end)
+	TeleportService.TeleportInitFailed:Connect(function(player: Player, result: Enum.TeleportResult, message: string)
+		if sentAway[player] then
+			warn(string.format("[tutorial] teleport for %s failed: %s %s", player.Name, tostring(result), message))
+			retry(player)
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		sent[player] = nil
+		sentAway[player] = nil
+		flying[player] = nil
 	end)
 end
 

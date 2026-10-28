@@ -79,6 +79,7 @@ function Match.new(map: MapDef, setup: Types.MatchSetup?): MatchState
 		primordials = {},
 		seats = {},
 		nextArmyId = 1,
+		mergedInto = {},
 		battles = {},
 		offers = {},
 		events = {},

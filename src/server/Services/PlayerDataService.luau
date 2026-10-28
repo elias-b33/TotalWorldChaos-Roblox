@@ -4,14 +4,18 @@
 -- rewards. Thin wrapper: the profile's shape and every rule are in Shared.Sim.Progression.
 --
 -- Session lock: only one server at a time can hold a profile; a second server waits, then takes it over and the
--- first one ends its session (and kicks the player there). Autosave every 5 minutes, a save after every reward,
--- and a final save on leave and on shutdown are ProfileStore's. The leave hooks run once per session: when the
--- player leaves, or just before the final save if the server shuts down first.
+-- first one ends its session (and kicks the player there). Autosave every 5 minutes and a final save on leave and
+-- on shutdown are ProfileStore's; rewards, Glory purchases and receipts also save at once (update), while equips
+-- and settings ride on the autosave (edit), so a flood of shop requests never floods the DataStore. The leave
+-- hooks run once per session: when the player leaves, or just before the final save if the server shuts down first.
 -- Without DataStore access (Studio with "Enable Studio Access to API Services" off) ProfileStore switches to its
--- in-memory mock store by itself: everything works, nothing outlives the test. The harness emulates DataStoreService.
+-- in-memory mock store by itself: everything works, nothing outlives the test. With it on, Studio saves go to their
+-- own store (STUDIO_STORE_NAME), so free test purchases and test history never reach live servers. The harness
+-- emulates DataStoreService (as Studio).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
@@ -24,15 +28,20 @@ local ProfileStore = require(script.Parent.Parent.Packages.ProfileStore)
 type Data = Types.PlayerProfile
 type Profile = ProfileStore.Profile<Data>
 
-local STORE_NAME = "PlayerData"
+local LIVE_STORE_NAME = "PlayerData"
+local STUDIO_STORE_NAME = "PlayerData_Studio" -- Studio (with API access) never reads or writes the live saves
 local KEY_PREFIX = "Player_"
 local MAX_RECEIPTS = 200 -- receipts and purchase history keep the newest this many
 local LOAD_FAILED = "Your save couldn't be loaded. Please rejoin in a minute."
 local SESSION_TAKEN = "Your save was opened on another server. Please rejoin."
+local RECEIPT_WAIT_SECONDS = 60 -- how long a receipt waits for a joining player's profile (a session steal takes ~40)
 
 local PlayerDataService = {}
 
-local store = ProfileStore.New(STORE_NAME, Progression.newProfile())
+PlayerDataService.STORE_NAME = if RunService:IsStudio() then STUDIO_STORE_NAME else LIVE_STORE_NAME
+PlayerDataService.KEY_PREFIX = KEY_PREFIX
+
+local store = ProfileStore.New(PlayerDataService.STORE_NAME, Progression.newProfile())
 local profiles: { [Player]: Profile } = {}
 local leaveHooks: { (Player, Data) -> () } = {}
 local loadHooks: { (Player, Data) -> () } = {}
@@ -129,8 +138,29 @@ function PlayerDataService.data(player: Player): Data?
 	return if profile then profile.Data else nil
 end
 
--- Change a loaded profile, save it now and send the player their new summary. Returns what `change` returned,
--- or nil if the profile isn't loaded.
+-- Change a loaded profile without saving now and send the player their new summary: for changes that can wait
+-- for the autosave and the final save on leave (equips, settings). Returns what `change` returned, or nil if the
+-- profile isn't loaded.
+function PlayerDataService.edit<T>(player: Player, change: (Data) -> T): T?
+	local profile = profiles[player]
+	if profile == nil or not profile:IsActive() then
+		return nil
+	end
+	local result = change(profile.Data)
+	sendSummary(player, profile.Data)
+	return result
+end
+
+-- Save a loaded profile now (ProfileStore queues it after any save already on its way).
+function PlayerDataService.save(player: Player)
+	local profile = profiles[player]
+	if profile and profile:IsActive() then
+		profile:Save()
+	end
+end
+
+-- Change a loaded profile, save it now and send the player their new summary: for what must not be lost (match
+-- rewards, Glory spent). Returns what `change` returned, or nil if the profile isn't loaded.
 function PlayerDataService.update<T>(player: Player, change: (Data) -> T): T?
 	local profile = profiles[player]
 	if profile == nil or not profile:IsActive() then
@@ -172,9 +202,16 @@ end
 -- The ProcessReceipt hook for developer products: ShopService's MarketplaceService.ProcessReceipt calls this with
 -- the catalogue item or offer the product sells and its grant function. Grants each purchase id once, records it
 -- in the purchase history, and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
+-- Roblox retries an unfinished purchase when the player joins, while their profile is still loading: the receipt
+-- waits for it (while they stay, up to RECEIPT_WAIT_SECONDS) instead of putting the item off to the next session.
 function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Data) -> ()): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	local profile = if player then profiles[player] else nil
+	local deadline = os.clock() + RECEIPT_WAIT_SECONDS
+	while profile == nil and player and player.Parent == Players and os.clock() < deadline do
+		task.wait()
+		profile = profiles[player]
+	end
 	if profile == nil then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
