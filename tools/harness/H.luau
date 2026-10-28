@@ -283,7 +283,6 @@ end
 H.OUT = OUT
 H.PRIVATE_OWNER = PRIVATE_OWNER
 H.shown = shown
-H.within = within
 H.hasIcon = hasIcon
 
 return H
