@@ -32,6 +32,7 @@ local EVENTS = {
 	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
 	"RequestSandbox", -- sandbox: "Enter" map | "Leave" | "Speed" n | "Play" nation | "Disasters" on | "NewWorld" map
 	"RequestMenu", -- the start menu: "Online" (join this server's matches) | "Tutorial" (off to a tutorial)
+	"RequestPreference", -- a saved preference (Sim.Preferences): key, value ("music" | "sounds", boolean)
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"Menu", -- show (true) or close (false) your start menu

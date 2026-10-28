@@ -12,7 +12,7 @@
 --   SeasonPass funnel  ready (TelemetryService.seasonPass), unused until the season pass exists
 --   Economy            Glory sources (match_reward, level_up) and sinks (shop items); Robux IAP sinks
 --   Progression        AccountLevel (Complete for each level passed, Start for the new one); SeasonTier ready
---   Custom events      the 21 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
+--   Custom events      the 22 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
 --                      sandbox_started and the economy
 --
 -- AnalyticsService only accepts events from servers of a published game: in Studio the calls go nowhere. Set a
@@ -31,6 +31,7 @@ local Catalogue = require(Shared.Catalogue)
 local Config = require(Shared.Config)
 local Maps = require(Shared.Maps)
 local Match = require(Shared.Sim.Match)
+local Preferences = require(Shared.Sim.Preferences)
 local Telemetry = require(Shared.Sim.Telemetry)
 local Tutorial = require(Shared.Sim.Tutorial)
 local Types = require(Shared.Types)
@@ -233,6 +234,14 @@ function TelemetryService.firstPick(lobby: Types.LobbyState, mapId: string)
 			onboard(player, "map_voted")
 		end
 	end
+end
+
+-- A speaker toggle changed (Sim.Preferences "music" or "sounds"): music_setting with both toggles and what the
+-- server was doing.
+function TelemetryService.musicSetting(player: Player, data: Types.PlayerProfile)
+	local music = Preferences.get(data, "music") == true
+	local sounds = Preferences.get(data, "sounds") == true
+	TelemetryService.send(Telemetry.musicSetting(music, sounds, menuWhere(), player.UserId), player)
 end
 
 -- MatchFlow -----------------------------------------------------------------------------------------------------
@@ -523,6 +532,11 @@ function TelemetryService.init()
 		lastCommand[player.UserId] = state.tick
 		if ok and command.kind == "Power" then
 			TelemetryService.send(Telemetry.powerUsed(state, player.UserId, command.power), player)
+		end
+	end)
+	PlayerDataService.onPreference(function(player: Player, key: string, data: Types.PlayerProfile)
+		if key == "music" or key == "sounds" then
+			TelemetryService.musicSetting(player, data)
 		end
 	end)
 	PlayerDataService.onLoaded(function(player: Player, data: Types.PlayerProfile)

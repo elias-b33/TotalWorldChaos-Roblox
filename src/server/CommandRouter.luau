@@ -30,6 +30,7 @@ type LobbyPending = { player: Player, requestId: number, intent: Types.LobbyInte
 local BUILDINGS = { Farm = true, Barracks = true, Fort = true }
 local MAX_MAP_ID = 32 -- longest map id a vote may name (the map list itself is checked by Sim.Lobby)
 local MAX_SETTING = 16 -- longest setting key or string value (the values themselves are checked by Sim.Settings)
+local MAX_PREFERENCE = 24 -- longest preference key or string value (the keys and values: Sim.Preferences)
 local DIPLOMACY_ACTIONS = { War = true, Ally = true, AcceptAlly = true, Peace = true, AcceptPeace = true }
 
 local CommandRouter = {}
@@ -441,6 +442,35 @@ function CommandRouter.onMenu(handler: (Player, Types.MenuAction) -> (boolean, s
 			reply(player, id, ok, reason)
 		end
 	end)
+end
+
+-- Saved preferences (Sim.Preferences: the speaker's Music and Sounds toggles): a short key and a boolean, a whole
+-- number or a short string. The shape and the rate limit are checked here, then `handler` (PlayerDataService, which
+-- checks the key and the value with Sim.Preferences) runs at once. The player gets CommandResult with its answer.
+function CommandRouter.onPreference(handler: (Player, string, boolean | number | string) -> (boolean, string?))
+	Remotes.event("RequestPreference").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, key: unknown, value: unknown)
+			if not isId(requestId) then
+				return
+			end
+			local id = requestId :: number
+			local shaped = type(key) == "string"
+				and #key > 0
+				and #key <= MAX_PREFERENCE
+				and (
+					type(value) == "boolean"
+					or (type(value) == "number" and value == math.floor(value) and math.abs(value) < 2 ^ 31)
+					or (type(value) == "string" and #value <= MAX_PREFERENCE)
+				)
+			if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+				reply(player, id, false, "TooFast")
+			elseif not shaped then
+				reply(player, id, false, "BadRequest")
+			else
+				local ok, reason = handler(player, key :: string, value :: boolean | number | string)
+				reply(player, id, ok, reason)
+			end
+		end)
 end
 
 -- Rewarded video requests (the placement name, at most MAX_ITEM_ID long): the shape and the rate limit are checked

@@ -235,6 +235,17 @@ T.test("first_pick: the seconds the chooser took, the map, picked or timeout", f
 	T.equal(Telemetry.firstPick(Lobby.new(Maps.ids, nil), "earth"), nil, "a vote logs map_vote instead")
 end)
 
+T.test("music_setting: both speaker toggles and what the server was doing", function()
+	local e = Telemetry.musicSetting(false, true, "match", 101)
+	T.equal(e.kind, "Custom")
+	T.equal(e.name, "music_setting")
+	T.equal(e.value, 1)
+	T.equal(e.userId, 101)
+	T.equal(table.concat(e.fields, ","), "off,on,match")
+	T.equal(table.concat(Telemetry.musicSetting(true, false, "lobby", 101).fields, ","), "on,off,lobby")
+	T.expect(Telemetry.sandboxAllows(e) == false, "a sandbox server doesn't send it")
+end)
+
 -- Economy and progression --------------------------------------------------------------------------------------------
 
 T.test("a reward with a level-up: two Glory sources with their balances, and AccountLevel progress", function()
