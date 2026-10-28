@@ -1,9 +1,10 @@
 --!strict
 -- Bottom sheet while a fleet is selected (docs/DESIGN.md "Navies", Controls): tap your fleet, then a sea zone to sail
 -- there or a coastal province to land the men aboard there, see the route and its time, tap Sail or Land. Someone
--- else's fleet shows the same facts without orders. Built from the UI kit like ArmySheet: a title with the ships and
--- their zone, chips (the owner when it isn't you, the men aboard out of the room, the troops aboard), a hint line
--- with an icon, and the buttons.
+-- else's fleet shows the same facts without orders. Built from the UI kit like ArmySheet (docs/UI_DIRECTION.md 7.10):
+-- the ships and their zone on a title plate, chips (the owner when it isn't you, the men aboard out of the room, each
+-- troop type aboard as its icon and men), the route line (an icon, where to, the sailing time dimmer) and Sail or
+-- Land (emerald) beside Cancel (slate).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,8 +23,12 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local SHEET_WIDTH = 444
-local CHIP_HEIGHT = 26
-local MAX_TROOP_CHIPS = 2 -- troop types aboard shown as chips (the sheet stays one row wide on a phone)
+local CHIP_HEIGHT = Theme.size.chip
+local BUTTON_WIDTH = 200 -- Sail or Land and Cancel side by side fill the sheet
+local LINE_HEIGHT = 22
+-- troop types aboard shown as chips, so the row stays one row on a phone: three beside the men aboard, two when the
+-- owner's chip is there too
+local MAX_TROOP_CHIPS = 3
 
 -- What the player is about to order: sail to a zone, or sail to a zone off a coast and land there.
 export type Order =
@@ -37,6 +42,7 @@ local title: TextLabel
 local chips: Frame
 local hint: TextLabel
 local hintIcon: GuiObject
+local sail: TextLabel -- "·  12 s sail", dimmer, after the destination
 local buttons: Frame
 local current: { fleet: number, order: Order? }? = nil
 local onConfirm: ((number, Order) -> ())? = nil
@@ -94,8 +100,8 @@ local function render()
 	local aboard = chip("manpower", string.format("%s / %s aboard", shortMen(fleet.men), shortMen(capacity)))
 	aboard.Name = "Aboard"
 	for i, part in RaceInfo.composition(fleet.troops) do
-		if i <= MAX_TROOP_CHIPS then
-			local c = chip(RaceInfo.troopIcon(part.troop), shortMen(part.men) .. " " .. RaceInfo.troopName(part.troop))
+		if i <= MAX_TROOP_CHIPS - (if mine then 0 else 1) then
+			local c = chip(RaceInfo.troopIcon(part.troop), shortMen(part.men))
 			c.Name = "Troop_" .. part.troop
 		end
 	end
@@ -103,6 +109,7 @@ local function render()
 	Widgets.clear(buttons)
 	local order = sel.order
 	local icon = "ship"
+	sail.Visible = false
 	if fleet.retreating then
 		hint.Text = string.format("Retreating to %s: no orders till it arrives", zoneName(fleet.dest))
 		icon = "retreat"
@@ -110,13 +117,15 @@ local function render()
 		local fleetId = sel.fleet
 		local seconds = Relations.sailTime(order.path, fleet)
 		if order.kind == "Sail" then
-			hint.Text = string.format("%s  ·  %d s sail", zoneName(order.zone), seconds)
+			hint.Text = zoneName(order.zone)
 		else
-			hint.Text = string.format("Land at %s  ·  %d s sail", map.provinces[order.province].name, seconds)
+			hint.Text = "Land at " .. map.provinces[order.province].name
 		end
+		sail.Text = string.format("·  %d s sail", seconds)
+		sail.Visible = true
 		icon = "clock"
 		local verb = if order.kind == "Sail" then "Sail" else "Land"
-		Widgets.iconTextButton(buttons, "check", verb, 120, Widgets.GOOD, function()
+		Widgets.iconTextButton(buttons, "check", verb, BUTTON_WIDTH, Widgets.GOOD, function()
 			if onConfirm then
 				onConfirm(fleetId, order)
 			end
@@ -140,7 +149,8 @@ local function render()
 		icon = "flag"
 	end
 	Icons.set(hintIcon, icon)
-	Widgets.iconTextButton(buttons, "close", if mine then "Cancel" else "Close", 120, Widgets.BUTTON_OFF, function()
+	local close = if mine then "Cancel" else "Close"
+	Widgets.iconTextButton(buttons, "close", close, BUTTON_WIDTH, Widgets.BUTTON_OFF, function()
 		if onCancel then
 			onCancel()
 		end
@@ -175,9 +185,29 @@ function FleetSheet.init(confirmHandler: (number, Order) -> (), cancelHandler: (
 	chips.LayoutOrder = 2
 	chips.Parent = sheet
 	Widgets.list(chips, true, Theme.space.s)
-	hint = Widgets.label(sheet, "", Theme.text.body, 22)
-	hint.LayoutOrder = 3
+	-- the route line: an icon and where to (or what is going on), then the sailing time, dimmer
+	local route = Instance.new("Frame")
+	route.Name = "Route"
+	route.BackgroundTransparency = 1
+	route.Size = UDim2.new(1, 0, 0, LINE_HEIGHT)
+	route.LayoutOrder = 3
+	route.Parent = sheet
+	Widgets.list(route, true, Theme.space.s)
+	hint = Widgets.label(route, "", Theme.text.body, LINE_HEIGHT)
+	hint.Name = "Hint"
+	hint.Size = UDim2.fromOffset(0, LINE_HEIGHT)
+	hint.AutomaticSize = Enum.AutomaticSize.X
+	hint.TextWrapped = false
+	hint.LayoutOrder = 1
 	hintIcon = Widgets.leadIcon(hint, "ship", Theme.size.icon)
+	sail = Widgets.hint(route, "", Theme.text.body, LINE_HEIGHT)
+	sail.Name = "SailTime"
+	sail.FontFace = Theme.font.body
+	sail.Size = UDim2.fromOffset(0, LINE_HEIGHT)
+	sail.AutomaticSize = Enum.AutomaticSize.X
+	sail.TextWrapped = false
+	sail.LayoutOrder = 2
+	sail.Visible = false
 	buttons = Instance.new("Frame")
 	buttons.Name = "Buttons"
 	buttons.BackgroundTransparency = 1
