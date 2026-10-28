@@ -40,6 +40,13 @@ local TOKEN_EDGE = Color3.fromRGB(20, 20, 28) -- army token outline (selected: y
 local DOT_SPACING = 4 -- map pixels between the dots of a route or strait
 local PIXELATED_FROM = 1.5 -- zoom from which map pixels are drawn hard-edged (smooth below, so thin lines don't flicker)
 local PAINT_SLICE = 0.008 -- seconds of painting per frame while a map is painted for the first time
+-- The close-up detail (PixelArt.paintDetail): a second image laid over the part of the map in view when zoomed in.
+local DETAIL_FROM = 4 -- screen pixels per map pixel from which it shows (more if the screen is too big for it)
+local DETAIL_OFF = 0.85 -- it is freed again below this share of that zoom
+local DETAIL_WIDTH = 1024 -- its image's width; the height follows the screen's shape (at most 1024)
+local DETAIL_COVER = 0.8 -- the view fills at most this share of it, so a short pan stays inside it
+local DETAIL_SETTLE = 0.15 -- seconds the view keeps still before the close-up is repainted around it
+local DETAIL_SLICE = 0.006 -- seconds of close-up painting per frame
 local FLAG_WIDTH, FLAG_HEIGHT = 24, 18 -- a capital's 16×12 flag, screen pixels
 local EMOTE_SIZE = 26 -- capital emote icon, screen pixels
 local VICTORY_SIZE = 32 -- victory animation over a winner's capital
@@ -70,6 +77,14 @@ local grids: { [string]: MapGrid.Grid } = {} -- decoded grids by map id
 local arts: { [string]: PixelArt.Art } = {} -- painted maps by map id and resolution (one theme each), reused
 local painting: { map: Types.MapDef, grid: MapGrid.Grid }? = nil -- what the current map is painted from
 local warned = false
+local closeUp: PixelArt.Detail? = nil -- the close-up, its image and the label showing it (nil when zoomed out)
+local detailImage: EditableImage? = nil
+local detailLabel: ImageLabel? = nil
+local detailAllowed = false -- full resolution only, and not after the device refused the image
+local detailJob = 0 -- bumps with every close-up paint; a paint that is no longer the latest stops
+local detailBusy = false
+local viewKey = "" -- where the view was last frame, and how long it has stayed there
+local viewStill = 0
 local layers: { [string]: Frame } = {}
 local widths: { [number]: number } = {} -- each province's width in map pixels
 local namesLaidOut = { zoom = -1, detail = false }
@@ -236,6 +251,162 @@ local function imageFor(w: number, h: number): EditableImage?
 		return result
 	end
 	return nil
+end
+
+-- Send part of a painting to its image: only the changed rectangle (x0, y0, x1, y1), unless most of it changed.
+local function upload(editable: EditableImage, pixels: buffer, width: number, height: number, d: { number })
+	local x0, y0, x1, y1 = d[1], d[2], d[3], d[4]
+	local w, h = x1 - x0 + 1, y1 - y0 + 1
+	if w * h * 2 >= width * height then
+		editable:WritePixelsBuffer(Vector2.zero, Vector2.new(width, height), pixels)
+		return
+	end
+	local rect = buffer.create(w * h * 4)
+	for row = 0, h - 1 do
+		buffer.copy(rect, row * w * 4, pixels, ((y0 + row) * width + x0) * 4, w * 4)
+	end
+	editable:WritePixelsBuffer(Vector2.new(x0, y0), Vector2.new(w, h), rect)
+end
+
+local function viewportSize(): Vector2
+	local camera = workspace.CurrentCamera
+	return if camera then camera.ViewportSize else Vector2.new(800, 600)
+end
+
+-- The close-up's image size for this screen, and the zoom it shows from (where the screen fits well inside it).
+local function detailSize(vp: Vector2): (number, number)
+	local f = PixelArt.DETAIL.factor
+	local h = math.ceil(DETAIL_WIDTH * vp.Y / math.max(vp.X, 1) / f) * f
+	return DETAIL_WIDTH, math.clamp(h, 16 * f, 1024)
+end
+
+local function detailZoom(vp: Vector2): number
+	local w, h = detailSize(vp)
+	local f = PixelArt.DETAIL.factor
+	return math.max(DETAIL_FROM, vp.X / (w / f * DETAIL_COVER), vp.Y / (h / f * DETAIL_COVER))
+end
+
+-- Free the close-up and its image (zoomed out, a new map), so phones get the memory back right away.
+local function freeDetail()
+	detailJob += 1
+	detailBusy = false
+	closeUp = nil
+	if detailLabel then
+		detailLabel:Destroy()
+		detailLabel = nil
+	end
+	if detailImage then
+		detailImage:Destroy()
+		detailImage = nil
+	end
+end
+
+-- Paint the close-up around a map point, a few milliseconds per frame (the old one stays up meanwhile), then show it.
+local function startDetail(a: PixelArt.Art, vp: Vector2, centre: Vector2)
+	local w, h = detailSize(vp)
+	local d = closeUp
+	if d == nil or d.width ~= w or d.height ~= h then
+		freeDetail()
+		local ok, result = pcall(function()
+			return AssetService:CreateEditableImage({ Size = Vector2.new(w, h) })
+		end)
+		local imageLayer = layers.Image
+		if not ok or result == nil or imageLayer == nil then
+			detailAllowed = false -- the device can't spare it: the map stays as it is
+			return
+		end
+		detailImage = result
+		local label = Instance.new("ImageLabel")
+		label.Name = "Detail"
+		label.BackgroundTransparency = 1
+		label.ResampleMode = Enum.ResamplerMode.Pixelated
+		label.ZIndex = 2
+		label.Visible = false
+		label.ImageContent = Content.fromObject(result)
+		label.Parent = imageLayer
+		detailLabel = label
+		d = PixelArt.newDetail(w, h)
+		closeUp = d
+	end
+	local target = d :: PixelArt.Detail
+	local x0, y0 = PixelArt.detailOrigin(a, target, centre.X, centre.Y)
+	detailJob += 1
+	local job = detailJob
+	detailBusy = true
+	task.spawn(function()
+		local last = os.clock()
+		local ok = pcall(PixelArt.paintDetail, a, target, x0, y0, function()
+			if detailJob ~= job then
+				error("a newer close-up replaced this one")
+			end
+			if os.clock() - last > DETAIL_SLICE then
+				task.wait()
+				last = os.clock()
+			end
+		end)
+		if detailJob ~= job then
+			return
+		end
+		detailBusy = false
+		local editable, label = detailImage, detailLabel
+		if not ok or art ~= a or closeUp ~= target or editable == nil or label == nil then
+			return
+		end
+		PixelArt.takeDetailDirty(target)
+		editable:WritePixelsBuffer(Vector2.zero, Vector2.new(target.width, target.height), target.pixels)
+		label.Position = UDim2.fromScale(target.x0 / size.X, target.y0 / size.Y)
+		label.Size = UDim2.fromScale(target.cols / size.X, target.rows / size.Y)
+		label.Visible = true
+	end)
+end
+
+-- Once a frame: show the close-up when zoomed in far enough, repaint it when the view has settled somewhere it
+-- doesn't cover, catch it up with ownership and selection changes, and free it when zoomed out.
+local function stepDetail(dt: number)
+	local a = art
+	if a == nil or not detailAllowed or imageLabel == nil then
+		if detailImage then
+			freeDetail()
+		end
+		return
+	end
+	local vp = viewportSize()
+	local z = MapView.zoom()
+	if z < detailZoom(vp) * (if detailImage then DETAIL_OFF else 1) then
+		if detailImage then
+			freeDetail()
+		end
+		return
+	end
+	local p0, p1 = MapView.toMap(Vector2.zero), MapView.toMap(vp)
+	local key = string.format("%d,%d,%d", math.floor(p0.X), math.floor(p0.Y), math.floor(z * 50))
+	if key ~= viewKey then
+		viewKey, viewStill = key, 0
+	else
+		viewStill += dt
+	end
+	local d, label, editable = closeUp, detailLabel, detailImage
+	if d and label and editable and not detailBusy then
+		if d.painted ~= a then
+			label.Visible = false -- painted from an older painting (another theme)
+		elseif
+			math.max(p0.X, 0) >= d.x0
+			and math.max(p0.Y, 0) >= d.y0
+			and math.min(p1.X, a.width) <= d.x0 + d.cols
+			and math.min(p1.Y, a.height) <= d.y0 + d.rows
+		then
+			if PixelArt.syncDetail(a, d) then
+				local rect = PixelArt.takeDetailDirty(d)
+				if rect then
+					upload(editable, d.pixels, d.width, d.height, rect)
+				end
+			end
+			return
+		end
+	end
+	if not detailBusy and viewStill >= DETAIL_SETTLE then
+		startDetail(a, vp, (p0 + p1) / 2)
+	end
 end
 
 -- Owners and nation colours from the snapshot into the pixel art.
@@ -424,6 +595,7 @@ end
 
 local function build(map: Types.MapDef)
 	generation += 1
+	freeDetail()
 	labels = {}
 	markers = {}
 	effects = {}
@@ -446,6 +618,7 @@ local function build(map: Types.MapDef)
 		editable = imageFor(g.width, g.height)
 	end
 	grid = g
+	detailAllowed = g == full -- no close-up on a device that needs the half-size map
 	size = Vector2.new(g.width, g.height)
 	local canvas = MapView.create(size, Palette.background[map.theme] or Palette.background.earth)
 
@@ -812,21 +985,6 @@ function MapRenderer.selectArmy(armyId: number?)
 	end
 end
 
--- Send what changed in the pixel art to the image: only the changed rectangle, unless most of it changed.
-local function upload(editable: EditableImage, a: PixelArt.Art, d: { number })
-	local x0, y0, x1, y1 = d[1], d[2], d[3], d[4]
-	local w, h = x1 - x0 + 1, y1 - y0 + 1
-	if w * h * 2 >= a.width * a.height then
-		editable:WritePixelsBuffer(Vector2.zero, Vector2.new(a.width, a.height), a.pixels)
-		return
-	end
-	local rect = buffer.create(w * h * 4)
-	for row = 0, h - 1 do
-		buffer.copy(rect, row * w * 4, a.pixels, ((y0 + row) * a.width + x0) * 4, w * 4)
-	end
-	editable:WritePixelsBuffer(Vector2.new(x0, y0), Vector2.new(w, h), rect)
-end
-
 function MapRenderer.init()
 	MapView.onZoom(onZoom)
 	ClientState.onReset(function()
@@ -916,9 +1074,10 @@ function MapRenderer.init()
 		if editable and painted and imageLabel then
 			local d = PixelArt.takeDirty(painted)
 			if d then
-				upload(editable, painted, d)
+				upload(editable, painted.pixels, painted.width, painted.height, d)
 			end
 		end
+		stepDetail(dt)
 	end)
 end
 

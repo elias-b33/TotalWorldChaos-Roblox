@@ -5,6 +5,7 @@ Total World Chaos ships with three maps. All three play by the same rules in `DE
 | | Earth | Eldmoor | Skyshards |
 | --- | --- | --- | --- |
 | In game | ![Earth](images/pixel_earth.png) | ![Eldmoor](images/pixel_eldmoor.png) | ![Skyshards](images/pixel_skyshards.png) |
+| Zoomed in | ![Earth close-up](images/pixel_earth_closeup.png) | ![Eldmoor close-up](images/pixel_eldmoor_closeup.png) | ![Skyshards close-up](images/pixel_skyshards_closeup.png) |
 | Preview | ![Earth](images/map_earth.jpg) | ![Eldmoor](images/map_eldmoor.jpg) | ![Skyshards](images/map_skyshards.jpg) |
 | Idea | The real world, 1:1 coastlines | Fantasy continent around a rich heartland | A shattered world of floating islands |
 | Provinces | 150 (11 mountains) | 147 (11 mountains) | 131 (11 mountains) |
@@ -16,6 +17,7 @@ Total World Chaos ships with three maps. All three play by the same rules in `DE
 The pictures above show each map at the start of a match.
 
 - **In game:** the 2D pixel art the game paints. Rebuild it with `python3 tools/harness/paint_maps.py`.
+- **Zoomed in:** a piece of the close-up detail the map lays over the view when you zoom in (see "Art direction"), painted by the same script.
 - **Preview:** the generator's political view (nation colours, stars on capitals, grey neutral land), used for vote cards.
 
 ## Rules every map follows
@@ -131,8 +133,14 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 
 ## Art direction
 
-- **2D pixel art, like WorldBox.** One map pixel is one stud; trees, peaks, dunes and castles are little sprites a few pixels big, and the camera zooms in until pixels are chunky. Painted at runtime by `src/client/PixelArt.luau`.
-- **Map colour is power.** Owned provinces are washed with their nation's colour at 59% opacity over the terrain, WorldBox's kingdom overlay, so trees, ridges and specks still show through. Each nation has a 1-pixel border in its darker border colour. Neutral land shows its natural colours.
+- **2D pixel art, like WorldBox.** One map pixel is one stud; trees, peaks, dunes and castles are little sprites a few pixels big. Painted at runtime by `src/client/PixelArt.luau`, in two paintings:
+  - **The whole map**, one pixel per map pixel: what the zoomed-out and region views show.
+  - **The close-up**, laid over the part of the map in view once you zoom in past about 4 screen pixels per map pixel: the same map at 4 × 4 sub-pixels per map pixel, so zooming in shows more detail instead of bigger blocks, the way WorldBox draws each tile as a little 8×8 sprite.
+- **Textures, not noise.** Each biome's ground is a small hand-made 8×8 pattern (grass tufts, dry strokes, sand ripples, snow drifts, rock facets, jungle floor, ash cracks, crystal facets, goo bubbles, metal plates), several variants of it plus their mirror images picked per block by a hash, so nothing visibly repeats. The whole map uses them at one pixel per map pixel with soft colours; the close-up at full contrast, four times finer.
+- **Height and light.** A smooth elevation field gives each biome raised patches of its darker "high" variant, with a dark lip on their south side and a lit north edge, and every slope is a little lighter or darker by the light from the north-west. Mountains keep WorldBox's rock bands; in the close-up their faces are lit and shaded and the bands blend smoothly.
+- **Water.** Three depth bands measured with a round (chamfer) distance from land, darker lips where it gets deeper, a light foam line along the shores, a shadow under south shores and gentle staggered wave dashes on rough patches of open water. In the close-up the coast is smooth (a blurred land mask, so the grid's steps round off, while 1-pixel islands and straits stay), with beaches of dry and wet sand, white surf and foam.
+- **Close-up decorations.** Dense forests of shaded trees with shadows cast to the south-east, snowy pines, jungle canopies, acacias, palms, cacti, bushes, rocks, boulders, flowers, hill mounds, glowing crystals, storm towers; crop rows and bevelled, riveted hull plating on Skyshards, with glowing rims and plated hulls under its platforms; a detailed castle (a dome on Skyshards) flying the owner's flag.
+- **Map colour is power.** On the whole map, owned provinces are washed with their nation's colour at 59% opacity over the terrain, WorldBox's kingdom overlay, and each nation has a 1-pixel border in its darker border colour. In the close-up the wash is lighter (48%) so the terrain shows through, with a stronger band (70%) just inside the border and a crisp border line in the darker colour; thin lines separate provinces and the selected province gets a white outline. Neutral land shows its natural colours.
 - **WorldBox's colours.** The terrain uses WorldBox's tile colours, taken from the game's data:
   - Ocean in three depth bands: shallow `#55aef0`, close `#4084e2`, deep `#3370cc`. A `#2d61af` shadow line runs just south of land.
   - Beaches are `#f7e898`.
@@ -155,7 +163,7 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 
 ### Map themes
 
-Shop cosmetics that re-skin the terrain of any map (docs/MONETIZATION.md 3.2), painted by `PixelArt` in the same pixel style: `PixelArt.themeColor` recolours each terrain pixel before the kingdom overlay goes on, so nation colours, borders and castles never change, and armies, names and effects are drawn on top as always.
+Shop cosmetics that re-skin the terrain of any map (docs/MONETIZATION.md 3.2), painted by `PixelArt` in the same pixel style: `PixelArt.themeColor` recolours each terrain pixel (on the whole map and in the close-up) before the kingdom overlay goes on, so nation colours, borders and castles never change, and armies, names and effects are drawn on top as always.
 
 | Theme | Land | Sea / space | Extras |
 | --- | --- | --- | --- |

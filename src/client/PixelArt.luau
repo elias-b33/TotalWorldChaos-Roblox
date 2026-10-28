@@ -1,8 +1,13 @@
 --!strict
+--!native
 -- The 2D pixel-art map, painted pixel by pixel from the province grid in WorldBox's own colours (tile colours,
 -- tree icons, water depths, mountain bands and kingdom overlay taken from WorldBox's game data; see
--- docs/MAPS.md "The 2D pixel-art map"). Owned provinces get their nation's colour as a translucent wash with a
+-- docs/MAPS.md "Art direction"). Owned provinces get their nation's colour as a translucent wash with a
 -- 1-pixel border in the nation's darker colour, like kingdoms in WorldBox.
+-- Two paintings: the whole map at one pixel per map pixel (PixelArt.new; what the zoomed-out map shows), and a
+-- close-up detail of just the part in view at DETAIL_FACTOR × DETAIL_FACTOR sub-pixels per map pixel
+-- (PixelArt.paintDetail; laid over the map when zoomed in), with WorldBox-style tile patterns, smooth coasts and
+-- borders, shaded trees and a lighter kingdom wash.
 -- Pure Luau on buffers (no Roblox APIs), so the same code paints the map in the game and in Lune tests.
 -- Colours are packed 0xRRGGBB integers; `pixels` is RGBA bytes, ready for EditableImage:WritePixelsBuffer.
 
@@ -10,13 +15,14 @@ local PixelArt = {}
 
 export type Grid = { width: number, height: number, ids: buffer, scale: number }
 
-type Style = {
+export type Style = {
 	base: number,
 	light: number,
 	dark: number,
 	high: number?, -- patches of the tile's darker "high" variant, like WorldBox's elevation tiles
 	deco: string,
 	sprite: { [string]: number }?, -- colours of the decoration sprites
+	family: string, -- its ground pattern (STAMPS, or "rows" / "panels")
 }
 
 export type Art = {
@@ -37,9 +43,15 @@ export type Art = {
 	selected: number,
 	near: buffer, -- per pixel: which border checks it needs (NEAR_* bits), worked out once per map
 	dirty: { number }?, -- x0, y0, x1, y1 of what changed since the last takeDirty
+	biomes: { [number]: Style }, -- province id -> its biome's style
+	elevation: buffer, -- per pixel: ground elevation 0–255 (0 at sea); high ground starts at HIGH_AT
+	ridge: buffer, -- per pixel: mountain ridge height 0–255 (0 off the mountains)
+	level: buffer, -- per pixel: mountain rock band 1–4 (ROCK), 0 off the mountains
+	sea: buffer, -- per pixel: water's distance from land in SEA_UNITs (0 on land, at most 255)
+	changed: { [number]: boolean }, -- provinces repainted since the close-up detail last caught up
 }
 
--- Called now and then while painting a whole map, so a client can spread the work over several frames.
+-- Called now and then while painting, so a client can spread the work over several frames.
 export type Yield = () -> ()
 
 -- A nation's map cosmetics: the border pattern and the shade set of its wash (CosmeticArt art names, e.g.
@@ -54,7 +66,7 @@ local function style(
 	high: number?,
 	sprite: { [string]: number }?
 ): Style
-	return { base = base, light = light, dark = dark, deco = deco, high = high, sprite = sprite }
+	return { base = base, light = light, dark = dark, deco = deco, high = high, sprite = sprite, family = "grass" }
 end
 
 local FOREST_TREE = { L = 0x86bc4e, M = 0x65a13f, D = 0x3f6b3f, S = 0x304e32 }
@@ -98,10 +110,42 @@ local BIOMES: { [string]: Style } = {
 }
 local FALLBACK = BIOMES.grassland
 
+-- Each biome's ground pattern, WorldBox-style: a small hand-made tile (STAMPS) instead of random specks.
+local FAMILY: { [string]: string } = {
+	grassland = "grass",
+	steppe = "dry",
+	savanna = "dry",
+	tundra = "snow",
+	desert = "sand",
+	drylands = "dry",
+	forest = "grass",
+	jungle = "jungle",
+	taiga = "snow",
+	hills = "grass",
+	mountains = "rock",
+	ice = "snow",
+	meadow = "grass",
+	frostfields = "snow",
+	dunes = "sand",
+	wildwood = "grass",
+	highlands = "grass",
+	ashlands = "ash",
+	peaks = "rock",
+	skymeadow = "rows",
+	heartruins = "panels",
+	crystalgrove = "crystal",
+	crags = "goo",
+	stormspire = "metal",
+}
+for name, s in BIOMES do
+	s.family = FAMILY[name] or "grass"
+end
+
 local FLOWERS = { 0xc96b90, 0xd08651, 0xab81c0, 0xc7d8b4, 0xddb847, 0x7f9da9 }
 
 -- WorldBox's ocean: shallow, close and deep water, each flat, with darker lips where it gets deeper and a shadow
 -- line on water just south of land. Light comes from the top, so lips and shadows always fall on the south side.
+-- A light foam line runs along the other shores, and gentle wave dashes cross the open water.
 local SEA = {
 	shallow = 0x55aef0,
 	medium = 0x4084e2,
@@ -110,12 +154,17 @@ local SEA = {
 	mediumLip = 0x3c7cd1,
 	shallowWave = 0x63bcf1,
 	mediumWave = 0x488fe5,
+	deepWave = 0x3e7fd8,
 	shadow = 0x2d61af,
+	foam = 0x86cdf6,
+	surf = 0xd4f0fc, -- the close-up's foam right at the shore
 	beach = 0xf7e898,
+	wetSand = 0xe6d18c,
 	beachLip = 0xd8c08c,
 }
 local SHALLOW_TO = 2 -- water up to this many pixels from land is shallow
 local MEDIUM_TO = 6 -- then close ocean up to here, then deep ocean
+local SEA_UNIT = 3 -- Art.sea counts in thirds of a pixel (a chamfer distance: 3 per straight step, 4 per diagonal)
 
 -- Mountains, in WorldBox's rock tiles: hills rock with winding ridges of mountain rock, summit crests on the
 -- ridges and a few snow caps on the highest points. Each band has a dark lip on its south side; ridges are lit
@@ -130,6 +179,12 @@ local RIDGE_FROM = { 0, 0.5, 0.74, 0.88 } -- ridge height (0 to 1) where each ro
 local SNOW_PATCHES = 0.62 -- snow caps only where patch noise is above this, so most crests stay bare rock
 local RIDGE_FADE = 6 -- ridges rise over this many pixels from a mountain province's edge
 local RIDGE_SLOPE = 12 -- height change (of 255) across a pixel that counts as a lit or shaded slope
+
+-- Ground elevation (smooth noise, 0–255): high ground (a biome's "high" variant, with a dark lip on its south side
+-- and a lit north edge) from HIGH_AT up; and a gentle light from the north-west on every slope.
+local HIGH_AT = 153
+local SHADE_SLOPE = 14 -- elevation change across two diagonal pixels that counts as a lit or shaded slope
+local SHADE = { 1.07, 1, 0.93 } -- lit, flat, shaded
 
 -- Skyshards floats in space (WorldBox's night sky), on platforms with crystal-glow rims and iron hulls.
 local SPACE = { top = 0x05003f, bottom = 0x0e165b, star = 0xddfcff, grid = 0x152770, rim = 0x7cfbef, hull = 0x494949 }
@@ -201,12 +256,17 @@ local function mul32(a: number, b: number): number
 	return bit32.band(bit32.lshift(bit32.band(hi * b, 0xffff), 16) + lo * b, 0xffffffff)
 end
 
+-- A deterministic 32-bit hash of a pixel (or any two integers) and a salt.
+local function hash32(x: number, y: number, salt: number): number
+	local h = bit32.bxor(mul32(bit32.band(x, 0xffffffff), 0x27d4eb2d), mul32(bit32.band(y, 0xffffffff), 0x165667b1))
+	h = bit32.bxor(h, mul32(salt, 0x9e3779b1))
+	h = mul32(bit32.bxor(h, bit32.rshift(h, 15)), 0x85ebca6b)
+	return bit32.bxor(h, bit32.rshift(h, 13))
+end
+
 -- Deterministic noise in [0, 1) for a pixel.
 local function noise(x: number, y: number, salt: number): number
-	local h = bit32.bxor(mul32(x, 0x27d4eb2d), mul32(y, 0x165667b1), mul32(salt, 0x9e3779b1))
-	h = mul32(bit32.bxor(h, bit32.rshift(h, 15)), 0x85ebca6b)
-	h = bit32.bxor(h, bit32.rshift(h, 13))
-	return h / 4294967296
+	return hash32(x, y, salt) / 4294967296
 end
 
 ------------------------------------------------------------------------------------------------- cosmetics
@@ -323,6 +383,14 @@ function PixelArt.themeColor(theme: string, c: number, land: boolean, space: boo
 	return c
 end
 
+-- A terrain colour under a theme, with the rule both paintings share: in winter the shallows (and their foam) freeze.
+local function themed(theme: string, c: number, kind: number): number -- kind: 1 land, 2 sea, 3 space
+	if theme == "winter" and kind == 2 and (c == SEA.shallow or c == SEA.shallowWave or c == SEA.foam) then
+		return ICE
+	end
+	return PixelArt.themeColor(theme, c, kind == 1, kind == 3)
+end
+
 -- Recolour the painted terrain for a theme, plus a few per-pixel touches: village lights at night, snow
 -- sparkles and frozen shallows in winter.
 local function applyTheme(art: Art, theme: string, yield: Yield?)
@@ -343,11 +411,7 @@ local function applyTheme(art: Art, theme: string, yield: Yield?)
 			local kind = if land then 1 elseif sky then 3 else 2
 			local t = cache[kind][c]
 			if t == nil then
-				if theme == "winter" and kind == 2 and (c == SEA.shallow or c == SEA.shallowWave) then
-					t = ICE -- the shallows freeze
-				else
-					t = PixelArt.themeColor(theme, c, land, kind == 3)
-				end
+				t = themed(theme, c, kind)
 				cache[kind][c] = t
 			end
 			if land and theme == "night" and noise(x, y, 91) > NIGHT_LIGHTS then
@@ -382,6 +446,151 @@ local function smoothNoise(w: number, h: number, cell: number, salt: number): (n
 		local d = buffer.readf32(lattice, i + cols * 4 + 4)
 		return (a + (b - a) * fx) * (1 - fy) + (c + (d - c) * fx) * fy
 	end
+end
+
+------------------------------------------------------------------------------------------------- ground patterns
+
+-- WorldBox paints every tile with a small hand-made texture instead of noise. Ours: 8×8 stamps per pattern family
+-- (grass tufts, dry strokes, sand ripples, snow drifts, rock facets...), several variants each plus their mirror
+-- images, picked per 8×8 block by a hash so nothing visibly repeats. The whole map uses them at one pixel per map
+-- pixel; the close-up at one pixel per sub-pixel, so they come out 4× finer there.
+-- "." base, "l" light, "d" dark, "h" highlight, "s" shadow (palette indices 1–5).
+local STAMP_ROWS: { [string]: { { string } } } = {
+	grass = {
+		{ "........", ".l.l....", "..d.....", "......l.", ".....d..", "..h.....", "..d..l.l", "......d." },
+		{ "........", "....l...", "...d.l..", "........", "l.l.....", ".d......", ".....h..", ".....d.." },
+		{ "......l.", ".h...d..", ".d......", "....l.l.", ".....d..", "l.......", "d...h...", "....d..." },
+		{ "........", "..l.....", ".d.l....", "........", "......l.", ".....d.l", ".l......", ".d......" },
+	},
+	dry = {
+		{ "........", ".ll.....", "...d....", "......l.", ".....ld.", "........", "..d..ll.", "........" },
+		{ "....ll..", "......d.", "........", ".l......", ".dl.....", "........", "....d.ll", "........" },
+		{ "........", "...h....", "..ld....", "........", "......ll", ".d......", "........", "..ll...." },
+	},
+	sand = {
+		{ "........", "..lll...", ".l...dd.", "........", "........", "......ll", "........", "........" },
+		{ "........", "........", "....lll.", "...l...d", "........", ".ll.....", "...d....", "........" },
+		{ "..ll....", "....d...", "........", "........", ".....lll", "....l...", "........", "........" },
+		{ "........", "........", "........", ".lll....", "l...dd..", "........", "........", "......h." },
+	},
+	snow = {
+		{ "........", "........", "..hhh...", ".l...l..", "........", "........", "......h.", "........" },
+		{ "........", "......l.", "........", "........", ".lhhl...", "........", "........", "........" },
+		{ "........", "........", "........", "....hh..", "...l..l.", "........", ".h......", "........" },
+		{ "........", "........", "........", "........", "........", "........", "........", "........" },
+		{ "........", "........", "........", "........", "........", ".....h..", "........", "........" },
+	},
+	rock = {
+		{ "........", ".l......", "..d...l.", "......d.", "...l....", "....d...", ".l....l.", "..d....d" },
+		{ "....l...", "...ld...", "......d.", ".l......", ".d...l..", ".....d..", "........", ".d......" },
+	},
+	jungle = {
+		{ ".d..l..d", "..l..d..", "d...d..l", ".l.....d", "...dl...", "d......l", "..l.d...", ".d...l.d" },
+		{ "..d...l.", "l...d...", ".d.l...d", "....d.l.", "d.l.....", "...d..d.", ".l...l..", "d...d..." },
+	},
+	ash = {
+		{ "....d...", "...d....", "..d..l..", "...dd...", "......d.", ".l...d..", "....d...", "...d...." },
+		{ "........", ".d......", "..dd....", "....d.l.", ".....d..", "..l...d.", "......d.", "........" },
+		{ "......d.", ".....d..", "..dd.d..", ".d....l.", "........", "...l....", "........", "d......." },
+	},
+	crystal = {
+		{ "........", ".h......", "..h.....", "..dh....", "...d....", "......h.", ".....hd.", "....hd.." },
+		{ "......h.", ".....hd.", "....hd..", "........", ".h......", "..h.....", "..dh....", "...d...." },
+	},
+	goo = {
+		{ "........", ".hl.....", ".ld..hl.", "..d..ld.", "......d.", "..hl....", "..ld....", "...d...." },
+		{ "....hl..", "....ld..", ".....d..", "hl......", "ld...hl.", ".d...ld.", "......d.", "........" },
+	},
+	metal = {
+		{ "dddddddd", "d.......", "d..l....", "d.......", "d.......", "d.....l.", "d.......", "d......." },
+		{ "dddddddd", "d.......", "d.......", "d...h...", "d.......", "d.......", "d.l.....", "d......." },
+	},
+}
+local STAMP_CODE: { [string]: number } = { ["."] = 1, l = 2, d = 3, h = 4, s = 5 }
+
+-- Each family's variants as 64 palette indices, mirrored copies included.
+local STAMPS: { [string]: { { number } } } = {}
+for family, variants in STAMP_ROWS do
+	local list: { { number } } = {}
+	for _, rows in variants do
+		local plain, mirrored = table.create(64, 1), table.create(64, 1)
+		for y = 0, 7 do
+			for x = 0, 7 do
+				local code = STAMP_CODE[string.sub(rows[y + 1], x + 1, x + 1)] or 1
+				plain[y * 8 + x + 1] = code
+				mirrored[y * 8 + (7 - x) + 1] = code
+			end
+		end
+		table.insert(list, plain)
+		table.insert(list, mirrored)
+	end
+	STAMPS[family] = list
+end
+
+-- The stamp variant of the 8×8 block holding pixel (x, y) of a pattern grid.
+local function stampOf(stamps: { { number } }, x: number, y: number): { number }
+	return stamps[hash32(x // 8, y // 8, 31) % #stamps + 1]
+end
+
+-- A biome's ground palette (base, light, dark, highlight, shadow) on low or high ground, lit (1), flat (2) or
+-- shaded (3) by the light from the north-west. Glowing colours (lava glints) never darken. `soft`: the whole map's
+-- version, its marks closer to the base colour, since at one pixel per map pixel strong marks read as specks.
+local palettes: { [Style]: { [number]: { number } } } = {}
+local function paletteOf(s: Style, high: boolean, shade: number, soft: boolean?): { number }
+	local set = palettes[s]
+	if set == nil then
+		set = {}
+		palettes[s] = set
+	end
+	local key = (if high then 3 else 0) + shade + (if soft then 6 else 0)
+	local pal = set[key]
+	if pal == nil then
+		local hi = s.high
+		local b = if high and hi then hi else s.base
+		local l = if high and hi then mix(hi, s.light, 0.5) else s.light
+		local d = if high and hi then scale(hi, 0.85) else s.dark
+		local k = SHADE[shade]
+		local list = if soft
+			then {
+				b,
+				if GLOW[l] then l else mix(b, l, 0.45),
+				mix(b, d, 0.45),
+				mix(b, l, 0.85),
+				mix(b, scale(d, 0.9), 0.85),
+			}
+			else { b, l, d, mix(l, 0xffffff, 0.2), scale(d, 0.8) }
+		pal = {}
+		for i, c in list do
+			pal[i] = if GLOW[c] or k == 1 then c else scale(c, k)
+		end
+		set[key] = pal
+	end
+	return pal
+end
+
+-- Pattern families of made surfaces (Skyshards' plating, crop rows, metal): no slopes, no shading.
+local FLAT: { [string]: boolean } = { panels = true, rows = true, metal = true }
+
+-- Light from the north-west: lit (1) where the ground rises towards the south-east, shaded (3) where it falls.
+local function shadeAt(art: Art, x: number, y: number): number
+	local w, h = art.width, art.height
+	if FLAT[(art.biomes[buffer.readu8(art.ids, y * w + x)] or FALLBACK).family] then
+		return 2
+	end
+	local elev = art.elevation
+	local here = buffer.readu8(elev, y * w + x)
+	local ax, ay = math.max(x - 1, 0), math.max(y - 1, 0)
+	local bx, by = math.min(x + 1, w - 1), math.min(y + 1, h - 1)
+	local a = buffer.readu8(elev, ay * w + ax)
+	local b = buffer.readu8(elev, by * w + bx)
+	if a == 0 then
+		a = here
+	end
+	if b == 0 then
+		b = here
+	end
+	local g = b - a
+	return if g > SHADE_SLOPE then 1 elseif g < -SHADE_SLOPE then 3 else 2
 end
 
 ------------------------------------------------------------------------------------------------- terrain
@@ -502,66 +711,113 @@ local function edgeDistance(art: Art, biomeOf: { [number]: Style }, yield: Yield
 	return dist
 end
 
+-- Gentle waves on open water: short light dashes on every few rows, staggered, in random runs. `x`, `y` and
+-- `period` are in the painting's own pixels (the close-up passes sub-pixels and a longer period).
+local function waveAt(x: number, y: number, period: number, deep: boolean): boolean
+	if y % period ~= 0 then
+		return false
+	end
+	local row = y // period
+	local sx = x + row * (period + 1)
+	local length = period * 2 + 3
+	if sx % length >= (period + 1) // 2 + 1 then
+		return false
+	end
+	return hash32(sx // length, row, 61) % (if deep then 5 else 3) == 0
+end
+
+-- A two-pass chamfer distance transform in place: every non-zero pixel gets its distance to the nearest zero pixel,
+-- in SEA_UNITs (SEA_UNIT per straight step, one more per diagonal step, so distances come out nearly round), capped
+-- at 255.
+local function chamfer(field: buffer, w: number, h: number)
+	local straight, diagonal = SEA_UNIT, SEA_UNIT + 1
+	for y = 0, h - 1 do
+		for x = 0, w - 1 do
+			local i = y * w + x
+			local v = buffer.readu8(field, i)
+			if v ~= 0 then
+				if x > 0 then
+					v = math.min(v, buffer.readu8(field, i - 1) + straight)
+				end
+				if y > 0 then
+					v = math.min(v, buffer.readu8(field, i - w) + straight)
+					if x > 0 then
+						v = math.min(v, buffer.readu8(field, i - w - 1) + diagonal)
+					end
+					if x < w - 1 then
+						v = math.min(v, buffer.readu8(field, i - w + 1) + diagonal)
+					end
+				end
+				buffer.writeu8(field, i, math.min(v, 255))
+			end
+		end
+	end
+	for y = h - 1, 0, -1 do
+		for x = w - 1, 0, -1 do
+			local i = y * w + x
+			local v = buffer.readu8(field, i)
+			if v ~= 0 then
+				if x < w - 1 then
+					v = math.min(v, buffer.readu8(field, i + 1) + straight)
+				end
+				if y < h - 1 then
+					v = math.min(v, buffer.readu8(field, i + w) + straight)
+					if x < w - 1 then
+						v = math.min(v, buffer.readu8(field, i + w + 1) + diagonal)
+					end
+					if x > 0 then
+						v = math.min(v, buffer.readu8(field, i + w - 1) + diagonal)
+					end
+				end
+				buffer.writeu8(field, i, math.min(v, 255))
+			end
+		end
+	end
+end
+
 local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield?)
 	local w, h = art.width, art.height
 	local ids = art.ids
 	local sky = art.theme == "sky"
 
-	-- distance from land over water, for the ocean's depth bands
-	local dist = buffer.create(w * h)
+	-- distance from land over water, for the ocean's depth bands (round, thanks to the chamfer transform)
+	local dist = art.sea
 	for i = 0, w * h - 1 do
-		buffer.writeu8(dist, i, if buffer.readu8(ids, i) == 0 then 255 else 0)
+		buffer.writeu8(dist, i, if buffer.readu8(ids, i) ~= 0 then 0 else 255)
 	end
-	for d = 1, if sky then 0 else MEDIUM_TO + 1 do
-		if yield then
-			yield()
-		end
-		for y = 0, h - 1 do
-			for x = 0, w - 1 do
-				local i = y * w + x
-				if buffer.readu8(dist, i) == 255 then
-					local prev = d - 1
-					if
-						(x > 0 and buffer.readu8(dist, i - 1) == prev)
-						or (x < w - 1 and buffer.readu8(dist, i + 1) == prev)
-						or (y > 0 and buffer.readu8(dist, i - w) == prev)
-						or (y < h - 1 and buffer.readu8(dist, i + w) == prev)
-					then
-						buffer.writeu8(dist, i, d)
-					end
-				end
-			end
-		end
-	end
+	chamfer(dist, w, h)
 	local function depth(i: number): number -- 1 shallow, 2 close ocean, 3 deep
 		local d = buffer.readu8(dist, i)
-		return if d <= SHALLOW_TO then 1 elseif d <= MEDIUM_TO then 2 else 3
+		return if d <= SHALLOW_TO * SEA_UNIT then 1 elseif d <= MEDIUM_TO * SEA_UNIT then 2 else 3
 	end
 	local patches = smoothNoise(w, h, 12, 5)
 	local detail = smoothNoise(w, h, 5, 6)
+	local calm = smoothNoise(w, h, 16, 14) -- waves only show in patches of rougher water
 
 	-- mountains: ridge height (0 to 255) where smooth noise crosses its middle, low along the province's edge
 	local rock = edgeDistance(art, biomeOf, yield)
 	local ridges = smoothNoise(w, h, 11, 11)
 	local ridgeDetail = smoothNoise(w, h, 4, 12)
 	local snowPatches = smoothNoise(w, h, 9, 13)
-	local heights = buffer.create(w * h)
-	local levels = buffer.create(w * h) -- index into ROCK, 0 off the mountains
+	local elev, heights, levels = art.elevation, art.ridge, art.level
 	for i = 0, w * h - 1 do
 		local pid = buffer.readu8(ids, i)
-		if pid ~= 0 and biomeOf[pid].deco == "rock" then
+		if pid ~= 0 then
 			local x, y = i % w, i // w
-			local n = ridges(x, y) * 0.8 + ridgeDetail(x, y) * 0.2
-			local height = (1 - math.abs(n - 0.5) * 2) * math.min(buffer.readu8(rock, i) / RIDGE_FADE, 1)
-			local level = 1
-			for band = #RIDGE_FROM, 2, -1 do
-				if height >= RIDGE_FROM[band] and (band < #RIDGE_FROM or snowPatches(x, y) > SNOW_PATCHES) then
-					level = band
-					break
+			buffer.writeu8(elev, i, math.clamp(math.floor((patches(x, y) * 0.7 + detail(x, y) * 0.3) * 255), 1, 255))
+			if biomeOf[pid].deco == "rock" then
+				local n = ridges(x, y) * 0.8 + ridgeDetail(x, y) * 0.2
+				local height = (1 - math.abs(n - 0.5) * 2) * math.min(buffer.readu8(rock, i) / RIDGE_FADE, 1)
+				local level = 1
+				for band = #RIDGE_FROM, 2, -1 do
+					if height >= RIDGE_FROM[band] and (band < #RIDGE_FROM or snowPatches(x, y) > SNOW_PATCHES) then
+						level = band
+						break
+					end
 				end
+				buffer.writeu8(heights, i, math.floor(height * 255))
+				buffer.writeu8(levels, i, level)
 			end
-			buffer.writeu8(heights, i, math.floor(height * 255))
-			buffer.writeu8(levels, i, level)
 		end
 	end
 
@@ -580,7 +836,8 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield
 					local level = buffer.readu8(levels, i)
 					local band = ROCK[level]
 					if level == 1 then
-						c = if n < 0.06 then band.a elseif n > 0.94 then band.b else band.base
+						local k = stampOf(STAMPS.rock, x, y)[(y % 8) * 8 + x % 8 + 1]
+						c = if k == 2 or k == 4 then band.a elseif k == 3 or k == 5 then band.b else band.base
 					else
 						local slope = if x > 0 and x < w - 1
 							then buffer.readu8(heights, i + 1) - buffer.readu8(heights, i - 1)
@@ -592,9 +849,20 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield
 						c = band.lip
 					end
 				else
-					local high = s.high
-					local ground = if high and patches(x, y) * 0.7 + detail(x, y) * 0.3 > 0.6 then high else s.base
-					c = if n > 0.95 then s.light elseif n < 0.05 then s.dark else ground
+					local e = buffer.readu8(elev, i)
+					local high = s.high ~= nil and e > HIGH_AT
+					local pal = paletteOf(s, high, shadeAt(art, x, y), true)
+					local stamps = STAMPS[s.family]
+					local k = if stamps then stampOf(stamps, x, y)[(y % 8) * 8 + x % 8 + 1] else 1
+					if high then
+						-- high ground: a dark lip on its south side, a lit edge on its north side
+						if y < h - 1 and buffer.readu8(elev, i + w) <= HIGH_AT then
+							k = 5
+						elseif y > 0 and buffer.readu8(elev, i - w) <= HIGH_AT then
+							k = 4
+						end
+					end
+					c = pal[k]
 					if s.deco == "flowers" and noise(x, y, 7) > (if s == BIOMES.meadow then 0.985 else 0.994) then
 						c = FLOWERS[1 + math.floor(noise(x, y, 8) * #FLOWERS)]
 					elseif s.deco == "rows" and y % 3 == 0 then
@@ -605,7 +873,7 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield
 						if x % 8 == 0 or y % 8 == 0 then
 							local lit = noise(x // 8, y // 8, 9)
 							c = if lit < 0.04 then panel.C elseif lit < 0.08 then panel.E else panel.R
-						elseif c == s.base then
+						else
 							local shade = noise(x // 8, y // 8, 10)
 							c = if shade < 0.2 then panel.P elseif shade > 0.8 then panel.Q else c
 						end
@@ -628,13 +896,13 @@ local function paintTerrain(art: Art, biomeOf: { [number]: Style }, yield: Yield
 			else
 				local band = depth(i)
 				c = if band == 1 then SEA.shallow elseif band == 2 then SEA.medium else SEA.deep
-				if band == 1 and n > 0.97 then
-					c = SEA.shallowWave
-				elseif band == 2 and n > 0.985 then
-					c = SEA.mediumWave
+				if calm(x, y) > 0.45 and waveAt(x, y, 4, band == 3) then
+					c = if band == 1 then SEA.shallowWave elseif band == 2 then SEA.mediumWave else SEA.deepWave
 				end
 				if y > 0 and buffer.readu8(ids, i - w) ~= 0 then
 					c = SEA.shadow -- just south of land
+				elseif buffer.readu8(dist, i) == SEA_UNIT then
+					c = SEA.foam -- along the other shores
 				elseif y < h - 1 and buffer.readu8(ids, i + w) == 0 and depth(i + w) > band then
 					c = if band == 1 then SEA.shallowLip else SEA.mediumLip -- deeper water below
 				end
@@ -696,6 +964,10 @@ local function rgba(c: number): number
 	return 0xff000000 + b * 65536 + g * 256 + r
 end
 
+local function unrgba(v: number): number
+	return bit32.band(v, 255) * 65536 + bit32.band(bit32.rshift(v, 8), 255) * 256 + bit32.band(bit32.rshift(v, 16), 255)
+end
+
 local function markDirty(art: Art, x0: number, y0: number, x1: number, y1: number)
 	local d = art.dirty
 	if d == nil then
@@ -713,6 +985,7 @@ local function paintProvince(art: Art, pid: number)
 	if box == nil then
 		return
 	end
+	art.changed[pid] = true
 	local o = art.owner[pid] or 0
 	local nation = if o ~= 0 then art.color[o] or 0x808080 else 0
 	local border = if o ~= 0 then art.border[o] or scale(nation, 0.75) else 0
@@ -807,6 +1080,1391 @@ local function drawCapitals(art: Art)
 	end
 end
 
+------------------------------------------------------------------------------------------------- close-up detail
+
+-- When the camera is zoomed in, MapRenderer lays a second image over the map: just the part in view, painted at
+-- DETAIL_FACTOR × DETAIL_FACTOR sub-pixels per map pixel from the same painting (Art), so zooming in shows more
+-- detail instead of bigger blocks, the way WorldBox draws every tile as a little 8×8 sprite:
+--   * the biome's ground pattern (STAMPS) at full sub-pixel resolution, lit from the north-west;
+--   * coasts and province edges smoothed: each map pixel's corners are cut where both neighbours on that side agree
+--     (the Scale2x rule), so staircases become diagonals; the same for high ground, water depths and mountain bands,
+--     which are blended between pixel centres;
+--   * beaches with wet sand, white surf and foam, a shadow under the south shores, wave dashes;
+--   * dense shaded trees, bushes, rocks, flowers, cacti, crystals and towers (DETAIL_DECOS), each one deterministic
+--     per map pixel so two overlapping close-ups always agree;
+--   * a lighter kingdom wash (DETAIL_ALPHA) so the terrain shows through, with a stronger band just inside the
+--     nation's border and a crisp border line, a thin line between provinces, and a white outline on the selection.
+-- Ownership changes repaint only the provinces involved (syncDetail), like the whole-map painting.
+
+local DETAIL_FACTOR = 4
+local DETAIL_MARGIN = 2 -- map pixels worked out around the close-up (border checks, sprites reaching in)
+local DETAIL_TOP = DETAIL_MARGIN + HULL + 1 -- (more above: Skyshards' hulls hang below their platforms)
+local DETAIL_ALPHA = 0.48 -- the kingdom wash in the close-up: lighter, so the terrain shows through
+local DETAIL_RIM_ALPHA = 0.7 -- a stronger band just inside a nation's border
+local DETAIL_BORDER = 2 -- sub-pixels of nation border
+local DETAIL_RIM = 2 -- sub-pixels of stronger wash inside it
+local DETAIL_SELECT = 2 -- sub-pixels of white outline round the selected province
+local DETAIL_LINE = 0.8 -- the 1-sub-pixel line between provinces darkens to this share
+local DETAIL_ROCK_SLOPE = 3 -- ridge height change across half a map pixel that counts as a lit or shaded slope
+local DETAIL_WAVES = 10 -- sub-pixel rows between wave dashes
+local SHORE = 1 -- detail flag: beach, surf or rim (no sprites on it)
+
+export type Detail = {
+	factor: number, -- sub-pixels per map pixel
+	width: number, -- image size in sub-pixels
+	height: number,
+	cols: number, -- map pixels covered
+	rows: number,
+	x0: number, -- the map pixel at the top-left (-1 before the first paint)
+	y0: number,
+	pixels: buffer, -- RGBA, width × height
+	ew: number, -- the working area: the close-up plus margins, in sub-pixels
+	eh: number,
+	ids: buffer, -- per working sub-pixel: its province (0 = sea or space), corners cut
+	terrain: buffer, -- per working sub-pixel: 0xRRGGBB before the kingdom wash
+	flags: buffer, -- per working sub-pixel: SHORE
+	painted: Art?, -- the painting it was last painted from
+	dirty: { number }?, -- x0, y0, x1, y1 (sub-pixels) changed since the last takeDetailDirty
+}
+
+PixelArt.DETAIL = {
+	factor = DETAIL_FACTOR,
+	alpha = DETAIL_ALPHA,
+	rimAlpha = DETAIL_RIM_ALPHA,
+	border = DETAIL_BORDER,
+	rim = DETAIL_RIM,
+	borderAlpha = BORDER_ALPHA,
+	select = DETAIL_SELECT,
+}
+
+-- Close-up sprites, in sub-pixels, drawn with their bottom row's middle on a jittered spot in their map pixel.
+-- L M D: the biome's sprite (or light, base, dark) colours; h highlight; S deep shade; T t trunk; k a shadow cast on
+-- the ground (south-east, away from the light); r R q rock greys; x X cactus; W snow; F a flower; C c crystal glow;
+-- G B tower metal; P hill foot; Y y lamp light.
+local DETAIL_SPRITES: { [string]: { string } } = {
+	tree = {
+		"..hLL..",
+		".hLLLLM",
+		"hLLLLMM",
+		"LLLMMMD",
+		"LMMMMDD",
+		".MMDDDS",
+		"..DTDkk",
+		"...Tkk.",
+	},
+	round = { ".hLL..", "hLLLM.", "LLLMMD", "LMMMDD", ".MDDSk", "..Tkk." },
+	jungle = {
+		"...hLL...",
+		".hLLLLMM.",
+		"hLLLLMMMD",
+		"LLLMMMMDD",
+		"LMMMMMDDD",
+		".MMMDDDDS",
+		"...DTDkk.",
+		"....Tkk..",
+	},
+	pine = { "...W...", "..LLM..", "..LMM..", ".WLLMD.", ".LLMMD.", "LLLMMDD", "LLMMMDS", "..kTkk.", "...Tk.." },
+	palm = { "hL...L.", ".LL.LM.", "..LLM..", "LM.TMDM", "L..T..D", "...T...", "..T....", "..Tkk.." },
+	acacia = { ".hLLLLM..", "hLLLMMMMD", ".DDMDDDDS", "....T....", "....Tt...", "....Tkk.." },
+	bush = { ".hL.", "LMMD", ".DSk" },
+	rock = { ".rR.", "rRRq", "Rqqk" },
+	boulder = { ".rrR.", "rRRRq", "RRqqq", ".qqkk" },
+	cactus = { "..x..", "x.x..", "xxx.x", "..xxX", "..x..", "..xkk" },
+	flowers = { "F...", "D.F.", "..D." },
+	mound = { "....hLL.....", "..hLLLLMM...", ".hLLLMMMMD..", "hLLMMMMMDDD.", "PPPPPPPPPPPk", "..kkkkkkkk.." },
+	crystal = { "..C..", ".CWC.", ".CCc.", "CWCcc", "CCccD", ".DDD.", "..kk." },
+	tower = { "..C..", "..G..", ".GGB.", ".GCB.", ".GGB.", "GGGBB", "GGGGB", "BBBBB", ".kkkk" },
+	plate = { ".hLL..", "hLLMMD", "LMMMDD", ".DDDk." },
+	light = { ".y.", "yYy", ".y." },
+}
+
+-- Which close-up decorations grow in each biome, and how often (chance per map pixel; one at most per pixel).
+local DETAIL_DECO_TABLE: { [string]: { { any } } } = {
+	grassland = { { "tree", 0.015 }, { "bush", 0.05 }, { "flowers", 0.05 }, { "rock", 0.01 } },
+	steppe = { { "bush", 0.035 }, { "rock", 0.015 } },
+	savanna = { { "acacia", 0.03 }, { "bush", 0.04 } },
+	tundra = { { "rock", 0.02 }, { "bush", 0.015 } },
+	desert = { { "cactus", 0.02 }, { "rock", 0.015 }, { "palm", 0.006 } },
+	drylands = { { "rock", 0.03 }, { "bush", 0.02 } },
+	forest = { { "tree", 0.42 }, { "round", 0.2 }, { "bush", 0.08 } },
+	jungle = { { "jungle", 0.55 }, { "round", 0.15 }, { "bush", 0.1 } },
+	taiga = { { "pine", 0.36 }, { "rock", 0.02 } },
+	hills = { { "mound", 0.05 }, { "rock", 0.03 }, { "bush", 0.03 } },
+	mountains = { { "boulder", 0.012 } },
+	ice = { { "rock", 0.005 } },
+	meadow = { { "flowers", 0.14 }, { "bush", 0.04 }, { "tree", 0.012 } },
+	frostfields = { { "rock", 0.012 }, { "bush", 0.01 } },
+	dunes = { { "rock", 0.01 }, { "cactus", 0.008 } },
+	wildwood = { { "tree", 0.4 }, { "round", 0.2 }, { "flowers", 0.06 } },
+	highlands = { { "mound", 0.05 }, { "bush", 0.04 }, { "rock", 0.02 } },
+	ashlands = { { "rock", 0.03 } },
+	peaks = { { "boulder", 0.012 } },
+	crystalgrove = { { "crystal", 0.16 } },
+	crags = { { "plate", 0.07 } },
+	stormspire = { { "tower", 0.09 } },
+}
+
+type Pixel = { dx: number, dy: number, ch: string }
+type DecoChoice = { upTo: number, pixels: { Pixel } }
+
+-- Sprites as pixel lists, relative to their foot (bottom row, middle).
+local function compile(rows: { string }): { Pixel }
+	local list: { Pixel } = {}
+	local h, w = #rows, #rows[1]
+	for j = 1, h do
+		for i = 1, w do
+			local ch = string.sub(rows[j], i, i)
+			if ch ~= "." then
+				table.insert(list, { dx = i - 1 - w // 2, dy = j - h, ch = ch })
+			end
+		end
+	end
+	-- shadows first, so a sprite's own pixels cover them
+	table.sort(list, function(a, b)
+		local ka, kb = if a.ch == "k" then 0 else 1, if b.ch == "k" then 0 else 1
+		if ka ~= kb then
+			return ka < kb
+		end
+		return if a.dy ~= b.dy then a.dy < b.dy else a.dx < b.dx
+	end)
+	return list
+end
+local DETAIL_PIXELS: { [string]: { Pixel } } = {}
+for name, rows in DETAIL_SPRITES do
+	DETAIL_PIXELS[name] = compile(rows)
+end
+local DETAIL_DECOS: { [Style]: { DecoChoice } } = {}
+for name, list in DETAIL_DECO_TABLE do
+	local choices: { DecoChoice } = {}
+	local total = 0
+	for _, entry in list do
+		total += entry[2] :: number
+		table.insert(choices, { upTo = total, pixels = DETAIL_PIXELS[entry[1] :: string] })
+	end
+	DETAIL_DECOS[BIOMES[name]] = choices
+end
+
+-- The castle (a dome on Skyshards) at sub-pixel size, built from rectangles: F f the owner's flag, R r roofs in the
+-- owner's colour, M m D lit, middle and shaded stone, W lit windows, p the flagpole, C c the dome's glow.
+local function buildCapital(sky: boolean): { string }
+	local w, h = 21, 22
+	local grid: { { string } } = {}
+	for y = 1, h do
+		grid[y] = table.create(w, ".")
+	end
+	local function put(x: number, y: number, ch: string)
+		if x >= 0 and y >= 0 and x < w and y < h then
+			grid[y + 1][x + 1] = ch
+		end
+	end
+	local function rect(x0: number, y0: number, x1: number, y1: number, ch: string)
+		for y = y0, y1 do
+			for x = x0, x1 do
+				put(x, y, ch)
+			end
+		end
+	end
+	if sky then
+		rect(2, 15, 18, 20, "m")
+		rect(2, 15, 2, 20, "M")
+		rect(18, 15, 18, 20, "D")
+		rect(2, 21, 18, 21, "D")
+		for y = 7, 14 do
+			for x = 3, 17 do
+				local dx, dy = x - 10, (y - 15) * 1.2
+				if dx * dx + dy * dy <= 52 then
+					put(x, y, if dx + dy < -6 then "W" elseif dx > 3 then "c" else "C")
+				end
+			end
+		end
+		rect(10, 0, 10, 7, "p")
+		rect(11, 1, 13, 1, "F")
+		rect(11, 2, 12, 2, "F")
+		put(14, 1, "f")
+		rect(6, 17, 7, 18, "W")
+		rect(13, 17, 14, 18, "W")
+	else
+		-- side towers with roofs in the owner's colour
+		for _, x0 in { 0, 16 } do
+			rect(x0, 7, x0 + 4, 21, "m")
+			rect(x0, 7, x0, 21, "M")
+			rect(x0 + 4, 7, x0 + 4, 21, "D")
+			put(x0 + 2, 3, "R")
+			rect(x0 + 1, 4, x0 + 3, 4, "R")
+			rect(x0, 5, x0 + 4, 6, "R")
+			rect(x0 + 3, 4, x0 + 3, 4, "r")
+			rect(x0 + 3, 5, x0 + 4, 6, "r")
+			rect(x0 + 2, 10, x0 + 2, 11, "W")
+		end
+		-- curtain walls and the keep
+		rect(5, 12, 15, 21, "m")
+		put(5, 11, "M")
+		put(15, 11, "D")
+		rect(7, 5, 13, 21, "m")
+		rect(7, 5, 7, 21, "M")
+		rect(13, 5, 13, 21, "D")
+		for x = 7, 13, 2 do
+			put(x, 4, if x == 13 then "D" else "M")
+		end
+		rect(10, 8, 10, 9, "W")
+		-- the gate
+		rect(9, 17, 11, 21, "D")
+		put(10, 16, "D")
+		rect(0, 21, 20, 21, "D")
+		-- the owner's flag
+		rect(10, 0, 10, 3, "p")
+		rect(11, 0, 13, 0, "F")
+		rect(11, 1, 12, 1, "F")
+		put(14, 0, "f")
+	end
+	local rows: { string } = {}
+	for y = 1, h do
+		rows[y] = table.concat(grid[y])
+	end
+	return rows
+end
+local DETAIL_CASTLE = buildCapital(false)
+local DETAIL_DOME = buildCapital(true)
+
+-- A new, empty close-up of width × height sub-pixels (factor: sub-pixels per map pixel, 1, 2, 4 or 8).
+function PixelArt.newDetail(width: number, height: number, factor: number?): Detail
+	local f = factor or DETAIL_FACTOR
+	assert(8 % f == 0, "the detail factor divides 8")
+	local cols, rows = width // f, height // f
+	local ew = (cols + 2 * DETAIL_MARGIN) * f
+	local eh = (rows + DETAIL_TOP + DETAIL_MARGIN) * f
+	return {
+		factor = f,
+		width = cols * f,
+		height = rows * f,
+		cols = cols,
+		rows = rows,
+		x0 = -1,
+		y0 = -1,
+		pixels = buffer.create(cols * f * rows * f * 4),
+		ew = ew,
+		eh = eh,
+		ids = buffer.create(ew * eh),
+		terrain = buffer.create(ew * eh * 4),
+		flags = buffer.create(ew * eh),
+		painted = nil,
+		dirty = nil,
+	}
+end
+
+type Ctx = {
+	art: Art,
+	d: Detail,
+	f: number,
+	bx: number, -- map pixel at the working area's top-left
+	by: number,
+	theme: { [number]: { [number]: number } }, -- themed colours by kind (1 land, 2 sea, 3 space)
+	palettes: { [Style]: { [number]: { number } } }, -- themed ground palettes
+	sprites: { [Style]: { [string]: number } }, -- themed sprite colours
+}
+
+local function tc(ctx: Ctx, c: number, kind: number): number
+	local cache = ctx.theme[kind]
+	local t = cache[c]
+	if t == nil then
+		t = themed(ctx.art.look, c, kind)
+		cache[c] = t
+	end
+	return t
+end
+
+local function groundPalette(ctx: Ctx, s: Style, high: boolean, shade: number): { number }
+	local set = ctx.palettes[s]
+	if set == nil then
+		set = {}
+		ctx.palettes[s] = set
+	end
+	local key = (if high then 3 else 0) + shade
+	local pal = set[key]
+	if pal == nil then
+		pal = {}
+		for i, c in paletteOf(s, high, shade) do
+			pal[i] = tc(ctx, c, 1)
+		end
+		set[key] = pal
+	end
+	return pal
+end
+
+local function spriteColours(ctx: Ctx, s: Style): { [string]: number }
+	local p = ctx.sprites[s]
+	if p then
+		return p
+	end
+	local sp = s.sprite or {}
+	local L, M, D = sp.L or s.light, sp.M or s.base, sp.D or s.dark
+	local T = sp.T or 0x6b4430
+	local raw: { [string]: number } = {
+		L = L,
+		M = M,
+		D = D,
+		h = mix(L, 0xffffff, 0.35),
+		S = scale(D, 0.72),
+		T = T,
+		t = scale(T, 0.7),
+		r = 0xb9bcb9,
+		R = 0x8a8d8a,
+		q = 0x5d605d,
+		x = 0x5d9a3c,
+		X = 0x3f6e2a,
+		W = 0xf4f8fb,
+		C = sp.C or 0x7cfbef,
+		c = sp.M or 0x64f1e2,
+		G = sp.G or 0xd8dee6,
+		B = sp.B or 0x2e363e,
+		P = sp.P or scale(s.dark, 0.8),
+	}
+	if s.deco == "crystals" then
+		raw.D = sp.D or s.dark
+	end
+	p = {}
+	for ch, c in raw do
+		p[ch] = tc(ctx, c, 1)
+	end
+	ctx.sprites[s] = p
+	return p
+end
+
+local SEA_CAP = (MEDIUM_TO + 2) * SEA_UNIT
+
+-- The depth band (1 shallow, 2 close, 3 deep) of water this far from land, in SEA_UNITs.
+local function seaBand(d: number): number
+	return if d <= (SHALLOW_TO + 0.5) * SEA_UNIT then 1 elseif d <= (MEDIUM_TO + 0.5) * SEA_UNIT then 2 else 3
+end
+
+local SEA_BANDS = { SEA.shallow, SEA.medium, SEA.deep }
+local SEA_WAVES = { SEA.shallowWave, SEA.mediumWave, SEA.deepWave }
+local SEA_LIPS = { SEA.shallowLip, SEA.mediumLip, SEA.deep }
+
+-- A map pixel of the close-up being painted, and the 3×3 neighbourhoods of the fields its sub-pixels blend between
+-- (read once per map pixel, when first needed).
+type Cell = {
+	cx: number,
+	cy: number,
+	sea: { number },
+	elev: { number },
+	ridge: { number },
+	shore: { number }, -- land (1) and water (-1), blurred: its zero line is a smooth coast
+	hasSea: boolean,
+	hasElev: boolean,
+	hasRidge: boolean,
+	snow: boolean, -- a snow cap in the neighbourhood (only then can the ridge's top band be snow)
+}
+
+local function window(art: Art, field: buffer, cx: number, cy: number, cap: number, out: { number })
+	local w, h = art.width, art.height
+	for j = -1, 1 do
+		local row = math.clamp(cy + j, 0, h - 1) * w
+		for i = -1, 1 do
+			out[(j + 1) * 3 + i + 2] = math.min(buffer.readu8(field, row + math.clamp(cx + i, 0, w - 1)), cap)
+		end
+	end
+end
+
+-- A 3×3 window blended at (fx, fy) from its centre pixel's centre (each from -1 to 1): exactly the field blended
+-- between the four nearest pixel centres.
+local function sample(win: { number }, fx: number, fy: number): number
+	local c, tx = 1, fx
+	if fx < 0 then
+		c, tx = 0, fx + 1
+	end
+	local r, ty = 1, fy
+	if fy < 0 then
+		r, ty = 0, fy + 1
+	end
+	local i = r * 3 + c + 1
+	local a = win[i]
+	local top = a + (win[i + 1] - a) * tx
+	return top + (win[i + 3] + (win[i + 4] - win[i + 3]) * tx - top) * ty
+end
+
+local function seaWindow(ctx: Ctx, cell: Cell): { number }
+	if not cell.hasSea then
+		window(ctx.art, ctx.art.sea, cell.cx, cell.cy, SEA_CAP, cell.sea)
+		cell.hasSea = true
+	end
+	return cell.sea
+end
+
+local function elevWindow(ctx: Ctx, cell: Cell): { number }
+	if not cell.hasElev then
+		window(ctx.art, ctx.art.elevation, cell.cx, cell.cy, 255, cell.elev)
+		cell.hasElev = true
+	end
+	return cell.elev
+end
+
+local function ridgeWindow(ctx: Ctx, cell: Cell): { number }
+	if not cell.hasRidge then
+		local art = ctx.art
+		window(art, art.ridge, cell.cx, cell.cy, 255, cell.ridge)
+		local w, h = art.width, art.height
+		local snow = false
+		for j = -1, 1 do
+			local row = math.clamp(cell.cy + j, 0, h - 1) * w
+			for i = -1, 1 do
+				if buffer.readu8(art.level, row + math.clamp(cell.cx + i, 0, w - 1)) == #ROCK then
+					snow = true
+				end
+			end
+		end
+		cell.snow = snow
+		cell.hasRidge = true
+	end
+	return cell.ridge
+end
+
+-- Land (1) and water (-1) round a map pixel, blurred with a 1-2-1 kernel: blended between pixel centres, its zero
+-- line is a smooth coastline that rounds off the grid's steps.
+local BLUR = { 1, 2, 1 }
+local function shoreWindow(ctx: Ctx, cell: Cell): { number }
+	local art = ctx.art
+	local w, h = art.width, art.height
+	local land = table.create(25, 0)
+	for j = -2, 2 do
+		local row = math.clamp(cell.cy + j, 0, h - 1) * w
+		for i = -2, 2 do
+			land[(j + 2) * 5 + i + 3] = if buffer.readu8(art.ids, row + math.clamp(cell.cx + i, 0, w - 1)) ~= 0
+				then 1
+				else -1
+		end
+	end
+	local out = cell.shore
+	for j = 0, 2 do
+		for i = 0, 2 do
+			local sum = 0
+			for dj = 0, 2 do
+				for di = 0, 2 do
+					sum += BLUR[dj + 1] * BLUR[di + 1] * land[(j + dj) * 5 + i + di + 1]
+				end
+			end
+			out[j * 3 + i + 1] = sum
+		end
+	end
+	return out
+end
+
+local function rockLevel(height: number, snow: boolean): number
+	for band = #RIDGE_FROM, 2, -1 do
+		if height >= RIDGE_FROM[band] * 255 and (band < #RIDGE_FROM or snow) then
+			return band
+		end
+	end
+	return 1
+end
+
+-- The close-up's rock bands, with faces lit from the north-west lighter and the others darker than WorldBox's flat
+-- tiles, so ridges stand out: base, lit, shaded, lip, light speck, dark speck.
+local DETAIL_ROCK: { { number } } = {}
+for i, band in ROCK do
+	DETAIL_ROCK[i] = if i == #ROCK
+		then { band.base, 0xffffff, band.b, band.lip, band.a, band.b }
+		else { band.base, mix(band.base, 0xffffff, 0.16), scale(band.base, 0.74), band.lip, band.a, band.b }
+end
+
+-- Mountain rock at sub-pixel (sx, sy) of a map pixel: bands by ridge height with a dark lip on their south side,
+-- faces lit from the north-west, specks on the flat parts.
+local function rockColour(ctx: Ctx, cell: Cell, sx: number, sy: number): number
+	local f = ctx.f
+	local win = ridgeWindow(ctx, cell)
+	local snow = cell.snow
+	local step = 1 / f
+	local fx, fy = (sx + 0.5) * step - 0.5, (sy + 0.5) * step - 0.5
+	local here = sample(win, fx, fy)
+	local level = rockLevel(here, snow)
+	local band = DETAIL_ROCK[level]
+	local below = sample(win, fx, fy + step)
+	if rockLevel(below, snow) < level or rockLevel(sample(win, fx, fy + 2 * step), snow) < level then
+		return tc(ctx, band[4], 1)
+	end
+	local slope = sample(win, fx + step, fy) - sample(win, fx - step, fy) + below - here
+	local c = band[1]
+	if slope > DETAIL_ROCK_SLOPE then
+		c = band[2]
+	elseif slope < -DETAIL_ROCK_SLOPE then
+		c = band[3]
+	else
+		local gx, gy = cell.cx * f + sx, cell.cy * f + sy
+		local k = stampOf(STAMPS.rock, gx, gy)[(gy % 8) * 8 + gx % 8 + 1]
+		c = if k == 2 or k == 4 then band[5] elseif k == 3 or k == 5 then band[6] else band[1]
+	end
+	return tc(ctx, c, 1)
+end
+
+-- Skyshards' hull plating at sub-pixel (gx, gy): 8-pixel panels in three shades (`shadeN` of the panel) with bevelled
+-- edges and rivets, and seams, a few of them lit (`litN`).
+local function panelColour(ctx: Ctx, sp: { [string]: number }, plain: number, gx: number, gy: number): number
+	local f = ctx.f
+	local size = 8 * f
+	local px, py = gx % size, gy % size
+	local panelX, panelY = gx // size, gy // size
+	if px == 0 or py == 0 then
+		local lit = noise(panelX, panelY, 9)
+		return tc(ctx, if lit < 0.04 then sp.C elseif lit < 0.08 then sp.E else scale(sp.R, 0.9), 1)
+	end
+	local shade = noise(panelX, panelY, 10)
+	local c = if shade < 0.2 then sp.P elseif shade > 0.8 then sp.Q else plain
+	if (px == 3 or px == size - 3) and (py == 3 or py == size - 3) then
+		c = mix(c, 0xffffff, 0.45) -- rivets
+	elseif px == 1 or py == 1 then
+		c = mix(c, 0xffffff, 0.18) -- lit edge
+	elseif px == size - 1 or py == size - 1 then
+		c = scale(c, 0.86) -- shaded edge
+	end
+	return tc(ctx, c, 1)
+end
+
+-- The colour of sub-pixel (sx, sy) of a map pixel when it belongs to `q` (0 = water or space; with corners cut, it
+-- can be a neighbour's), its ground lit by `shade`.
+local function subColour(ctx: Ctx, cell: Cell, q: number, shade: number, sx: number, sy: number): number
+	local art, f = ctx.art, ctx.f
+	local gx, gy = cell.cx * f + sx, cell.cy * f + sy
+	local step = 1 / f
+	local fx, fy = (sx + 0.5) * step - 0.5, (sy + 0.5) * step - 0.5
+	if q == 0 then
+		if art.theme == "sky" then
+			local c = mix(SPACE.top, SPACE.bottom, math.clamp(gy / (art.height * f), 0, 1))
+			if gx % (32 * f) == 0 or gy % (32 * f) == 0 then
+				c = mix(c, SPACE.grid, 0.6)
+			end
+			return tc(ctx, c, 3)
+		end
+		local win = seaWindow(ctx, cell)
+		local band = seaBand(sample(win, fx, fy))
+		if band < 3 and seaBand(sample(win, fx, fy + step)) > band then
+			return tc(ctx, SEA_LIPS[band], 2)
+		end
+		if waveAt(gx, gy, DETAIL_WAVES, band == 3) then
+			return tc(ctx, SEA_WAVES[band], 2)
+		end
+		return tc(ctx, SEA_BANDS[band], 2)
+	end
+	local s = art.biomes[q] or FALLBACK
+	if s.deco == "rock" then
+		return rockColour(ctx, cell, sx, sy)
+	end
+	local high = false
+	local k = 1
+	if s.high then
+		local win = elevWindow(ctx, cell)
+		high = sample(win, fx, fy) > HIGH_AT
+		if high then
+			if sample(win, fx, fy + step) <= HIGH_AT then
+				k = 5
+			elseif sample(win, fx, fy - step) <= HIGH_AT then
+				k = 4
+			end
+		end
+	end
+	local pal = groundPalette(ctx, s, high, shade)
+	if k == 1 then
+		local family = s.family
+		local stamps = STAMPS[family]
+		if stamps then
+			k = stampOf(stamps, gx, gy)[(gy % 8) * 8 + gx % 8 + 1]
+		elseif family == "rows" then
+			-- crop rows every 3 map pixels (like the whole map), with plants standing between them
+			local r = gy % (3 * f)
+			local sp = s.sprite :: { [string]: number }
+			if r < f then
+				return tc(ctx, if r == f - 1 then scale(sp.R, 0.82) else sp.R, 1)
+			end
+			k = if (gx + (gy // (3 * f)) * 2) % 3 == 0
+				then (if r == f then 4 elseif r < 2 * f then 2 else 3)
+				else (if r == 3 * f - 1 then 3 else 1)
+		elseif family == "panels" then
+			return panelColour(ctx, s.sprite :: { [string]: number }, paletteOf(s, false, 2)[1], gx, gy)
+		end
+	end
+	return pal[k]
+end
+
+-- The working area's ground: every sub-pixel's province (corners cut) and terrain colour.
+local function detailGround(ctx: Ctx, yield: Yield?)
+	local art, d, f = ctx.art, ctx.d, ctx.f
+	local half = f // 2
+	local W, H = art.width, art.height
+	local ids = art.ids
+	local ew = d.ew
+	local sub, terr = d.ids, d.terrain
+	local bx, by = ctx.bx, ctx.by
+	local ecols, erows = ew // f, d.eh // f
+	local sky = art.theme == "sky"
+	local biomes = art.biomes
+	local cell: Cell = {
+		cx = 0,
+		cy = 0,
+		sea = table.create(9, 0),
+		elev = table.create(9, 0),
+		ridge = table.create(9, 0),
+		shore = table.create(9, 0),
+		hasSea = false,
+		hasElev = false,
+		hasRidge = false,
+		snow = false,
+	}
+	local function id(cx: number, cy: number): number
+		if cx < 0 or cy < 0 or cx >= W or cy >= H then
+			return 0
+		end
+		return buffer.readu8(ids, cy * W + cx)
+	end
+	for ey = 0, erows - 1 do
+		if yield then
+			yield()
+		end
+		local cy = by + ey
+		for ex = 0, ecols - 1 do
+			local cx = bx + ex
+			cell.cx, cell.cy = cx, cy
+			cell.hasSea, cell.hasElev, cell.hasRidge = false, false, false
+			local E = id(cx, cy)
+			local B, D, R, U = id(cx, cy - 1), id(cx - 1, cy), id(cx + 1, cy), id(cx, cy + 1)
+			local tl = if D == B and B ~= E and B ~= R and D ~= U then B else -1
+			local tr = if B == R and R ~= E and B ~= D and R ~= U then R else -1
+			local bl = if D == U and D ~= E and D ~= B and U ~= R then D else -1
+			local br = if R == U and R ~= E and R ~= B and U ~= D then R else -1
+			-- where land meets water, the coast follows the shore field instead (corners are only cut between provinces)
+			local land = E ~= 0
+			local coastal = (B ~= 0) ~= land
+				or (D ~= 0) ~= land
+				or (R ~= 0) ~= land
+				or (U ~= 0) ~= land
+				or (id(cx - 1, cy - 1) ~= 0) ~= land
+				or (id(cx + 1, cy - 1) ~= 0) ~= land
+				or (id(cx - 1, cy + 1) ~= 0) ~= land
+				or (id(cx + 1, cy + 1) ~= 0) ~= land
+			local shoreWin: { number }? = nil
+			if coastal then
+				shoreWin = shoreWindow(ctx, cell)
+				if not land or tl == 0 then
+					tl = -1
+				end
+				if not land or tr == 0 then
+					tr = -1
+				end
+				if not land or bl == 0 then
+					bl = -1
+				end
+				if not land or br == 0 then
+					br = -1
+				end
+			end
+			local base = ey * f * ew + ex * f
+			local gx0, gy0 = cx * f, cy * f
+			local s = if E ~= 0 then biomes[E] or FALLBACK else FALLBACK
+			local shade = if E ~= 0 then shadeAt(art, cx, cy) else 2
+			if tl < 0 and tr < 0 and bl < 0 and br < 0 and not coastal then
+				-- fast paths: a whole map pixel of plain ground, rock, plating, open water or space
+				if E ~= 0 then
+					local stamps = STAMPS[s.family]
+					if s.deco == "rock" then
+						for sy = 0, f - 1 do
+							local o = base + sy * ew
+							for sx = 0, f - 1 do
+								buffer.writeu8(sub, o + sx, E)
+								buffer.writeu32(terr, (o + sx) * 4, rockColour(ctx, cell, sx, sy))
+							end
+						end
+						continue
+					elseif s.family == "panels" then
+						local sp = s.sprite :: { [string]: number }
+						local plain = paletteOf(s, false, 2)[1]
+						for sy = 0, f - 1 do
+							local o = base + sy * ew
+							for sx = 0, f - 1 do
+								buffer.writeu8(sub, o + sx, E)
+								buffer.writeu32(terr, (o + sx) * 4, panelColour(ctx, sp, plain, gx0 + sx, gy0 + sy))
+							end
+						end
+						continue
+					elseif stamps then
+						local uniform = true
+						local high = false
+						if s.high then
+							local win = elevWindow(ctx, cell)
+							high = win[5] > HIGH_AT
+							for i = 1, 9 do
+								if (win[i] > HIGH_AT) ~= high then
+									uniform = false
+								end
+							end
+						end
+						if uniform then
+							local pal = groundPalette(ctx, s, high, shade)
+							local stamp = stampOf(stamps, gx0, gy0)
+							for sy = 0, f - 1 do
+								local o = base + sy * ew
+								local row = ((gy0 + sy) % 8) * 8 + 1
+								for sx = 0, f - 1 do
+									buffer.writeu8(sub, o + sx, E)
+									buffer.writeu32(terr, (o + sx) * 4, pal[stamp[row + (gx0 + sx) % 8]])
+								end
+							end
+							continue
+						end
+					end
+				elseif sky then
+					local spaceH = H * f
+					for sy = 0, f - 1 do
+						local o = base + sy * ew
+						local gy = gy0 + sy
+						local c = mix(SPACE.top, SPACE.bottom, math.clamp(gy / spaceH, 0, 1))
+						local onGrid = gy % (32 * f) == 0
+						local flat = tc(ctx, if onGrid then mix(c, SPACE.grid, 0.6) else c, 3)
+						local line = tc(ctx, mix(c, SPACE.grid, 0.6), 3)
+						for sx = 0, f - 1 do
+							buffer.writeu8(sub, o + sx, 0)
+							buffer.writeu32(terr, (o + sx) * 4, if (gx0 + sx) % (32 * f) == 0 then line else flat)
+						end
+					end
+					continue
+				else
+					local win = seaWindow(ctx, cell)
+					local lo, hi = SEA_CAP, 0
+					for i = 1, 9 do
+						lo, hi = math.min(lo, win[i]), math.max(hi, win[i])
+					end
+					local band = seaBand(lo)
+					if band == seaBand(hi) and lo > 0 then
+						local flat, wave = tc(ctx, SEA_BANDS[band], 2), tc(ctx, SEA_WAVES[band], 2)
+						for sy = 0, f - 1 do
+							local o = base + sy * ew
+							for sx = 0, f - 1 do
+								buffer.writeu8(sub, o + sx, 0)
+								buffer.writeu32(
+									terr,
+									(o + sx) * 4,
+									if waveAt(gx0 + sx, gy0 + sy, DETAIL_WAVES, band == 3) then wave else flat
+								)
+							end
+						end
+						continue
+					end
+				end
+			end
+			for sy = 0, f - 1 do
+				for sx = 0, f - 1 do
+					local q, scx, scy = E, cx, cy
+					if sy < half then
+						if sx < half then
+							if tl >= 0 and sx + sy < half then
+								q, scy = tl, cy - 1
+							end
+						elseif tr >= 0 and (f - 1 - sx) + sy < half then
+							q, scx = tr, cx + 1
+						end
+					else
+						if sx < half then
+							if bl >= 0 and sx + (f - 1 - sy) < half then
+								q, scx = bl, cx - 1
+							end
+						elseif br >= 0 and (f - 1 - sx) + (f - 1 - sy) < half then
+							q, scy = br, cy + 1
+						end
+					end
+					if shoreWin then
+						-- (a map pixel the blur would wipe out keeps its middle, so 1-pixel islands and straits stay)
+						local fx, fy = (sx + 0.5) / f - 0.5, (sy + 0.5) / f - 0.5
+						local middle = math.abs(fx) <= 0.25 and math.abs(fy) <= 0.25 and (shoreWin[5] > 0) ~= land
+						if if middle then not land else sample(shoreWin, fx, fy) <= 0 then
+							q = 0
+						elseif q == 0 then
+							-- water turned land: the land beside it, straight across first, then diagonally
+							local hx = if sx < half then cx - 1 else cx + 1
+							local vy = if sy < half then cy - 1 else cy + 1
+							local first, second = id(hx, cy), id(cx, vy)
+							if math.abs(fx) < math.abs(fy) then
+								first, second = second, first
+							end
+							if first ~= 0 then
+								q = first
+							elseif second ~= 0 then
+								q = second
+							else
+								q = id(hx, vy)
+							end
+							scx, scy = cx, cy
+							if q ~= 0 then
+								if q == id(hx, cy) then
+									scx = hx
+								elseif q == id(cx, vy) then
+									scy = vy
+								else
+									scx, scy = hx, vy
+								end
+							end
+						end
+					end
+					local o = base + sy * ew + sx
+					buffer.writeu8(sub, o, q)
+					local lit = if q == E then shade elseif q ~= 0 then shadeAt(art, scx, scy) else 2
+					buffer.writeu32(terr, o * 4, subColour(ctx, cell, q, lit, sx, sy))
+				end
+			end
+		end
+	end
+end
+
+-- Shores: beaches with wet sand and a lip on their south side, surf and foam on the water, a shadow under south
+-- shores; on Skyshards, glowing rims round the platforms and hulls hanging below them.
+local function detailShores(ctx: Ctx, yield: Yield?)
+	local art, d, f = ctx.art, ctx.d, ctx.f
+	local ew, eh = d.ew, d.eh
+	local sub, terr, flags = d.ids, d.terrain, d.flags
+	local sky = art.theme == "sky"
+	local ecols, erows = ew // f, eh // f
+	local reach = f -- sub-pixels checked each way
+	local beach, wet, lip = tc(ctx, SEA.beach, 1), tc(ctx, SEA.wetSand, 1), tc(ctx, SEA.beachLip, 1)
+	local surf, foam, shadow = tc(ctx, SEA.surf, 2), tc(ctx, SEA.foam, 2), tc(ctx, SEA.shadow, 2)
+	local rim = tc(ctx, SPACE.rim, 1)
+	local biomes = art.biomes
+	local function land(o: number): boolean
+		return buffer.readu8(sub, o) ~= 0
+	end
+	for ey = 1, erows - 2 do
+		if yield and ey % 8 == 0 then
+			yield()
+		end
+		for ex = 1, ecols - 2 do
+			local base = ey * f * ew + ex * f
+			-- only map pixels where land meets water somewhere near
+			local first = land(base)
+			local mixed = false
+			for j = -1, 1 do
+				for i = -1, 1 do
+					local o = base + j * f * ew + i * f
+					if land(o) ~= first or land(o + f - 1) ~= first or land(o + (f - 1) * ew) ~= first then
+						mixed = true
+					end
+				end
+			end
+			if not mixed then
+				continue
+			end
+			for sy = 0, f - 1 do
+				for sx = 0, f - 1 do
+					local o = base + sy * ew + sx
+					local q = buffer.readu8(sub, o)
+					-- the nearest sub-pixel of the other kind straight up, down, left or right
+					local near, below, above = reach + 1, false, false
+					for k = 1, reach do
+						local hit = false
+						if land(o - k) ~= (q ~= 0) or land(o + k) ~= (q ~= 0) then
+							hit = true
+						end
+						if land(o + k * ew) ~= (q ~= 0) then
+							hit, below = true, true
+						end
+						if land(o - k * ew) ~= (q ~= 0) then
+							hit, above = true, true
+						end
+						if hit then
+							near = k
+							break
+						end
+					end
+					if near > reach then
+						continue
+					end
+					if q ~= 0 then
+						if sky then
+							if near == 1 then
+								buffer.writeu32(terr, o * 4, rim)
+								buffer.writeu8(flags, o, SHORE)
+							elseif near == 2 then
+								buffer.writeu32(terr, o * 4, mix(rim, buffer.readu32(terr, o * 4), 0.55))
+								buffer.writeu8(flags, o, SHORE)
+							end
+						else
+							local s = biomes[q] or FALLBACK
+							if s.deco ~= "rock" and s ~= BIOMES.ice and s ~= BIOMES.frostfields and near <= f - 1 then
+								buffer.writeu32(
+									terr,
+									o * 4,
+									if below and near <= 2 then lip elseif near == 1 then wet else beach
+								)
+								buffer.writeu8(flags, o, SHORE)
+							end
+						end
+					elseif not sky then
+						if above then
+							buffer.writeu32(terr, o * 4, shadow)
+						elseif near == 1 then
+							buffer.writeu32(terr, o * 4, surf)
+						elseif near == 2 then
+							buffer.writeu32(terr, o * 4, foam)
+						end
+					end
+				end
+			end
+		end
+	end
+	if not sky then
+		return
+	end
+	-- hulls: each column of space below a platform, top down
+	local hullDepth = HULL * f
+	local bx, by = ctx.bx * f, ctx.by * f
+	for x = 0, ew - 1 do
+		local run = hullDepth + 1
+		for y = 0, eh - 1 do
+			local o = y * ew + x
+			if buffer.readu8(sub, o) ~= 0 then
+				run = 0
+			else
+				run += 1
+				if run <= hullDepth then
+					local gx, gy = bx + x, by + y
+					local c: number
+					if run > hullDepth - 2 then
+						c = SPACE.rim
+					else
+						c = scale(SPACE.hull, 1 - (run / f) * 0.09)
+						if gy % (2 * f) == 0 or gx % (3 * f) == 0 then
+							c = scale(c, 0.78) -- plate seams
+						elseif gx % (3 * f) == 1 then
+							c = mix(c, 0xffffff, 0.12)
+						end
+						if
+							hash32(gx // (3 * f), gy // (2 * f), 3) % 23 == 0
+							and gx % (3 * f) == 6
+							and gy % (2 * f) == 4
+						then
+							c = SPACE.rim -- a lit porthole
+						end
+					end
+					buffer.writeu32(terr, o * 4, tc(ctx, c, 3))
+					buffer.writeu8(flags, o, SHORE)
+				end
+			end
+		end
+	end
+end
+
+-- Stars, and the close-up decorations: trees, bushes, rocks, flowers... (one at most per map pixel, chosen by a
+-- hash of the map pixel so every close-up agrees), and village lights or snow sparkles on themed maps.
+local function detailSprites(ctx: Ctx, yield: Yield?)
+	local art, d, f = ctx.art, ctx.d, ctx.f
+	local ew, eh = d.ew, d.eh
+	local sub, terr, flags = d.ids, d.terrain, d.flags
+	local W, H = art.width, art.height
+	local ids = art.ids
+	local ecols, erows = ew // f, eh // f
+	local look = art.look
+	local sky = art.theme == "sky"
+	local shadows: { [number]: number } = {}
+	local star = tc(ctx, SPACE.star, 3)
+	local lamp, glow = NIGHT_LIGHT, mix(NIGHT_LIGHT, 0x3a3550, 0.45)
+	local function id(cx: number, cy: number): number
+		if cx < 0 or cy < 0 or cx >= W or cy >= H then
+			return 0
+		end
+		return buffer.readu8(ids, cy * W + cx)
+	end
+	for ey = 0, erows - 1 do
+		if yield and ey % 8 == 0 then
+			yield()
+		end
+		local cy = ctx.by + ey
+		for ex = 0, ecols - 1 do
+			local cx = ctx.bx + ex
+			local pid = id(cx, cy)
+			local h = hash32(cx, cy, 401)
+			local ax = ex * f + bit32.band(bit32.rshift(h, 16), f - 1)
+			local ay = ey * f + bit32.band(bit32.rshift(h, 20), f - 1)
+			if pid == 0 then
+				if sky and bit32.band(h, 0xff) < 2 then
+					local o = ay * ew + ax
+					if buffer.readu8(sub, o) == 0 and buffer.readu8(flags, o) == 0 then
+						buffer.writeu32(terr, o * 4, star)
+					end
+				end
+				continue
+			end
+			if look == "night" and noise(cx, cy, 91) > NIGHT_LIGHTS then
+				for _, p in DETAIL_PIXELS.light do
+					local x, y = ax + p.dx, ay + p.dy
+					if x >= 0 and y >= 0 and x < ew and y < eh then
+						buffer.writeu32(terr, (y * ew + x) * 4, if p.ch == "Y" then lamp else glow)
+					end
+				end
+				continue
+			elseif look == "winter" and noise(cx, cy, 93) > WINTER_FLAKES then
+				buffer.writeu32(terr, (ay * ew + ax) * 4, 0xffffff)
+				continue
+			end
+			local s = art.biomes[pid] or FALLBACK
+			local choices = DETAIL_DECOS[s]
+			if choices == nil then
+				continue
+			end
+			-- not right by the shore
+			if id(cx - 1, cy) == 0 or id(cx + 1, cy) == 0 or id(cx, cy - 1) == 0 or id(cx, cy + 1) == 0 then
+				continue
+			end
+			local r = bit32.band(h, 0xffff) / 65536
+			local pixels: { Pixel }? = nil
+			for _, choice in choices do
+				if r < choice.upTo then
+					pixels = choice.pixels
+					break
+				end
+			end
+			if pixels == nil then
+				continue
+			end
+			local colours = spriteColours(ctx, s)
+			local flower = tc(ctx, FLOWERS[1 + bit32.rshift(h, 24) % #FLOWERS], 1)
+			for _, p in pixels do
+				local x, y = ax + p.dx, ay + p.dy
+				if x < 0 or y < 0 or x >= ew or y >= eh then
+					continue
+				end
+				local o = y * ew + x
+				if buffer.readu8(sub, o) ~= pid or buffer.readu8(flags, o) ~= 0 then
+					continue
+				end
+				if p.ch == "k" then
+					local c = buffer.readu32(terr, o * 4)
+					local t = shadows[c]
+					if t == nil then
+						t = scale(c, 0.76)
+						shadows[c] = t
+					end
+					buffer.writeu32(terr, o * 4, t)
+				else
+					buffer.writeu32(terr, o * 4, if p.ch == "F" then flower else colours[p.ch])
+				end
+			end
+		end
+	end
+end
+
+type Washes = { inner: { [number]: number }, wash: { [number]: number }, rim: { [number]: number } }
+
+-- The kingdom layer over map pixels cx0..cx1, cy0..cy1 (inside the close-up), into its RGBA pixels: a lighter
+-- wash, a stronger rim, the border line, lines between provinces and the selection. `only`: just this province's
+-- sub-pixels (a repaint).
+local function detailPolitics(ctx: Ctx, cx0: number, cy0: number, cx1: number, cy1: number, only: number?)
+	local art, d, f = ctx.art, ctx.d, ctx.f
+	local ew = d.ew
+	local sub, terr, out = d.ids, d.terrain, d.pixels
+	local W = art.width
+	local near = art.near
+	local owner = art.owner
+	local selected = art.selected
+	local reach = math.max(DETAIL_BORDER + DETAIL_RIM, DETAIL_SELECT)
+	local washes: { [number]: Washes } = {}
+	local function washesOf(o: number): Washes
+		local t = washes[o]
+		if t == nil then
+			t = { inner = {}, wash = {}, rim = {} }
+			washes[o] = t
+		end
+		return t
+	end
+	local function tintOf(o: number, c: number): number
+		local nation = art.color[o] or 0x808080
+		local look = art.styles[o]
+		return if look and look.shades ~= "default"
+			then PixelArt.shadeColor(look.shades, nation, brightness(c))
+			else nation
+	end
+	local function ownerOf(q: number): number
+		return if q == 0 then 0 else owner[q] or 0
+	end
+	local function innerCell(cx: number, cy: number): boolean
+		if cx < 1 or cy < 1 or cx >= W - 1 or cy >= art.height - 1 then
+			return false
+		end
+		local i = cy * W + cx
+		return buffer.readu8(near, i) == 0
+			and buffer.readu8(near, i - 1) == 0
+			and buffer.readu8(near, i + 1) == 0
+			and buffer.readu8(near, i - W) == 0
+			and buffer.readu8(near, i + W) == 0
+	end
+	local dw = d.width
+	for cy = cy0, cy1 do
+		local ey = cy - ctx.by
+		local py = cy - d.y0
+		for cx = cx0, cx1 do
+			local ex = cx - ctx.bx
+			local px = cx - d.x0
+			local base = ey * f * ew + ex * f
+			local pbase = py * f * dw + px * f
+			local E = buffer.readu8(sub, base)
+			if E ~= 0 and innerCell(cx, cy) then
+				if only and E ~= only then
+					continue
+				end
+				-- inside a province: only the wash (and the selection's tint)
+				local o = ownerOf(E)
+				local cache = if E == selected then nil else washesOf(o).inner
+				for sy = 0, f - 1 do
+					local o1, p1 = base + sy * ew, pbase + sy * dw
+					for sx = 0, f - 1 do
+						local c = buffer.readu32(terr, (o1 + sx) * 4)
+						local v = if cache then cache[c] else nil
+						if v == nil then
+							local t = if o ~= 0 then mix(c, tintOf(o, c), DETAIL_ALPHA) else c
+							if E == selected then
+								t = mix(t, 0xffffff, 0.3)
+							end
+							v = rgba(t)
+							if cache then
+								cache[c] = v
+							end
+						end
+						buffer.writeu32(out, (p1 + sx) * 4, v)
+					end
+				end
+				continue
+			end
+			for sy = 0, f - 1 do
+				for sx = 0, f - 1 do
+					local o1 = base + sy * ew + sx
+					local q = buffer.readu8(sub, o1)
+					if only and q ~= only then
+						continue
+					end
+					local c = buffer.readu32(terr, o1 * 4)
+					local v = c
+					if q ~= 0 then
+						local o = ownerOf(q)
+						local dOwn, dId = 99, 99
+						if o ~= 0 or q == selected then
+							for k = 1, reach do
+								local a = buffer.readu8(sub, o1 - k)
+								local b = buffer.readu8(sub, o1 + k)
+								local c1 = buffer.readu8(sub, o1 - k * ew)
+								local c2 = buffer.readu8(sub, o1 + k * ew)
+								if a ~= q or b ~= q or c1 ~= q or c2 ~= q then
+									dId = math.min(dId, k)
+									if
+										o ~= 0
+										and (
+											(a ~= q and ownerOf(a) ~= o)
+											or (b ~= q and ownerOf(b) ~= o)
+											or (c1 ~= q and ownerOf(c1) ~= o)
+											or (c2 ~= q and ownerOf(c2) ~= o)
+										)
+									then
+										dOwn = k
+										break
+									end
+								end
+							end
+						end
+						if o ~= 0 then
+							if dOwn <= DETAIL_BORDER then
+								local look = art.styles[o]
+								local border = art.border[o] or scale(art.color[o] or 0x808080, 0.75)
+								local b = if look and look.border ~= "solid"
+									then PixelArt.borderShade(
+										look.border,
+										border,
+										(cx * f + sx) // 2,
+										(cy * f + sy) // 2
+									)
+									else border
+								v = mix(c, b, BORDER_ALPHA)
+							elseif dOwn <= DETAIL_BORDER + DETAIL_RIM then
+								local cache = washesOf(o).rim
+								v = cache[c]
+								if v == nil then
+									v = mix(c, tintOf(o, c), DETAIL_RIM_ALPHA)
+									cache[c] = v
+								end
+							else
+								local cache = washesOf(o).wash
+								v = cache[c]
+								if v == nil then
+									v = mix(c, tintOf(o, c), DETAIL_ALPHA)
+									cache[c] = v
+								end
+							end
+						end
+						if dOwn > DETAIL_BORDER then
+							local right, down = buffer.readu8(sub, o1 + 1), buffer.readu8(sub, o1 + ew)
+							if (right ~= q and right ~= 0) or (down ~= q and down ~= 0) then
+								v = scale(v, DETAIL_LINE)
+							end
+						end
+						if q == selected then
+							v = if dId <= DETAIL_SELECT then 0xffffff else mix(v, 0xffffff, 0.3)
+						end
+					end
+					buffer.writeu32(out, (pbase + sy * dw + sx) * 4, rgba(v))
+				end
+			end
+		end
+	end
+end
+
+-- Castles (domes on Skyshards) in the close-up, on top of everything. Returns the sub-pixel rectangles drawn.
+local function detailCapitals(ctx: Ctx, within: { number }?)
+	local art, d, f = ctx.art, ctx.d, ctx.f
+	local sprite = if art.theme == "sky" then DETAIL_DOME else DETAIL_CASTLE
+	local h, w = #sprite, #sprite[1]
+	for pid, capital in art.capitals do
+		local x0 = (capital.x - d.x0) * f + f // 2 - w // 2
+		local y0 = (capital.y + 3 - d.y0) * f - h
+		local x1, y1 = x0 + w - 1, y0 + h - 1
+		if x1 < 0 or y1 < 0 or x0 >= d.width or y0 >= d.height then
+			continue
+		end
+		if within and (x1 < within[1] or y1 < within[2] or x0 > within[3] or y0 > within[4]) then
+			continue
+		end
+		local o = art.owner[pid] or 0
+		local flag = if o ~= 0 then art.color[o] or 0x808080 else 0xb0b0b0
+		local palette: { [string]: number } = {
+			F = flag,
+			f = scale(flag, 0.75),
+			R = flag,
+			r = scale(flag, 0.72),
+			M = 0xf2ede4,
+			m = 0xd9d1c3,
+			D = 0x6e6558,
+			W = 0xffe9a0,
+			p = 0x3b3128,
+			C = 0x7cfbef,
+			c = 0x4fc9c0,
+		}
+		for j = 1, h do
+			local row = sprite[j]
+			for i = 1, w do
+				local ch = string.sub(row, i, i)
+				local x, y = x0 + i - 1, y0 + j - 1
+				if ch ~= "." and x >= 0 and y >= 0 and x < d.width and y < d.height then
+					buffer.writeu32(d.pixels, (y * d.width + x) * 4, rgba(palette[ch]))
+				end
+			end
+		end
+		local dirty = d.dirty
+		if dirty == nil then
+			d.dirty = { math.max(x0, 0), math.max(y0, 0), math.min(x1, d.width - 1), math.min(y1, d.height - 1) }
+		else
+			dirty[1] = math.max(math.min(dirty[1], x0), 0)
+			dirty[2] = math.max(math.min(dirty[2], y0), 0)
+			dirty[3] = math.min(math.max(dirty[3], x1), d.width - 1)
+			dirty[4] = math.min(math.max(dirty[4], y1), d.height - 1)
+		end
+	end
+end
+
+local function contextOf(art: Art, d: Detail): Ctx
+	return {
+		art = art,
+		d = d,
+		f = d.factor,
+		bx = d.x0 - DETAIL_MARGIN,
+		by = d.y0 - DETAIL_TOP,
+		theme = { {}, {}, {} },
+		palettes = {},
+		sprites = {},
+	}
+end
+
+-- The map pixel a close-up of this size would start at to be centred on map point (x, y), kept inside the map.
+function PixelArt.detailOrigin(art: Art, d: Detail, x: number, y: number): (number, number)
+	local x0 = math.clamp(math.floor(x - d.cols / 2), 0, math.max(art.width - d.cols, 0))
+	local y0 = math.clamp(math.floor(y - d.rows / 2), 0, math.max(art.height - d.rows, 0))
+	return x0, y0
+end
+
+-- Paint the close-up of map pixels x0.. (d.cols wide), y0.. (d.rows tall) from a painting, kingdoms included.
+-- Pass `yield` to have it called every so often (a client spreads the work over frames).
+function PixelArt.paintDetail(art: Art, d: Detail, x0: number, y0: number, yield: Yield?)
+	d.x0 = math.clamp(math.floor(x0), 0, math.max(art.width - d.cols, 0))
+	d.y0 = math.clamp(math.floor(y0), 0, math.max(art.height - d.rows, 0))
+	d.painted = art
+	table.clear(art.changed) -- what changes from here on is caught up by syncDetail
+	buffer.fill(d.flags, 0, 0)
+	local ctx = contextOf(art, d)
+	detailGround(ctx, yield)
+	detailShores(ctx, yield)
+	detailSprites(ctx, yield)
+	local cols, rows = math.min(d.cols, art.width - d.x0), math.min(d.rows, art.height - d.y0)
+	for cy = d.y0, d.y0 + rows - 1, 8 do
+		if yield then
+			yield()
+		end
+		detailPolitics(ctx, d.x0, cy, d.x0 + cols - 1, math.min(cy + 7, d.y0 + rows - 1), nil)
+	end
+	d.dirty = nil
+	detailCapitals(ctx, nil)
+	d.dirty = { 0, 0, d.width - 1, d.height - 1 }
+end
+
+-- Catch the close-up up with the painting: repaint the kingdom layer of the provinces whose owner, colours, style
+-- or selection changed since (only those, and their castles). Returns true if anything in the close-up changed.
+function PixelArt.syncDetail(art: Art, d: Detail): boolean
+	if d.painted ~= art or next(art.changed) == nil then
+		return false
+	end
+	local ctx = contextOf(art, d)
+	local f = d.factor
+	local any = false
+	local cx1, cy1 = math.min(d.x0 + d.cols, art.width) - 1, math.min(d.y0 + d.rows, art.height) - 1
+	for pid in art.changed do
+		local box = art.boxes[pid]
+		if box == nil then
+			continue
+		end
+		local x0, y0 = math.max(box[1] - 1, d.x0), math.max(box[2] - 1, d.y0)
+		local x1, y1 = math.min(box[3] + 1, cx1), math.min(box[4] + 1, cy1)
+		if x1 < x0 or y1 < y0 then
+			continue
+		end
+		detailPolitics(ctx, x0, y0, x1, y1, pid)
+		local rect = { (x0 - d.x0) * f, (y0 - d.y0) * f, (x1 - d.x0 + 1) * f - 1, (y1 - d.y0 + 1) * f - 1 }
+		local dirty = d.dirty
+		if dirty == nil then
+			d.dirty = { rect[1], rect[2], rect[3], rect[4] }
+		else
+			dirty[1] = math.min(dirty[1], rect[1])
+			dirty[2] = math.min(dirty[2], rect[2])
+			dirty[3] = math.max(dirty[3], rect[3])
+			dirty[4] = math.max(dirty[4], rect[4])
+		end
+		detailCapitals(ctx, rect)
+		any = true
+	end
+	table.clear(art.changed)
+	return any
+end
+
+-- The sub-pixel rectangle (x0, y0, x1, y1, inclusive) of the close-up changed since the last call, or nil.
+function PixelArt.takeDetailDirty(d: Detail): { number }?
+	local r = d.dirty
+	d.dirty = nil
+	return r
+end
+
+-- The colour of one close-up pixel, and the terrain under it before the kingdom wash, 0xRRGGBB; and its province
+-- (for tests and debugging).
+function PixelArt.detailPixel(d: Detail, x: number, y: number): number
+	return unrgba(buffer.readu32(d.pixels, (y * d.width + x) * 4))
+end
+
+function PixelArt.detailTerrain(d: Detail, x: number, y: number): number
+	local o = (y + DETAIL_TOP * d.factor) * d.ew + x + DETAIL_MARGIN * d.factor
+	return buffer.readu32(d.terrain, o * 4)
+end
+
+function PixelArt.detailProvince(d: Detail, x: number, y: number): number
+	local o = (y + DETAIL_TOP * d.factor) * d.ew + x + DETAIL_MARGIN * d.factor
+	return buffer.readu8(d.ids, o)
+end
+
 ------------------------------------------------------------------------------------------------- public API
 
 type MapLike = {
@@ -837,8 +2495,14 @@ function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?, look: string?): A
 		selected = 0,
 		near = buffer.create(w * h),
 		dirty = nil,
+		biomes = {},
+		elevation = buffer.create(w * h),
+		ridge = buffer.create(w * h),
+		level = buffer.create(w * h),
+		sea = buffer.create(w * h),
+		changed = {},
 	}
-	local biomeOf: { [number]: Style } = {}
+	local biomeOf = art.biomes
 	for _, p in map.provinces do
 		biomeOf[p.id] = BIOMES[p.biome] or FALLBACK
 		if p.isCapital then
@@ -1036,8 +2700,7 @@ end
 
 -- The colour of one pixel, 0xRRGGBB (for tests and debugging).
 function PixelArt.pixel(art: Art, x: number, y: number): number
-	local v = buffer.readu32(art.pixels, (y * art.width + x) * 4)
-	return bit32.band(v, 255) * 65536 + bit32.band(bit32.rshift(v, 8), 255) * 256 + bit32.band(bit32.rshift(v, 16), 255)
+	return unrgba(buffer.readu32(art.pixels, (y * art.width + x) * 4))
 end
 
 return PixelArt

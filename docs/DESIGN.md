@@ -216,14 +216,15 @@ The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. Th
 
 - **Province grid:** `MapData` carries each map's province grid (`grid`): which province every map pixel belongs to, at 1 pixel = 1 stud (Earth and Eldmoor 1024×512, Skyshards 1024×768), run-length encoded. `MapGrid` decodes it once per match, and a tap looks up the province under the finger in it.
 - **Painting:** `PixelArt` paints the whole map into an RGBA buffer at match start, in about half a second, using WorldBox's colours (docs/MAPS.md "Art direction"). Skyshards gets space with a faint grid instead of sea.
-  - **Sea:** ocean in three depth bands, with beaches and a shadow under the coast.
-  - **Land:** each biome's base colour, with specks and patches of higher ground.
+  - **Sea:** ocean in three round depth bands, with beaches, a foam line, a shadow under the coast and gentle wave dashes.
+  - **Land:** each biome's base colour with its own small tile pattern (WorldBox-style textures, not random specks), raised patches of higher ground with a lit edge and a dark lip, and slopes lit from the north-west.
   - **Mountains:** grey ridges with a few snow caps.
   - **Sprites:** small ones for trees, pines, palms, crystals and towers.
   - **Owners:** an owned province is washed with its nation's colour at 59%, and each nation has a 1-pixel border in its darker colour (WorldBox's kingdom look). Thin darker lines separate provinces.
   - **Capitals:** a castle, or a dome on Skyshards.
   - **Map themes** (shop cosmetics, docs/MONETIZATION.md 3.2): `Night`, `Winter` and `Autumn` repaint the terrain colours of any map before the owners go on top (moonlit land, a navy sea and village lights; snow and frozen shallows; turning leaves). Nation colours, borders, castles and everything drawn over the map stay the same. The match's theme comes from the theme vote (`MatchState.theme`, sent in the snapshot); a player who chose "Always classic" sees the classic look. `tests/themes.spec.luau` checks on all three maps that every nation colour and border stands out from the themed terrain about as well as on the classic look.
 - **On screen:** the buffer goes into one `EditableImage`, shown by an `ImageLabel` with pixelated resampling on a canvas that `MapView` pans and zooms (from the whole map down to 10 screen pixels per map pixel). An ownership change repaints only the provinces involved and their neighbours, and the image is uploaded at most once a frame.
+- **Close-up detail:** zoomed in past about 4 screen pixels per map pixel (more on big screens, so the view always fits), `MapRenderer` lays a second `EditableImage` over the map: just the part in view (with room to pan), painted by `PixelArt.paintDetail` at 4 × 4 sub-pixels per map pixel (docs/MAPS.md "Art direction"): the biome patterns at full resolution, smooth coasts and province edges, beaches and surf, dense shaded trees and other decorations, lit mountain faces, a lighter kingdom wash (48%) with a stronger band inside each nation's border, the border line, the selection's white outline and a detailed castle. It repaints when the view settles somewhere it doesn't cover (a few milliseconds per frame, the old one staying up meanwhile), catches up with ownership, cosmetic and selection changes by repainting only those provinces, and follows the map theme. Zoomed out again, its image is destroyed so phones get the memory back. It isn't used with the half-size fallback image, or if the device refuses the second image.
 - **On top:** province names and development pips (shown once a province is about 70 screen pixels wide; a name that would overlap a bigger province's name waits until there's room); army sizes show from the region zoom inwards, and zoomed out only on your own armies, Rebels and the selected army, army tokens gliding between province centres, battle and siege badges, and dotted straits and routes. All of them are GUI objects placed on the canvas.
 - **Requirement:** `EditableImage` works in Studio, but fails by default in a published game.
   - **Turning it on:** the owner enables *Allow Mesh / Image APIs*. In Studio it's under Experience Settings → Security; on the Creator Dashboard it's in the game's Configure settings.
@@ -236,7 +237,8 @@ The map is 2D pixel art in the style of WorldBox, drawn in a full-screen GUI. Th
 | Budget | Target |
 | --- | --- |
 | Provinces | ≤ 150 |
-| Map image | one `EditableImage` per match, ≤ 1024×1024 (Earth 1024×512 = 2 MB) |
+| Map image | one `EditableImage` per match, ≤ 1024×1024 (Earth 1024×512 = 2 MB); painted in < 1 s |
+| Close-up image | at most one more, only while zoomed in, ≤ 1024×1024 (a phone in landscape: 1024×476 = 1.9 MB), one extra `ImageLabel`; one repaint < 150 ms of work, spread over frames |
 | Map GUI objects (names, tokens, dots) | ≤ 2,000 |
 | Armies on the map | ≤ 60 |
 | Server work per tick | < 5 ms |
@@ -519,6 +521,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 ### Phase 4: Polish and shop
 
 - [x] 2D pixel-art map for Earth, Eldmoor and Skyshards (WorldBox style, painted at runtime)
+- [x] Map textures: biome tile patterns, height shading, foam and waves on the whole map, and a close-up detail layer when zoomed in (smooth coasts and borders, shaded trees, a lighter kingdom wash)
 - [x] Map vote in the Lobby with the three vote cards
 - [x] Tutorial match
 - [x] Progression rules in Sim: match XP and Glory, level curve, ranks
