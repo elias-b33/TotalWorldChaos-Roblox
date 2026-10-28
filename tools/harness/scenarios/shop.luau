@@ -173,12 +173,12 @@ local function run()
 	nation.gold, nation.manpower = 200, 10000
 	Emulator.press(alice, "Capital")
 	Emulator.run(1)
-	Emulator.press(alice, "Regiment")
+	Emulator.press(alice, H.lineButton(alice))
 	Emulator.run(2)
 	local flagOnMap = alice.localPlayer.PlayerGui:FindFirstChild("Flag" .. A, true)
 	H.expect(flagOnMap ~= nil and flagOnMap:FindFirstChild("Flag") ~= nil, "Alice's flag stands by her capital")
 	H.expect(bob.localPlayer.PlayerGui:FindFirstChild("Flag" .. A, true) ~= nil, "Bob sees it too")
-	-- (every nation's army has a sprite now, a soldier of its race by default: look at Alice's own army)
+	-- (every nation's army has a sprite now, a soldier of its main troop by default: look at Alice's own army)
 	local aliceArmy
 	for id, a in state.armies do
 		if a.owner == A then
@@ -189,17 +189,18 @@ local function run()
 	local skin = aliceToken and aliceToken:FindFirstChild("TokenSkin")
 	H.expect(
 		skin ~= nil and skin:GetAttribute("Skin") == "shield" and skin:GetAttribute("Soldier") == nil,
-		"Bob sees Alice's army with her token skin, the Shield: an equipped token wins over her race's soldier"
+		"Bob sees Alice's army with her token skin, the Shield: an equipped token wins over her troop's soldier"
 	)
-	-- Bob has no token equipped: his army is a soldier of his nation's race
+	-- Bob has no token equipped: his army is a soldier of its troop, his race's line troop
 	local B = H.myNation(bob)
 	local bobsArmy = require("../../../src/shared/Sim/Army").spawn(state, B, state.nations[B].capital, 1000)
+	local bobsLine = require("../../../src/shared/Sim/Troops").ofRole(state.nations[B].race, "line")
 	Emulator.run(1.5)
 	local bobToken = alice.localPlayer.PlayerGui:FindFirstChild("Army" .. bobsArmy.id, true)
 	local soldier = bobToken and bobToken:FindFirstChild("TokenSkin")
 	H.expect(
-		soldier ~= nil and soldier:GetAttribute("Soldier") == state.nations[B].race and soldier:GetAttribute("Skin") == nil,
-		"Alice sees Bob's army as a soldier of his race (" .. state.nations[B].race .. ")"
+		soldier ~= nil and soldier:GetAttribute("Soldier") == bobsLine and soldier:GetAttribute("Skin") == nil,
+		"Alice sees Bob's army as a soldier of his troop (" .. tostring(bobsLine) .. ")"
 	)
 
 	-- her emote over the capital, seen by Bob

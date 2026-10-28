@@ -5,6 +5,8 @@ local Emulator = require("../Emulator")
 local H = require("../H")
 local provinceByName = H.provinceByName
 
+local Troops = require("../../../src/shared/Sim/Troops")
+
 local function run()
 	Emulator.run(1)
 	local alice = Emulator.addClient("Alice")
@@ -50,9 +52,9 @@ local function run()
 	H.expect(beaten.location == rock and beaten.retreating == nil, "it walked home and is a normal army again")
 	H.expect(
 		state.armies[beaten.id] ~= nil
-			and select(2, H.badge(alice, beaten.id)) == require("../../../src/shared/Sim/Troops").icon(state.mapId, "Infantry")
+			and select(2, H.badge(alice, beaten.id)) == Troops.icon(Troops.ofRole(state.nations[A].race, "line"))
 			and not H.iconText(alice, "retreat", "", "Map"),
-		"no flag once home: its badge shows its troops (the map's infantry) again"
+		"no flag once home: its badge shows its troops (its race's line troop) again"
 	)
 	H.shot(alice, "home")
 end

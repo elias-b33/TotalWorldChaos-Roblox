@@ -112,12 +112,12 @@ function Relations.path(nationId: number, from: number, to: number): { number }?
 end
 
 -- Seconds an army takes to walk a route (Sim.Movement.moveTicks): its slowest troop's speed, with a Forest race
--- crossing forest at plains speed and a Swift race marching faster. Without an army, normal infantry speed.
+-- crossing forest at plains speed and a Swift race marching faster. Without an army, normal line-troop speed.
 function Relations.travelTime(path: { number }, army: Snapshot.ArmyRecord?): number
 	local map = ClientState.map()
 	local t = 0
 	if map then
-		local troops: Types.Composition = if army then Troops.decode(army.troops) else { Infantry = 1 }
+		local troops: Types.Composition = if army then Troops.decode(army.troops) else { [Troops.BASE] = 1 }
 		local owner = if army then ClientState.nation(army.owner) else nil
 		local race = if owner then owner.race :: Types.Race else nil
 		for _, id in path do

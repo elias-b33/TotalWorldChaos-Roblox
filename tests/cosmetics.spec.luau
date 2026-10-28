@@ -179,23 +179,23 @@ T.test("animated flags wave between frames; others stay still", function()
 	T.equal(c, d, "the sun doesn't")
 end)
 
-T.test("every race has a soldier: a 12×12 grid of known colour codes, outlined, in the nation's colours", function()
-	local Races = require("../src/shared/Sim/Races")
+T.test("every troop has a soldier: a 12×12 grid of known colour codes, outlined, in the nation's colours", function()
+	local Troops = require("../src/shared/Sim/Troops")
 	local codes = "NDLKWG."
 	for code in CosmeticArt.SOLDIER_COLOURS do
 		T.expect(not string.find("NDLKWG.", code, 1, true), code .. " doesn't shadow a token code")
 		codes ..= code
 	end
 	local seen: { [string]: string } = {}
-	for _, race in Races.LIST do
-		local rows = CosmeticArt.SOLDIERS[race]
-		T.expect(rows ~= nil, race .. " has a soldier")
-		T.equal(#rows, CosmeticArt.TOKEN_SIZE.h, race .. " height")
+	for _, troop in Troops.LIST do
+		local rows = CosmeticArt.SOLDIERS[troop]
+		T.expect(rows ~= nil, troop .. " has a soldier")
+		T.equal(#rows, CosmeticArt.TOKEN_SIZE.h, troop .. " height")
 		for _, row in rows do
-			T.equal(#row, CosmeticArt.TOKEN_SIZE.w, race .. " width")
-			T.expect(string.match(row, "^[" .. codes .. "]+$") ~= nil, race .. " codes: " .. row)
+			T.equal(#row, CosmeticArt.TOKEN_SIZE.w, troop .. " width")
+			T.expect(string.match(row, "^[" .. codes .. "]+$") ~= nil, troop .. " codes: " .. row)
 		end
-		local px, w, h = CosmeticArt.soldier(race, 0x3cd74b, 0x47b052)
+		local px, w, h = CosmeticArt.soldier(troop, 0x3cd74b, 0x47b052)
 		T.equal(w, 12)
 		T.equal(h, 12)
 		local nation, border, outline, opaque = 0, 0, 0, 0
@@ -210,18 +210,18 @@ T.test("every race has a soldier: a 12×12 grid of known colour codes, outlined,
 				end
 			end
 		end
-		T.expect(nation >= 14, race .. " wears its nation's colour (" .. nation .. " pixels)")
-		T.expect(border >= 4, race .. " has a belt in the border colour")
-		T.expect(outline >= 25, race .. " is outlined")
-		T.expect(opaque < 144, race .. " stands on the map, transparent round it")
+		T.expect(nation >= 14, troop .. " wears its nation's colour (" .. nation .. " pixels)")
+		T.expect(border >= 4, troop .. " has a belt in the border colour")
+		T.expect(outline >= 25, troop .. " is outlined")
+		T.expect(opaque < 144, troop .. " stands on the map, transparent round it")
 		local key = buffer.tostring(px)
-		T.expect(seen[key] == nil, race .. " looks different from " .. tostring(seen[key]))
-		seen[key] = race
+		T.expect(seen[key] == nil, troop .. " looks different from " .. tostring(seen[key]))
+		seen[key] = troop
 	end
 	local unknown = CosmeticArt.soldier("Gnomes", 0x3cd74b, 0x47b052)
 	T.expect(
 		buffer.tostring(unknown) == buffer.tostring((CosmeticArt.token("square", 0x3cd74b, 0x47b052))),
-		"no race: the square"
+		"an unknown troop: the square"
 	)
 end)
 

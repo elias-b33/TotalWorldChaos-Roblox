@@ -104,7 +104,7 @@ local function run()
 	Emulator.press(alice, "Capital")
 	Emulator.run(1)
 	for _ = 1, 5 do
-		Emulator.press(alice, "Regiment")
+		Emulator.press(alice, H.lineButton(alice))
 		Emulator.run(1.2)
 	end
 	win(alice)

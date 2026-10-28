@@ -27,7 +27,7 @@ local function run()
 	Emulator.press(alice, "Farm")
 	Emulator.run(1.5)
 	H.expect(capital.building == "Farm", "Farm was built")
-	Emulator.press(alice, "Regiment")
+	Emulator.press(alice, H.lineButton(alice))
 	Emulator.run(1.5)
 	local armies = 0
 	for _, a in state.armies do

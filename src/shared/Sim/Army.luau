@@ -1,7 +1,8 @@
 --!strict
 -- Army bookkeeping: ids, spawning, reinforcing, and the army's composition (men per troop type, docs/DESIGN.md
 -- "Troops"). Army.men is the total and Army.troops the composition; Army.setTroops is the one place either changes,
--- so they always agree: recruits, merges, battle losses and a Meteor all go through it.
+-- so they always agree: recruits, merges, battle losses and a Meteor all go through it. Without a troop type, a
+-- nation's new army is its race's line troop and a neutral one (garrisons, Rebels) Troops.BASE.
 
 local Troops = require("./Troops")
 local Types = require("../Types")
@@ -80,6 +81,12 @@ function Army.idleAt(state: MatchState, owner: number, location: number): Army?
 end
 
 -- A new army of `men` men of one troop type (infantry unless told otherwise: garrisons, Rebels, tests).
+-- The troop a new army is made of when none is given: the owner's line troop, Troops.BASE for neutral armies.
+local function defaultTroop(state: MatchState, owner: number): Troop
+	local nation = state.nations[owner]
+	return Troops.ofRole(if nation then nation.race else nil, "line") or Troops.BASE
+end
+
 function Army.spawn(state: MatchState, owner: number, location: number, men: number, troop: Troop?): Army
 	local army: Army = {
 		id = Army.nextId(state),
@@ -91,7 +98,7 @@ function Army.spawn(state: MatchState, owner: number, location: number, men: num
 		moveProgress = 0,
 		inBattle = false,
 	}
-	local kind: Troop = troop or Troops.BASE
+	local kind: Troop = troop or defaultTroop(state, owner)
 	Army.setTroops(army, { [kind] = men })
 	state.armies[army.id] = army
 	return army
@@ -99,7 +106,7 @@ end
 
 -- New regiments join an idle army already in the province, or form a new one.
 function Army.reinforce(state: MatchState, owner: number, location: number, men: number, troop: Troop?): Army
-	local kind: Troop = troop or Troops.BASE
+	local kind: Troop = troop or defaultTroop(state, owner)
 	local army = Army.idleAt(state, owner, location)
 	if army then
 		Army.add(army, { [kind] = men })

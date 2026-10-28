@@ -127,7 +127,7 @@ Province names are generated from per-region word lists (Hoarreach, Silvershade,
 ```
 
 - **Home shards:** 8 provinces around an impassable storm spire. The capital (Landing) is on the far side from the Heartstone, and the Gate faces it.
-- **Races: the sci-fi cast.** Five peoples of space: human Marines (with mechs), Robots (drones), an Insectoid hive (hive warriors), Crystal folk (golems) and Energy beings (storm wisps); the shared troops are troopers, gunners and hover bikes here. Every shard has the same land, so each race holds two opposite shards and no two neighbouring shards share one: Aurora and Solace Marines, Zephyr and Ember Insectoids, Nimbus and Rime Crystal folk, Tempest and Verdance Robots, Halo and Umbra Energy beings. Races are the one thing that differs between shards.
+- **Races: the sci-fi cast.** Five peoples of space, each with its own five troops (docs/DESIGN.md "Troops"): human Marines (troopers to mechs), Robots (automatons to juggernauts), an Insectoid hive (swarmlings to hive warriors), Crystal folk (shardlings to golems) and Energy beings (sparks to stormlords). Every shard has the same land, so each race holds two opposite shards and no two neighbouring shards share one: Aurora and Solace Marines, Zephyr and Ember Insectoids, Nimbus and Rime Crystal folk, Tempest and Verdance Robots, Halo and Umbra Energy beings. Races are the one thing that differs between shards.
 - **Drift isles:** 10 two-province islets between neighbouring shards. These are the first contested land.
 - **The Heartstone:** 10 Approaches (development 3, 2,000-man garrisons) and 10 Sanctums (development 4, 3,000-man garrisons) around the Heartstone Spire. That's almost two-thirds of the map's neutral development in one place.
 
@@ -171,25 +171,25 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 
 Each race builds its own capital (docs/DESIGN.md "Races"), so you see at a glance whose kingdom it is. The owner's colour is on its flag, roofs and banners, and a capital keeps its founders' look when someone else takes it: only the flag changes. Skyshards' peoples build in its sci-fi materials (steel, crystal, cyan and red light).
 
-| Map | Race | Capital (close-up) | Army token |
+| Map | Race | Capital (close-up) | Soldiers (line, ranged, fast, elite, special) |
 | --- | --- | --- | --- |
-| Earth | Kingdom | a castle: round towers under tall cones and a keep with a pointed roof in the owner's colour, a gate | a man-at-arms in a great helm with a heater shield and a raised sword |
-| Earth | Empire | a marble palace: steps, a colonnade, a pediment roofed in the owner's colour with a gold wreath | a legionary with a red-crested helmet, a tall curved shield and a short sword |
-| Earth | Nomads | a great felt tent with a band in the owner's colour and a painted door, a horse-tail standard | a horse archer in a fur-trimmed cap with a recurve bow |
-| Earth | Republic | a harbour: a lantern tower, a merchants' hall roofed in the owner's colour, a boat with a sail, the water | a crossbowman in a broad kettle hat |
-| Earth | Clans | a tower house with the owner's banner on a crag, a palisade of stakes | a bearded pikeman in a steel cap |
-| Eldmoor | Humans | a stone castle: two towers and a keep with roofs in the owner's colour | a footman with a kite shield and a spear |
-| Eldmoor | Elves | a tree hall: a great pale-barked tree, its crown lit from the north-west, little halls with the owner's roofs up in the leaves, lanterns, a glowing door between the roots | an elf archer with a drawn bow |
-| Eldmoor | Orcs | a spiked war camp: a hide tent on crossed poles with a band in the owner's colour, bone spikes, a fire in its door, a palisade of sharpened stakes | a green orc warrior with horns, tusks and a cleaver |
-| Eldmoor | Dwarves | a stone hall carved into a snowy mountain: pillars, a gable and banners in the owner's colour, a gate glowing with a forge | a red-bearded dwarf with an axe |
-| Eldmoor | Lizardfolk | a stepped pyramid of mossy stone with a stair, a shrine with a glowing door and a crest in the owner's colour, reeds | a lizard warrior with an orange crest and a spear |
-| Skyshards | Marines | a glowing dome on a steel base | a marine in power armour with a cyan visor and a rifle |
-| Skyshards | Robots | a factory with cyan windows and a red-lit bay, a radar dish, a mast with red lights | a robot with an antenna light and a red eye strip |
-| Skyshards | Insectoids | a ridged hive spire of purple chitin with glowing amber cells and spikes | an insect warrior with antennae, compound eyes and four arms |
-| Skyshards | Crystal folk | a cluster of glowing cyan and violet shards on a steel platform | a crystal being with a faceted glowing head |
-| Skyshards | Energy beings | a floating orb of light over a lattice pylon, a ring and arcs | an energy being: a crackling orb with a tail |
+| Earth | Kingdom | a castle: round towers under tall cones and a keep with a pointed roof in the owner's colour, a gate | Earth's shared four (a spearman with a round shield, a hooded bowman, a horseman, a catapult) and Knights: a man-at-arms in a great helm with a heater shield and a raised sword |
+| Earth | Empire | a marble palace: steps, a colonnade, a pediment roofed in the owner's colour with a gold wreath | the shared four and Legionaries: a red-crested helmet, a tall curved shield and a short sword |
+| Earth | Nomads | a great felt tent with a band in the owner's colour and a painted door, a horse-tail standard | the shared four and Horse archers: a fur-trimmed cap and a recurve bow |
+| Earth | Republic | a harbour: a lantern tower, a merchants' hall roofed in the owner's colour, a boat with a sail, the water | the shared four and Crossbowmen: a broad kettle hat and a crossbow |
+| Earth | Clans | a tower house with the owner's banner on a crag, a palisade of stakes | the shared four and Pikemen: a bearded pikeman in a steel cap |
+| Eldmoor | Humans | a stone castle: two towers and a keep with roofs in the owner's colour | a footman with a kite shield and a spear, a yeoman with a longbow, a lancer on a grey horse, a knight (Earth's), a mage in a pointed hat with a glowing staff |
+| Eldmoor | Elves | a tree hall: a great pale-barked tree, its crown lit from the north-west, little halls with the owner's roofs up in the leaves, lanterns, a glowing door between the roots | a warden with a leaf-shaped shield, an elf archer, an elf on an elk, a hooded ranger, a walking tree |
+| Eldmoor | Orcs | a spiked war camp: a hide tent on crossed poles with a band in the owner's colour, bone spikes, a fire in its door, a palisade of sharpened stakes | a green grunt with horns, tusks and a cleaver, a javelin thrower, an orc on a grey wolf, a war-painted berserker with two axes, a blue-grey troll with a club |
+| Eldmoor | Dwarves | a stone hall carved into a snowy mountain: pillars, a gable and banners in the owner's colour, a gate glowing with a forge | a red-bearded dwarf with an axe, a dwarf with a smoking firelock, a dwarf on a woolly ram, an ironguard in plate with a tower shield, a sapper with a lamp cap and a powder keg |
+| Eldmoor | Lizardfolk | a stepped pyramid of mossy stone with a stair, a shrine with a glowing door and a crest in the owner's colour, reeds | a crested lizard with a spear, a blowgunner, a lizard on a running raptor, a crocodile-headed guard with a mace, a stalker under a cloak of reeds |
+| Skyshards | Marines | a glowing dome on a steel base | a marine in power armour with a cyan visor and a rifle, a heavy gunner, a marine on a hover bike, a walking mech, a tracked gun |
+| Skyshards | Robots | a factory with cyan windows and a red-lit bay, a radar dish, a mast with red lights | a robot with an antenna light and a red eye strip, a dome-headed laserbot, a rotor drone, a juggernaut on tracks, a spider robot |
+| Skyshards | Insectoids | a ridged hive spire of purple chitin with glowing amber cells and spikes | an insect warrior with four arms, an acid-dripping spitter, a giant wasp, a horned hive warrior with scythes, a digging beetle |
+| Skyshards | Crystal folk | a cluster of glowing cyan and violet shards on a steel platform | a crystal being with a faceted glowing head, a caster with a prism, a rider on a floating shard, a crystal golem, a humming resonator |
+| Skyshards | Energy beings | a floating orb of light over a lattice pylon, a ring and arcs | a crackling orb with a tail, an arc caster, a racing storm wisp, a crowned stormlord, a little storm cloud |
 
-On the whole map each capital is a 5 × 6 pixel sprite in the same colours; in the close-up it is a 21 × 22 sub-pixel building, and the capital's name stands below it. Armies are little soldiers of their nation's race unless it has a token skin equipped, and each army's badge shows the icon of the troop type it is mostly made of, as the map draws it (docs/DESIGN.md "Map rendering"). `lune run tools/harness/race_sheet` paints every race's icons, soldier and capital at the sizes the game shows them into `tools/harness/out/gui/races.png`; `lune run tools/harness/play kingdoms` (Skyshards, or `MAP=earth` / `MAP=eldmoor`) photographs each race's capital and army at the three zooms in a real match.
+On the whole map each capital is a 5 × 6 pixel sprite in the same colours; in the close-up it is a 21 × 22 sub-pixel building, and the capital's name stands below it. An army is a little soldier of the troop type it is mostly made of (each of a race's five troops has its own) unless its nation has a token skin equipped, and its badge shows that troop's icon (docs/DESIGN.md "Troops", "Map rendering"). `lune run tools/harness/race_sheet` paints every race's icons, line soldier and capital at the sizes the game shows them into `tools/harness/out/gui/races.png`, and `lune run tools/harness/troop_sheet` every race's five troops (icons, soldiers, numbers) into `tools/harness/out/gui/troops.png`; `lune run tools/harness/play kingdoms` (Skyshards, or `MAP=earth` / `MAP=eldmoor`) photographs each race's capital and army at the three zooms in a real match.
 
 ### Map themes
 

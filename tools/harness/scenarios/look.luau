@@ -193,8 +193,9 @@ local function run()
 	local pips = name:FindFirstChild("Pips")
 	H.expect(pips ~= nil and pips.Visible, "with its development pips under it")
 	local text, icon = H.badge(alice, guard.id)
-	local infantry = require("../../../src/shared/Sim/Troops").icon(state.mapId, "Infantry") -- the map's own name for it
-	H.expect(text == "3k" and icon == infantry, "the army's badge: its main troop's icon (" .. infantry .. ") and 3k")
+	local Troops = require("../../../src/shared/Sim/Troops")
+	local line = Troops.icon(Troops.ofRole(state.nations[A].race, "line")) -- (Army.spawn: the nation's line troop)
+	H.expect(text == "3k" and icon == line, "the army's badge: its main troop's icon (" .. line .. ") and 3k")
 	local badge = H.mapObject(alice, "Army" .. guard.id):FindFirstChild("Strength")
 	H.expect(badge:FindFirstChildOfClass("UIStroke").Color == Theme.color.gold, "the selected army's badge is outlined in gold")
 	-- a province's status pills as "icon:text" words, sorted

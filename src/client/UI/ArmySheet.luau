@@ -1,7 +1,8 @@
 --!strict
 -- Bottom sheet while an army is selected (docs/DESIGN.md "Moving armies"): tap the army, tap the destination,
 -- see the route and arrival time, tap Go. Built from the UI kit: a title with the army's size, its composition as
--- chips (a troop icon and its men each, docs/DESIGN.md "Troops"), a hint line with an icon, and Go / Cancel buttons.
+-- chips (a troop icon and its men each, docs/DESIGN.md "Troops"; with its name while three or fewer types fit the
+-- row), its special's trick when it has one, a hint line with an icon, and Go / Cancel buttons.
 
 local Players = game:GetService("Players")
 
@@ -13,12 +14,14 @@ local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
+local NAMED_CHIPS = 3 -- up to this many troop types, a chip shows the troop's name; more show the icon and men only
 
 local ArmySheet = {}
 
 local sheet: Frame
 local title: TextLabel
 local chips: Frame
+local trick: TextLabel
 local hint: TextLabel
 local hintIcon: GuiObject
 local buttons: Frame
@@ -41,14 +44,25 @@ local function render()
 		return
 	end
 	title.Text = string.format("%s at %s", shortMen(army.men), map.provinces[army.location].name)
-	-- the composition: one chip per troop type in the stack
+	-- the composition: one chip per troop type in the stack, in role order; and its special's trick
 	Widgets.clear(chips)
-	for i, part in RaceInfo.composition(army.troops) do
-		local name = RaceInfo.troopName(part.troop) -- as the map calls it
-		local chip = Widgets.chip(chips, RaceInfo.troopIcon(part.troop), shortMen(part.men) .. " " .. name, nil, 26)
+	local parts = RaceInfo.composition(army.troops)
+	local trickText = ""
+	for i, part in parts do
+		local text = shortMen(part.men)
+		if #parts <= NAMED_CHIPS then
+			text ..= " " .. RaceInfo.troopName(part.troop)
+		end
+		local chip = Widgets.chip(chips, RaceInfo.troopIcon(part.troop), text, nil, 26)
 		chip.Name = "Troop_" .. part.troop
 		chip.LayoutOrder = i
+		local t = RaceInfo.troopTrick(part.troop)
+		if t ~= "" then
+			trickText = RaceInfo.troopName(part.troop) .. ": " .. string.lower(string.sub(t, 1, 1)) .. string.sub(t, 2)
+		end
 	end
+	trick.Text = trickText
+	trick.Visible = trickText ~= ""
 	Widgets.clear(buttons)
 	local dest, path = sel.dest, sel.path
 	local icon = "arrow"
@@ -106,14 +120,18 @@ function ArmySheet.init(goHandler: (number, number) -> (), cancelHandler: () -> 
 	chips.LayoutOrder = 2
 	chips.Parent = sheet
 	Widgets.list(chips, true, Theme.space.s)
+	trick = Widgets.label(sheet, "", Theme.text.small, 18)
+	trick.Name = "Trick"
+	trick.TextColor3 = Theme.color.textDim
+	trick.LayoutOrder = 3
 	hint = Widgets.label(sheet, "", Theme.text.body, 22)
-	hint.LayoutOrder = 3
+	hint.LayoutOrder = 4
 	hintIcon = Widgets.leadIcon(hint, "arrow", Theme.size.icon)
 	buttons = Instance.new("Frame")
 	buttons.Name = "Buttons"
 	buttons.BackgroundTransparency = 1
 	buttons.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
-	buttons.LayoutOrder = 4
+	buttons.LayoutOrder = 5
 	buttons.Parent = sheet
 	Widgets.list(buttons, true, 8)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

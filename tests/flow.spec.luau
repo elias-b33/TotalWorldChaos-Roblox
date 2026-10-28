@@ -9,6 +9,7 @@ local Match = require("../src/shared/Sim/Match")
 local Rng = require("../src/shared/Sim/Rng")
 local Snapshot = require("../src/shared/Snapshot")
 local T = require("./TestKit")
+local Troops = require("../src/shared/Sim/Troops")
 local Tick = require("../src/shared/Sim/Tick")
 
 -- What a keen player might tap every few seconds: develop the poorest province, then build, then recruit.
@@ -32,8 +33,9 @@ local function greedyIntent(state, nationId: number)
 	-- recruit with the gold left over after saving for the next development (recruiting every spare coin piles up
 	-- upkeep until income can never pay for a development again)
 	local saving = if best then Economy.developCost(state.provinces[best].development) else 0
-	if state.nations[nationId].gold >= saving + Config.Troops.Infantry.gold then
-		return { kind = "Recruit", province = state.nations[nationId].capital, regiments = 1, troop = "Infantry" }
+	local line = Troops.ofRole(state.nations[nationId].race, "line") or Troops.BASE
+	if state.nations[nationId].gold >= saving + Config.Troops[line].gold then
+		return { kind = "Recruit", province = state.nations[nationId].capital, regiments = 1, troop = line }
 	end
 	return { kind = "Develop", province = best or state.nations[nationId].capital }
 end

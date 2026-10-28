@@ -101,11 +101,6 @@ function Troops.canRecruit(race: Race?, troop: Troop): boolean
 	return Troops.isTroop(troop) and table.find(Troops.roster(race), troop) ~= nil
 end
 
--- What a nation of this race recruits, in role order: line, ranged, fast, elite, special.
-function Troops.available(race: Race?): { Troop }
-	return Troops.roster(race)
-end
-
 -- What the UI calls a troop.
 function Troops.name(troop: Troop): string
 	local stats = STATS[troop]

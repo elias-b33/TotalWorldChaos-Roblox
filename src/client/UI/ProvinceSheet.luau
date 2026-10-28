@@ -28,6 +28,8 @@ local Theme = Widgets.Theme
 local SHEET_WIDTH = 560
 local CELL = Vector2.new(128, 52) -- action buttons: at least 44 px tall on phones
 local CHIP_HEIGHT = 26
+local LONG_CAPTION = 12 -- characters that fit a cell's caption at the kit's size; longer ones (troop names like
+-- "Crocodile guard") are set a size or two smaller
 
 local TERRAIN_ICONS: { [string]: string } = { Plains = "farm", Forest = "tree", Hills = "hills", Mountain = "mountain" }
 local BUILDING_ICONS: { [string]: string } = { Farm = "farm", Barracks = "sword", Fort = "castle" }
@@ -63,6 +65,9 @@ local function action(
 )
 	local b = Widgets.actionButton(actions, icon, caption, costs, CELL, color, onPress, name)
 	b.LayoutOrder = #actions:GetChildren()
+	if #caption > LONG_CAPTION then
+		b.TextSize = if #caption > LONG_CAPTION + 1 then Theme.text.small - 2 else Theme.text.small - 1
+	end
 	if not enabled then
 		Widgets.setEnabled(b, false)
 	end

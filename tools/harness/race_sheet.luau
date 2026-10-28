@@ -1,9 +1,9 @@
 --!nocheck
 -- Paints every map's cast at the sizes the game shows it, so new art can be checked by eye (docs/DESIGN.md
--- "Races"): per race, a row with its icon and its elite's icon (16, 20, 24 and 32 px on the UI's navy), its soldier
--- token (18 px as on the map, and 36 px) in two nation colours, its capital on the whole map (5 × 6 at 1, 3.5 and 8
--- screen pixels per map pixel) and close up (21 × 22 at 1 and 2.5 screen pixels per sub-pixel), on its map's ground;
--- then each map's shared troop icons.
+-- "Races"): per race, a row with its icon and its elite's icon (16, 20, 24 and 32 px on the UI's navy), its line
+-- troop's soldier token (18 px as on the map, and 36 px) in two nation colours, its capital on the whole map (5 × 6 at
+-- 1, 3.5 and 8 screen pixels per map pixel) and close up (21 × 22 at 1 and 2.5 screen pixels per sub-pixel), on its
+-- map's ground. Every troop of every roster: tools/harness/troop_sheet.luau.
 --
 --   lune run tools/harness/race_sheet        # -> tools/harness/out/gui/races.png
 
@@ -30,7 +30,7 @@ for _, id in Maps.ids do
 end
 local rows = 0
 for _, map in maps do
-	rows += #Races.forMap(map.id) + 1
+	rows += #Races.forMap(map.id)
 end
 local H = rows * ROW + 8
 local sheet = buffer.create(W * H * 4)
@@ -76,9 +76,9 @@ for _, map in maps do
 	for _, race in Races.forMap(map.id) do
 		local y0 = row * ROW + 4
 		fill(0, y0, 300, ROW - 4, NAVY)
-		local elite = Troops.elite(race)
+		local elite = Troops.ofRole(race, "elite")
 		local x = 6
-		for _, name in { string.lower(race), Troops.icon(map.id, elite) } do
+		for _, name in { string.lower(race), Troops.icon(elite) } do
 			local pixels = IconArt.paint(name)
 			for _, size in { 16, 20, 24, 32 } do
 				blit(pixels, 16, 16, x, y0 + 6 + (32 - size), size / 16)
@@ -86,12 +86,12 @@ for _, map in maps do
 			end
 			x += 6
 		end
-		label(6, y0 + 44, string.format("%s (%s) · %s", Races.name(race), map.title, Troops.name(map.id, elite)))
+		label(6, y0 + 44, string.format("%s (%s) · %s", Races.name(race), map.title, Troops.name(elite)))
 		label(6, y0 + 60, Races.bonusText(race))
-		-- soldiers on the map's ground
+		-- its line troop's soldiers on the map's ground
 		fill(300, y0, 200, ROW - 4, GROUND[map.theme])
 		for i, colours in NATIONS do
-			local pixels = CosmeticArt.soldier(race, colours[1], colours[2])
+			local pixels = CosmeticArt.soldier(Troops.ofRole(race, "line"), colours[1], colours[2])
 			blit(pixels, 12, 12, 300 + 8 + (i - 1) * 90, y0 + 30, 1.5)
 			blit(pixels, 12, 12, 300 + 36 + (i - 1) * 90, y0 + 12, 3)
 		end
@@ -109,21 +109,6 @@ for _, map in maps do
 		end
 		row += 1
 	end
-	-- the map's shared troops
-	local y0 = row * ROW + 4
-	fill(0, y0, W, ROW - 4, NAVY)
-	local x = 6
-	for _, troop in Troops.SHARED do
-		local pixels = IconArt.paint(Troops.icon(map.id, troop))
-		for _, size in { 16, 20, 24, 32 } do
-			blit(pixels, 16, 16, x, y0 + 6 + (32 - size), size / 16)
-			x += size + 4
-		end
-		label(x - 88, y0 + 44, Troops.name(map.id, troop))
-		x += 40
-	end
-	label(6, y0 + 64, map.title .. ": the shared troops")
-	row += 1
 end
 
 fs.writeDir(OUT)

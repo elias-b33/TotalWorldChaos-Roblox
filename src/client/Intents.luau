@@ -111,7 +111,7 @@ function Intents.build(provinceId: number, building: string)
 	send("RequestBuild", provinceId, building)
 end
 
--- troop: Infantry | Archers | Cavalry, or the nation's race's elite (Knights | Rangers | Berserkers | Ironguard)
+-- troop: one of the five of the nation's race's roster (Config.Races[race].roster); the server refuses any other
 function Intents.recruit(provinceId: number, regiments: number, troop: string)
 	send("RequestRecruit", provinceId, regiments, troop)
 end

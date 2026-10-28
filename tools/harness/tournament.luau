@@ -64,16 +64,15 @@ end
 
 local MINUTES = Config.Phases.MatchEndTick // 60
 
--- The troop types a map's nations can recruit: the shared roles, then its races' elites (Troops.LIST order).
+-- The troop types a map's nations can recruit: each race's roster in role order (line, ranged, fast, elite,
+-- special), the map's races in cast order, every troop once (Earth's cultures share four).
 local function mapTroops(mapId: string): { string }
 	local out = {}
-	for _, troop in Troops.LIST do
-		local used = Troops.isShared(troop)
-		for _, race in Races.forMap(mapId) do
-			used = used or Troops.elite(race) == troop
-		end
-		if used then
-			table.insert(out, troop)
+	for _, race in Races.forMap(mapId) do
+		for _, troop in Troops.roster(race) do
+			if table.find(out, troop) == nil then
+				table.insert(out, troop)
+			end
 		end
 	end
 	return out
@@ -544,7 +543,7 @@ for _, mapId in mapIds do
 		local mix = {}
 		for _, troop in mapTroops(mapId) do
 			local share = (troopMenAt[m][troop] or 0) / math.max(troopMenAt[m].all or 0, 1)
-			table.insert(mix, string.format("%s %d%%", Troops.name(mapId, troop), math.floor(100 * share + 0.5)))
+			table.insert(mix, string.format("%s %d%%", Troops.name(troop), math.floor(100 * share + 0.5)))
 		end
 		print(string.format("  men by troop at %d:00: %s", m, table.concat(mix, ", ")))
 	end
@@ -582,13 +581,22 @@ for _, mapId in mapIds do
 			troopLine,
 			string.format(
 				"%s %.1f (%d%%)",
-				Troops.name(mapId, troop),
+				Troops.name(troop),
 				n / seeds,
 				math.floor(100 * n / math.max(troopTotal, 1) + 0.5)
 			)
 		)
 	end
 	print("regiments recruited per match: " .. table.concat(troopLine, ", "))
+	local roleLine = {}
+	for _, role in Troops.ROLES do
+		local n = 0
+		for troop, r in recruits do
+			n += if Troops.role(troop) == role then r else 0
+		end
+		table.insert(roleLine, string.format("%s %d%%", role, math.floor(100 * n / math.max(troopTotal, 1) + 0.5)))
+	end
+	print("  by role: " .. table.concat(roleLine, ", "))
 	print(string.format("bot commands %d, rejected %d", commands, rejected))
 	for k, v in reasons do
 		print(string.format("  rejected %s × %d", k, v))

@@ -1,7 +1,7 @@
 --!strict
 -- What is drawn on the 2D map (docs/DESIGN.md "Map rendering"): the pixel-art image painted by PixelArt
 -- (terrain, owners, the selected province, each race's capitals), straits, province names with their development
--- pips, army tokens (a soldier of the nation's race, or its token skin) gliding from province to province with their
+-- pips, army tokens (a soldier of its main troop, or its token skin) gliding from province to province with their
 -- strength badges (the icon of the troop type an army is mostly made of), each province's status pills (battle,
 -- siege, Primordial powers), the coalition leader's crown and route lines. Everything sits on MapView's canvas,
 -- placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
@@ -1320,7 +1320,7 @@ local function refreshArmies()
 			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon, its token its soldier
 			resoldier(t)
 		end
-		local troopIcon = if t.troop then RaceInfo.troopIcon(t.troop) else nil -- as this map draws it
+		local troopIcon = if t.troop then RaceInfo.troopIcon(t.troop) else nil
 		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating, troopIcon)
 		local text = MapBadges.shortMen(army.men)
 		if t.icon ~= icon or t.text ~= text then

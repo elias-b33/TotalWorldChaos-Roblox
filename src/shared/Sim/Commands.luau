@@ -74,8 +74,8 @@ local function build(
 	return true, nil
 end
 
--- Regiments of one troop type: the shared roles for everyone, an elite only for the races whose elite it is
--- (WrongRace).
+-- Regiments of one troop type: only the five of the nation's race's roster (a nation is one race for the whole
+-- match: any other troop is WrongRace).
 local function recruit(
 	state: MatchState,
 	nationId: number,

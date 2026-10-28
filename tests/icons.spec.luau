@@ -170,18 +170,15 @@ T.test("the previous-page arrow mirrors the next-page one", function()
 	end
 end)
 
-T.test("every map's races and every troop as each map draws it have an icon", function()
-	local Maps = require("../src/shared/Maps")
+T.test("every map's races and every troop have an icon, and they all differ", function()
 	local Races = require("../src/shared/Sim/Races")
 	local Troops = require("../src/shared/Sim/Troops")
 	for _, race in Races.LIST do
 		T.expect(IconArt.rows(string.lower(race)) ~= nil, race .. " has an icon")
 	end
-	for _, mapId in Maps.ids do
-		for _, troop in Troops.LIST do
-			local icon = Troops.icon(mapId, troop)
-			T.expect(IconArt.rows(icon) ~= nil, mapId .. ": " .. troop .. " has an icon (" .. icon .. ")")
-		end
+	for _, troop in Troops.LIST do
+		local icon = Troops.icon(troop)
+		T.expect(IconArt.rows(icon) ~= nil, troop .. " has an icon (" .. icon .. ")")
 	end
 	-- the races' heads and the troops' icons all differ
 	local seen: { [string]: string } = {}
@@ -189,10 +186,8 @@ T.test("every map's races and every troop as each map draws it have an icon", fu
 	for _, race in Races.LIST do
 		table.insert(names, string.lower(race))
 	end
-	for _, mapId in Maps.ids do
-		for _, troop in Troops.LIST do
-			table.insert(names, Troops.icon(mapId, troop))
-		end
+	for _, troop in Troops.LIST do
+		table.insert(names, Troops.icon(troop))
 	end
 	for _, name in names do
 		local key = table.concat(IconArt.rows(name) :: { string })
@@ -201,10 +196,40 @@ T.test("every map's races and every troop as each map draws it have an icon", fu
 	end
 end)
 
-T.test("the whole set is small in memory", function()
-	-- each icon is its own 16×16 RGBA EditableImage when shown: 1 KB. Every map's peoples, their elites and
-	-- Skyshards' troop names brought the set to about 100 icons; a match shows at most its own map's few dozen.
-	T.expect(#IconArt.names() * 16 * 16 * 4 <= 128 * 1024, "under 128 KB even if every icon is on screen")
+T.test("a match's icons are small in memory", function()
+	-- each icon is its own 16×16 RGBA EditableImage when shown: 1 KB. A match only ever shows its own map's peoples
+	-- and their troops, next to the shared UI icons: at most that set is on screen.
+	local Maps = require("../src/shared/Maps")
+	local Races = require("../src/shared/Sim/Races")
+	local Troops = require("../src/shared/Sim/Troops")
+	local peoples: { [string]: boolean } = {}
+	for _, race in Races.LIST do
+		peoples[string.lower(race)] = true
+		for _, troop in Troops.roster(race) do
+			peoples[Troops.icon(troop)] = true
+		end
+	end
+	local shared = 0
+	for _, name in IconArt.names() do
+		shared += if peoples[name] then 0 else 1
+	end
+	for _, mapId in Maps.ids do
+		local own: { [string]: boolean } = {}
+		local count = shared
+		for _, race in Races.forMap(mapId) do
+			for _, name in { string.lower(race), table.unpack(Troops.roster(race)) } do
+				local icon = string.lower(name)
+				if not own[icon] then
+					own[icon] = true
+					count += 1
+				end
+			end
+		end
+		T.expect(
+			count * 16 * 16 * 4 <= 128 * 1024,
+			mapId .. ": under 128 KB even if every icon is on screen (" .. count .. ")"
+		)
+	end
 end)
 
 T.finish()

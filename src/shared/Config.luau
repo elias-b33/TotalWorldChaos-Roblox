@@ -60,8 +60,8 @@ Config.Army = {
 --   line     the base of every army: cheap, as good attacking as defending
 --   ranged   the defenders: weak attacking, strong holding a province
 --   fast     marches fast (Config.Army.FastMoveTicks)
---   elite    the race's best regiment, and the dearest to keep
---   special  one trick, a small hook in the rules (Sim.Troops), each special its own:
+--   elite    the race's signature and its strongest regiment in battle
+--   special  one trick each, a small hook in the rules (Sim.Troops):
 --              siegeSpeed   an army with them in it besieges this many times as fast
 --              terrain      these men fight with +terrainBonus combat strength in battles in that terrain
 --              pathfinder   they march through forest and hills at plains speed (an army keeps its slowest pace)
@@ -158,7 +158,7 @@ Config.Troops = {
 		gold = 15,
 		manpower = 1000,
 		upkeep = 1.75,
-		attack = 1.25,
+		attack = 1.5,
 		defence = 2.0,
 	},
 	-- Eldmoor: the Humans
@@ -190,7 +190,7 @@ Config.Troops = {
 		upkeep = 2,
 		attack = 1.25,
 		defence = 0.75,
-		vsNeutral = 0.5,
+		vsNeutral = 0.3,
 	},
 	-- Eldmoor: the Elves
 	Wardens = {
@@ -242,7 +242,7 @@ Config.Troops = {
 		terrainBonus = 0.5,
 	},
 	-- Eldmoor: the Orcs
-	Grunts = { name = "Grunts", role = "line", gold = 9, manpower = 750, upkeep = 1.5, attack = 1.1, defence = 0.9 },
+	Grunts = { name = "Grunts", role = "line", gold = 9, manpower = 750, upkeep = 1.5, attack = 1.1, defence = 1.0 },
 	SpearThrowers = {
 		name = "Spear throwers",
 		role = "ranged",
@@ -250,7 +250,7 @@ Config.Troops = {
 		manpower = 750,
 		upkeep = 1.75,
 		attack = 0.9,
-		defence = 1.25,
+		defence = 1.4,
 	},
 	WolfRiders = {
 		name = "Wolf riders",
@@ -268,7 +268,7 @@ Config.Troops = {
 		gold = 12,
 		manpower = 750,
 		upkeep = 1.5,
-		attack = 1.75,
+		attack = 2.0,
 		defence = 0.75,
 	},
 	Trolls = {
@@ -276,14 +276,14 @@ Config.Troops = {
 		role = "special",
 		gold = 24,
 		manpower = 1000,
-		upkeep = 2.5,
+		upkeep = 2.25,
 		attack = 1.5,
 		defence = 1.25,
 		terrain = "Hills",
 		terrainBonus = 0.5,
 	},
 	-- Eldmoor: the Dwarves
-	Axemen = { name = "Axemen", role = "line", gold = 12, manpower = 1000, upkeep = 1.6, attack = 1.05, defence = 1.1 },
+	Axemen = { name = "Axemen", role = "line", gold = 12, manpower = 1000, upkeep = 1.5, attack = 1.05, defence = 1.1 },
 	Firelocks = {
 		name = "Firelocks",
 		role = "ranged",
@@ -309,7 +309,7 @@ Config.Troops = {
 		gold = 25,
 		manpower = 1000,
 		upkeep = 2,
-		attack = 1.5,
+		attack = 1.75,
 		defence = 2.0,
 	},
 	Sappers = {
@@ -399,13 +399,13 @@ Config.Troops = {
 		defence = 1.0,
 		fast = true,
 	},
-	Mechs = { name = "Mechs", role = "elite", gold = 40, manpower = 1000, upkeep = 4, attack = 2.25, defence = 2.0 },
+	Mechs = { name = "Mechs", role = "elite", gold = 35, manpower = 1000, upkeep = 3.5, attack = 2.25, defence = 2.0 },
 	Artillery = {
 		name = "Artillery",
 		role = "special",
 		gold = 22,
 		manpower = 750,
-		upkeep = 2.25,
+		upkeep = 2,
 		attack = 0.6,
 		defence = 0.5,
 		siegeSpeed = 2,
@@ -426,7 +426,7 @@ Config.Troops = {
 		gold = 15,
 		manpower = 1000,
 		upkeep = 2,
-		attack = 0.8,
+		attack = 0.85,
 		defence = 1.45,
 	},
 	Drones = {
@@ -434,7 +434,7 @@ Config.Troops = {
 		role = "fast",
 		gold = 18,
 		manpower = 750,
-		upkeep = 2.25,
+		upkeep = 2,
 		attack = 1.3,
 		defence = 0.8,
 		fast = true,
@@ -442,16 +442,16 @@ Config.Troops = {
 	Juggernauts = {
 		name = "Juggernauts",
 		role = "elite",
-		gold = 35,
+		gold = 30,
 		manpower = 1000,
-		upkeep = 3.5,
+		upkeep = 3,
 		attack = 1.75,
 		defence = 2.25,
 	},
 	Crawlers = {
 		name = "Crawlers",
 		role = "special",
-		gold = 20,
+		gold = 18,
 		manpower = 1000,
 		upkeep = 2.25,
 		attack = 1.25,
@@ -463,9 +463,9 @@ Config.Troops = {
 	Swarmlings = {
 		name = "Swarmlings",
 		role = "line",
-		gold = 8,
-		manpower = 750,
-		upkeep = 1.3,
+		gold = 9,
+		manpower = 1000,
+		upkeep = 1.4,
 		attack = 0.95,
 		defence = 0.85,
 	},
@@ -474,7 +474,7 @@ Config.Troops = {
 		role = "ranged",
 		gold = 13,
 		manpower = 750,
-		upkeep = 1.75,
+		upkeep = 2,
 		attack = 0.8,
 		defence = 1.3,
 	},
@@ -491,9 +491,9 @@ Config.Troops = {
 	HiveWarriors = {
 		name = "Hive warriors",
 		role = "elite",
-		gold = 12,
+		gold = 14,
 		manpower = 750,
-		upkeep = 1.5,
+		upkeep = 2,
 		attack = 1.75,
 		defence = 0.75,
 	},
@@ -502,7 +502,7 @@ Config.Troops = {
 		role = "special",
 		gold = 14,
 		manpower = 750,
-		upkeep = 1.75,
+		upkeep = 2,
 		attack = 1.2,
 		defence = 0.9,
 		pathfinder = true,
@@ -511,10 +511,10 @@ Config.Troops = {
 	Shardlings = {
 		name = "Shardlings",
 		role = "line",
-		gold = 11,
+		gold = 10,
 		manpower = 1000,
 		upkeep = 1.5,
-		attack = 0.9,
+		attack = 1.0,
 		defence = 1.15,
 	},
 	PrismCasters = {
@@ -523,7 +523,7 @@ Config.Troops = {
 		gold = 16,
 		manpower = 1000,
 		upkeep = 2,
-		attack = 0.75,
+		attack = 0.8,
 		defence = 1.6,
 	},
 	ShardGliders = {
@@ -536,13 +536,13 @@ Config.Troops = {
 		defence = 1.1,
 		fast = true,
 	},
-	Golems = { name = "Golems", role = "elite", gold = 25, manpower = 1000, upkeep = 2, attack = 1.25, defence = 2.25 },
+	Golems = { name = "Golems", role = "elite", gold = 22, manpower = 1000, upkeep = 2, attack = 1.5, defence = 2.25 },
 	Resonators = {
 		name = "Resonators",
 		role = "special",
-		gold = 20,
+		gold = 18,
 		manpower = 1000,
-		upkeep = 2.25,
+		upkeep = 2,
 		attack = 1.0,
 		defence = 1.4,
 		terrain = "Forest",
@@ -586,7 +586,7 @@ Config.Troops = {
 		upkeep = 2,
 		attack = 1.3,
 		defence = 0.7,
-		vsNeutral = 0.5,
+		vsNeutral = 0.4,
 	},
 }
 
@@ -611,8 +611,8 @@ end
 Config.Races = {
 	-- Earth (realistic): human cultures, given to nations by terrain and balance
 	Kingdom = { name = "Kingdom", passive = "Gold", goldBonus = 0.1, roster = human("Knights") },
-	Empire = { name = "Empire", passive = "Attack", attackBonus = 0.1, roster = human("Legionaries") },
-	Nomads = { name = "Nomads", passive = "Swift", moveMultiplier = 0.8, roster = human("HorseArchers") },
+	Empire = { name = "Empire", passive = "Attack", attackBonus = 0.05, roster = human("Legionaries") },
+	Nomads = { name = "Nomads", passive = "Swift", moveMultiplier = 0.85, roster = human("HorseArchers") },
 	Republic = { name = "Republic", passive = "Upkeep", upkeepMultiplier = 0.85, roster = human("Crossbowmen") },
 	Clans = {
 		name = "Clans",
@@ -625,7 +625,7 @@ Config.Races = {
 	Humans = {
 		name = "Humans",
 		passive = "Gold",
-		goldBonus = 0.1,
+		goldBonus = 0.08,
 		roster = {
 			line = "Footmen",
 			ranged = "Longbowmen",
@@ -637,7 +637,7 @@ Config.Races = {
 	Elves = {
 		name = "Elves",
 		passive = "Forest",
-		forestBonus = 0.1,
+		forestBonus = 0.05,
 		roster = {
 			line = "Wardens",
 			ranged = "ElvenArchers",
@@ -681,7 +681,7 @@ Config.Races = {
 	Marines = {
 		name = "Marines",
 		passive = "Gold",
-		goldBonus = 0.1,
+		goldBonus = 0.12,
 		roster = { line = "Troopers", ranged = "Gunners", fast = "HoverBikes", elite = "Mechs", special = "Artillery" },
 	},
 	Robots = {
@@ -711,7 +711,7 @@ Config.Races = {
 	Crystals = {
 		name = "Crystal folk",
 		passive = "Forest",
-		forestBonus = 0.1,
+		forestBonus = 0.15,
 		roster = {
 			line = "Shardlings",
 			ranged = "PrismCasters",
@@ -723,7 +723,7 @@ Config.Races = {
 	Energy = {
 		name = "Energy beings",
 		passive = "Swift",
-		moveMultiplier = 0.8,
+		moveMultiplier = 0.85,
 		roster = {
 			line = "Sparks",
 			ranged = "ArcCasters",
@@ -1174,11 +1174,13 @@ Config.Bots = {
 	PeaceLossShare = 0.3, -- accept (and offer) white peace after losing this share of my provinces in a war
 	UpkeepReserveMonths = 2, -- build only with gold left over after this many months of upkeep
 	-- the troop mix by role (docs/DESIGN.md "Bot AI"): the line troop is the base; a threatened province raises the
-	-- ranged troop while it is under ArcherShare of the bot's men, and at war it buys its special (under SpecialShare),
-	-- else its fast troop or its elite (under AttackShare), when it can pay and keep UpkeepReserveMonths
-	ArcherShare = 0.3,
-	AttackShare = 0.3,
+	-- ranged troop while it is under RangedShare of the bot's men; at war it buys its special while under
+	-- SpecialShare, else its elite and its fast troop while under EliteShare and FastShare (the one furthest below
+	-- its share first), when it can pay and keep UpkeepReserveMonths
+	RangedShare = 0.3,
 	SpecialShare = 0.1,
+	EliteShare = 0.2,
+	FastShare = 0.1,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
 }

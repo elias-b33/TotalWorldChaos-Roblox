@@ -5,8 +5,8 @@
 -- One siege per province: whoever started it keeps it while one of its armies (or an ally's) stands there; a rival
 -- besieger at peace with it waits instead of blocking. An interrupted siege (a battle, a defender, the besieger
 -- leaving) keeps its progress for Config.Siege.GraceTicks, then resets. Retreating armies are ignored.
--- Army size doesn't matter, but troops do: while an army with a siege troop in it (Ironguard, Legionaries) besieges
--- (the holder's or an ally's), the siege moves that troop's Config.Troops siegeSpeed times as fast.
+-- Army size doesn't matter, but troops do: while an army with a siege troop in it (Catapults, Sappers, Artillery)
+-- besieges (the holder's or an ally's), the siege moves that troop's Config.Troops siegeSpeed times as fast.
 
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")

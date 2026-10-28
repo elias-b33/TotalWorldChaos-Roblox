@@ -1,9 +1,9 @@
 --!nocheck
 -- Races and troops (docs/DESIGN.md "Races", "Troops"). The draft shows every nation's race and the tapped one's
 -- bonus, and picking Ironholds makes Alice the Dwarves; the nations drawer shows the races; the province sheet
--- recruits each troop the Dwarves can raise into one army whose sheet shows the composition; the server refuses
--- another race's elite; Ironguard besiege faster than infantry; and archers win a battle defending that they lose
--- attacking.
+-- recruits each of the Dwarves' five troops into one army whose sheet shows the composition and the Sappers' trick;
+-- the server refuses another race's troop; Sappers besiege faster than Axemen; and the Dwarves' ranged troop, the
+-- Firelocks, wins a battle defending that it loses attacking.
 
 local Config = require("../../../src/shared/Config")
 local Emulator = require("../Emulator")
@@ -70,62 +70,72 @@ local function run()
 	H.shot(alice, "nations")
 	Emulator.press(alice, "NationsButton")
 
-	-- the province sheet: one recruit button per troop the Dwarves raise, each with its price
+	-- the province sheet: one recruit button for each of the Dwarves' five troops, each with its price
+	local Troops = require("../../../src/shared/Sim/Troops")
+	local ROSTER = { "Axemen", "Firelocks", "RamRiders", "Ironguard", "Sappers" }
 	local nation = state.nations[me]
 	nation.gold, nation.manpower = 1000, 20000
 	Emulator.press(alice, "Capital")
 	Emulator.run(1)
+	for i, troop in Troops.roster("Dwarves") do
+		H.expect(troop == ROSTER[i], "the Dwarves' " .. Troops.ROLES[i] .. " troop: " .. troop)
+		H.expect(H.button(alice, "Recruit_" .. troop) ~= nil, "a recruit button for " .. Troops.name(troop))
+	end
 	H.expect(
-		Emulator.findText(alice, "Ironguard") ~= nil and Emulator.findText(alice, "Knights") == nil,
-		"Infantry, Archers, Cavalry and Ironguard, no other race's elite"
+		Emulator.findText(alice, "Ram riders") ~= nil and Emulator.findText(alice, "Knights") == nil,
+		"each under its own name, and no other race's troop"
 	)
 	H.shot(alice, "recruit_buttons")
 	local t = Config.Troops
-	for _, button in { "Regiment", "Archers", "Cavalry", "Ironguard" } do
-		Emulator.press(alice, button)
+	local spent = 0
+	for _, troop in ROSTER do
+		Emulator.press(alice, "Recruit_" .. troop)
 		Emulator.run(1.2)
+		spent += t[troop].gold
 	end
 	local army = Army.idleAt(state, me, nation.capital)
-	H.expect(army ~= nil and army.men == 4000, "the four regiments make one army")
+	H.expect(army ~= nil and army.men == 5000, "the five regiments make one army")
+	local each = true
+	for _, troop in ROSTER do
+		each = each and army.troops[troop] == 1000
+	end
+	H.expect(each, "one regiment of each troop type")
+	H.expect(nation.gold == 1000 - spent, "each at its own price")
+	-- on the map: a soldier and a badge of its main troop (five equal regiments: the dearest, the Ram riders); the
+	-- province sheet's chips say the same, and its owner chip shows the Dwarves
+	local sprite = H.mapObject(alice, "Army" .. army.id)
+		and H.mapObject(alice, "Army" .. army.id):FindFirstChild("TokenSkin")
+	H.expect(sprite ~= nil and sprite:GetAttribute("Soldier") == "RamRiders", "Alice's army is a ram rider on the map")
 	H.expect(
-		army.troops.Infantry == 1000
-			and army.troops.Archers == 1000
-			and army.troops.Cavalry == 1000
-			and army.troops.Ironguard == 1000,
-		"one regiment of each troop type"
+		select(2, H.badge(alice, army.id)) == "ramriders",
+		"its badge shows the Ram riders: equal men, the dearest troop"
 	)
-	H.expect(
-		nation.gold == 1000 - t.Infantry.gold - t.Archers.gold - t.Cavalry.gold - t.Ironguard.gold,
-		"each at its own price"
-	)
-	-- on the map: a dwarf soldier, and a badge with its main troop's icon (four equal regiments: the dearest, and of
-	-- cavalry and ironguard at the same price, the elite); the province sheet's chips say the same, and its owner chip
-	-- shows the Dwarves
-	local sprite = H.mapObject(alice, "Army" .. army.id) and H.mapObject(alice, "Army" .. army.id):FindFirstChild("TokenSkin")
-	H.expect(sprite ~= nil and sprite:GetAttribute("Soldier") == "Dwarves", "Alice's army is a dwarf soldier on the map")
-	H.expect(select(2, H.badge(alice, army.id)) == "ironguard", "its badge shows the Ironguard: equal men, the dearest troop")
-	H.expect(H.iconIn(alice, "ArmyChip" .. army.id, "ironguard"), "so does its chip on the province sheet")
+	H.expect(H.iconIn(alice, "ArmyChip" .. army.id, "ramriders"), "so does its chip on the province sheet")
 	H.expect(H.iconIn(alice, "Owner", "dwarves"), "the owner chip shows the Dwarves' icon")
 
-	-- the army sheet shows the composition as chips
+	-- the army sheet shows the composition as chips (five types: icons and men, no names) and the Sappers' trick
 	Emulator.press(alice, "Move")
 	Emulator.run(0.5)
-	for _, troop in { "Infantry", "Archers", "Cavalry", "Ironguard" } do
-		H.expect(Emulator.findText(alice, "1k " .. troop) ~= nil, "the army sheet shows 1k " .. troop)
+	for _, troop in ROSTER do
+		H.expect(H.iconIn(alice, "Troop_" .. troop, Troops.icon(troop)), "the army sheet shows 1k " .. troop)
 	end
+	H.expect(
+		Emulator.findText(alice, string.format("Sappers: besieges %gx as fast", t.Sappers.siegeSpeed)) ~= nil,
+		"and what the Sappers do"
+	)
 	H.shot(alice, "army_composition")
 	Emulator.press(alice, "Cancel")
 	Emulator.run(0.5)
 
-	-- the server refuses another race's elite (the sheet never offers it; a hacked client could still ask)
+	-- the server refuses any other race's troop (the sheet never offers one; a hacked client could still ask)
 	H.client(alice, "Intents").recruit(nation.capital, 1, "Knights")
 	Emulator.run(1.2)
 	H.expect(Emulator.findText(alice, "Only its own race can recruit that troop") ~= nil, "the refusal toast")
-	H.expect(army.troops.Knights == nil and army.men == 4000, "and no knights joined")
-	H.shot(alice, "refused_elite")
+	H.expect(army.troops.Knights == nil and army.men == 5000, "and no knights joined")
+	H.shot(alice, "refused_troop")
 
-	-- Ironguard besiege faster (Config.Troops.Ironguard.siegeSpeed): Alice's Ironguard and her infantry each besiege
-	-- a neutral province of the same development (garrisons gone); the Ironguard's falls first
+	-- Sappers besiege faster (Config.Troops.Sappers.siegeSpeed): Alice's Sappers and her Axemen each besiege a neutral
+	-- province of the same development (garrisons gone); the Sappers' falls first
 	local pair
 	for _, a in state.provinces do
 		for _, bId in a.neighbors do
@@ -157,31 +167,32 @@ local function run()
 		end
 	end
 	local required = state.provinces[fastId].development * Config.Siege.TicksPerDevelopment
-	Army.spawn(state, me, fastId, 1000, "Ironguard")
-	Army.spawn(state, me, slowId, 1000) -- infantry
+	Army.spawn(state, me, fastId, 1000, "Sappers")
+	Army.spawn(state, me, slowId, 1000) -- her line troop, the Axemen
 	H.client(alice, "MapView").centreOn(H.provinceMap(alice, fastId), true)
 	Emulator.run(8)
 	local fast, slow = state.provinces[fastId].siege, state.provinces[slowId].siege
 	H.expect(fast ~= nil and slow ~= nil, "both sieges are running")
 	H.expect(
-		math.abs(fast.progress - t.Ironguard.siegeSpeed * slow.progress) < 1e-9,
-		string.format("Ironguard %.2f vs infantry %d after the same seconds", fast.progress, slow.progress)
+		math.abs(fast.progress - t.Sappers.siegeSpeed * slow.progress) < 1e-9,
+		string.format("Sappers %.2f vs Axemen %d after the same seconds", fast.progress, slow.progress)
 	)
-	H.shot(alice, "ironguard_siege")
+	H.shot(alice, "sappers_siege")
 	deadline = Emulator.now() + required
 	while state.provinces[fastId].owner ~= me and Emulator.now() < deadline do
 		Emulator.run(1)
 	end
-	H.expect(state.provinces[fastId].owner == me, "the Ironguard took their province")
-	H.expect(state.provinces[slowId].owner == nil, "while the infantry's siege still runs")
+	H.expect(state.provinces[fastId].owner == me, "the Sappers took their province")
+	H.expect(state.provinces[slowId].owner == nil, "while the Axemen's siege still runs")
 	deadline = Emulator.now() + required
 	while state.provinces[slowId].owner ~= me and Emulator.now() < deadline do
 		Emulator.run(1)
 	end
-	H.expect(state.provinces[slowId].owner == me, "the infantry's province falls later")
+	H.expect(state.provinces[slowId].owner == me, "the Axemen's province falls later")
 
-	-- a battle where troop types matter: 3,000 archers holding Alice's plains province beat 3,000 attacking infantry;
-	-- the same archers attacking the enemy's plains province lose to 3,000 defending infantry
+	-- a battle where troop types matter: 3,000 Firelocks (the Dwarves' ranged troop) holding Alice's plains province
+	-- beat 3,000 attacking Footmen; the same Firelocks attacking the enemy's plains province lose to 3,000 defending
+	-- Footmen
 	state.tick = 179
 	Emulator.run(2)
 	local enemy, home, away
@@ -218,7 +229,7 @@ local function run()
 		end
 	end
 	H.expect(enemy ~= nil, "a plains province of Alice's next to a neighbour's plains")
-	state.nations[enemy].race = "Humans" -- no forest or hills bonus could decide it anyway, on plains
+	state.nations[enemy].race = "Humans" -- its line troop, Footmen (no forest or hills bonus could decide it, on plains)
 	state.wars[999] = { id = 999, attackers = { me }, defenders = { enemy }, startedAt = state.tick }
 	H.expect(Diplomacy.atWar(state, me, enemy), "Alice is at war with " .. state.nations[enemy].name)
 	local function fight(where: number, archerSide: number, infantrySide: number)
@@ -227,8 +238,8 @@ local function run()
 				state.armies[id] = nil
 			end
 		end
-		local archers = Army.spawn(state, archerSide, where, 3000, "Archers")
-		local infantry = Army.spawn(state, infantrySide, where, 3000)
+		local archers = Army.spawn(state, archerSide, where, 3000, "Firelocks")
+		local infantry = Army.spawn(state, infantrySide, where, 3000) -- the Humans' Footmen
 		return archers, infantry
 	end
 	local won0 = nation.battlesWon
@@ -237,34 +248,53 @@ local function run()
 	Emulator.run(1.5)
 	H.shot(alice, "archers_hold")
 	Emulator.run(3)
-	H.expect(nation.battlesWon == won0 + 1, "defending, the archers won")
-	H.expect(state.armies[raiders.id] == nil or raiders.retreating == true, "the infantry was beaten off")
-	H.expect(state.armies[holders.id] ~= nil and holders.men > raiders.men, "the archers kept more men")
+	H.expect(nation.battlesWon == won0 + 1, "defending, the Firelocks won")
+	H.expect(state.armies[raiders.id] == nil or raiders.retreating == true, "the Footmen were beaten off")
+	H.expect(state.armies[holders.id] ~= nil and holders.men > raiders.men, "the Firelocks kept more men")
 	Emulator.run(1)
-	H.expect(select(2, H.badge(alice, holders.id)) == "archers", "the archers' badge shows the bow once the battle is over")
+	H.expect(
+		select(2, H.badge(alice, holders.id)) == "firelocks",
+		"their badge shows the firelock once the battle is over"
+	)
 	local enemyWon0 = state.nations[enemy].battlesWon
 	local attackers = fight(away, me, enemy)
 	Emulator.run(4.5)
 	-- (the enemy is a bot at war: it may win other battles meanwhile, so count at least this one)
-	H.expect(state.nations[enemy].battlesWon > enemyWon0, "attacking, the same archers lost")
+	H.expect(state.nations[enemy].battlesWon > enemyWon0, "attacking, the same Firelocks lost")
 	H.expect(state.armies[attackers.id] == nil or attackers.retreating == true, "and fell back")
 	local held = false -- (the infantry may have merged with the raiders that fell back there)
 	for _, a in state.armies do
 		held = held or (a.owner == enemy and a.location == away and not a.retreating)
 	end
-	H.expect(held and state.provinces[away].owner == enemy, "the defending infantry holds its province")
+	H.expect(held and state.provinces[away].owner == enemy, "the defending Footmen hold their province")
 	H.client(alice, "MapView").centreOn(H.provinceMap(alice, away), true)
 	Emulator.run(1.5)
 	H.shot(alice, "archers_attack")
 
-	-- another race's sheet: an Orc nation's elite is the Berserkers (750 manpower)
+	-- another race's sheet: the Orcs' five, most of them for 750 manpower
 	nation.race = "Orcs"
 	Emulator.run(1.5)
 	Emulator.press(alice, "Capital")
 	Emulator.run(1)
-	H.expect(Emulator.findText(alice, "Berserkers") ~= nil and Emulator.findText(alice, "Ironguard") == nil, "Orcs recruit Berserkers")
+	for _, troop in Troops.roster("Orcs") do
+		H.expect(H.button(alice, "Recruit_" .. troop) ~= nil, "Orcs recruit " .. Troops.name(troop))
+	end
+	H.expect(Emulator.findText(alice, "Ironguard") == nil, "and no Dwarven troop")
 	H.expect(Emulator.findText(alice, "750") ~= nil, "for 750 manpower")
 	H.shot(alice, "orc_buttons")
+
+	-- the longest troop names (the Lizardfolk's "Crocodile guard", "Swamp stalkers") take a smaller caption
+	nation.race = "Lizardfolk"
+	Emulator.run(1.5)
+	Emulator.press(alice, "Capital")
+	Emulator.run(1)
+	local guard = H.button(alice, "Recruit_CrocodileGuard")
+	local footmen = H.button(alice, "Recruit_Scaleguards")
+	H.expect(
+		guard ~= nil and footmen ~= nil and guard.TextSize < footmen.TextSize,
+		"Crocodile guard's caption is set smaller than Scaleguards'"
+	)
+	H.shot(alice, "lizardfolk_buttons")
 end
 
 return {

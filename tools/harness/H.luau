@@ -243,6 +243,24 @@ function H.myNation(client)
 	return H.client(client, "ClientState").myNation()
 end
 
+-- The visible button Named `name`, or nil.
+function H.button(client, name: string)
+	for _, b in Emulator.buttons(client) do
+		if b.button.Name == name then
+			return b.button
+		end
+	end
+	return nil
+end
+
+-- The province sheet's recruit button for the client's nation's line troop ("Recruit_Troopers" on Skyshards'
+-- Marines, "Recruit_Infantry" on Earth).
+function H.lineButton(client): string
+	local Troops = require("../../src/shared/Sim/Troops")
+	local nation = H.state().nations[H.myNation(client)]
+	return "Recruit_" .. (Troops.ofRole(nation and nation.race, "line") or Troops.BASE)
+end
+
 -- A province's centre in map pixels (the 2D map's coordinates).
 function H.provinceMap(client, provinceId: number)
 	return H.client(client, "MapRenderer").centerOf(provinceId)
@@ -283,7 +301,6 @@ end
 H.OUT = OUT
 H.PRIVATE_OWNER = PRIVATE_OWNER
 H.shown = shown
-H.within = within
 H.hasIcon = hasIcon
 
 return H
