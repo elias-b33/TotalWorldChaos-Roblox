@@ -32,7 +32,7 @@ SHEETS = os.path.join(ROOT, "docs", "images")
 
 MAPS = {
     "earth": (earth, "earth", "Earth", "The real world · 150 provinces · 10 river nations"),
-    "eldmoor": (fantasy, "fantasy", "Eldmoor", "Fantasy continent · 146 provinces · hold the Crownlands"),
+    "eldmoor": (fantasy, "fantasy", "Eldmoor", "Fantasy continent · 147 provinces · hold the Crownlands"),
     "skyshards": (sky, "sky", "Skyshards", "Floating islands · 131 provinces · perfectly fair"),
 }
 

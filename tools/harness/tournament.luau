@@ -8,6 +8,10 @@
 --   lune run tools/harness/tournament 20 all Hard/Normal   # mixed: half the nations on each, swapped every seed
 --   lune run tools/harness/tournament 20 all Easy/Player   # Easy bots against Normal-bot stand-ins for players
 --   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
+--   lune run tools/harness/tournament 200 eldmoor     # start-position balance (docs/BALANCE.md section 16)
+--
+-- "share" is a slot's wins over the fair share (all wins / 10). Win counts are noisy: at 200 seeds one slot's count
+-- moves by about ±5 (±0.2× share) from seed to seed, so judge start positions on 200 seeds per map, not 20.
 
 local process = require("@lune/process")
 
@@ -345,7 +349,13 @@ for _, mapId in mapIds do
 			math.ceil(Config.Win.DominationShare * ownable)
 		)
 	)
-	print("slot  nation        start position (capital)      wins  avg final provinces")
+	-- share: wins over the fair share (all wins, alliance co-winners included, split evenly over the slots)
+	local totalWins = 0
+	for _, w in wins do
+		totalWins += w
+	end
+	local fair = math.max(totalWins, 1) / #map.nations
+	print("slot  nation        start position (capital)      wins  share  avg final provinces")
 	local mostWins = 0
 	for _, def in map.nations do
 		local capitalName = ""
@@ -358,11 +368,12 @@ for _, mapId in mapIds do
 		mostWins = math.max(mostWins, w)
 		print(
 			string.format(
-				"%4d  %-12s  %-28s  %4d  %6.1f",
+				"%4d  %-12s  %-28s  %4d  %4.2fx  %6.1f",
 				def.slot,
 				def.name,
 				capitalName,
 				w,
+				w / fair,
 				(provincesSum[def.slot] or 0) / seeds
 			)
 		)

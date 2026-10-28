@@ -437,6 +437,63 @@ T.test("bots are staggered and a leaver's nation is taken over at once", functio
 	T.equal(schedule.nextDue[1], state.tick + planTicks, "the leaver's nation planned on the next tick")
 end)
 
+-- The order the bots first plan in sticks for the whole match (who plans right after each payday, who reaches
+-- contested land first). It used to follow nation ids, so on the symmetric Skyshards slots 9 and 10 won 4× as
+-- often as slots 1 and 8. Now it is drawn per match from the bots' rng.
+T.test("the bots' first planning order is random per match, not by nation id", function()
+	local planTicks = Config.Bots.Normal.planTicks
+	local seeds = 40
+	local sum: { [number]: number } = {}
+	local orders: { [string]: boolean } = {}
+	for seed = 1, seeds do
+		local state = Match.new(map)
+		local schedule = Bot.newSchedule()
+		local rng = Rng.new(seed * 104729) -- spread the seeds: small ones give a near-zero first draw
+		local first: { [number]: number } = {}
+		local order = {}
+		for _ = 1, 5 do
+			state.tick += 1
+			Bot.step(schedule, state, rng, "Normal")
+			for nationId = 1, 10 do
+				if first[nationId] == nil and schedule.nextDue[nationId] == state.tick + planTicks then
+					first[nationId] = state.tick
+					table.insert(order, nationId)
+				end
+			end
+		end
+		for nationId = 1, 10 do
+			T.expect(first[nationId] ~= nil, "bot " .. nationId .. " did not plan in the first 5 ticks")
+			sum[nationId] = (sum[nationId] or 0) + first[nationId]
+		end
+		orders[table.concat(order, ",")] = true
+	end
+	local distinct = 0
+	for _ in orders do
+		distinct += 1
+	end
+	T.expect(distinct >= seeds / 2, "only " .. distinct .. " different orders in " .. seeds .. " matches")
+	for nationId = 1, 10 do
+		local average = sum[nationId] / seeds -- ticks 1-5, so 3 on average for every slot
+		T.expect(average > 2.3 and average < 3.7, string.format("bot %d first plans at tick %.1f", nationId, average))
+	end
+	-- the same rng gives the same order (deterministic tests and replays)
+	local function firstPair(seed: number): string
+		local state = Match.new(map)
+		local schedule = Bot.newSchedule()
+		state.tick = 1
+		Bot.step(schedule, state, Rng.new(seed), "Normal")
+		local ids = {}
+		for nationId, due in schedule.nextDue do
+			if due == 1 + planTicks then
+				table.insert(ids, nationId)
+			end
+		end
+		table.sort(ids)
+		return table.concat(ids, ",")
+	end
+	T.equal(firstPair(7), firstPair(7))
+end)
+
 -- Whole matches -----------------------------------------------------------------------------------------
 
 for _, mapId in Maps.ids do

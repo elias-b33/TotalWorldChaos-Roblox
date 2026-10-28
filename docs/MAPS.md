@@ -7,9 +7,9 @@ Total World Chaos ships with three maps. All three play by the same rules in `DE
 | In game | ![Earth](images/pixel_earth.png) | ![Eldmoor](images/pixel_eldmoor.png) | ![Skyshards](images/pixel_skyshards.png) |
 | Preview | ![Earth](images/map_earth.jpg) | ![Eldmoor](images/map_eldmoor.jpg) | ![Skyshards](images/map_skyshards.jpg) |
 | Idea | The real world, 1:1 coastlines | Fantasy continent around a rich heartland | A shattered world of floating islands |
-| Provinces | 150 (11 mountains) | 146 (15 mountains) | 131 (11 mountains) |
-| Straits | 26 sea lanes (1 wraps around the map) | 8 sea lanes | 30 rope bridges |
-| Neutral at start | 59 | 51 | 40 |
+| Provinces | 150 (11 mountains) | 147 (11 mountains) | 131 (11 mountains) |
+| Straits | 25 sea lanes (1 wraps around the map) | 8 sea lanes | 30 rope bridges |
+| Neutral at start | 59 | 56 | 40 |
 | Fairness | Asymmetric geography, equal start | Semi-balanced | Perfectly symmetric |
 | Feel | Familiar, epic, great for clips | Chokepoint fights over the centre | Fast and aggressive, competitive |
 
@@ -27,7 +27,8 @@ These are checked by the generator (`tools/mapgen/layout.py`), so a map that bre
 - **One connected world.** Every passable province can reach every other one by land or strait. Mountains are impassable and never owned; they only shape the routes.
 - **≤ 150 provinces** (the performance budget).
 - **Straits** are extra neighbour links across water or void, exactly as in the design doc. Each map draws them in its own style: dashed sea lanes on Earth, ink sea lanes on Eldmoor, rope bridges on Skyshards.
-- **Neutral garrisons** default to one regiment (1,000 men, `Config.NeutralGarrison`). A map can give a province a bigger garrison; only the two map centres do (the Crownlands and the Heartstone).
+- **Neutral garrisons** default to one regiment (1,000 men, `Config.NeutralGarrison`). A map can give a province a bigger garrison: the two map centres (the Crownlands and the Heartstone) and a few provinces set for start-position balance (see each map).
+- **Start-position balance** is measured, not assumed: `lune run tools/harness/tournament 200 <map>` plays 200 bot matches and prints each slot's wins against its fair share. The goal (`docs/BALANCE.md` section 17) is that no slot wins more than about twice its share and none (almost) never wins. Fixes go into the generator (garrisons, passes, sea lanes, where a capital sits), never into special rules.
 
 ## Earth
 
@@ -52,16 +53,21 @@ The real world on a Miller projection, centred on 11°E so the Americas sit on t
 
 - **Crowded Old World.** Rhine, Volga and Tigris start only a province or two apart, so Europe and the Middle East turn violent first. The Alps, Caucasus and Zagros funnel those wars.
 - **The Roof of the World.** Tibet, Himalaya, Karakoram, Pamir and Hindu Kush form one impassable wall, so India and China can only reach each other through Southeast Asia or Central Asia.
-- **Lonely Americas.** Mississippi and Amazon get lots of quiet expansion room but only three ways out: Greenland–Iceland in the north, the Dakar–Natal lane across the Atlantic, and the Bering Strait wrap.
+- **Lonely Americas.** Mississippi and Amazon get lots of quiet expansion room but only two ways out: Greenland–Iceland in the north and the Bering Strait wrap. (There used to be a Dakar–Natal lane too; see start-position balance below.)
 - **Big empty wilds.** Siberia, Canada, the Sahara and Australia are a few huge, poor provinces. They're cheap to take and add province count (which counts towards the 50% domination win) but little development.
 
-Sea lanes: Iceland–Scotland, Iceland–Greenland, Greenland–Laurentia, England–Seine, Latium–Numidia (Sicily), Hellas–Anatolia, Yemen–Horn, Najd–Persis (Hormuz), Lanka–Dravida, Malaya–Sumatra, Sumatra–Java, Java–Borneo, Borneo–Luzon, Luzon–Formosa, Formosa–Lingnan, Korea–Yamato, Yamato–Ezo, Ezo–Amur (Sakhalin), Java–Top End, New Guinea–Queensland, Murray–Aotearoa, Madagascar–Sofala, Antilles–Appalachia, Antilles–Yucatan, Senegambia–Sertao (Dakar–Natal), and Chukotka–Alaska (Bering, wraps). Gibraltar, the Bosporus and the Øresund are narrow enough to count as land borders.
+Sea lanes: Iceland–Scotland, Iceland–Greenland, Greenland–Laurentia, England–Seine, Latium–Numidia (Sicily), Hellas–Anatolia, Yemen–Horn, Najd–Persis (Hormuz), Lanka–Dravida, Malaya–Sumatra, Sumatra–Java, Java–Borneo, Borneo–Luzon, Luzon–Formosa, Formosa–Lingnan, Korea–Yamato, Yamato–Ezo, Ezo–Amur (Sakhalin), Java–Top End, New Guinea–Queensland, Murray–Aotearoa, Madagascar–Sofala, Antilles–Appalachia, Antilles–Yucatan, and Chukotka–Alaska (Bering, wraps). Gibraltar, the Bosporus and the Øresund are narrow enough to count as land borders.
 
-**Balance watch (Phase 5):** win rate by start position matters most here. Volga and Yangtze (room to grow) will likely be strong and Rhine (surrounded) risky. Fix it with development and garrisons on neutral land, never with special rules.
+**Start-position balance (Phase 5).** Bots attack their weakest neighbour, so on Earth the nations with a safe backyard won and the crowded middle lost: Amazon and Mekong won about 2.5× their share, Niger and Tigris almost never (numbers in `docs/BALANCE.md` section 17). Four generator changes, each small and real-world-shaped:
+
+- **No Dakar–Natal lane.** Niger was Amazon's only neighbour, so Amazon declared war on it 85 times in 100 matches. Without the lane Amazon's wars go north, to Mississippi.
+- **Oman and Mauretania are new provinces** next to Tigris and Niger, the two nations with the least neutral land. To stay at 150 provinces, Westralia merged into the **Outback** and Araucania into **Patagonia** (both dead-end backyards of Mekong and Amazon). The two new provinces reuse the old ids (89 and 145), so no other id moved.
+- **2,000-man garrisons** on the quiet wilds of Volga and Zambezi, which nobody else reaches early: Ob and Yenisei (western Siberia), the Horn, Abyssinia and Madagascar.
+- The Bering wrap, Gibraltar, the Bosporus and every other lane are unchanged.
 
 ## Eldmoor
 
-A fantasy continent built for chokepoint fights. Ten kingdoms ring the **Crownlands**, a rich neutral heartland around Moonmere lake. The **Dragonspine** mountains wall the Crownlands off, with three passes. Crownlands provinces have development 3–4 and 3,000-man garrisons, so taking the centre is a mid-game commitment, not an opening move.
+A fantasy continent built for chokepoint fights. Ten kingdoms ring the **Crownlands**, a rich neutral heartland around Moonmere lake. The **Dragonspine** mountains wall the Crownlands off: three wide gaps and four one-province mountain passes. Crownlands provinces have development 3–4 and 3,000-man garrisons, so taking the centre is a mid-game commitment, not an opening move.
 
 | Colour | Nation | Region | Terrain |
 | --- | --- | --- | --- |
@@ -78,9 +84,18 @@ A fantasy continent built for chokepoint fights. Ten kingdoms ring the **Crownla
 
 **How it plays**
 
-- **The Crownlands are the prize.** About 13 rich provinces sit behind three passes, so whoever holds a pass controls the centre's economy.
+- **The Crownlands are the prize.** About 13 rich provinces sit behind the Dragonspine. Three gaps (north for Frostmarch, west for Greenvale and Saltmarsh, south-east for Ashen and Elderwood) and four narrow passes (Gianttalon Pass for Wyrmcoast, Titanspine Pass for Ironholds, Titanpeak Pass for Sunscorch, Eaglespire Pass for Saltmarsh) lead in, so every mainland kingdom has its own door and whoever holds one controls part of the centre's economy.
 - **Island nations** (Mistborn, Corsairs) start safe but have to cross sea lanes to grow, like Britain and Japan on Earth. Each island group has at least two crossings, so no single army can seal one in.
 - **Mount Cinder** sits inside Ashen territory as a natural fortress wall.
+
+**Start-position balance (Phase 5).** With only the three gaps, Ironholds and Sunscorch were walled in with almost no neutral land and won 0 of 200 bot matches, while Frostmarch (the only kingdom with a gap to itself) won 125 (numbers in `docs/BALANCE.md` section 17). The generator now:
+
+- **cuts four passes** through the Dragonspine (`PASSES_FOR` in `tools/mapgen/maps/fantasy.py`): the peak straight between each walled-in kingdom and Moonmere becomes a passable highland province, neutral at the start with a normal garrison;
+- **moves Elderwood's capital** to the south of the great forest (`CAPITAL_AT`), so its start territory no longer reaches Ironholds' border and the northern forest starts neutral;
+- **adds an eighth province to the Isle of Mists** (Oakshire, `EXTRA_SEEDS`), so Mistborn starts on its island alone instead of on a mainland foothold wedged against Ironholds;
+- **garrisons Ironholds' two open flanks** with 2,000 men (Highcairn towards Frostmarch, Duskshade towards Elderwood and the Mistborn crossing; `GARRISONS`).
+
+Peaks are placed before every other province, extra seeds after them, and passes and garrisons are applied after naming, so no other province moved or was renamed; slots and colours stay as listed above.
 - **Terrain flavour is cosmetic.** Frostfields, dunes and meadows all play as Plains; ashlands and highlands play as Hills.
 
 Province names are generated from per-region word lists (Hoarreach, Silvershade, Dunehaven). Rename anything by editing `NAME_PARTS` or the zone list in `tools/mapgen/maps/fantasy.py`. Names and terrain use separate random streams, so renaming never moves terrain.
@@ -192,7 +207,7 @@ This answers the open question "keep the hex grid or switch to hand-made provinc
 | 1 | Generated hex map | **Skyshards `MapData`** converted from `layout.json`, drawn as simple flat discs at province centres with lines for neighbours. Real data from day one, and symmetric, so early tests are fair. |
 | 2–3 | (one map) | Build and test on Skyshards. Add Eldmoor once war works (Gate 2). |
 | 4 | Hand-made final map | **2D pixel-art maps for all three** (done early, painted from `MapData`), plus the **map vote** with the three cards. |
-| 5 | A second map | **Per-map balance** from win rate by start position. Earth needs it most. |
+| 5 | A second map | **Per-map balance** from win rate by start position (done: `docs/BALANCE.md` section 17). |
 
 ## Task cards
 
@@ -234,5 +249,5 @@ Done when: 3 test clients vote and the chosen map loads
 - **Equal start on every map:** 8 provinces and 17 development per nation.
 - **Neutral garrison:** 1,000 men by default (`Config.NeutralGarrison`). Maps may override per province.
 - **Scale:** 1 px = 0.5 stud, and texture tiles every 128 studs.
-- **Earth straits:** the Bering Strait wraps around the map edge, and the Dakar–Natal lane links the Americas to Africa.
+- **Earth straits:** the Bering Strait wraps around the map edge. The Dakar–Natal lane was removed for start-position balance (Amazon attacked Niger through it in almost every match); the Americas reach the Old World through Greenland–Iceland and Bering.
 - **`biome`** is a cosmetic field in map data only. `MatchState` is unchanged.

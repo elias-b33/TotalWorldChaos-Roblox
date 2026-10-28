@@ -328,13 +328,16 @@ def auto_connect(lay: Layout) -> None:
         add_strait(lay, a, b, pts, auto=True)
 
 
-def assign_start_territories(lay: Layout, allowed=None) -> None:
+def assign_start_territories(lay: Layout, allowed=None, order: list[str] | None = None) -> None:
     """Round-robin claims outward from each capital until every nation holds START_SIZE provinces.
 
     allowed(slot, province) -> bool can restrict claims (Skyshards keeps each nation on its own shard).
+    order lists the nations by slot; by default slots follow the capitals' seed order.
     """
     n = len(lay.seeds)
     caps = [(i, s.nation) for i, s in enumerate(lay.seeds) if s.nation]
+    if order is not None:
+        caps.sort(key=lambda c: order.index(c[1]))
     lay.owner = [None] * n
     lay.nations = []
     for slot, (i, name) in enumerate(caps):
