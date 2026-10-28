@@ -644,6 +644,12 @@ def draw_image(img, rect, info, images, rotation=0):
             _images[path] = Image.frombytes("RGBA", (info["width"], info["height"]), f.read())
     src = _images[path]
     x0, y0, x1, y1 = rect
+    if info.get("fit") and x1 > x0 and y1 > y0:
+        # ScaleType.Fit: the largest box with the image's shape, centred in the label
+        scale = min((x1 - x0) / src.width, (y1 - y0) / src.height)
+        w, h = src.width * scale, src.height * scale
+        x0, y0 = x0 + ((x1 - x0) - w) / 2, y0 + ((y1 - y0) - h) / 2
+        x1, y1 = x0 + w, y0 + h
     vx0, vy0, vx1, vy1 = max(x0, 0), max(y0, 0), min(x1, img.width), min(y1, img.height)
     if vx1 - vx0 < 1 or vy1 - vy0 < 1:
         return

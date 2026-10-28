@@ -99,9 +99,8 @@ local function showThumb(holder: Frame, map: Types.MapDef)
 	local function attach(image: EditableImage)
 		local label = Instance.new("ImageLabel")
 		label.Name = "Thumb"
-		label.AnchorPoint = Vector2.new(0.5, 0)
-		label.Position = UDim2.fromScale(0.5, 0)
-		label.Size = UDim2.fromOffset(math.floor(THUMB_HEIGHT * map.imageSize.x / map.imageSize.y), THUMB_HEIGHT)
+		label.Size = UDim2.fromScale(1, 1)
+		label.ScaleType = Enum.ScaleType.Fit -- the whole map inside the card on any phone, keeping its shape
 		label.BackgroundTransparency = 1
 		label.ResampleMode = Enum.ResamplerMode.Pixelated
 		label.ImageContent = Content.fromObject(image)

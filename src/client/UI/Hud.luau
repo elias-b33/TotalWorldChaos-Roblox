@@ -29,6 +29,7 @@ local BAR_GAP = 8 -- between items
 local BAR_BUTTON = 40 -- icon buttons in the bar (the bar's full height is the touch target)
 local TOAST_SECONDS = 2.5
 local TOAST_WIDTH = 340 -- clear of the tutorial card at the top left
+local LEFT_PANELS = 258 -- the nations drawer (8 + 250 px) and the tutorial card (8 + 236 px) stay left of the toasts
 
 local Hud = {}
 
@@ -297,6 +298,8 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	fitBar(bar, optional)
 
 	toastLabel = Widgets.toast(gui, BAR_HEIGHT + 10, TOAST_WIDTH)
+	-- centred in the room right of the top-left panels, so a toast never covers them, even on a 667 px phone
+	toastLabel.Position = UDim2.new(0.5, LEFT_PANELS // 2, 0, BAR_HEIGHT + 10)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 

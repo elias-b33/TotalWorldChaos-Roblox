@@ -70,6 +70,7 @@ local function dumpGui(inst)
 					width = image.Size.X,
 					height = image.Size.Y,
 					pixelated = enumName(inst.ResampleMode) == "Pixelated",
+					fit = enumName(inst.ScaleType) == "Fit", -- the whole image inside the box, keeping its shape
 					color = c3(inst.ImageColor3),
 					transparency = inst.ImageTransparency,
 				}
