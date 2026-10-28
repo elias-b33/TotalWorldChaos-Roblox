@@ -1318,7 +1318,11 @@ makeEnv = function(m: Machine, scriptInst)
 				parts[i] = tostring(parts[i])
 			end
 			local msg = string.format("[%s %6.1fs] WARN %s", m.name, now, table.concat(parts, " "))
-			table.insert(warnings, msg)
+			-- with NO_EDITABLE_IMAGE the map's "turn on Allow Mesh / Image APIs" warning is the expected fallback,
+			-- not a failure; every other warning still fails the scenario
+			if not (process.env.NO_EDITABLE_IMAGE and string.find(msg, "no EditableImage", 1, true)) then
+				table.insert(warnings, msg)
+			end
 			log(msg)
 		end,
 	}
