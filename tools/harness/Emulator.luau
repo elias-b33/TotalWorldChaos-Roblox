@@ -237,6 +237,7 @@ local EVENT_PROPS = {
 	{ "RunService", { "Heartbeat", "RenderStepped", "Stepped" }, false },
 	{ "GuiButton", { "Activated", "MouseButton1Click" }, false },
 	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged", "DescendantAdded" }, false },
+	{ "MarketplaceService", { "PromptGamePassPurchaseFinished", "PromptProductPurchaseFinished" }, false },
 }
 for _, spec in EVENT_PROPS do
 	local class, names, queued = spec[1], spec[2], spec[3]
@@ -702,9 +703,70 @@ roblox.implementMethod("HttpService", "GenerateGUID", function(_service, wrap)
 	return if wrap == false then guid else "{" .. guid .. "}"
 end)
 
+-- Property-changed signals exist but never fire headless (sizes and positions don't change here).
+roblox.implementMethod("Instance", "GetPropertyChangedSignal", function(inst, property)
+	return eventOf(inst, "PropertyChanged_" .. tostring(property), false)
+end)
+
 local closeCallbacks = {}
 roblox.implementMethod("DataModel", "BindToClose", function(_dm, fn)
 	table.insert(closeCallbacks, fn)
+end)
+
+roblox.implementMethod("Players", "GetPlayerByUserId", function(players, userId)
+	for _, child in players:GetChildren() do
+		if child.ClassName == "Player" and child.UserId == userId then
+			return child
+		end
+	end
+	return nil
+end)
+
+---------------------------------------------------------------------------------------------- marketplace
+
+-- MarketplaceService with what ShopService uses. The server's ProcessReceipt callback is kept so a scenario can
+-- call it (Emulator.processReceipt); prompts are recorded in Emulator.prompts instead of opening a dialog; game
+-- pass ownership comes from Emulator.gamePasses[userId][passId] and live prices from Emulator.productPrices.
+Emulator.prompts = {} -- { { kind = "Product" | "GamePass", userId, id } }
+Emulator.gamePasses = {} :: { [number]: { [number]: boolean } }
+Emulator.productPrices = {} :: { [number]: number }
+local marketplaceCallbacks: { [any]: any } = {}
+
+roblox.implementProperty("MarketplaceService", "ProcessReceipt", function(service)
+	return marketplaceCallbacks[service]
+end, function(service, fn)
+	marketplaceCallbacks[service] = fn
+end)
+roblox.implementMethod("MarketplaceService", "PromptProductPurchase", function(_service, player, id)
+	table.insert(Emulator.prompts, { kind = "Product", userId = player.UserId, id = id })
+end)
+roblox.implementMethod("MarketplaceService", "PromptGamePassPurchase", function(_service, player, id)
+	table.insert(Emulator.prompts, { kind = "GamePass", userId = player.UserId, id = id })
+end)
+roblox.implementMethod("MarketplaceService", "UserOwnsGamePassAsync", function(_service, userId, passId)
+	task.wait()
+	local owned = Emulator.gamePasses[userId]
+	return owned ~= nil and owned[passId] == true
+end)
+roblox.implementMethod("MarketplaceService", "GetProductInfo", function(_service, id)
+	task.wait()
+	return { PriceInRobux = Emulator.productPrices[id] or 0 }
+end)
+
+-- Call the server's MarketplaceService.ProcessReceipt with a receipt, as Roblox would. Yields; returns the decision.
+function Emulator.processReceipt(receipt)
+	local service = Emulator.server.dm:GetService("MarketplaceService")
+	local fn = marketplaceCallbacks[service]
+	assert(fn, "the server never set MarketplaceService.ProcessReceipt")
+	return fn(receipt)
+end
+
+-- TextChatService.OnIncomingMessage is a client callback; keep it so the client can set it.
+local chatCallbacks: { [any]: any } = {}
+roblox.implementProperty("TextChatService", "OnIncomingMessage", function(service)
+	return chatCallbacks[service]
+end, function(service, fn)
+	chatCallbacks[service] = fn
 end)
 
 -- A kick is never expected in a scenario: record it as a warning so the scenario fails.

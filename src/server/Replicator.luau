@@ -31,20 +31,31 @@ function Replicator.init()
 	lobbyRemote = Remotes.event("Lobby")
 end
 
+-- Every nation's equipped cosmetics travel next to the match state (ShopService sets this).
+local cosmeticsOf: ((Types.MatchState) -> { Types.NationCosmetics })? = nil
+
+function Replicator.setCosmetics(fn: (Types.MatchState) -> { Types.NationCosmetics })
+	cosmeticsOf = fn
+end
+
+local function full(state: Types.MatchState): Snapshot.SnapshotData
+	return Snapshot.full(state, if cosmeticsOf then cosmeticsOf(state) else nil)
+end
+
 -- Snapshot(data, yourNationId or 0)
 function Replicator.sendSnapshot(player: Player, state: Types.MatchState, nationId: number?)
-	snapshotRemote:FireClient(player, Snapshot.full(state), nationId or 0)
+	snapshotRemote:FireClient(player, full(state), nationId or 0)
 end
 
 -- A new match: forget the old baseline so the next delta is computed against the new state.
 function Replicator.reset(state: Types.MatchState)
-	lastSent = Snapshot.full(state)
+	lastSent = full(state)
 end
 
 -- Tick order step 9: one delta with only what changed since the last tick, plus this tick's events.
 -- Then moving armies' positions on the unreliable channel. Events are spent once sent.
 function Replicator.broadcast(state: Types.MatchState)
-	local current = Snapshot.full(state)
+	local current = full(state)
 	if lastSent then
 		local delta = Snapshot.diff(lastSent, current, state.events)
 		if delta then

@@ -18,8 +18,11 @@ local ClientState = require(Client.ClientState)
 local Palette = require(Client.Palette)
 local ProfileState = require(Client.ProfileState)
 local Relations = require(Client.Relations)
+local Sounds = require(Client.Sounds)
 
 local BAR_HEIGHT = 44
+local BAR_PADDING = 12 -- left and right
+local BAR_GAP = 10 -- between items
 local TOAST_SECONDS = 2.5
 
 local Hud = {}
@@ -48,6 +51,48 @@ local function label(parent: Instance, text: string, width: number, align: Enum.
 	l.Text = text
 	l.Parent = parent
 	return l
+end
+
+local function barButton(parent: Instance, name: string, text: string, order: number): TextButton
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Size = UDim2.fromOffset(BAR_HEIGHT, BAR_HEIGHT)
+	button.BackgroundTransparency = 1
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 22
+	button.Text = text
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.LayoutOrder = order
+	button.Parent = parent
+	return button
+end
+
+-- On narrow screens (small or notched phones) the least important items step aside, in this order, so the bar
+-- never runs off the screen.
+local function fitBar(bar: Frame, optional: { GuiObject })
+	local available = bar.AbsoluteSize.X - 2 * BAR_PADDING
+	if available <= 0 then
+		return -- not laid out yet
+	end
+	local function needed(): number
+		local total, count = 0, 0
+		for _, child in bar:GetChildren() do
+			if child:IsA("GuiObject") and child.Visible then
+				total += child.Size.X.Offset
+				count += 1
+			end
+		end
+		return total + math.max(count - 1, 0) * BAR_GAP
+	end
+	for _, item in optional do
+		item.Visible = true
+	end
+	for _, item in optional do
+		if needed() <= available then
+			break
+		end
+		item.Visible = false
+	end
 end
 
 local function formatNumber(n: number): string
@@ -167,7 +212,7 @@ local function eventText(e: Types.MatchEvent): string?
 	return nil
 end
 
-function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
+function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopButton: (() -> ())?)
 	gui = Instance.new("ScreenGui")
 	gui.Name = "Hud"
 	gui.ResetOnSpawn = false
@@ -178,32 +223,22 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
 	bar.Active = true -- swallow taps so they don't reach the map
 	bar.Size = UDim2.new(1, 0, 0, BAR_HEIGHT)
 	bar.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
-	bar.BackgroundTransparency = 0.25
+	bar.BackgroundTransparency = 0.08 -- nearly solid: map names behind it would read as clutter
 	bar.BorderSizePixel = 0
 	bar.Parent = gui
 	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, 12)
-	padding.PaddingRight = UDim.new(0, 12)
+	padding.PaddingLeft = UDim.new(0, BAR_PADDING)
+	padding.PaddingRight = UDim.new(0, BAR_PADDING)
 	padding.Parent = bar
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 14)
+	layout.Padding = UDim.new(0, BAR_GAP)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = bar
 
 	-- capital button: recentres the camera on your capital (stands in for double-tapping it)
-	local home = Instance.new("TextButton")
-	home.Name = "Capital"
-	home.Size = UDim2.fromOffset(BAR_HEIGHT, BAR_HEIGHT)
-	home.BackgroundTransparency = 1
-	home.Font = Enum.Font.GothamBold
-	home.TextSize = 22
-	home.Text = "⭐"
-	home.TextColor3 = Color3.new(1, 1, 1)
-	home.LayoutOrder = 1
-	home.Parent = bar
-	home.Activated:Connect(onCapitalButton)
+	barButton(bar, "Capital", "⭐", 1).Activated:Connect(onCapitalButton)
 
 	nationSwatch = Instance.new("Frame")
 	nationSwatch.Size = UDim2.fromOffset(14, 14)
@@ -214,37 +249,42 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> ())
 	corner.CornerRadius = UDim.new(1, 0)
 	corner.Parent = nationSwatch
 
-	nationLabel = label(bar, "", 130)
+	nationLabel = label(bar, "", 110)
+	nationLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	nationLabel.LayoutOrder = 3
-	goldLabel = label(bar, "", 90)
+	goldLabel = label(bar, "", 80)
 	goldLabel.LayoutOrder = 4
-	manpowerLabel = label(bar, "", 100)
+	manpowerLabel = label(bar, "", 88)
 	manpowerLabel.LayoutOrder = 5
-	rankLabel = label(bar, "", 64)
+	rankLabel = label(bar, "", 56)
 	rankLabel.LayoutOrder = 6
-	clockLabel = label(bar, "", 90)
+	clockLabel = label(bar, "", 84)
 	clockLabel.LayoutOrder = 7
 
-	local nationsButton = Instance.new("TextButton")
-	nationsButton.Name = "NationsButton"
-	nationsButton.Size = UDim2.fromOffset(BAR_HEIGHT, BAR_HEIGHT)
-	nationsButton.BackgroundTransparency = 1
-	nationsButton.Font = Enum.Font.GothamBold
-	nationsButton.TextSize = 22
-	nationsButton.Text = "🌍"
-	nationsButton.TextColor3 = Color3.new(1, 1, 1)
-	nationsButton.LayoutOrder = 8
-	nationsButton.Parent = bar
-	nationsButton.Activated:Connect(onNationsButton)
+	barButton(bar, "NationsButton", "🌍", 8).Activated:Connect(onNationsButton)
 
 	-- your account level (MONETIZATION.md 5.2), from the saved profile
-	levelLabel = label(bar, "", 64)
+	levelLabel = label(bar, "", 52)
 	levelLabel.Name = "Level"
 	levelLabel.LayoutOrder = 9
 	ProfileState.onChange(function()
 		local summary = ProfileState.summary()
 		levelLabel.Text = if summary then "🎖 " .. summary.level else ""
 	end)
+
+	-- the shop (MONETIZATION.md 3): cosmetics only, Robux purchases open after the match
+	if onShopButton then
+		barButton(bar, "ShopButton", "🛒", 10).Activated:Connect(onShopButton)
+	end
+
+	-- sound on and off for the session (docs/DESIGN.md "Sound and effects")
+	Sounds.attachMuteButton(barButton(bar, "Mute", "🔊", 11))
+
+	local optional: { GuiObject } = { levelLabel, rankLabel, nationSwatch }
+	bar:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		fitBar(bar, optional)
+	end)
+	fitBar(bar, optional)
 
 	toastLabel = Instance.new("TextLabel")
 	toastLabel.Name = "Toast"

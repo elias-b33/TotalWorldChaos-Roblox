@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
-local Palette = require(Client.Palette)
+local Cosmetics = require(Client.Cosmetics)
 local Relations = require(Client.Relations)
 local Widgets = require(script.Parent.Widgets)
 
@@ -35,23 +35,32 @@ local function render()
 		row.LayoutOrder = i
 		row.Parent = rows
 		Widgets.list(row, true, 6)
-		local dot = Instance.new("Frame")
-		dot.Size = UDim2.fromOffset(12, 12)
-		dot.BackgroundColor3 = Palette.nation(n.colorIndex)
-		dot.BorderSizePixel = 0
-		dot.LayoutOrder = 1
-		dot.Parent = row
-		Widgets.corner(dot, 6)
+		-- the nation's flag (cosmetic), in its colour
+		local looks = Cosmetics.of(n.id)
+		local flag = Cosmetics.flagLabel(row, looks.flag, n.colorIndex, UDim2.fromOffset(20, 15))
+		flag.LayoutOrder = 1
 		local who = if n.id == me then "⭐ " elseif n.controller == "Player" then "👤 " else ""
 		local status = if n.eliminated then "☠ " else Relations.icon(me, n.id)
+		local vip = if looks.vip then " [VIP]" else ""
 		local label = Widgets.label(
 			row,
-			string.format("%s%s  🏴%d %s", who, n.name, Relations.provinceCount(n.id), status),
+			string.format("%s%s%s  🏴%d %s", who, n.name, vip, Relations.provinceCount(n.id), status),
 			14,
 			24
 		)
-		label.Size = UDim2.new(1, -18, 1, 0)
+		label.Size = UDim2.new(1, -26, 1, 0)
 		label.LayoutOrder = 2
+		-- nameplate frame (cosmetic): an outline around the name
+		local frameColor = Cosmetics.frameColor(looks.frame)
+		if frameColor then
+			label.BackgroundTransparency = 0.85
+			label.BackgroundColor3 = frameColor
+			Widgets.corner(label, 6)
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = frameColor
+			stroke.Thickness = 2
+			stroke.Parent = label
+		end
 	end
 end
 
@@ -83,6 +92,7 @@ function Nations.init()
 			render()
 		end
 	end)
+	Cosmetics.onChange(render)
 end
 
 return Nations

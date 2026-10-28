@@ -102,6 +102,7 @@ def draw_line(img: Image.Image, x: float, y: float, line: str, size: int, color,
 
 def draw_text_block(img, rect, text, size, color, align="Center", valign="Center", stroke=False):
     x0, y0, x1, y1 = rect
+    text = text.replace("", "R$")  # Roblox fonts draw U+E002 as the Robux icon; our fonts don't have it
     lines = text.split("\n")
     line_h = int(size * 1.25)
     total = line_h * len(lines)

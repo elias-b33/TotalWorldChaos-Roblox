@@ -25,6 +25,10 @@ local Relations = require(Client.Relations)
 local Results = require(Client.UI.Results)
 local Sounds = require(Client.Sounds)
 local Tutorial = require(Client.UI.Tutorial)
+local Cosmetics = require(Client.Cosmetics)
+local Emotes = require(Client.UI.Emotes)
+local Shop = require(Client.UI.Shop)
+local ShopState = require(Client.ShopState)
 
 local selectedArmy: number? = nil
 
@@ -116,7 +120,9 @@ end
 
 -- Listeners first (in draw order), then start listening to the server.
 MapRenderer.init()
-Hud.init(centreOnCapital, Nations.toggle)
+Hud.init(centreOnCapital, Nations.toggle, function()
+	Shop.toggle()
+end)
 ProvinceSheet.init(function()
 	MapRenderer.select(nil)
 end, selectArmy)
@@ -145,8 +151,12 @@ Draft.init()
 ClientState.onReset(function()
 	selectedArmy = nil
 end)
+Cosmetics.init()
+Shop.init(Hud.toast)
+Emotes.init()
 Effects.init() -- after MapRenderer: draws on the canvas it builds
 Sounds.init() -- after every other UI: hooks a tap sound onto their buttons
 ProfileState.init()
+ShopState.init()
 LobbyState.init()
 ClientState.init()

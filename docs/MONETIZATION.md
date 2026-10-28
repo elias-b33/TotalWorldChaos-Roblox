@@ -185,6 +185,32 @@ We don't launch with an experience subscription:
 
 Gold, manpower, regiments, buildings, Primordial charges or cooldowns, combat modifiers, start-position or draft-order picks, map vote weight, match information (fog, enemy plans), extra alliance slots, XP from other players, ranked rating, titles, Glory.
 
+### 3.10 Shop setup (Creator Dashboard)
+
+The catalogue is `src/shared/Catalogue.luau`; prices by rarity are in `Config.Shop`. Every Roblox id lives in one place at the top of the catalogue, `Catalogue.PRODUCT_IDS` and `Catalogue.VIP_PASS_ID`, and starts at **0**.
+
+**Test mode.** While an id is 0, Studio grants that purchase free, through the same `ProcessReceipt` path with a made-up receipt (the shop header says "Studio test mode"). A live server refuses it ("Not on sale yet"), so a forgotten id can never give an item away. With "Enable Studio Access to API Services" on, test purchases save to the real DataStore for your own test account.
+
+**What the owner creates** (Creator Dashboard → your experience → Monetization):
+
+1. **Game pass** "VIP", 249 Robux. Put its id in `Catalogue.VIP_PASS_ID`.
+2. **Developer products**, one per key of `Catalogue.PRODUCT_IDS`, priced as below. Put each id next to its key.
+
+| Product keys | Price (Robux) |
+| --- | ---: |
+| `flag_tricolour`, `flag_cross`, `shades_dawn`, `shades_dusk`, `frame_bronze`, `fx_meteor_ice`, `fx_plague_violet` (Common) | 49 |
+| `flag_sun`, `flag_crown`, `flag_vanguard`, `border_dashes`, `border_runes`, `shades_royal`, `token_shield`, `token_vanguard`, `frame_silver`, `fx_blessing_rays` (Rare) | 99 |
+| `flag_comet`, `border_embers`, `token_tower`, `victory_fireworks`, `fx_meteor_comet` (Epic) | 149 |
+| `token_dragon`, `victory_dragon` (Legendary) | 249 |
+| `emote_charge`, `emote_wave`, `emote_gg`, `emote_laugh` (static emotes) | 25 |
+| `emote_fire`, `emote_crown` (animated emotes) | 49 |
+| `starter` (Starter Pack, once per account) | 149 |
+| `set_royal` (Royal Set: Crown flag, Runes border, Shield token) | 199 |
+
+3. Opt in to managed pricing if you want: the shop reads live prices with `MarketplaceService:GetProductInfo`, and the Config numbers are only shown while an id is 0.
+
+**How a purchase flows.** The client asks (`RequestBuy`); `CommandRouter` checks the shape; `ShopService` checks the rules (`Sim/Shop`): Robux prompts only open in the Lobby, the draft and on Results, never during a match. Developer products are granted in `MarketplaceService.ProcessReceipt` → `PlayerDataService.processReceipt`: each purchase id is granted once, recorded in the purchase history and saved before `PurchaseGranted`. VIP is checked with `UserOwnsGamePassAsync` on join and on `PromptGamePassPurchaseFinished`, and the pass is added to the purchase history too.
+
 ## 4. Currency: Glory
 
 **Decision: one soft currency, Glory, earned only by playing. It is never sold for Robux, directly or in a bundle.** Robux buys items directly.

@@ -148,7 +148,7 @@ function PlayerDataService.onLeaving(hook: (Player, Data) -> ())
 end
 
 -- Run `hook` (in its own thread) once a joining player's profile has loaded: sending a new player to the
--- tutorial, a Results reward that waited for the profile.
+-- tutorial, checking the VIP pass, a Results reward that waited for the profile.
 function PlayerDataService.onLoaded(hook: (Player, Data) -> ())
 	table.insert(loadHooks, hook)
 end
@@ -169,10 +169,10 @@ local function trimReceipts(data: Data)
 	end
 end
 
--- The ProcessReceipt hook for developer products (no shop yet: ShopService will set
--- MarketplaceService.ProcessReceipt to call this with the product's grant function). Grants each purchase id once,
--- and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
-function PlayerDataService.processReceipt(receipt: any, grant: (Data) -> ()): Enum.ProductPurchaseDecision
+-- The ProcessReceipt hook for developer products: ShopService's MarketplaceService.ProcessReceipt calls this with
+-- the catalogue item or offer the product sells and its grant function. Grants each purchase id once, records it
+-- in the purchase history, and answers PurchaseGranted only after the receipt is saved, as Roblox requires.
+function PlayerDataService.processReceipt(receipt: any, item: string, grant: (Data) -> ()): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	local profile = if player then profiles[player] else nil
 	if profile == nil then
@@ -185,10 +185,13 @@ function PlayerDataService.processReceipt(receipt: any, grant: (Data) -> ()): En
 		data.receipts[id] = os.time()
 		table.insert(
 			data.purchaseHistory,
-			{ product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time() }
+			{ product = receipt.ProductId, robux = receipt.CurrencySpent, at = os.time(), item = item }
 		)
 		trimReceipts(data)
 		profile:Save()
+		if player then
+			sendSummary(player, data)
+		end
 	end
 	while profile:IsActive() and (profile.LastSavedData :: Data).receipts[id] == nil do
 		task.wait()

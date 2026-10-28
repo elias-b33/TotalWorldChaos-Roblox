@@ -15,6 +15,7 @@ local Types = require(Shared.Types)
 local Server = script.Parent.Parent
 local CommandRouter = require(Server.CommandRouter)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local ShopService = require(script.Parent.ShopService)
 
 local SECONDS_PER_DAY = 86400
 
@@ -31,8 +32,8 @@ local function today(): number
 	return os.time() // SECONDS_PER_DAY -- UTC day number; Sim never reads the clock
 end
 
-local function isVip(_player: Player): boolean
-	return false -- the VIP pass arrives with ShopService
+local function isVip(player: Player): boolean
+	return ShopService.isVip(player) -- +25% match XP and Glory (MONETIZATION 3.3)
 end
 
 local function options(player: Player, data: Types.PlayerProfile): Progression.RewardOptions

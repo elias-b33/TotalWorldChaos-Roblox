@@ -37,6 +37,8 @@ local limiter = RateLimit.new(Config.Net.MaxIntentsPerSecond)
 local commandResult: RemoteEvent
 local nationOf: (Player) -> number?
 local observers: { (Player, Types.Command, boolean) -> () } = {}
+local shopHandler: ((Player, Types.ShopIntent) -> (boolean, string?))? = nil
+local MAX_ITEM_ID = 40 -- longest catalogue id a shop request may name (the catalogue itself is checked by Sim.Shop)
 
 local function isId(v: unknown): boolean
 	return type(v) == "number" and v == v and v >= 1 and v <= 1e6 and v == math.floor(v)
@@ -167,6 +169,46 @@ function CommandRouter.init(getNation: (Player) -> number?)
 		acceptLobby(player, requestId, if isId(nation) then { kind = "Pick", nation = nation :: number } else nil)
 	end)
 
+	-- Shop intents: not tied to the match clock, so ShopService answers them right away (it may yield to save).
+	local function acceptShop(player: Player, requestId: unknown, intent: Types.ShopIntent?)
+		if not isId(requestId) then
+			return
+		end
+		local id = requestId :: number
+		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+			reply(player, id, false, "TooFast")
+		elseif intent == nil or shopHandler == nil then
+			reply(player, id, false, "BadRequest")
+		else
+			local handler = shopHandler :: (Player, Types.ShopIntent) -> (boolean, string?)
+			task.spawn(function()
+				local ok, reason = handler(player, intent)
+				reply(player, id, ok, reason)
+			end)
+		end
+	end
+	local function isItemId(v: unknown): boolean
+		return type(v) == "string" and #v > 0 and #v <= MAX_ITEM_ID
+	end
+
+	Remotes.event("RequestBuy").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, item: unknown, currency: unknown)
+			local ok = isItemId(item) and (currency == "Glory" or currency == "Robux")
+			acceptShop(
+				player,
+				requestId,
+				if ok then { kind = "Buy", item = item :: string, currency = currency :: "Glory" | "Robux" } else nil
+			)
+		end)
+
+	Remotes.event("RequestEquip").OnServerEvent:Connect(function(player: Player, requestId: unknown, item: unknown)
+		acceptShop(player, requestId, if isItemId(item) then { kind = "Equip", item = item :: string } else nil)
+	end)
+
+	Remotes.event("RequestEmote").OnServerEvent:Connect(function(player: Player, requestId: unknown, item: unknown)
+		acceptShop(player, requestId, if isItemId(item) then { kind = "Emote", item = item :: string } else nil)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
 	end)
@@ -246,6 +288,11 @@ end
 -- Called with every player command once it has been applied (ok or not), e.g. for match stats.
 function CommandRouter.observe(fn: (Player, Types.Command, boolean) -> ())
 	table.insert(observers, fn)
+end
+
+-- ShopService handles shop intents (buy, equip, emote); the player gets CommandResult with its answer.
+function CommandRouter.onShop(handler: (Player, Types.ShopIntent) -> (boolean, string?))
+	shopHandler = handler
 end
 
 -- A new match makes queued intents meaningless.

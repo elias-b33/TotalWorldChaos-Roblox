@@ -10,6 +10,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
+local Cosmetics = require(Client.Cosmetics)
 local Palette = require(Client.Palette)
 local ProfileState = require(Client.ProfileState)
 local Widgets = require(script.Parent.Widgets)
@@ -186,6 +187,11 @@ local function render()
 		)
 		l.TextColor3 = if n then Palette.nation(n.colorIndex):Lerp(Color3.new(1, 1, 1), 0.4) else l.TextColor3
 		l.LayoutOrder = 2 + i
+		if n then -- the nation's flag (cosmetic) at the end of its row
+			local flag = Cosmetics.flagLabel(l, Cosmetics.of(n.id).flag, n.colorIndex, UDim2.fromOffset(20, 15))
+			flag.AnchorPoint = Vector2.new(1, 0.5)
+			flag.Position = UDim2.new(1, -4, 0.5, 0)
+		end
 	end
 	Widgets.label(body, "⏳ Next match starts soon", 14, 22).LayoutOrder = 20
 	local hasReward = renderReward()

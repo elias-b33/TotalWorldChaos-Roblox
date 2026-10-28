@@ -32,6 +32,7 @@ export type Art = {
 	color: { [number]: number }, -- nation slot -> colour
 	border: { [number]: number }, -- nation slot -> border colour
 	capitals: { [number]: { x: number, y: number } },
+	styles: { [number]: NationStyle }, -- nation slot -> its border style and shade set (cosmetics); missing = default
 	selected: number,
 	near: buffer, -- per pixel: which border checks it needs (NEAR_* bits), worked out once per map
 	dirty: { number }?, -- x0, y0, x1, y1 of what changed since the last takeDirty
@@ -39,6 +40,10 @@ export type Art = {
 
 -- Called now and then while painting a whole map, so a client can spread the work over several frames.
 export type Yield = () -> ()
+
+-- A nation's map cosmetics: the border pattern and the shade set of its wash (CosmeticArt art names, e.g.
+-- "dashes", "dawn"). Both only ever use shades of the nation's own colours.
+export type NationStyle = { border: string, shades: string }
 
 local function style(
 	base: number,
@@ -201,6 +206,44 @@ local function noise(x: number, y: number, salt: number): number
 	h = mul32(bit32.bxor(h, bit32.rshift(h, 15)), 0x85ebca6b)
 	h = bit32.bxor(h, bit32.rshift(h, 13))
 	return h / 4294967296
+end
+
+------------------------------------------------------------------------------------------------- cosmetics
+
+-- Border styles (docs/MONETIZATION.md 3.2): the colour of one border pixel, from the nation's border colour.
+-- Every variant is that colour mixed with white or darkened, so its hue never changes (map colour is power).
+function PixelArt.borderShade(pattern: string, border: number, x: number, y: number): number
+	if pattern == "dashes" then
+		return if ((x + y) // 3) % 2 == 0 then border else mix(border, 0xffffff, 0.45)
+	elseif pattern == "runes" then
+		local k = (x * 3 + y * 5) % 7
+		return if k == 0 then mix(border, 0xffffff, 0.6) elseif k == 3 then scale(border, 0.6) else border
+	elseif pattern == "embers" then
+		local n = noise(x, y, 77)
+		return if n > 0.72 then mix(border, 0xffffff, 0.55) elseif n < 0.3 then scale(border, 0.7) else border
+	elseif pattern == "laurel" then
+		return if (x + 2 * y) % 4 < 2 then mix(border, 0xffffff, 0.3) else scale(border, 0.8)
+	end
+	return border
+end
+
+-- Shade sets: the wash colour over a terrain pixel of this brightness (0–255), from the nation's colour. Three
+-- shades of the same hue: for light, middle and dark terrain.
+function PixelArt.shadeColor(set: string, nation: number, brightness: number): number
+	local band = if brightness > 150 then 1 elseif brightness > 95 then 2 else 3
+	if set == "dawn" then
+		return if band == 1 then mix(nation, 0xffffff, 0.35) elseif band == 2 then mix(nation, 0xffffff, 0.2) else nation
+	elseif set == "dusk" then
+		return if band == 1 then nation elseif band == 2 then scale(nation, 0.85) else scale(nation, 0.7)
+	elseif set == "royal" then
+		return if band == 1 then mix(nation, 0xffffff, 0.3) elseif band == 2 then nation else scale(nation, 0.65)
+	end
+	return nation
+end
+
+local function brightness(c: number): number
+	local r, g, b = rgb(c)
+	return (r * 299 + g * 587 + b * 114) / 1000
 end
 
 -- Smooth noise in [0, 1): random values on a lattice every `cell` pixels, blended smoothly in between.
@@ -562,13 +605,17 @@ local function paintProvince(art: Art, pid: number)
 	local selected = art.selected == pid
 	local w = art.width
 	local ids, terrain, near, pixels = art.ids, art.terrain, art.near, art.pixels
+	local look = if o ~= 0 then art.styles[o] else nil
+	local borderStyle = if look then look.border else "solid"
+	local shades = if look then look.shades else "default"
 
 	-- most pixels' colours depend only on their terrain colour: work each one out once per repaint
 	local washed: { [number]: number } = {}
 	local function wash(c: number): number
 		local t = washed[c]
 		if t == nil then
-			t = if o ~= 0 then mix(c, nation, NATION_ALPHA) else c
+			local tint = if shades == "default" then nation else PixelArt.shadeColor(shades, nation, brightness(c))
+			t = if o ~= 0 then mix(c, tint, NATION_ALPHA) else c
 			washed[c] = t
 		end
 		return t
@@ -604,7 +651,9 @@ local function paintProvince(art: Art, pid: number)
 				end
 			end
 			if edge then
-				v = mix(c, border, BORDER_ALPHA) -- the nation border
+				-- the nation border, in its style's pattern
+				local b = if borderStyle == "solid" then border else PixelArt.borderShade(borderStyle, border, x, y)
+				v = mix(c, b, BORDER_ALPHA)
 			elseif bit32.btest(flags, NEAR_LINE) then
 				v = scale(v, PROVINCE_LINE)
 			end
@@ -668,6 +717,7 @@ function PixelArt.new(map: MapLike, grid: Grid, yield: Yield?): Art
 		color = {},
 		border = {},
 		capitals = {},
+		styles = {},
 		selected = 0,
 		near = buffer.create(w * h),
 		dirty = nil,
@@ -789,6 +839,44 @@ function PixelArt.setOwners(
 		drawCapitals(art)
 	end
 	return any
+end
+
+-- Apply nations' border styles and shade sets (nation slot -> style; missing = default). Repaints only the
+-- provinces of nations whose style changed (and their neighbours). Returns true if anything changed.
+function PixelArt.setStyles(art: Art, styles: { [number]: NationStyle }): boolean
+	local changed: { [number]: boolean } = {}
+	for slot, s in styles do
+		local old = art.styles[slot]
+		if old == nil or old.border ~= s.border or old.shades ~= s.shades then
+			art.styles[slot] = { border = s.border, shades = s.shades }
+			changed[slot] = true
+		end
+	end
+	for slot in art.styles do
+		if styles[slot] == nil then
+			art.styles[slot] = nil
+			changed[slot] = true
+		end
+	end
+	if next(changed) == nil then
+		return false
+	end
+	local repaint: { [number]: boolean } = {}
+	for pid, o in art.owner do
+		if changed[o] then
+			repaint[pid] = true
+			for _, other in art.touching[pid] or {} do
+				repaint[other] = true
+			end
+		end
+	end
+	for pid in repaint do
+		paintProvince(art, pid)
+	end
+	if next(repaint) then
+		drawCapitals(art)
+	end
+	return true
 end
 
 -- Highlight one province (0 or nil = none). Returns true if anything changed.

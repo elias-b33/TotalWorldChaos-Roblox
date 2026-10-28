@@ -16,6 +16,9 @@ local EVENTS = {
 	"RequestVote", -- lobby: mapId
 	"RequestPick", -- lobby: nationId
 	"RequestTutorial", -- tutorial: "Skip" | "Leave"
+	"RequestBuy", -- shop: itemId, "Glory" | "Robux"
+	"RequestEquip", -- shop: itemId
+	"RequestEmote", -- shop: emote itemId
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",
@@ -25,6 +28,7 @@ local EVENTS = {
 	"Profile", -- your ProfileSummary (on join and after every change)
 	"Reward", -- your RewardReport at Results
 	"Tutorial", -- your TutorialView in the tutorial match (nil = no prompts)
+	"Shop", -- your ShopView (on join and after every change)
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

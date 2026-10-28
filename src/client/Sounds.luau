@@ -1,6 +1,6 @@
 --!strict
--- Every sound the game plays, in one place, plus the mute toggle (top-right of the top bar, remembered for the
--- session) and a tap sound for every button.
+-- Every sound the game plays, in one place, plus the mute toggle (the 🔊 button Hud puts at the right end of the
+-- top bar, remembered for the session) and a tap sound for every button.
 --
 -- Only sounds that ship inside every Roblox client (rbxasset://sounds/...) are used, so nothing has to be uploaded.
 -- They can't be checked outside Studio: play each one once in Studio (see docs/DESIGN.md "Sound and effects") and
@@ -49,8 +49,6 @@ local SOUNDS: { [string]: { id: string, volume: number, gap: number } } = {
 	Cataclysm = { id = "rbxasset://sounds/HalloweenThunder.wav", volume = 0.7, gap = 1 },
 	Results = { id = "rbxasset://sounds/victory.wav", volume = 0.6, gap = 1 },
 }
-
-local BUTTON_SIZE = 44 -- the top bar's height (UI/Hud BAR_HEIGHT)
 
 local muted = false -- module state lives as long as the client session, across matches
 local instances: { [string]: Sound } = {}
@@ -114,6 +112,15 @@ function Sounds.setMuted(value: boolean)
 	end
 end
 
+-- The mute toggle: Hud builds the button in the top bar, Sounds keeps its icon in step.
+function Sounds.attachMuteButton(button: TextButton)
+	muteButton = button
+	button.Text = if muted then "🔇" else "🔊"
+	button.Activated:Connect(function()
+		Sounds.setMuted(not muted)
+	end)
+end
+
 -- The id of a sound, for the harness and for anyone checking the list.
 function Sounds.id(name: SoundName): string?
 	local def = SOUNDS[name]
@@ -135,27 +142,6 @@ end
 -- Call last, after the other UI is built: every button there and every button made later taps.
 function Sounds.init()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "Sound"
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 1 -- over the top bar
-	local button = Instance.new("TextButton")
-	button.Name = "Mute"
-	button.AnchorPoint = Vector2.new(1, 0)
-	button.Position = UDim2.new(1, -4, 0, 0)
-	button.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
-	button.BackgroundTransparency = 1
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 22
-	button.TextColor3 = Color3.new(1, 1, 1)
-	button.Text = if muted then "🔇" else "🔊"
-	button.Parent = gui
-	button.Activated:Connect(function()
-		Sounds.setMuted(not muted)
-	end)
-	muteButton = button
-	gui.Parent = playerGui
 
 	for _, d in playerGui:GetDescendants() do
 		hookButton(d)
