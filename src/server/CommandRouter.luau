@@ -209,6 +209,10 @@ function CommandRouter.init(getNation: (Player) -> number?)
 		acceptShop(player, requestId, if isItemId(item) then { kind = "Emote", item = item :: string } else nil)
 	end)
 
+	Remotes.event("RequestDefaultTheme").OnServerEvent:Connect(function(player: Player, requestId: unknown, on: unknown)
+		acceptShop(player, requestId, if type(on) == "boolean" then { kind = "DefaultTheme", on = on } else nil)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		RateLimit.forget(limiter, player.UserId)
 	end)

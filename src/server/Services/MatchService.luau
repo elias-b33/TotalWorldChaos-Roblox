@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Catalogue = require(Shared.Catalogue)
 local Config = require(Shared.Config)
 local Maps = require(Shared.Maps)
 local Match = require(Shared.Sim.Match)
@@ -26,6 +27,15 @@ function MatchService.lockedMap(): string?
 		return override
 	end
 	return nil
+end
+
+-- HOOK (private-server settings): a map theme the server forces on every match, skipping the theme vote, or nil
+-- for the vote. For now a "Theme" attribute on Workspace (a Theme catalogue id: "theme_night"; "theme_classic"
+-- forces the classic look). The private-server "theme" setting returns its value here.
+function MatchService.forcedTheme(): string?
+	local id = workspace:GetAttribute("Theme")
+	local item = if type(id) == "string" then Catalogue.item(id) else nil
+	return if item and item.slot == "Theme" then item.id else nil
 end
 
 -- Map for a match that skips the Lobby (Workspace "SkipLobby").

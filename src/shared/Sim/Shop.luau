@@ -191,6 +191,16 @@ function Shop.nationCosmetics(state: Types.MatchState, byUser: { [number]: Cosme
 	return out
 end
 
+-- The map theme a player brings to the theme vote (Sim.Lobby.chooseTheme): the equipped one, or the classic look.
+function Shop.themeOf(profile: Profile, vip: boolean): string
+	return Shop.equippedIn(profile, "Theme", vip) or Catalogue.DEFAULTS.Theme
+end
+
+-- The opt-out (docs/MONETIZATION.md 3.2): "always show me the classic map", whatever theme won the vote.
+function Shop.setDefaultTheme(profile: Profile, on: boolean)
+	profile.settings.defaultTheme = if on then true else nil
+end
+
 -- Capital emotes: owned only, and one per Config.Shop.EmoteCooldownTicks. lastTick = the tick of the player's
 -- previous emote (nil = none this match).
 function Shop.canEmote(profile: Profile, id: string, vip: boolean, lastTick: number?, tick: number): (boolean, string?)
@@ -253,6 +263,7 @@ function Shop.view(
 		robuxOpen = robuxOpen,
 		starterOffer = starterOffer,
 		testMode = testMode,
+		defaultTheme = profile.settings.defaultTheme == true,
 	}
 end
 

@@ -4,6 +4,10 @@
 -- ring in the new owner's colour when a province changes hands, an effect for each Primordial power, and a flash
 -- and banner when the phase changes. Sounds for the same moments come from Sounds.
 --
+-- Power-effect cosmetics: a power is drawn in its caster's equipped look (Cosmetics.powerEffect, PowerFx.LOOKS).
+-- A look only picks colours and particle shapes; the area (PowerFx.AREA), the timing (POWER_SECONDS) and the
+-- sound cue are the power's, the same for every look.
+--
 -- Client-only and cosmetic: it only reads ClientState (deltas, events, the snapshot). Particles are square frames on
 -- the map canvas's "Effects" layer, sized in whole map pixels (at least MIN_PIXEL on screen) and moved with
 -- TweenService. Cheap on phones: frames are pooled (at most MAX_PARTICLES), only a few effects run at once, and
@@ -21,9 +25,11 @@ local Snapshot = require(Shared.Snapshot)
 
 local Client = script.Parent
 local ClientState = require(Client.ClientState)
+local Cosmetics = require(Client.Cosmetics)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
 local Palette = require(Client.Palette)
+local PowerFx = require(Client.PowerFx)
 local Sounds = require(Client.Sounds)
 
 local MAX_PARTICLES = 240 -- pooled frames, all effects together (the map's GUI budget is 2,000 objects)
@@ -49,7 +55,6 @@ local SKULL_COLORS: { [string]: Color3 } = { B = fx.bone, K = fx.ink }
 local FLAG = { "PFFF", "PFFF", "P...", "P...", "P..." }
 local FLAG_COLORS: { [string]: Color3 } = { P = fx.pole, F = fx.ink }
 local CRATER = { ".CCC.", "CDDDC", "CDDDC", ".CCC." }
-local CRATER_COLORS: { [string]: Color3 } = { C = fx.earth, D = fx.crater }
 
 -- Phase banners: icon and a few words, and the flash colour.
 local PHASES: { [string]: { text: string, color: Color3, sound: Sounds.SoundName } } = {
@@ -75,7 +80,8 @@ local armyAt: { [number]: number } = {}
 local phase = ""
 local lastShown = ""
 local lastProvince = 0
-local history: { { kind: string, province: number, at: number } } = {} -- the last few effects shown
+type Shown = { kind: string, province: number, at: number, look: string } -- look: a power's look ("" = default)
+local history: { Shown } = {} -- the last few effects shown
 local seed = 20240611
 
 local flash: Frame
@@ -246,13 +252,13 @@ local function sprite(
 end
 
 -- Room for one more effect? Minor ones stop at MAX_MINOR, major ones at MAX_MAJOR.
-local function begin(major: boolean, seconds: number, kind: string, provinceId: number): boolean
+local function begin(major: boolean, seconds: number, kind: string, provinceId: number, look: string?): boolean
 	if active >= (if major then MAX_MAJOR else MAX_MINOR) then
 		return false
 	end
 	active += 1
 	lastShown, lastProvince = kind, provinceId
-	table.insert(history, { kind = kind, province = provinceId, at = os.clock() })
+	table.insert(history, { kind = kind, province = provinceId, at = os.clock(), look = look or "" })
 	if #history > 32 then
 		table.remove(history, 1)
 	end
@@ -352,54 +358,117 @@ end
 
 -- Primordial powers ------------------------------------------------------------------------------------------
 
-local function meteor(c: Vector2, u: number)
+local DEFAULT_LOOK = PowerFx.look("Meteor") :: PowerFx.Look
+local colors3: { [number]: Color3 } = {}
+
+-- A packed 0xRRGGBB colour (PowerFx) as a Color3, made once.
+local function color3(c: number): Color3
+	local made = colors3[c]
+	if made == nil then
+		made = Color3.fromRGB(bit32.rshift(c, 16), bit32.band(bit32.rshift(c, 8), 255), bit32.band(c, 255))
+		colors3[c] = made
+	end
+	return made :: Color3
+end
+
+local function colorList(list: { number }): { Color3 }
+	local out = {}
+	for i, c in list do
+		out[i] = color3(c)
+	end
+	return out
+end
+
+-- A bar-shaped particle (w × h map pixels) that pops in at p, holds, then fades: the pieces of a star.
+local function bar(color: Color3, p: Vector2, w: number, h: number, hold: number)
+	local particle = acquire(color)
+	if particle == nil then
+		return
+	end
+	local serial = particle.serial
+	particle.frame.Position = at(p)
+	particle.frame.Size = UDim2.fromScale(w / size.X, 0)
+	tween(particle, 0.2, Enum.EasingStyle.Quad, { Size = UDim2.fromScale(w / size.X, h / size.Y) })
+	tween(particle, FADE, Enum.EasingStyle.Linear, { BackgroundTransparency = 1 }, 0.2 + hold)
+	task.delay(0.2 + hold + FADE, release, particle, serial)
+end
+
+-- A four-point star: a horizontal and a vertical bar.
+local function star(color: Color3, p: Vector2, u: number, hold: number)
+	bar(color, p, 3 * u, u, hold)
+	bar(color, p, u, 3 * u, hold)
+end
+
+local function meteor(c: Vector2, u: number, look: PowerFx.Look)
 	local g = generation
+	local comet = look.style == "comet"
 	local start = c + Vector2.new(22 * u, -36 * u)
 	Sounds.play("MeteorFall")
-	local core = acquire(fx.fireOrange)
-	local inner = acquire(fx.fireYellow)
-	for i, p in { core, inner } do
-		if p then
-			p.frame.Position = at(start)
-			p.frame.Size = square((if i == 1 then 4 else 2) * u)
-			tween(p, METEOR_FALL, Enum.EasingStyle.Linear, { Position = at(c) })
+	-- the rock and its bright centre (the comet adds a glowing plus around its head), falling together
+	local parts = { { look.core, Vector2.zero, 4 }, { look.inner, Vector2.zero, 2 } }
+	if comet then
+		for _, d in { Vector2.new(2, 0), Vector2.new(-2, 0), Vector2.new(0, 2), Vector2.new(0, -2) } do
+			table.insert(parts, { look.inner, d, 1 })
 		end
 	end
-	local trail = { fx.fireYellow, fx.fireOrange, fx.fireRed, fx.smoke }
+	local falling: { Particle } = {}
+	for _, part in parts do
+		local p = acquire(color3(part[1] :: number))
+		if p then
+			local offset = (part[2] :: Vector2) * u
+			p.frame.Position = at(start + offset)
+			p.frame.Size = square((part[3] :: number) * u)
+			tween(p, METEOR_FALL, Enum.EasingStyle.Linear, { Position = at(c + offset) })
+			table.insert(falling, p)
+		end
+	end
+	local trail = colorList(look.particles)
 	local t0 = os.clock()
 	local step = 0
 	while os.clock() - t0 < METEOR_FALL do
 		step += 1
 		local p = start:Lerp(c, (os.clock() - t0) / METEOR_FALL)
 		local drift = Vector2.new(between(-1, 1) * u, -2 * u)
-		spark(trail[(step - 1) % #trail + 1], p, p + drift, 2 * u, u, 0.45)
+		if comet then
+			-- a long glittering tail: sparks that hang in the air longer, and a twinkle beside each
+			spark(trail[(step - 1) % #trail + 1], p, p + drift * 0.4, 2 * u, u, 0.8)
+			spark(trail[1], p + Vector2.new(between(-2, 2), between(-2, 2)) * u, p, u, u, 0.6)
+		else
+			spark(trail[(step - 1) % #trail + 1], p, p + drift, 2 * u, u, 0.45)
+		end
 		task.wait(0.05)
 		if g ~= generation then
 			return
 		end
 	end
-	for _, p in { core, inner } do
-		if p then
-			release(p, p.serial)
-		end
+	for _, p in falling do
+		release(p, p.serial)
 	end
-	-- impact: the flash, a ring of fire, crater dust, a crater, and the screen shake from the spec
+	-- impact: the flash, a ring, crater dust, a crater, and the screen shake from the spec
 	MapView.shake(8, 0.5)
 	Sounds.play("MeteorImpact")
-	pop(c, fx.white, 20 * u, 0.35)
-	ring(c, fx.fireOrange, 14, 2 * u, 14 * u, 2 * u, 0.6)
-	burst(c, { fx.earth, fx.smoke, fx.dustGrey }, 18, 3 * u, 11 * u, 2 * u, 1, 3 * u)
-	sprite(c, CRATER, CRATER_COLORS, u, 2)
+	pop(c, color3(look.flash), 20 * u, 0.35)
+	ring(c, color3(look.ring), 14, 2 * u, PowerFx.AREA.Meteor * u, 2 * u, 0.6)
+	burst(c, colorList(look.debris), 18, 3 * u, 11 * u, 2 * u, 1, 3 * u)
+	sprite(c, CRATER, { C = color3(look.rim), D = color3(look.pit) }, u, 2)
+	if comet then
+		-- a burst of stars over the crater
+		for i = 1, 6 do
+			local angle = i / 6 * 2 * math.pi
+			star(trail[(i - 1) % 2 + 1], c + Vector2.new(math.cos(angle), math.sin(angle)) * 8 * u, u, 0.5)
+		end
+	end
 end
 
 -- Returns how many provinces it pulses over.
-local function plague(nationId: number): number
+local function plague(nationId: number, look: PowerFx.Look): number
 	local snapshot = ClientState.snapshot()
 	if snapshot == nil then
 		return 0
 	end
 	local shown = 0
-	local colors = { fx.plague, fx.plagueDark, fx.plagueLight }
+	local colors = colorList(look.particles)
+	local ringColor = color3(look.ring)
 	for _, record in snapshot.provinces do
 		if shown >= MAX_PLAGUE_PROVINCES then
 			break
@@ -409,7 +478,7 @@ local function plague(nationId: number): number
 			local c, u = MapRenderer.centerOf(record.id), unit()
 			for pulse = 0, 2 do
 				task.delay(pulse * 0.6 + shown * 0.05, function()
-					ring(c, fx.plague, 10, u, 8 * u, 2 * u, 0.8)
+					ring(c, ringColor, 10, u, PowerFx.AREA.Plague * u, 2 * u, 0.8)
 					for i = 1, 4 do
 						local from = c + Vector2.new(between(-5, 5), between(-3, 3)) * u
 						spark(colors[(i - 1) % #colors + 1], from, from - Vector2.new(0, 6 * u), 2 * u, u, 0.9)
@@ -461,17 +530,50 @@ local function earthquake(c: Vector2, u: number)
 	burst(c, { fx.dust, fx.earth }, 10, 2 * u, 7 * u, 2 * u, 0.8, 2 * u)
 end
 
-local function blessing(c: Vector2, u: number)
-	ring(c, fx.gold, 12, 2 * u, 11 * u, 2 * u, 0.9)
-	local colors = { fx.gold, fx.paleGold, fx.white }
-	for i = 1, 20 do
+-- A beam of light coming down into the province from `top`, `length` map pixels long.
+local function beam(color: Color3, top: Vector2, u: number, length: number)
+	local p = acquire(color)
+	if p == nil then
+		return
+	end
+	local serial = p.serial
+	p.frame.AnchorPoint = Vector2.new(0.5, 0)
+	p.frame.Position = at(top)
+	p.frame.Size = UDim2.fromScale(2 * u / size.X, 0)
+	p.frame.BackgroundTransparency = 0.25
+	tween(p, 0.35, Enum.EasingStyle.Quad, { Size = UDim2.fromScale(2 * u / size.X, length / size.Y) })
+	tween(p, 0.5, Enum.EasingStyle.Linear, { BackgroundTransparency = 1 }, 0.9)
+	task.delay(1.4, function()
+		if p.serial == serial then
+			p.frame.AnchorPoint = Vector2.new(0.5, 0.5) -- back to the pool's usual anchor
+		end
+		release(p, serial)
+	end)
+end
+
+local function blessing(c: Vector2, u: number, look: PowerFx.Look)
+	local rays = look.style == "rays"
+	ring(c, color3(look.ring), 12, 2 * u, PowerFx.AREA.Blessing * u, 2 * u, 0.9)
+	local colors = colorList(look.particles)
+	if rays then
+		-- five beams of light, inside the blessing's ring
+		for i, x in { -8, -4, 0, 4, 8 } do
+			task.delay((i - 1) * 0.08, beam, color3(look.ray), c + Vector2.new(x * u, -10 * u), u, 14 * u)
+		end
+	end
+	for i = 1, if rays then 12 else 20 do
 		task.delay(i * 0.06, function()
-			local p = acquire(colors[(i - 1) % #colors + 1])
+			local color = colors[(i - 1) % #colors + 1]
+			local spot = c + Vector2.new(between(-8, 8), between(-6, 6)) * u
+			if rays then
+				star(color, spot, u, 0.4) -- four-point stars instead of squares
+				return
+			end
+			local p = acquire(color)
 			if p == nil then
 				return
 			end
 			local serial = p.serial
-			local spot = c + Vector2.new(between(-8, 8), between(-6, 6)) * u
 			p.frame.Position = at(spot)
 			p.frame.Size = square(0)
 			tween(p, 0.3, Enum.EasingStyle.Quad, { Size = square(2 * u), Position = at(spot - Vector2.new(0, u)) })
@@ -504,7 +606,7 @@ local POWER_SECONDS: { [string]: number } = {
 	Shield = 0.8,
 }
 
-local POWER_DRAW: { [string]: (Vector2, number) -> () } = {
+local POWER_DRAW: { [string]: (Vector2, number, PowerFx.Look) -> () } = {
 	Meteor = meteor,
 	Rebels = rebels,
 	Earthquake = earthquake,
@@ -512,28 +614,32 @@ local POWER_DRAW: { [string]: (Vector2, number) -> () } = {
 	Shield = shieldCast,
 }
 
-local function power(name: string?, hit: number, provinceId: number)
+-- `by`: the caster's nation (0 for a Cataclysm disaster): its equipped look for this power, else the default.
+local function power(name: string?, hit: number, provinceId: number, by: number)
 	if name == nil then
 		return
 	end
 	local mine = hit ~= 0 and hit == ClientState.myNation()
 	local seconds = POWER_SECONDS[name] or 2
 	local sound: Sounds.SoundName? = if name == "Meteor" then "MeteorImpact" else name :: any
+	local art = if by ~= 0 then Cosmetics.art(Cosmetics.powerEffect(by, name)) else ""
+	local look = PowerFx.look(name, art) or DEFAULT_LOOK -- powers without variants ignore it
+	local lookName = if PowerFx.LOOKS[name] and PowerFx.LOOKS[name][art] then art else ""
 	if name == "Plague" then
 		-- over the whole nation, not one province
-		local shown = if begin(true, seconds, name, provinceId) then plague(hit) else 0
+		local shown = if begin(true, seconds, name, provinceId, lookName) then plague(hit, look) else 0
 		if shown > 0 or mine then
 			Sounds.play("Plague")
 		end
 		return
 	end
 	local draw = POWER_DRAW[name]
-	if draw and visible(provinceId, false) and begin(true, seconds, name, provinceId) then
+	if draw and visible(provinceId, false) and begin(true, seconds, name, provinceId, lookName) then
 		if name ~= "Meteor" and sound then
 			Sounds.play(sound)
 		end
 		local c, u = MapRenderer.centerOf(provinceId), unit()
-		task.spawn(draw, c, u)
+		task.spawn(draw, c, u, look)
 	elseif mine and sound then
 		Sounds.play(sound)
 	end
@@ -622,7 +728,7 @@ local function phaseChanged(name: string)
 		return
 	end
 	lastShown, lastProvince = name, 0
-	table.insert(history, { kind = name, province = 0, at = os.clock() })
+	table.insert(history, { kind = name, province = 0, at = os.clock(), look = "" })
 	Sounds.play(def.sound)
 	flash.BackgroundColor3 = def.color
 	flash.BackgroundTransparency = 0.45
@@ -708,7 +814,7 @@ local function onDelta(delta: Snapshot.DeltaData)
 		elseif e.kind == "ProvinceTaken" then
 			captured(e.province, e.a, e.b)
 		elseif e.kind == "Power" or e.kind == "Disaster" then
-			power(Primordial.POWERS[e.a], e.b, e.province)
+			power(Primordial.POWERS[e.a], e.b, e.province, e.by or 0)
 		end
 	end
 	for _, a in delta.armies do
@@ -731,8 +837,9 @@ function Effects.stats(): { active: number, particles: number, domes: number, la
 	return { active = active, particles = created - #free, domes = domeCount, last = lastShown, province = lastProvince }
 end
 
--- The last few effects shown (kind, province, os.clock() when it started), oldest first, for the harness.
-function Effects.history(): { { kind: string, province: number, at: number } }
+-- The last few effects shown (kind, province, os.clock() when it started, a power's look), oldest first, for the
+-- harness.
+function Effects.history(): { Shown }
 	return history
 end
 

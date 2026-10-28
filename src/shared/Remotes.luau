@@ -19,6 +19,7 @@ local EVENTS = {
 	"RequestBuy", -- shop: itemId, "Glory" | "Robux"
 	"RequestEquip", -- shop: itemId
 	"RequestEmote", -- shop: emote itemId
+	"RequestDefaultTheme", -- shop: true = always show the classic map (the theme opt-out)
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"CommandResult",

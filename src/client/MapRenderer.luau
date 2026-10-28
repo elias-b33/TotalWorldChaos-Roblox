@@ -2,7 +2,7 @@
 -- What is drawn on the 2D map (docs/DESIGN.md "Map rendering"): the pixel-art image painted by PixelArt
 -- (terrain, owners, the selected province), straits, province names, army tokens gliding between province
 -- centres, battle and siege markers, the coalition leader's crown and route lines. Everything sits on MapView's
--- canvas, placed in map pixels.
+-- canvas, placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
 
 local AssetService = game:GetService("AssetService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +23,7 @@ local Cosmetics = require(script.Parent.Cosmetics)
 local MapView = require(script.Parent.MapView)
 local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
+local ShopState = require(script.Parent.ShopState)
 
 local NAME_MIN_PIXELS = 70 -- a province's name shows once the province is this wide on screen
 local NAME_RELAYOUT = 0.04 -- names are laid out again when the zoom changes by this share
@@ -66,7 +67,8 @@ local imageLabel: ImageLabel? = nil
 local size = Vector2.new(1024, 512)
 local generation = 0 -- bumps with every new map, so a painting finished for an old one is ignored
 local grids: { [string]: MapGrid.Grid } = {} -- decoded grids by map id
-local arts: { [string]: PixelArt.Art } = {} -- painted maps by map id and resolution, reused across matches
+local arts: { [string]: PixelArt.Art } = {} -- painted maps by map id and resolution (one theme each), reused
+local painting: { map: Types.MapDef, grid: MapGrid.Grid }? = nil -- what the current map is painted from
 local warned = false
 local layers: { [string]: Frame } = {}
 local widths: { [number]: number } = {} -- each province's width in map pixels
@@ -373,9 +375,55 @@ local function refreshVictory()
 	end
 end
 
+-- The painted map in the match's theme: reused from an earlier match on this map if it has that theme, or painted
+-- now, a few milliseconds per frame (the old painting stays up meanwhile). Only one theme per map is kept.
+local function paintMap()
+	local job = painting
+	if job == nil then
+		return
+	end
+	local map, g = job.map, job.grid
+	local look = Cosmetics.matchTheme()
+	local background = Palette.background[map.theme] or Palette.background.earth
+	local canvas = MapView.canvas()
+	local back = if canvas then canvas.Parent else nil
+	if back and back:IsA("Frame") then
+		local themed = PixelArt.themeColor(look, packed(background), false, map.theme == "sky")
+		back.BackgroundColor3 =
+			Color3.fromRGB(bit32.rshift(themed, 16), bit32.band(bit32.rshift(themed, 8), 255), bit32.band(themed, 255))
+	end
+	local key = map.id .. ":" .. g.width
+	local cached = arts[key]
+	if cached and cached.look == look then
+		art = cached
+		PixelArt.select(cached, nil)
+		PixelArt.invalidate(cached)
+		return
+	end
+	local myGeneration = generation
+	task.spawn(function()
+		local last = os.clock()
+		local painted = PixelArt.new(map, g, function()
+			if os.clock() - last > PAINT_SLICE then
+				task.wait()
+				last = os.clock()
+			end
+		end, look)
+		arts[key] = painted
+		if generation == myGeneration and Cosmetics.matchTheme() == look then
+			local old = art
+			art = painted
+			if old then
+				PixelArt.select(painted, old.selected)
+			end
+			paintOwners()
+			PixelArt.invalidate(painted)
+		end
+	end)
+end
+
 local function build(map: Types.MapDef)
 	generation += 1
-	local myGeneration = generation
 	labels = {}
 	markers = {}
 	effects = {}
@@ -422,30 +470,9 @@ local function build(map: Types.MapDef)
 		end
 	end
 
-	-- the painted map: reused from an earlier match on this map, or painted now, a few milliseconds per frame
-	local key = map.id .. ":" .. g.width
-	local cached = arts[key]
-	if cached then
-		art = cached
-		PixelArt.select(cached, nil)
-		PixelArt.invalidate(cached)
-	else
-		art = nil
-		task.spawn(function()
-			local last = os.clock()
-			local painted = PixelArt.new(map, g, function()
-				if os.clock() - last > PAINT_SLICE then
-					task.wait()
-					last = os.clock()
-				end
-			end)
-			arts[key] = painted
-			if generation == myGeneration then
-				art = painted
-				paintOwners()
-			end
-		end)
-	end
+	painting = { map = map, grid = g }
+	art = nil
+	paintMap()
 
 	local straits = layer("Straits", canvas)
 	local linkColor = if map.theme == "sky" then Palette.energyLink else Palette.strait
@@ -838,6 +865,13 @@ function MapRenderer.init()
 			if e.kind == "Emote" then
 				showEmote(e)
 			end
+		end
+	end)
+	-- the opt-out ("always show the classic map") was switched: repaint the terrain
+	ShopState.onChange(function()
+		local a = art
+		if painting and a and a.look ~= Cosmetics.matchTheme() then
+			paintMap()
 		end
 	end)
 	-- someone equipped something: flags, borders, shades and tokens follow

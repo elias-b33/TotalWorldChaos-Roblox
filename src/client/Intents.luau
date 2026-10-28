@@ -134,4 +134,9 @@ function Intents.emote(itemId: string)
 	send("RequestEmote", itemId)
 end
 
+-- The map-theme opt-out: true = always show me the classic map.
+function Intents.defaultTheme(on: boolean)
+	send("RequestDefaultTheme", on)
+end
+
 return Intents

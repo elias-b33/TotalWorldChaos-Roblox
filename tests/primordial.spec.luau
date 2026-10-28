@@ -111,6 +111,7 @@ T.test("Meteor kills half an army and costs a development level in its province"
 	T.equal(Primordial.POWERS[e.a], "Meteor")
 	T.equal(e.b, B)
 	T.equal(e.province, where)
+	T.equal(e.by, A, "the event names the caster, for its power-effect cosmetic")
 end)
 
 T.test("Meteor's development loss respects the province owner's immunity, and doesn't start it", function()
@@ -515,6 +516,7 @@ T.test("a Primordial earns charges and casts powers, and can do nothing else", f
 	T.expect(ok, err)
 	T.equal(army.men, 2000)
 	T.equal(state.primordials[BOB].charges, 0)
+	T.equal(state.events[#state.events].by, state.seats[BOB], "a Primordial casts as the nation it held")
 	ok, err = Commands.applyPrimordial(state, BOB, { kind = "Develop", province = where })
 	T.expect(not ok)
 	T.equal(err, "Primordial")
