@@ -762,9 +762,9 @@ local function phaseChanged(name: string)
 	bannerStroke.Transparency = 0
 	Icons.set(bannerIcon, def.icon)
 	Icons.dim(bannerIcon, false)
-	bannerScale.Scale = BANNER_POP
+	bannerScale.Scale = BANNER_POP * Widgets.uiScale()
 	banner.Visible = true
-	TweenService:Create(bannerScale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	TweenService:Create(bannerScale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = Widgets.uiScale() }):Play()
 	task.delay(BANNER_SECONDS, function()
 		if bannerSerial == serial then
 			local info = TweenInfo.new(BANNER_FADE, Enum.EasingStyle.Quad)
@@ -914,7 +914,9 @@ function Effects.init()
 	pad.PaddingRight = UDim.new(0, Theme.space.xl + Theme.space.s)
 	bannerIcon = Widgets.leadIcon(banner, "war", Theme.icon.medium, Theme.space.m)
 	bannerScale = Instance.new("UIScale")
+	bannerScale.Name = "DeviceScale" -- Widgets.fit shares it
 	bannerScale.Parent = banner
+	Widgets.fit(banner)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ClientState.onReset(onReset)

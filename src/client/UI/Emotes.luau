@@ -83,13 +83,14 @@ function Emotes.init()
 		round.CornerRadius = UDim.new(0.5, 0)
 	end
 
-	picker = Widgets.panel(gui, 0)
+	picker = Widgets.panel(gui, 0, "plate")
 	picker.Name = "EmotePicker"
 	picker.AnchorPoint = Vector2.new(0, 1)
 	picker.Position = UDim2.new(0, 12, 1, -BUTTON_SIZE - 20)
 	picker.Visible = false
 	Widgets.list(picker, true, 6)
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	ShopState.onChange(function()
 		refresh()

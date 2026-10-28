@@ -9,6 +9,7 @@ local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local Relations = require(Client.Relations)
+local HudLayout = require(script.Parent.HudLayout)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
@@ -68,10 +69,15 @@ function Offers.init()
 	column.Name = "Column"
 	column.BackgroundTransparency = 1
 	column.AnchorPoint = Vector2.new(1, 0)
-	column.Position = UDim2.new(1, -10, 0, 54)
 	column.Size = UDim2.fromOffset(WIDTH, 300)
 	column.Parent = gui
 	Widgets.list(column, false, Theme.space.m)
+	local function place()
+		Widgets.fit(column, nil, UDim2.new(1, -10, 0, HudLayout.contentTop()))
+	end
+	place()
+	HudLayout.onChange(place)
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	-- once a second is plenty: offers change with deltas and count down slowly
 	local acc = 0

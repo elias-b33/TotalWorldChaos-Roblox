@@ -15,6 +15,7 @@ local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
 local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
+local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
@@ -162,25 +163,20 @@ function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?)
 	local gui = Widgets.screen("Nations", 4)
 	drawer = Widgets.panel(gui, WIDTH)
 	drawer.Name = "Drawer"
-	drawer.Position = UDim2.fromOffset(8, 52)
 	drawer.Visible = false
 	Widgets.list(drawer, false, Theme.space.xs)
-	-- the title, and beside it the way to the quests (in the header: a row under ten nations runs off a phone)
-	local header = Instance.new("Frame")
-	header.Name = "Header"
-	header.BackgroundTransparency = 1
-	header.Size = UDim2.new(1, 0, 0, if onQuests then Widgets.BUTTON_HEIGHT else 28)
-	header.LayoutOrder = 0
-	header.Parent = drawer
-	local title = Widgets.title(header, "Nations", Theme.text.heading, if onQuests then Widgets.BUTTON_HEIGHT else 28)
-	Widgets.leadIcon(title, "globe", Theme.size.icon)
+	-- the title on a plate on the drawer's top edge, and beside it, on the same edge, the way to the quests (a row
+	-- under ten nations would run off a phone)
+	local header = Widgets.header(drawer, "Nations", "globe")
 	if onQuests then
 		questsText = buttonText or questsText
 		local b = Widgets.iconTextButton(header, "scroll", "", 112, Widgets.GOLD, onQuests)
 		b.Name = "QuestsButton"
 		b.TextSize = Theme.text.small
+		b.ZIndex = 3
 		b.AnchorPoint = Vector2.new(1, 0)
-		b.Position = UDim2.fromScale(1, 0)
+		local pad = drawer:FindFirstChildOfClass("UIPadding") :: UIPadding
+		b.Position = UDim2.new(1, pad.PaddingRight.Offset - 6, 0, -pad.PaddingTop.Offset - 22)
 		questsButton = b
 		renderQuestsButton()
 	end
@@ -200,6 +196,14 @@ function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?)
 	raceLine.LayoutOrder = 2
 	raceLine.Visible = false
 	Widgets.leadIcon(raceLine, "humans", 16, Theme.space.xs)
+	-- under the top bar, with room for what stands on its top edge (the Quests button reaches 22 px above it)
+	local function place()
+		local above = if onQuests then Widgets.BUTTON_HEIGHT // 2 else Theme.size.titlePlate // 2
+		Widgets.fit(drawer, nil, UDim2.fromOffset(Theme.space.m, HudLayout.contentTop() + above))
+	end
+	place()
+	HudLayout.onChange(place)
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	ClientState.onReset(render)
 	ClientState.onDelta(function(delta)

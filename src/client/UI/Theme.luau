@@ -112,8 +112,24 @@ Theme.shadow = {
 	plate = { y = 4, transparency = 0.55 }, -- plates over the map: top-bar items, toasts, Lobby buttons
 	button = { y = 3, transparency = 0.6 }, -- buttons over the map
 	window = { y = 6, transparency = 0.5 }, -- windows and sheets
+	title = { y = 3, transparency = 0.5 }, -- title plates on a window's edge
+	counter = { y = 3, transparency = 0.65 }, -- the top bar's counters and chips
 	glow = { blur = 12, transparency = 0.45 }, -- rare shop cards, claimable rewards
 }
+
+-- Tablets (docs/STUDIO.md "UI kit"): the whole UI grows with the screen's short side, so a sheet or the top bar is
+-- as big in the hand on an iPad as on a phone. Phones (short side under `phone`) stay at exactly 1; bigger screens
+-- get short side / `base`, at most `max` (an iPad Air in landscape, 820 px: 1.26; an iPad Pro, 1024 px: 1.4).
+Theme.tablet = { phone = 600, base = 650, max = 1.4 }
+
+-- The UI's scale on a screen of this size (GUI px).
+function Theme.uiScale(screen: Vector2): number
+	local short = math.min(screen.X, screen.Y)
+	if short < Theme.tablet.phone then
+		return 1
+	end
+	return math.clamp(short / Theme.tablet.base, 1, Theme.tablet.max)
+end
 
 -- Cosmetic rarities (shop cards, season pass reward cells): the frame band, the tag and the glow.
 Theme.rarity = {

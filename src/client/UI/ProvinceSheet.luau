@@ -26,7 +26,7 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local SHEET_WIDTH = 560
-local CELL = Vector2.new(128, 52) -- action buttons: at least 44 px tall on phones
+local CELL = Vector2.new(126, 52) -- action tiles: four fill the sheet inside its frame, at least 44 px tall
 local CHIP_HEIGHT = 26
 
 local TERRAIN_ICONS: { [string]: string } = { Plains = "farm", Forest = "tree", Hills = "hills", Mountain = "mountain" }
@@ -290,16 +290,14 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 	sheet.Visible = false
 	Widgets.list(sheet, false, Theme.space.m)
 
-	-- header: name on the left, close button on the right
-	local header
-	header, title = Widgets.header(sheet, "", "flag", function()
+	-- the province's name on a title plate on the sheet's top edge, the close gem on its corner
+	local _, plate = Widgets.header(sheet, "", "flag", function()
 		ProvinceSheet.show(nil)
 		if onClose then
 			onClose()
 		end
 	end)
-	header.Size = UDim2.new(1, 0, 0, 36)
-	header.LayoutOrder = 1
+	title = plate
 	titleIcon = title:FindFirstChild("Icon") :: GuiObject
 
 	info = chipRow(2, "Info")
@@ -318,6 +316,7 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = actions
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ClientState.onReset(function()

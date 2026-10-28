@@ -4,7 +4,6 @@
 -- pointer, a tap (or click) is handed to the tap handler. Map positions are in map-art pixels (1 pixel = 1 stud);
 -- things drawn on the map are children of the canvas, placed by scale so they follow every pan and zoom.
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,7 +12,8 @@ local TAP_SLOP = 8 -- pixels a press may move and still count as a tap
 local MAX_ZOOM = 10 -- screen pixels per map pixel at the closest zoom
 local ZOOM_LEVELS = 3 -- whole map, region, close-up (mouse wheel steps between them)
 local SMOOTHING = 12 -- higher = snappier
-local HUD_BAR = 44 -- the HUD's top bar (UI/Hud BAR_HEIGHT), drawn under Roblox's own top bar: the map is framed below both
+
+local HudLayout = require(script.Parent.UI.HudLayout)
 
 local MapView = {}
 
@@ -49,12 +49,9 @@ local function viewport(): Vector2
 	return if camera then camera.ViewportSize else Vector2.new(800, 600)
 end
 
--- Everything above the map: Roblox's top bar (the inset the HUD sits below) plus the HUD's own bar.
+-- Everything above the map: the HUD's top bar, in Roblox's own top-bar row (or just under it).
 local function topBand(): number
-	local ok, inset = pcall(function()
-		return GuiService:GetGuiInset()
-	end)
-	return HUD_BAR + (if ok and typeof(inset) == "Vector2" then inset.Y else 0)
+	return HudLayout.barBottom()
 end
 
 -- How far down the screen the map starts (Roblox's top bar plus the HUD's), for things placed in full-screen GUIs.
