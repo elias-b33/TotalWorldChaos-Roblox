@@ -93,7 +93,8 @@ local function sendView(player: Player, starterOffer: boolean?)
 	shopRemote:FireClient(player, view)
 end
 
--- Send a player their shop state again (a new UTC day: the rotating shop; a season reward: owned items).
+-- Send a player their shop view again (another service changed it: a new UTC day's rotating shop, a season reward,
+-- an achievement, the Warlord frame).
 function ShopService.refresh(player: Player)
 	sendView(player)
 end

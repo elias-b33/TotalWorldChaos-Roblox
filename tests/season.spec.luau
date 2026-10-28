@@ -213,4 +213,19 @@ T.test("season items are never sold", function()
 	T.expect(Catalogue.PRODUCT_IDS.season_pass ~= nil and Catalogue.PRODUCT_IDS.season_bundle ~= nil, "pass products")
 end)
 
+T.test("a season title is also given as a wearable title", function()
+	local p = profileIn(S1)
+	for _, track in Season.TRACKS do
+		for _, r in Season.rewards(S1, C.Tiers, track) do
+			if r.title then
+				Season.grant(p, r)
+				local wearable = Catalogue.titleNamed(r.title)
+				T.expect(wearable ~= nil, r.title .. " is a catalogue title")
+				T.expect(p.owned[wearable :: string] == true, r.title .. " can be worn")
+			end
+		end
+	end
+	T.expect(p.owned.title_s1_veteran and p.owned.title_primordial_herald, "both tier-50 titles")
+end)
+
 T.finish()

@@ -21,6 +21,7 @@ local Scene = require("./Scene")
 local OUT = "tools/harness/out"
 local LOBBY_SCENARIOS = { lobby = true, shop = true, quests = true, analytics = true, private = true, themes = true, season = true } -- these run the Lobby; the rest boot with SkipLobby
 LOBBY_SCENARIOS.ads = true -- the rewarded video only plays in the Lobby
+LOBBY_SCENARIOS.leaderboards = true -- the 🏆 button is in the Lobby
 local PRIVATE_OWNER = 5001 -- the private scenario's server owner (Workspace "PrivateServerOwner")
 local TUTORIAL_SCENARIOS = { tutorial = true } -- these boot a tutorial server (Workspace "Tutorial")
 local scenarioName = process.args[1] or "smoke"
@@ -673,7 +674,14 @@ function scenarios.progression()
 	local report = H.client(alice, "ProfileState").reward()
 	-- finish 100 + 1st place 150 + 1 province 5 + 1 battle 5 + first match today 200 = 460 XP (level 2);
 	-- Glory 20 + 40 + 1 + 1 + 50, and 50 for the level-up, 25 for the first step of the play calendar = 187
-	H.expect(report ~= nil and report.reward.xp == 460 and report.reward.glory == 187, "the reward: 460 XP, 187 Glory")
+	-- plus the achievements the win unlocked (First Blood, Domination, Victor, Podium...): one line of their own
+	local achievementGlory = 0
+	for _, line in report.reward.lines do
+		achievementGlory += if line.kind == "Achievement" then line.glory else 0
+	end
+	H.expect(achievementGlory >= 500, "achievements the match unlocked pay " .. achievementGlory .. " Glory")
+	local glory = 187 + achievementGlory
+	H.expect(report ~= nil and report.reward.xp == 460 and report.reward.glory == glory, "the reward: 460 XP, 187 Glory + achievements")
 	H.expect(report.reward.placement == 1 and report.after.level == 2, "1st place, and Alice reached level 2")
 	H.expect(Emulator.findText(alice, "+460 XP") ~= nil, "the Results screen shows the XP and Glory")
 	H.expect(Emulator.findText(alice, "First match today") ~= nil, "with the breakdown")
@@ -684,7 +692,7 @@ function scenarios.progression()
 
 	Emulator.run(1)
 	local saved = H.saved(userId)
-	H.expect(saved.Data.xp == 460 and saved.Data.glory == 187, "the reward was saved to the DataStore")
+	H.expect(saved.Data.xp == 460 and saved.Data.glory == glory, "the reward was saved to the DataStore")
 	H.expect(saved.MetaData.ActiveSession ~= nil, "Alice's server holds the session lock")
 	H.expect(Emulator.dataStores.PlayerData == nil, "Studio saves go to their own store, never the live one")
 
@@ -697,7 +705,7 @@ function scenarios.progression()
 	local again = Emulator.addClient("Alice", nil, userId)
 	Emulator.run(3)
 	local data = Data.data(again.serverPlayer)
-	H.expect(data and data.xp == 460 and data.glory == 187 and data.level == 2, "after rejoining: 460 XP, 187 Glory, level 2")
+	H.expect(data and data.xp == 460 and data.glory == glory and data.level == 2, "after rejoining: 460 XP, the Glory, level 2")
 	H.expect(H.client(again, "ProfileState").summary().level == 2, "and Alice's client knows it")
 	Emulator.run(30) -- the next match
 	H.expect(H.state().result == nil, "a new match started")
@@ -1993,7 +2001,11 @@ function scenarios.analytics()
 	local matchReward, levelUp = economy(a, "match_reward"), economy(a, "level_up")
 	H.expect(matchReward and matchReward.args[1] == "Source" and matchReward.args[5] == "Gameplay", "a Glory Gameplay source: match_reward")
 	H.expect(levelUp and levelUp.args[3] == Config.Progression.LevelUpGlory, "and level_up (50 Glory)")
-	H.expect(levelUp.args[4] == data.glory and matchReward.args[4] == data.glory - levelUp.args[3], "with the ending balances")
+	-- the win also unlocks achievements (Domination, Victor...): their Glory is its own source, logged last
+	local achievement = economy(a, "achievement")
+	H.expect(achievement and achievement.args[4] == data.glory, "and achievement, ending on Alice's balance")
+	local extra = achievement.args[3]
+	H.expect(levelUp.args[4] == data.glory - extra and matchReward.args[4] == data.glory - extra - levelUp.args[3], "with the ending balances")
 	H.expect(fields(matchReward) == "1-9,false,true", "Alice is a payer now")
 	local done = calls("LogProgressionCompleteEvent", a, "AccountLevel")
 	H.expect(#done == 1 and done[1].args[2] == 1, "AccountLevel 1 completed")
@@ -3048,6 +3060,190 @@ function scenarios.season()
 	Emulator.press(alice, "✕")
 	local saved = H.saved(player.UserId).Data
 	H.expect(saved.season.premium and saved.season.claimed.P1 and saved.owned.token_ember_knight, "the pass and the claims are saved")
+end
+
+-- Phase 5: leaderboards and achievements. Four players (Alice and Bob are friends; Alice has a friend, Zed, who
+-- isn't here) play a public match through the Lobby. Alice wore last week's Warlord frame in, wins by Domination:
+-- the weekly board (an OrderedDataStore per week) gets everyone's points in one batch, the friends view shows only
+-- Alice's friends, and Domination pays 300 Glory and the title "the Dominant", which she wears into the next match.
+-- Then a new week: fresh boards, and last week's top wear the Warlord frame.
+function scenarios.leaderboards()
+	local Login = require("../../src/shared/Sim/Login")
+	local LobbyService = H.server("Services.LobbyService")
+	local Data = H.server("Services.PlayerDataService")
+	local workspace = Emulator.server.dm:GetService("Workspace")
+	local function waitForMatch(client)
+		local deadline = Emulator.now() + 240
+		while (LobbyService.active() or H.state().phase ~= "Peace" or H.myNation(client) == 0) and Emulator.now() < deadline do
+			Emulator.run(1)
+		end
+		Emulator.run(1)
+		H.expect(H.state().phase == "Peace" and H.myNation(client) ~= 0, "a match started with " .. client.name .. " in it")
+	end
+	local function row(rows, name)
+		for _, r in rows do
+			if r.name == name then
+				return r
+			end
+		end
+		return nil
+	end
+
+	Emulator.run(1)
+	local week = Login.weekOf(H.server("Services.ProgressionService").today())
+	local ALICE, BOB, CAROL, DAVE, ZED, STRANGER = 7001, 7002, 7003, 7004, 9001, 9002
+	-- last week: Alice made the top 100; this week, before the match: Zed (Alice's friend) and a stranger have points
+	Emulator.orderedStores["Conquest/W" .. (week - 1)] = { [tostring(ALICE)] = 25 }
+	Emulator.orderedStores["Conquest/W" .. week] = { [tostring(ZED)] = 12, [tostring(STRANGER)] = 30 }
+	Emulator.displayNames[ZED] = "Zed"
+	Emulator.displayNames[STRANGER] = "Stranger"
+	Emulator.friends[ALICE] = { BOB, ZED }
+	Emulator.friends[BOB] = { ALICE }
+	local alice = Emulator.addClient("Alice", nil, ALICE)
+	local bob = Emulator.addClient("Bob", nil, BOB)
+	local carol = Emulator.addClient("Carol", nil, CAROL)
+	local dave = Emulator.addClient("Dave", nil, DAVE)
+	Emulator.run(3)
+	local trophies = H.client(alice, "TrophyState")
+	H.expect(trophies.achievements() ~= nil and #trophies.achievements().list == 30, "Alice sees her 30 achievements")
+	local boards = trophies.boards()
+	H.expect(boards ~= nil and boards.week == week, "and this week's boards")
+	H.expect(boards.warlord and H.client(alice, "ShopState").owns("frame_warlord"), "last week's top 100: Alice wears the Warlord frame")
+	H.expect(not H.client(bob, "ShopState").owns("frame_warlord"), "Bob wasn't in it")
+	for _, id in Emulator.friendCalls do
+		H.expect(id == ALICE or id == BOB or id == CAROL or id == DAVE, "the friends list is read only for a player's own friends")
+	end
+
+	-- the Lobby's 🏆 button, next to 🛒 and 📜, opens the Trophies screen
+	Emulator.run(2)
+	H.shot(alice, "lobby_button")
+	Emulator.press(alice, "🏆")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "0 of 30 earned") ~= nil, "the Trophies screen opens from the Lobby")
+	H.shot(alice, "lobby_trophies")
+	Emulator.press(alice, "Tab" .. "Weekly")
+	Emulator.run(0.3)
+	-- the board was read when the server started (empty then); the points added since show at the next read
+	H.expect(Emulator.findText(alice, "No points yet this week") ~= nil, "the weekly board, as the server last read it")
+	Emulator.press(alice, "✕")
+
+	-- the match: Alice equips the Warlord frame, then wins by Domination
+	H.client(alice, "Intents").equip("frame_warlord")
+	waitForMatch(alice)
+	H.expect(Data.data(alice.serverPlayer).equipped.Frame == "frame_warlord", "Alice wears the Warlord frame in the match")
+	local state = H.state()
+	local humans = 0
+	for _ in state.seats do
+		humans += 1
+	end
+	H.expect(humans == 4 and not state.setup.private, "a public match with 4 players: it counts")
+	local glory0 = Data.data(alice.serverPlayer).glory
+	local A = H.myNation(alice)
+	local total, given = 0, 0
+	for _, p in state.provinces do
+		total += 1
+		given += if p.owner == A then 1 else 0
+	end
+	for _, p in state.provinces do
+		if given < math.ceil(Config.Win.DominationShare * total) and p.owner ~= A and p.terrain ~= "Mountain" and not p.isCapital then
+			p.owner = A
+			given += 1
+		end
+	end
+	Emulator.run(3)
+	H.expect(state.result ~= nil and state.result.kind == "Domination", "Alice won by Domination")
+
+	-- achievements: Domination pays 300 Glory and its title, shown on the Results screen
+	local data = Data.data(alice.serverPlayer)
+	H.expect(data.achievements.domination == 1 and data.owned.title_dominant == true, "Domination is earned, with its title")
+	local report = H.client(alice, "ProfileState").reward()
+	local achievementGlory = 0
+	for _, line in report.reward.lines do
+		if line.kind == "Achievement" then
+			achievementGlory += line.glory
+		end
+	end
+	H.expect(achievementGlory >= 300, "the Results breakdown pays it (" .. achievementGlory .. " Glory from achievements)")
+	H.expect(data.glory >= glory0 + 300, "into Alice's Glory")
+	H.expect(table.find(trophies.achievements().recent, "domination") ~= nil, "Alice's view lists it as just unlocked")
+	H.expect(Emulator.findText(alice, "Unlocked: ") ~= nil and Emulator.findText(alice, "Domination") ~= nil, "the Results screen says so")
+	H.expect(Emulator.findText(alice, "🏆 Achievement") ~= nil, "with an achievement line in the breakdown")
+	H.shot(alice, "results")
+
+	-- the weekly board: one batch of writes at Results, then a fresh read
+	Emulator.run(2)
+	local scores = Emulator.orderedStores["Conquest/W" .. week]
+	H.expect(scores[tostring(ALICE)] == 10, "Alice won: 10 conquest points on this week's board")
+	for _, client in { bob, carol, dave } do
+		H.expect((scores[tostring(client.serverPlayer.UserId)] or 0) >= 1, client.name .. " got points for their place")
+	end
+	H.expect(Emulator.orderedCalls.IncrementAsync == 4, "one write per player (" .. tostring(Emulator.orderedCalls.IncrementAsync) .. ")")
+	H.expect(Emulator.orderedStores["Level/global"][tostring(ALICE)] == data.xp, "the level board has Alice's XP")
+	boards = trophies.boards()
+	H.expect(boards.myPoints == 10 and boards.myRank == 3, "Alice: 10 points, 3rd behind the stranger (30) and Zed (12)")
+	H.expect(row(boards.weekly, "Alice") ~= nil and row(boards.weekly, "Carol") ~= nil, "everyone is on the weekly board")
+	local friendNames = {}
+	for _, r in boards.friends do
+		table.insert(friendNames, r.name)
+	end
+	H.expect(#boards.friends == 3 and row(boards.friends, "Zed") and row(boards.friends, "Bob") and row(boards.friends, "Alice"),
+		"Alice's friends view: Alice, Bob and Zed (" .. table.concat(friendNames, ", ") .. ")")
+	H.expect(row(boards.friends, "Carol") == nil and row(boards.friends, "Stranger") == nil, "nobody else")
+	H.expect(#H.client(bob, "TrophyState").boards().friends == 2, "Bob's friends view: Bob and Alice")
+	H.expect(row(boards.level, "Alice").level == data.level, "the global level board shows Alice's level")
+
+	-- the Trophies screen from the Results screen: achievements, weekly, friends and level boards
+	Emulator.press(alice, "TrophiesButton")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "✅ Domination") ~= nil, "the Trophies screen opens from Results, Domination done")
+	H.shot(alice, "achievements")
+	Emulator.press(alice, "TitleButton")
+	Emulator.run(1)
+	H.expect(data.equipped.Title == "title_dominant", "Alice wears the title the Dominant")
+	H.expect(Emulator.findText(alice, "the Dominant") ~= nil, "the title button shows it")
+	Emulator.press(alice, "Tab" .. "Weekly")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(alice, "You: 10 pts") ~= nil, "the weekly board says where Alice stands")
+	H.shot(alice, "weekly")
+	Emulator.press(alice, "Tab" .. "Friends")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(alice, "Zed") ~= nil and Emulator.findText(alice, "Carol") == nil, "the friends board shows only friends")
+	H.shot(alice, "friends")
+	Emulator.press(alice, "Tab" .. "Level")
+	Emulator.run(0.3)
+	H.expect(Emulator.findText(alice, "Lv " .. data.level) ~= nil, "the level board")
+	H.shot(alice, "level")
+	Emulator.press(alice, "✕")
+
+	-- the next match: the title under Alice's name, the Warlord frame round it
+	waitForMatch(alice)
+	Emulator.press(alice, "🌍")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "the Dominant") ~= nil, "the nations list shows Alice's title")
+	H.shot(alice, "nations_title")
+	Emulator.press(alice, "🌍")
+	-- the shop's frames: Warlord worn, Centurion earned only (never sold)
+	Emulator.press(alice, "🛒")
+	Emulator.run(0.5)
+	Emulator.press(alice, "Tab_Frame")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Centurion") ~= nil and Emulator.findText(alice, "🏆 Achievement") ~= nil, "the shop shows the Centurion frame: earned, not for sale")
+	H.shot(alice, "shop_frames")
+	Emulator.press(alice, "▶")
+	Emulator.run(0.5)
+	H.expect(Emulator.findText(alice, "Warlord") ~= nil and Emulator.findText(alice, "Equipped") ~= nil, "and the Warlord frame Alice wears")
+	H.shot(alice, "shop_warlord")
+	Emulator.press(alice, "✕")
+
+	-- a new week (DevDay): fresh boards; last week's top 100 (all four of them) wear the Warlord frame
+	workspace:SetAttribute("DevDay", 7)
+	Emulator.run(Config.Leaderboards.RefreshSeconds + 5)
+	boards = trophies.boards()
+	H.expect(boards.week == week + 1 and boards.myPoints == 0, "a new week: Alice starts at 0 points")
+	H.expect(H.client(bob, "ShopState").owns("frame_warlord") and H.client(bob, "TrophyState").boards().warlord, "Bob made last week's top 100: the Warlord frame")
+	H.expect(H.client(alice, "ShopState").owns("frame_warlord"), "Alice keeps it for another week")
+	local reads = Emulator.orderedCalls.GetSortedAsync or 0
+	H.expect(reads <= 20, "sorted reads stay within budget (" .. reads .. " in " .. math.floor(Emulator.now()) .. " s)")
 end
 
 local function runScenario(name: string)

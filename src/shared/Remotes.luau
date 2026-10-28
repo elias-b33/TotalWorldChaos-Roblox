@@ -39,6 +39,8 @@ local EVENTS = {
 	"Quests", -- your QuestView (on join, at Results and after every change)
 	"NotificationPrompt", -- after your first finished match: ask to turn on experience notifications (Sim.Ads)
 	"Season", -- your SeasonView (on join, at Results and after every change)
+	"Achievements", -- your AchievementView (on join and after every match)
+	"Boards", -- your BoardsView: weekly, friends and level boards (on join and after every refresh)
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

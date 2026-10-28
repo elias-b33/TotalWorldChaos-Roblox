@@ -32,6 +32,8 @@ local QuestService = require(Server.Services.QuestService)
 local SeasonService = require(Server.Services.SeasonService)
 local TelemetryService = require(Server.Services.TelemetryService)
 local AdRewardService = require(Server.Services.AdRewardService)
+local AchievementService = require(Server.Services.AchievementService)
+local LeaderboardService = require(Server.Services.LeaderboardService)
 
 local PHASE_TOASTS = {
 	War = "War! Nations can fight now",
@@ -146,6 +148,8 @@ end, MatchService.current, MatchService.nationOf)
 QuestService.init()
 AdRewardService.init() -- after QuestService: the quest reroll ad and the notification prompt
 SeasonService.init()
+AchievementService.init() -- after QuestService: its reward hook runs after the quests'
+LeaderboardService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
 nextMatch()

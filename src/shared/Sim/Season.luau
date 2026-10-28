@@ -6,6 +6,7 @@
 -- skips. When a season ends, whatever you earned and didn't claim is granted the next time you play.
 -- Pure: SeasonService passes in the profile and the season the UTC day falls in (Season.current).
 
+local Catalogue = require("../Catalogue")
 local Config = require("../Config")
 local Types = require("../Types")
 
@@ -160,14 +161,18 @@ function Season.claimable(state: State, def: Def?): { { tier: number, track: Tra
 	return out
 end
 
--- Give one reward. Items, titles and badges go in profile.owned (titles as "title:…", badges as "badge:…"); an item
--- already owned stays owned. Returns the Glory it paid.
+-- Give one reward. Items, titles and badges go in profile.owned (titles as "title:…" and as the wearable title
+-- item of that name, badges as "badge:…"); an item already owned stays owned. Returns the Glory it paid.
 function Season.grant(profile: Profile, reward: Reward): number
 	if reward.item then
 		profile.owned[reward.item] = true
 	end
 	if reward.title then
 		profile.owned["title:" .. reward.title] = true
+		local wearable = Catalogue.titleNamed(reward.title) -- worn from the 🏆 screen like an achievement's
+		if wearable then
+			profile.owned[wearable] = true
+		end
 	end
 	if reward.badge then
 		profile.owned["badge:" .. reward.badge] = true

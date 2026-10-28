@@ -82,9 +82,9 @@ export type Offer = {
 -- kinds: WarDeclared(a attacks b), PeaceMade(a, b), AllianceFormed(a, b), Offer(a -> b, province = offer id),
 -- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a),
 -- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province, by = the caster's nation, for a
--- Primordial the nation it last held, so clients show the caster's power-effect cosmetic), Disaster (same fields,
--- no caster), Eliminated(a)
-export type MatchEvent = { kind: string, a: number, b: number, province: number, by: number? }
+-- Primordial the nation it last held, so clients show the caster's power-effect cosmetic; men = the men a Meteor
+-- killed, for achievements), Disaster (same fields, no caster), Eliminated(a)
+export type MatchEvent = { kind: string, a: number, b: number, province: number, by: number?, men: number? }
 
 export type MatchResult = {
 	kind: "Domination" | "Alliance" | "Score",
@@ -268,6 +268,18 @@ export type PlayerMatchStats = {
 	alliances: number, -- alliances formed
 	mostProvinces: number, -- most provinces held at once
 	questCounted: { [string]: number }, -- quest stat -> what quests already counted (a leave, then Results)
+	feats: MatchFeats, -- for achievements (Sim.Achievements.observe)
+}
+
+-- What a player's nation did this match that only achievements need (Sim.Achievements.observe keeps it).
+export type MatchFeats = {
+	peaceNeutral: number, -- neutral provinces captured during Peace
+	meteorKills: number, -- men killed by the player's Meteors
+	fortHolds: number, -- sieges of the player's forts that ended with the fort still theirs
+	besieged: { [number]: boolean }, -- the player's forts under siege right now (province id -> true)
+	lowAtCheck: boolean?, -- in the bottom 3 at Config.Achievements.ComebackTick (nil = not checked yet)
+	allies: { number }, -- the nations the player was allied with, last seen while their nation lived
+	counted: { [string]: number }, -- achievement stat -> what was already counted (a leave, then Results)
 }
 
 -- One row of a reward breakdown. kind: Finish, Placement, Provinces, Battles, Primordial, Powers, FirstMatch,
@@ -378,7 +390,17 @@ export type RewardReport = { reward: MatchReward, before: ProfileSummary, after:
 -- Shop and cosmetics (docs/MONETIZATION.md 3, 10). Item data is in Shared.Catalogue, the rules in Sim.Shop.
 
 export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
-export type CosmeticSlot = "Flag" | "Border" | "Shades" | "Token" | "Frame" | "Victory" | "Emote" | "PowerFx" | "Theme"
+export type CosmeticSlot =
+	"Flag"
+	| "Border"
+	| "Shades"
+	| "Token"
+	| "Frame"
+	| "Victory"
+	| "Emote"
+	| "PowerFx"
+	| "Theme"
+	| "Title" -- text under your name; never sold: earned from achievements
 
 export type CatalogueItem = {
 	id: string,
@@ -393,6 +415,7 @@ export type CatalogueItem = {
 	power: PrimordialPower?, -- PowerFx: the power it re-skins
 	animated: boolean?,
 	season: string?, -- a season-pass reward of this season id: never sold (MONETIZATION 6)
+	earned: boolean?, -- never sold: an achievement or the weekly leaderboard gives it (Sim.Achievements)
 }
 
 -- A pass or developer product that grants several items: VIP, the starter pack, nation skin sets.
@@ -423,6 +446,7 @@ export type NationCosmetics = {
 	powerFx: { [string]: string },
 	vip: boolean,
 	flame: number?, -- play-streak flame on the nameplate (Sim.Login.flameTier; nil or 0 = none)
+	title: string?, -- equipped title item id (nil or the default = none)
 }
 
 -- Shop requests: CommandRouter checks the shape, Sim.Shop the rules. Equipping an item puts it in its slot.
@@ -513,6 +537,55 @@ export type TelemetryEvent = {
 	transaction: string?, -- economy transaction type (Enum.AnalyticsEconomyTransactionType names)
 	balance: number?, -- economy ending balance
 	fields: { string }, -- custom fields 1-3
+}
+
+-- Achievements (docs/MONETIZATION.md 5.6): the list is Config.Achievements.List, the rules Sim.Achievements.
+-- kind: Best = the best single match counts; Sum = matches add up (lifetime); Lifetime = a profile number (matches,
+-- wins, level...); Maps = the maps won on (progress = how many). Progress lives in profile.achievements (id -> value).
+export type AchievementDef = {
+	id: string,
+	name: string,
+	stat: string,
+	kind: "Best" | "Sum" | "Lifetime" | "Maps",
+	target: number,
+	glory: number, -- one-time Glory (0 = none)
+	title: string?, -- a Title catalogue item it gives
+	item: string?, -- a cosmetic catalogue item it gives
+}
+
+export type AchievementEntry = {
+	id: string,
+	name: string,
+	stat: string,
+	target: number,
+	progress: number,
+	done: boolean,
+	glory: number,
+	title: string?,
+	item: string?,
+}
+
+-- What a player sees of their achievements (the Achievements remote, on join and after every match).
+export type AchievementView = {
+	list: { AchievementEntry },
+	titles: { string }, -- title item ids they own
+	title: string, -- the equipped title (Catalogue.DEFAULTS.Title = none)
+	recent: { string }, -- ids unlocked by the last match (the Results screen)
+}
+
+-- Leaderboards (docs/MONETIZATION.md 7.3). Rows carry display names only: no user ids or other personal data.
+export type BoardRow = { rank: number, name: string, value: number, me: boolean, level: number? }
+
+-- What a player sees of the boards (the Boards remote, on join and after every refresh).
+export type BoardsView = {
+	week: number, -- the week (Sim.Login.weekOf) the weekly board is for
+	weekly: { BoardRow }, -- weekly conquest points, best first
+	friends: { BoardRow }, -- the same, only you and your friends
+	level: { BoardRow }, -- account XP (value), with the level
+	myPoints: number, -- your conquest points this week
+	myRank: number, -- your weekly rank (0 = not in the rows read)
+	warlord: boolean, -- you have the Warlord frame this week (last week's top Config.Leaderboards.WarlordTop)
+	live: boolean, -- the boards are saved (false: no DataStore access, e.g. Studio with API access off)
 }
 
 return {}

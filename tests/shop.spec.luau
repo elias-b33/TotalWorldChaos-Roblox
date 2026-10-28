@@ -31,8 +31,11 @@ T.test("every item has a known slot, a unique id and a price or a reason to have
 	for _, item in Catalogue.ITEMS do
 		T.expect(seen[item.id] == nil, "duplicate id " .. item.id)
 		seen[item.id] = true
-		T.expect(table.find(Catalogue.SLOTS, item.slot) ~= nil, "slot of " .. item.id)
-		if item.free or item.vipOnly or item.season then
+		T.expect(table.find(Catalogue.SLOTS, item.slot) ~= nil or item.slot == "Title", "slot of " .. item.id)
+		if item.slot == "Title" then
+			T.expect(item.free or item.earned or item.season, item.id .. ": titles are never sold")
+		end
+		if item.free or item.vipOnly or item.season or item.earned then
 			T.equal(item.robux, nil, item.id .. " is not sold")
 		else
 			T.expect(item.robux ~= nil, item.id .. " has a Robux price")

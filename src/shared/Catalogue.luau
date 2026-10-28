@@ -75,6 +75,7 @@ Catalogue.DEFAULTS = {
 	Frame = "frame_none",
 	Victory = "victory_trophy",
 	Theme = "theme_classic",
+	Title = "title_none",
 } :: { [string]: string }
 
 local items: { Item } = {}
@@ -94,8 +95,8 @@ local function add(id: string, slot: Types.CosmeticSlot, rarity: Types.Rarity, n
 	for k, v in extra or {} do
 		(item :: any)[k] = v
 	end
-	if item.free or item.vipOnly or item.season then
-		item.glory, item.robux = nil, nil -- defaults, VIP items and season-pass rewards are never sold
+	if item.free or item.vipOnly or item.season or item.earned then
+		item.glory, item.robux = nil, nil -- defaults, VIP items, season-pass rewards and earned items are never sold
 	end
 	table.insert(items, item)
 	byId[id] = item
@@ -104,6 +105,7 @@ end
 local FREE = { free = true }
 local VIP = { vipOnly = true }
 local ANIMATED = { animated = true }
+local EARNED = { earned = true } -- never sold: an achievement or the weekly leaderboard gives it
 
 local function emote(id: string, name: string, icon: string, animated: boolean, season: string?)
 	local kind = if animated then "Animated" else "Static"
@@ -145,6 +147,7 @@ add("token_vanguard", "Token", "Rare", "Vanguard", "vanguard")
 add("token_tower", "Token", "Epic", "Siege Tower", "tower")
 add("token_dragon", "Token", "Legendary", "Dragon", "dragon", ANIMATED)
 add("token_vip", "Token", "Rare", "VIP Lion", "lion", VIP)
+add("token_world_shaker", "Token", "Legendary", "World Shaker", "world_shaker", EARNED) -- achievement "World Shaker"
 
 -- Capital emotes: an icon over your capital for a few seconds.
 emote("emote_charge", "Charge", "📯", false)
@@ -164,6 +167,8 @@ add("frame_none", "Frame", "Common", "Plain", "none", FREE)
 add("frame_bronze", "Frame", "Common", "Bronze", "bronze")
 add("frame_silver", "Frame", "Rare", "Silver", "silver")
 add("frame_gold", "Frame", "Rare", "VIP Gold", "gold", VIP)
+add("frame_centurion", "Frame", "Epic", "Centurion", "centurion", EARNED) -- achievement "Centurion"
+add("frame_warlord", "Frame", "Epic", "Warlord", "warlord", EARNED) -- last week's top 100 (Sim.Leaderboards)
 
 -- Primordial-power effects: how one power looks (PowerFx.LOOKS). Same area, timing and sound cue as the default.
 -- Common recolours it, Rare gives it a new style, Epic a new style with more animation.
@@ -171,6 +176,7 @@ add("fx_meteor_ice", "PowerFx", "Common", "Ice Meteor", "ice", { power = "Meteor
 add("fx_plague_violet", "PowerFx", "Common", "Violet Plague", "violet", { power = "Plague" })
 add("fx_blessing_rays", "PowerFx", "Rare", "Sun Rays", "rays", { power = "Blessing" })
 add("fx_meteor_comet", "PowerFx", "Epic", "Comet Strike", "comet", { power = "Meteor", animated = true })
+add("fx_meteor_storm", "PowerFx", "Rare", "Storm Meteor", "storm", { power = "Meteor", earned = true }) -- "Meteorologist"
 
 -- Map themes: a re-skin of the terrain on any map (PixelArt.THEMES), e.g. "Night Earth". Nation colours never
 -- change. You see yours on the vote cards; everyone sees it when it wins the theme vote (Sim.Lobby.chooseTheme).
@@ -230,6 +236,17 @@ add("fx_blessing_ember", "PowerFx", "Rare", "Ember Halo", "ember", s1Fx("Blessin
 add("fx_blessing_worldsplitter", "PowerFx", "Epic", "Worldsplitter Rays", "worldsplitter", s1Fx("Blessing", true))
 add("fx_blessing_starfall", "PowerFx", "Epic", "Starfall Blessing", "starfall", s1Fx("Blessing", true))
 add("fx_blessing_sunfire", "PowerFx", "Epic", "Sunfire Blessing", "sunfire", s1Fx("Blessing", true))
+-- Titles: text under your name (docs/MONETIZATION.md 3.2). Never sold: achievements (Config.Achievements) and the
+-- season pass give them. Not a shop tab; the 🏆 Trophies screen equips them. The art is the text shown.
+add("title_none", "Title", "Common", "No title", "", FREE)
+add("title_dominant", "Title", "Rare", "the Dominant", "the Dominant", EARNED)
+add("title_unbroken", "Title", "Rare", "the Unbroken", "the Unbroken", EARNED)
+add("title_cartographer", "Title", "Rare", "Cartographer", "Cartographer", EARNED)
+add("title_champion", "Title", "Rare", "the Champion", "the Champion", EARNED)
+add("title_kingslayer", "Title", "Rare", "the Kingslayer", "the Kingslayer", EARNED)
+add("title_fateful", "Title", "Rare", "the Fateful", "the Fateful", EARNED)
+add("title_s1_veteran", "Title", "Rare", "Season 1 Veteran", "Season 1 Veteran", S1) -- free track, tier 50
+add("title_primordial_herald", "Title", "Epic", "Primordial Herald", "Primordial Herald", S1) -- premium, tier 50
 
 Catalogue.ITEMS = items
 
@@ -302,6 +319,16 @@ end
 
 function Catalogue.offer(id: string): Offer?
 	return offerById[id]
+end
+
+-- The wearable title showing this text (a season-pass title reward is given as one), or nil.
+function Catalogue.titleNamed(name: string): string?
+	for _, item in items do
+		if item.slot == "Title" and item.name == name then
+			return item.id
+		end
+	end
+	return nil
 end
 
 -- Items of one slot, in shop order.

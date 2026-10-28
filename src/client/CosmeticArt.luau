@@ -460,9 +460,27 @@ CosmeticArt.TOKENS = {
 			"..KKKK.KKKK.",
 		},
 	},
+	-- the World Shaker achievement's Legendary token: a crowned titan's helm
+	world_shaker = {
+		{
+			"G.G.G..G.G.G",
+			"GGGGGGGGGGGG",
+			".KKKKKKKKKK.",
+			"KNNNNNNNNNNK",
+			"KNKKKNNKKKNK",
+			"KNKWKNNKWKNK",
+			"KNNNNNNNNNNK",
+			"KDNNNKKNNNDK",
+			".KDNNNNNNDK.",
+			".KNDKNNKDNK.",
+			"..KNNNNNNK..",
+			"...KKKKKK...",
+		},
+	},
 } :: { [string]: { { string } } }
 
--- Nameplate frames: the outline colour around a name (none = no outline).
+-- Nameplate frames: the outline colour around a name (none = no outline). Centurion and Warlord are earned
+-- (an achievement, last week's top 100).
 CosmeticArt.FRAME_COLORS = {
 	bronze = 0xb87333,
 	silver = 0xc9d1dc,
@@ -473,6 +491,8 @@ CosmeticArt.FRAME_COLORS = {
 	obsidian = 0x6a5a86,
 	primordial_eye = 0xb06cff,
 	rift = 0x7cfbef,
+	centurion = 0xb36bff,
+	warlord = 0xe0483c,
 } :: { [string]: number }
 
 local function colourOf(ch: string, nation: number, border: number): number

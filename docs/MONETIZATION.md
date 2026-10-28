@@ -382,7 +382,7 @@ Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: pl
 
 **Play streak:** consecutive days with a finished match. One missed day per week is covered automatically (the week of the missed day, Monday to Sunday). Streak rewards are cosmetic only: a flame on your nameplate at 3 days, a bigger flame at 7, a blue flame at 14 and the title "the Unyielding" at 30. A broken streak keeps every earned reward (they follow the best streak). The nameplate flame shows after your nation's name in the 🌍 nations list.
 
-**Achievements:** one-time, shown with progress bars. 30 at launch. Examples:
+**Achievements:** one-time, shown with progress bars on the 🏆 Trophies screen (Lobby and Results). 30 at launch, in `Config.Achievements`; the rules are `Sim/Achievements.luau`. They are checked with every match reward (Results, or leaving early) and pay on the spot: Glory as one "🏆 Achievements" line on the Results breakdown, titles and cosmetics into the profile (never sold; the shop shows them as "🏆 Achievement"). An AFK match counts nothing; a private match with custom rules or under 4 players counts everything except the win-type ones (like "win" quests). "One match" goals take the best match; lifetime goals read the profile's lifetime stats.
 
 | Achievement | Condition | Reward |
 | --- | --- | --- |
@@ -390,13 +390,34 @@ Three a week (Monday 00:00 UTC), each worth 1,000 XP and 150 Glory. Examples: pl
 | Land Grab | Capture 10 neutral provinces in one Peace phase | 100 Glory |
 | Domination | Win by holding half of the land (50% of ownable provinces) | 300 Glory, title "the Dominant" |
 | Better Together | Win an alliance victory | 200 Glory |
-| Comeback | Win after being in the bottom 3 at 10:00 | 500 Glory, title "the Unbroken" |
-| Kingmaker | As a Primordial, see an ally win | 200 Glory |
-| Meteorologist | Kill 20,000 men with meteors (lifetime) | Rare meteor effect |
+| Comeback | Win after being in the bottom 3 (of the nations still in) at 10:00 | 500 Glory, title "the Unbroken" |
+| Kingmaker | As a Primordial, see an ally win (the nations you were allied with when your nation fell) | 200 Glory |
+| Meteorologist | Kill 20,000 men with meteors (lifetime) | Rare meteor effect "Storm Meteor" |
 | Cartographer | Win on Earth, Eldmoor and Skyshards | 300 Glory, title "Cartographer" |
-| Iron Wall | Defend a fort through 3 sieges in one match | 200 Glory |
-| Centurion | Play 100 matches | Epic frame |
-| World Shaker | Reach level 90 | Legendary token |
+| Iron Wall | Defend a fort through 3 sieges in one match (a siege that ends with the fort still yours) | 200 Glory |
+| Centurion | Play 100 matches | Epic frame "Centurion" |
+| World Shaker | Reach level 90 | Legendary token "World Shaker" (a crowned helm) |
+| Victor | Win a match | 100 Glory |
+| Champion | Win 10 matches | 300 Glory, title "the Champion" |
+| Veteran | Play 10 matches | 100 Glory |
+| Seasoned | Play 50 matches | 200 Glory |
+| Pathfinder | Capture 100 provinces (lifetime) | 100 Glory |
+| Conqueror | Capture 500 provinces (lifetime) | 300 Glory |
+| Battle-Hardened | Win 100 battles (lifetime) | 200 Glory |
+| General | Win 10 battles in one match | 150 Glory |
+| Regicide | Capture an enemy capital | 100 Glory |
+| Kingslayer | Capture 3 capitals in one match | 300 Glory, title "the Kingslayer" |
+| Empire | Hold 40 provinces at once | 200 Glory |
+| Builder | Build 5 buildings in one match | 50 Glory |
+| Prosperity | Develop a province to level 5 | 100 Glory |
+| Diplomat | Form an alliance | 50 Glory |
+| Risen | Rise as a Primordial and stay to Results | 100 Glory |
+| Wrath of the Gods | Use 5 Primordial powers in one match | 100 Glory |
+| Hand of Fate | Use 100 Primordial powers (lifetime) | 200 Glory, title "the Fateful" |
+| Drill Sergeant | Recruit 30 regiments in one match | 50 Glory |
+| Podium | Finish in the top 3 | 50 Glory |
+
+**Titles** are text after your name in the 🌍 nations list. The Trophies screen's title button cycles through the ones you own (or none); equipping goes through the shop's `RequestEquip`. Rank titles (section 5.3) aren't built yet.
 
 ## 6. Season pass
 
@@ -529,6 +550,15 @@ Theme: molten earth, ember and the old gods waking. Map theme: Ember Eldmoor.
 | Friends | Weekly conquest, friends only | Weekly | None (bragging) |
 | Global level | Account XP | Never | None |
 | Per-map wins | Wins on each map | Never | Map title at 100 wins |
+
+Built (Phase 5): the weekly, friends and global level boards and the Warlord frame, in the 🏆 Trophies screen (Lobby and Results). Per-map wins isn't built yet. Numbers live in `Config.Leaderboards`, the rules in `Sim/Leaderboards.luau`, the DataStore work in `Services/LeaderboardService.luau`.
+
+- **Weekly conquest:** one `OrderedDataStore` ("Conquest", scope `W<week>`, week = Monday-to-Sunday UTC weeks from `Sim/Login.weekOf`), key = userId, value = points. Points need a public server (private servers never count, whatever their rules) and 4+ real players (who held a nation); leaving early, AFK or ending without a nation scores 0.
+- **Friends:** the weekly board filtered to you and your friends. Each player's own friend list comes from `Players:GetFriendsAsync` when they join (up to 200, kept in server memory only); friends are found among the weekly rows the server has read (the top 200) and the players in the server. You are always on it.
+- **Global level:** an `OrderedDataStore` ("Level") of account XP; rows show the level.
+- **Warlord frame:** a catalogue frame (`frame_warlord`, never sold). When a player joins (or a week starts) the server reads last week's top 100 once per week; a player in it owns the frame until the week ends (`profile.settings.warlordWeek`).
+- **DataStore budget:** writes go in one batch after each Results: one `IncrementAsync` (weekly) and one `SetAsync` (level) per player the match moved. Reads are cached and refreshed every 2 minutes (2 `GetSortedAsync` pages of the weekly board, 1 of the level board), plus a refresh after each batch of writes, one `GetAsync` per joining player (their own points) and one sorted read of last week's board per week. That's far under Roblox's per-server limits even with 1 player.
+- **Fair play (section 10):** boards carry display names only (from `UserService:GetUserInfosByUserIdsAsync`), never user ids or anything else; the friends API is only called for a player's own friends. Without DataStore access (Studio with API access off) the boards live in the server's memory and the screen says "not saved".
 
 ### 7.4 Next-map vote and events
 

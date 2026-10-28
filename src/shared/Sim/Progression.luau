@@ -96,6 +96,15 @@ function Progression.newStats(userId: number, tick: number): Stats
 		alliances = 0,
 		mostProvinces = 0,
 		questCounted = {},
+		feats = {
+			peaceNeutral = 0,
+			meteorKills = 0,
+			fortHolds = 0,
+			besieged = {},
+			lowAtCheck = nil,
+			allies = {},
+			counted = {},
+		},
 	}
 end
 

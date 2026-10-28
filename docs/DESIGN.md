@@ -539,7 +539,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Per-map balance from win rate by start position (bot tournament; `docs/BALANCE.md` section 17)
 - [x] Season pass (8 weeks, 50 tiers)
 - [x] Rotating shop
-- [ ] Weekly, friends and global leaderboards; achievements
+- [x] Weekly, friends and global leaderboards; achievements
 - [x] Rewarded video quest reroll; experience notifications
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 

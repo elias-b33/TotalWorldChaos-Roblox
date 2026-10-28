@@ -476,13 +476,13 @@ end
 function SeasonUI.init(showToast: (string) -> ())
 	toast = showToast
 	gui = Widgets.screen("Season", 32) -- above the shop (30) and the quests (31): it opens from the shop's Offers tab
-	-- the Lobby's 🎟 button, next to 🛒 and 📜, in a screen under the full-screen panels (like the 📜 button)
+	-- the Lobby's 🎟 button, after 🛒, 📜 and 🏆, in a screen under the full-screen panels (like the 📜 button)
 	local buttonGui = Widgets.screen("SeasonButton", 29)
 
 	openButton = Instance.new("TextButton")
 	openButton.Name = "SeasonButton"
 	openButton.AnchorPoint = Vector2.new(0, 1)
-	openButton.Position = UDim2.new(0, 12 + 2 * (BUTTON_SIZE + 10), 1, -12)
+	openButton.Position = UDim2.new(0, 12 + 3 * (BUTTON_SIZE + 10), 1, -12)
 	openButton.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
 	openButton.BackgroundColor3 = PREMIUM
 	openButton.Font = Enum.Font.GothamBold

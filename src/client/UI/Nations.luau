@@ -3,6 +3,10 @@
 -- and at the bottom the way to your quests during a match (the top bar has no room for another button).
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+ReplicatedStorage:WaitForChild("Shared")
+local Catalogue = require(ReplicatedStorage.Shared.Catalogue)
 
 local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
@@ -62,6 +66,13 @@ local function render()
 		)
 		label.Size = UDim2.new(1, -26, 1, 0)
 		label.LayoutOrder = 2
+		-- an achievement title after the name (MONETIZATION 3.2): last, so a long name cuts the title, nothing else
+		local title = if looks.title then Catalogue.item(looks.title) else nil
+		if title then
+			label.Text ..= " · " .. title.art
+			label.TextWrapped = false
+			label.TextTruncate = Enum.TextTruncate.AtEnd
+		end
 		-- nameplate frame (cosmetic): an outline around the name
 		local frameColor = Cosmetics.frameColor(looks.frame)
 		if frameColor then
