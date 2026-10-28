@@ -16,11 +16,15 @@ local Snapshot = require(Shared.Snapshot)
 local Types = require(Shared.Types)
 
 local ClientState = require(script.Parent.ClientState)
+local LabelLayout = require(script.Parent.LabelLayout)
 local MapView = require(script.Parent.MapView)
 local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
 
 local NAME_MIN_PIXELS = 70 -- a province's name shows once the province is this wide on screen
+local NAME_RELAYOUT = 0.04 -- names are laid out again when the zoom changes by this share
+local NAME_OFFSET = 6 -- screen pixels between a province's centre and the top of its name
+local NAME_HEIGHT, PIPS_HEIGHT = 18, 16
 local DETAIL_ZOOM = 0.9 -- garrisons and development pips show from this share of the region zoom inwards
 local TEXT_SIZE = 14 -- the smallest text on the map (docs/DESIGN.md "UI and controls")
 local TOKEN_SIZE = 14 -- army token, screen pixels
@@ -54,7 +58,8 @@ local arts: { [string]: PixelArt.Art } = {} -- painted maps by map id and resolu
 local warned = false
 local layers: { [string]: Frame } = {}
 local widths: { [number]: number } = {} -- each province's width in map pixels
-local labels: { [number]: { frame: Frame, pips: TextLabel } } = {}
+local namesLaidOut = { zoom = -1, detail = false }
+local labels: { [number]: { frame: Frame, pips: TextLabel, width: number } } = {} -- width: of the name, on screen
 local markers: { [number]: TextLabel } = {}
 local effects: { [number]: TextLabel } = {}
 local crowns: { [number]: TextLabel } = {}
@@ -130,13 +135,39 @@ local function detailVisible(z: number): boolean
 	return z >= MapView.regionZoom() * DETAIL_ZOOM
 end
 
+-- Names of provinces wide enough on screen, minus any that would overlap a bigger province's name.
+local function layoutNames(z: number, detail: boolean)
+	local last = namesLaidOut
+	if last.detail == detail and last.zoom > 0 and math.abs(z / last.zoom - 1) < NAME_RELAYOUT then
+		return
+	end
+	namesLaidOut = { zoom = z, detail = detail }
+	local boxes: { LabelLayout.Box } = {}
+	for id, label in labels do
+		local width = widths[id] or 0
+		if width * z >= NAME_MIN_PIXELS then
+			local c = MapRenderer.centerOf(id) * z
+			table.insert(boxes, {
+				id = id,
+				x = c.X - label.width / 2,
+				y = c.Y + NAME_OFFSET,
+				w = label.width,
+				h = if detail then NAME_HEIGHT + PIPS_HEIGHT else NAME_HEIGHT,
+				priority = width,
+			})
+		end
+	end
+	local shown = LabelLayout.place(boxes)
+	for id, label in labels do
+		label.frame.Visible = shown[id] == true
+		label.pips.Visible = detail
+	end
+end
+
 -- Everything that depends on the zoom: names, garrisons, and how the pixels are sampled.
 local function onZoom(z: number)
 	local detail = detailVisible(z)
-	for id, label in labels do
-		label.frame.Visible = (widths[id] or 0) * z >= NAME_MIN_PIXELS
-		label.pips.Visible = detail
-	end
+	layoutNames(z, detail)
 	for _, token in tokens do
 		if token.neutral then
 			token.frame.Visible = detail
@@ -202,6 +233,7 @@ local function build(map: Types.MapDef)
 	tokens = {}
 	layers = {}
 	widths = {}
+	namesLaidOut = { zoom = -1, detail = false }
 	selectedArmy = nil
 
 	-- full resolution if the device allows it, else half
@@ -286,16 +318,18 @@ local function build(map: Types.MapDef)
 			local frame = Instance.new("Frame")
 			frame.Name = "P" .. def.id
 			frame.AnchorPoint = Vector2.new(0.5, 0)
-			frame.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, 6)
-			frame.Size = UDim2.fromOffset(150, 36)
+			frame.Position = at(MapRenderer.centerOf(def.id)) + UDim2.fromOffset(0, NAME_OFFSET)
+			frame.Size = UDim2.fromOffset(150, NAME_HEIGHT + PIPS_HEIGHT)
 			frame.BackgroundTransparency = 1
 			frame.Parent = labelLayer
 			local name = textLabel(frame, def.name)
-			name.Size = UDim2.new(1, 0, 0, 18)
+			name.Size = UDim2.new(1, 0, 0, NAME_HEIGHT)
 			local dev = textLabel(frame, pips(if record then record.development else def.development))
-			dev.Position = UDim2.fromOffset(0, 18)
-			dev.Size = UDim2.new(1, 0, 0, 16)
-			labels[def.id] = { frame = frame, pips = dev }
+			dev.Position = UDim2.fromOffset(0, NAME_HEIGHT)
+			dev.Size = UDim2.new(1, 0, 0, PIPS_HEIGHT)
+			local width =
+				math.max(LabelLayout.textWidth(def.name, TEXT_SIZE), LabelLayout.textWidth(dev.Text, TEXT_SIZE))
+			labels[def.id] = { frame = frame, pips = dev, width = width }
 		end
 	end
 	layer("Tokens", canvas)
