@@ -15,7 +15,7 @@ A 25-minute map PvP match: 10 nations on one map expand, fight and ally, and pla
 
 | Source | Keep | Cut |
 | --- | --- | --- |
-| EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, naval combat, war score, most modifiers |
+| EU4 | Provinces, development, armies on a map, sieges, alliances, war and peace, coalitions against the leader | Trade nodes, estates, missions, ideas, religion, rebels, ship types and admirals (navies are one ship per map), war score, most modifiers |
 | WorldBox | World powers (here: Primordial powers), disasters, the four classic races (and a cast of peoples for every map), watching borders spread across the map, the pixel-art map look | Individual units, creatures, sandbox world editing |
 
 ## Match structure
@@ -204,7 +204,7 @@ One elite per race (Knights are both the Kingdom's and the Humans'):
 
 Each map's water is split into named **sea zones** (on Skyshards, **space zones** in the void around the shards). Nations build ships in their coastal provinces, carry armies across the water, fight at sea, close straits and blockade coasts. Rules: `Sim/Navy.luau`; numbers: `Config.Navy`; the zones of each map: `docs/MAPS.md` "Sea zones"; balance: measured with bot tournaments once bots sail (stage 3).
 
-- **Sea zones:** Earth has 22 (the oceans and seas, such as the North Atlantic and the Mediterranean), Eldmoor 10 round its coasts, Skyshards 10 (one wedge of space round each home shard). A zone lists its neighbouring zones and its coasts: the provinces it touches. A province touching several zones is a coast of each; the one it shares the most shore with is its **port**. Every strait lies in one zone. Lakes (the Caspian, Moonmere) have no zone.
+- **Sea zones:** Earth has 22 (the oceans and seas, such as the North Atlantic and the Mediterranean), Eldmoor 10 round its coasts, Skyshards 10 (one wedge of space round each home shard). A zone lists its neighbouring zones and its coasts: the provinces it touches. A province touching several zones is a coast of each; the one it shares the most shore with is its **port**. Every strait lies in one zone. Lakes (the Caspian, Moonmere) have no zone. Zones are tappable: the map data's sea grid gives every water pixel its zone id (`MapGrid.decodeSea`), as the province grid does for land.
 - **Ships:** one ship type per map: a sailing **Galleon** on Earth, a **Dragonship** on Eldmoor, a **Starship** on Skyshards, with the same numbers everywhere. A ship costs 25 gold (no manpower) and 1 gold upkeep a month, fights with a hull of 1,000 (like a regiment's 1,000 men, attack and defence 1) and carries one regiment: 1,000 men of any troop type. Ships are built 1–5 at a time in an owned coastal province and launch into its port zone, joining the nation's fleet standing there or forming a new one. A blockaded province can't launch ships.
 - **Fleets:** a nation's ships standing still in one zone are one fleet, one token, merging like armies. A fleet sails from zone to zone (8 s a zone, along the fewest zones) with the men aboard. A damaged fleet still counts its hull in whole ships, rounded up: 2,550 hull is 3 ships that carry 3 regiments.
 - **Embarking:** order an army onto one of your fleets. It walks to the nearest coast of the fleet's zone (or of the zone the fleet is sailing to) and boards when the fleet is there; as many men as there is room for go aboard (every troop type in proportion), and the rest stay ashore as the same army. The men aboard are no army while at sea: they can't fight, besiege or be hit by a Meteor, and they still cost upkeep.
@@ -213,6 +213,9 @@ Each map's water is split into named **sea zones** (on Skyshards, **space zones*
 - **Straits:** an enemy fleet (at war with you, not retreating) in a strait's zone stops your armies crossing that strait; an army already on it stops at its edge. Skyshards' bridges are straits, so a space fleet off a shard cuts it off from the Heartstone and its drift isles.
 - **Blockades:** your coastal province is blockaded while an enemy fleet is in one of its zones and no fleet of yours or an ally's is there. It earns 50% less gold, can't launch ships, and sieges of it by the blockader's side run 1.25× as fast. You get a toast when a blockade starts.
 - **War reach:** you may declare war on a nation you share a sea zone with (both hold a coast of it), not only on one you border by land, because fleets make wars across water real.
+- **Races at sea:** race passives are about armies. At sea there is no Attack, Forest or Hills bonus, every fleet sails at the same speed (Swift is for marching), and an Upkeep race pays less for the men aboard but full price for its ships.
+- **Who sees fleets:** everyone sees every fleet for now. One helper decides it (`Navy.visible`), so fog of war can hide fleets later without touching the rules.
+- **Controls** (the same flow as moving an army): tap your fleet, then a sea zone to sail there or a coastal province to land there, then Confirm. To embark, tap an army, then one of your fleets, then Confirm. Ships are built from an owned coastal province's sheet.
 - An eliminated nation's fleets disband with everyone aboard.
 
 ### Primordial powers
@@ -740,7 +743,9 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Weekly, friends and global leaderboards; achievements
 - [x] Rewarded video quest reroll; experience notifications
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
-- [ ] Navies: sea and space zones in the map data, ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades, war across the sea, bots at sea (rules and tests done: `tests/navy.spec.luau`)
+- [x] Navies, stage 1: sea and space zones in the map data (generator, validator, `MapData`), the rules for ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades and war across the sea (`Sim/Navy.luau`, tests in `tests/navy.spec.luau`)
+- [ ] Navies, stage 2: the orders through `CommandRouter`, fleets in the snapshot, the ship art for each map, fleet tokens and sea zones on the map, the fleet sheet, toasts, a harness scenario
+- [ ] Navies, stage 3: bots at sea, bot tournaments and balance (Earth's Americas), a `docs/STUDIO.md` recipe
 
 ## Open questions
 

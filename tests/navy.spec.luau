@@ -101,7 +101,7 @@ for _, mapId in Maps.ids do
 
 	T.test(mapId .. ": the sea grid covers only water, every zone has pixels, each centre lies in its zone", function()
 		local land = MapGrid.decode(map)
-		local sea = MapGrid.decode({ imageSize = map.imageSize, grid = map.seaGrid } :: any)
+		local sea = MapGrid.decodeSea(map)
 		T.equal(sea.width, land.width)
 		T.equal(sea.height, land.height)
 		local pixels: { [number]: number } = {}
@@ -583,6 +583,14 @@ T.test("ships and the men aboard cost upkeep", function()
 	T.near(Economy.upkeep(state, AURORA), 2 * Config.Navy.ShipUpkeep, 1e-9)
 	Navy.setCargo(fleet, { Infantry = 1000 })
 	T.near(Economy.upkeep(state, AURORA), 2 * Config.Navy.ShipUpkeep + Config.Troops.Infantry.upkeep, 1e-9)
+	-- an Upkeep race pays less for the men aboard, not for the ships
+	state.nations[AURORA].race = "Robots"
+	T.equal(Config.Races.Robots.passive, "Upkeep")
+	local discount = Config.Races.Robots.upkeepMultiplier :: number
+	T.near(Economy.upkeep(state, AURORA), 2 * Config.Navy.ShipUpkeep + Config.Troops.Infantry.upkeep * discount, 1e-9)
+	-- a damaged fleet pays for what is left of its hull
+	fleet.hull = 1500
+	T.near(Economy.upkeep(state, AURORA), 1.5 * Config.Navy.ShipUpkeep + Config.Troops.Infantry.upkeep * discount, 1e-9)
 end)
 
 T.test("an eliminated nation's fleets go with it", function()

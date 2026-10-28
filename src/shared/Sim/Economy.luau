@@ -71,21 +71,23 @@ function Economy.regiments(state: MatchState, nationId: number): number
 	return men / Config.Army.MenPerRegiment
 end
 
--- Gold per month a nation pays for its armies (every troop type at its own upkeep, aboard ships too) and its ships
--- (Config.Navy.ShipUpkeep a ship, for what is left of a damaged fleet's hull); an Upkeep race pays less for both.
+-- Gold per month a nation pays for its armies (every troop type at its own upkeep, aboard ships too; less for an
+-- Upkeep race) and its ships (Config.Navy.ShipUpkeep a ship, for what is left of a damaged fleet's hull; the same
+-- for every race).
 function Economy.upkeep(state: MatchState, nationId: number): number
-	local gold = 0
+	local troops, ships = 0, 0
 	for _, army in state.armies do
 		if army.owner == nationId then
-			gold += Troops.upkeep(army.troops)
+			troops += Troops.upkeep(army.troops)
 		end
 	end
 	for _, fleet in state.fleets or {} do
 		if fleet.owner == nationId then
-			gold += fleet.hull / Config.Navy.ShipHull * Config.Navy.ShipUpkeep + Troops.upkeep(fleet.troops)
+			troops += Troops.upkeep(fleet.troops)
+			ships += fleet.hull / Config.Navy.ShipHull * Config.Navy.ShipUpkeep
 		end
 	end
-	return gold * Races.upkeepMultiplier(Races.of(state, nationId))
+	return troops * Races.upkeepMultiplier(Races.of(state, nationId)) + ships
 end
 
 function Economy.monthlyIncome(state: MatchState, nationId: number): Income
