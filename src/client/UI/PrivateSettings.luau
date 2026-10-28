@@ -26,6 +26,8 @@ local OPTION_WIDTH = 76
 local HEADER_HEIGHT = 36
 local TEAM_CELL = Vector2.new(120, 36)
 local TEXT_SIZE = 14
+local SETTINGS_WIDTH = 140
+local LOBBY_BUTTONS = 4 -- the round buttons in the bottom-left corner during the vote (shop, quests, trophies, pass)
 
 type Option = { button: TextButton, key: string, value: string | number | boolean }
 
@@ -328,12 +330,13 @@ function PrivateSettings.init()
 	gui = Widgets.screen("PrivateSettings", 25) -- the summary and the button: above the vote screen, below the shop
 	sheetGui = Widgets.screen("PrivateSettingsSheet", 31) -- the sheet covers the shop's button too
 
-	-- the summary: a dark strip with a lock icon and one line
+	-- the summary: a dark strip with a lock icon and one line, between the Lobby's round buttons and Settings
+	local left = Widgets.cornerRowEnd(LOBBY_BUTTONS) + Theme.space.m
 	summaryLabel = Widgets.label(gui, "", TEXT_SIZE, Widgets.BUTTON_HEIGHT)
 	summaryLabel.Name = "Summary"
-	summaryLabel.AnchorPoint = Vector2.new(0.5, 1)
-	summaryLabel.Position = UDim2.new(0.5, 0, 1, -12)
-	summaryLabel.Size = UDim2.new(1, -340, 0, Widgets.BUTTON_HEIGHT)
+	summaryLabel.AnchorPoint = Vector2.new(0, 1)
+	summaryLabel.Position = UDim2.new(0, left, 1, -Theme.space.l)
+	summaryLabel.Size = UDim2.new(1, -(left + SETTINGS_WIDTH + Theme.space.l + Theme.space.m), 0, Widgets.BUTTON_HEIGHT)
 	summaryLabel.BackgroundColor3 = Theme.color.navyDeep
 	summaryLabel.BackgroundTransparency = 0.1
 	summaryLabel.TextColor3 = Theme.color.goldPale
@@ -343,7 +346,7 @@ function PrivateSettings.init()
 	Widgets.padding(summaryLabel, Theme.space.m, 0)
 	Widgets.leadIcon(summaryLabel, "lock", Theme.size.icon)
 
-	openButton = Widgets.iconTextButton(gui, "gear", "Settings", 140, Widgets.BUTTON, function()
+	openButton = Widgets.iconTextButton(gui, "gear", "Settings", SETTINGS_WIDTH, Widgets.BUTTON, function()
 		open = true
 		PrivateSettings.render()
 	end)

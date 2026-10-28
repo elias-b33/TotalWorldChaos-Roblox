@@ -433,11 +433,13 @@ One look for every screen, made to sit on WorldBox's pixel map and read at a gla
 | `primary` / `good` / `danger` / `secondary` / `special` | `#3d7ce0` / `#3aa856` / `#d9434b` / `#4a5385` / `#8a4fd8` | buttons: main, confirm, war, cancel, Primordial |
 | `disabled` | `#353a57` (text `#8a8fb0`) | can't be pressed now |
 
+Cosmetic rarities (`Theme.rarity`, the outline and rarity line of shop cards and season pass rewards): Common `#c9cde0`, Rare `#5aa8ff`, Epic `#b36ff2`, Legendary `#ff9f3a`.
+
 - **Type:** Fredoka One for titles, buttons and numbers; Builder Sans Bold for labels, Builder Sans Medium for hints. Sizes: hero 28, title 22, heading 18, body 15, small 14 (nothing smaller).
 - **Spacing:** 4 / 6 / 8 / 12 / 16 px; corner radius 4 / 6 / 8; outlines 2 px; buttons at least 44 px tall.
 - **Icons:** 16×16 sprites in one 24-colour palette with a dark outline (`IconArt.ICONS`, plus recoloured variants), each painted once into its own 1 KB EditableImage on first use and shown with pixelated resampling at 16, 20, 24 or 32 px. Without EditableImage they fall back to emoji. A leading emoji in a toast or older string becomes its icon (`IconArt.EMOJI`). `lune run tools/harness/icon_sheet` paints them all into `tools/harness/out/gui/icons.png`; `tests/icons.spec.luau` checks every icon.
-- **Components** (`Widgets`): `panel`, `sheet` (bottom sheet), `card`, `header` (icon, gold title, close cross), `title`, `label`, `hint`, `button` (colours `BUTTON`, `GOOD`, `DANGER`, `BUTTON_OFF`, `GOLD`, `SPECIAL`), `iconTextButton`, `iconButton`, `actionButton` (icon, caption, cost line), `setEnabled`, `tab` / `setTab`, `chip` (icon + value), `badge`, `progress` / `setProgress`, `toast` / `setToast`, `icon`, `leadIcon`, `setIconText`.
-- **GUI objects:** a button is 4 objects (button, corner, outline, bevel); the press scale is made on the first press. Hidden sheets and pickers drop their buttons and rebuild them when they open, and the private server sheet is built on first open.
+- **Components** (`Widgets`): `panel`, `sheet` (bottom sheet), `card`, `header` (icon, gold title, close cross), `title`, `label`, `hint`, `button` (colours `BUTTON`, `GOOD`, `DANGER`, `BUTTON_OFF`, `GOLD`, `SPECIAL`), `iconTextButton`, `iconButton`, `actionButton` (icon, caption, cost line), `setEnabled`, `tab` / `setTab`, `chip` (icon + value), `badge`, `progress` / `setProgress`, `toast` / `setToast`, `icon`, `leadIcon`, `setIconText`; for the full-screen meta screens (shop, season pass, quests, trophies): `window` (a full-screen panel), `fitButton` (as wide as its icon and text: a price, Claim, Equip), `pager` (arrow buttons and "2/5"), `tag` (a status in a dark well: Owned, Equipped, a lock), `cornerButton` / `cornerRowEnd` (the Lobby's round buttons in the bottom-left corner), `countBadge` / `setCount`. Prices show the Robux glyph (U+E002, drawn by every Roblox font) or the Glory medal icon.
+- **GUI objects:** a button is 4 objects (button, corner, outline, bevel); the press scale is made on the first press. Hidden sheets and pickers drop their buttons and rebuild them when they open, the private server sheet is built on first open, and the shop, season pass, quests and trophies screens build their contents when they open and drop them when they close.
 
 ### Sound and effects
 
@@ -556,7 +558,8 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Private server settings
 - [x] Sound and effects for battles and Primordial powers
 - [x] UI kit with a "pixel kingdom" look and runtime pixel icons, on the HUD, sheets, powers, nations, offers, map vote, draft, private settings and emotes ("UI style")
-- [ ] Shop, Quests, Results and Tutorial restyled on the UI kit
+- [x] Shop, season pass, quests, trophies and the Lobby's round buttons restyled on the UI kit
+- [ ] Results and Tutorial restyled on the UI kit
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
 

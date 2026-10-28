@@ -1,15 +1,16 @@
 --!strict
--- The shop (docs/MONETIZATION.md 3, 10), phone first: a 🛒 button opens a full-screen panel with tabs (offers, one
--- per cosmetic slot, purchase history), five item cards per page with a preview, the Robux and Glory prices and
--- the owned / equipped state. Also the starter-pack offer (at most once per session, after the 2nd match, never
--- during a match, no timer).
+-- The shop (docs/MONETIZATION.md 3, 10), phone first: a cart button opens a full-screen panel with tabs (offers, the
+-- rotating shop, one per cosmetic slot, purchase history), five item cards per page with a preview, the Robux and
+-- Glory prices and the owned / equipped state. Also the starter-pack offer (at most once per session, after the 2nd
+-- match, never during a match, no timer). Built from the UI kit (docs/DESIGN.md "UI style"); the panel's contents
+-- are built when it opens and dropped when it closes.
 --
--- Rules for minors (section 10): every price shows its currency icon, Robux prices are read live from
--- MarketplaceService (the Config list price only while a product id is unset), bundles show the real sum of their
--- pieces, no random items, no countdowns, no prompts during a match (the server refuses them).
--- Power effects show a pixel preview of the effect, map themes a small map painted in the theme; the Themes tab
--- also holds the opt-out ("always show me the classic map").
--- The rotating shop (section 3.8, Sim.ShopRotation): the 🔄 Today tab shows the 4 daily and 2 weekly slots with the
+-- Rules for minors (section 10): every price shows its currency icon (the Robux glyph, the Glory medal), Robux
+-- prices are read live from MarketplaceService (the Config list price only while a product id is unset), bundles
+-- show the real sum of their pieces, no random items, no countdowns, no prompts during a match (the server refuses
+-- them). Power effects show a pixel preview of the effect, map themes a small map painted in the theme; the Themes
+-- tab also holds the opt-out ("always show me the classic map").
+-- The rotating shop (section 3.8, Sim.ShopRotation): the Today tab shows the 4 daily and 2 weekly slots with the
 -- time until they change; a rotating item outside its days says it is back within 60 days. Season-pass rewards only
 -- show once owned; the Offers tab links to the season pass screen (UI.Season).
 
@@ -24,6 +25,7 @@ local Config = require(Shared.Config)
 local Season = require(Shared.Sim.Season)
 local Shop = require(Shared.Sim.Shop)
 local ShopRotation = require(Shared.Sim.ShopRotation)
+local SimAds = require(Shared.Sim.Ads)
 local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
@@ -34,43 +36,51 @@ local LobbyState = require(Client.LobbyState)
 local ProfileState = require(Client.ProfileState)
 local SeasonState = require(Client.SeasonState)
 local ShopState = require(Client.ShopState)
+local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
+local Theme = Widgets.Theme
 local ROBUX = utf8.char(0xE002) -- Roblox's Robux icon in every Roblox font
-local GLORY = "🏅"
 local PER_PAGE = 5 -- item cards per page
+local OFFERS_PER_PAGE = 3 -- offer cards are wider: what's inside is a list
+local TODAY_COLUMNS = 6 -- 4 daily and 2 weekly slots
 local HISTORY_PER_PAGE = 6
-local BUTTON_SIZE = 52
-local HEADER_HEIGHT = 40
-local TAB_HEIGHT = 44
+local BAR = Widgets.BUTTON_HEIGHT -- the header and the tab row
+local GAP = Theme.space.m -- between cards
+local TODAY_GAP = Theme.space.s
+local TAB_GAP = Theme.space.xs
 local FOOTER_HEIGHT = 18
-local CARD = Color3.fromRGB(32, 35, 50)
-local GOLD = Color3.fromRGB(242, 193, 78)
-local OFF_TEXT = Color3.fromRGB(150, 152, 165)
+local PREVIEW_HEIGHT = 52
+local COMPACT_PREVIEW = 40 -- the Today tab's cards: their section titles take a line
+local TAG_HEIGHT = 36
+local BUTTONS_HEIGHT = 2 * Widgets.BUTTON_HEIGHT + Theme.space.s -- a card's price buttons, stacked
+local TITLE_HEIGHT = 32 -- an offer card's icon and name
+local LINE = 17 -- a 14 px line
+local HISTORY_ROW = 32
+local DATE_WIDTH = 104
+local PRICE_WIDTH = 96
+local TEST_WIDTH = 150
+local SECONDS_PER_DAY = 86400
 local DEFAULT_COLOR = 1 -- previews use your nation's colour, or red before you have one
-
-local RARITY_COLORS: { [string]: Color3 } = {
-	Common = Color3.fromRGB(190, 194, 205),
-	Rare = Color3.fromRGB(90, 160, 255),
-	Epic = Color3.fromRGB(190, 110, 255),
-	Legendary = Color3.fromRGB(255, 170, 60),
-}
+local SEASON_PASS = "Season Pass"
 
 type Tab = { id: string, icon: string, label: string }
 local TABS: { Tab } = {
-	{ id = "Offers", icon = "🎁", label = "Offers" },
-	{ id = "Today", icon = "🔄", label = "Today" },
-	{ id = "Flag", icon = "🏳", label = "Flags" },
-	{ id = "Border", icon = "🧱", label = "Borders" },
-	{ id = "Shades", icon = "🎨", label = "Shades" },
-	{ id = "Token", icon = "♟", label = "Tokens" },
-	{ id = "Emote", icon = "😀", label = "Emotes" },
-	{ id = "Victory", icon = "🏆", label = "Victory" },
-	{ id = "Frame", icon = "🖼", label = "Frames" },
-	{ id = "PowerFx", icon = "✨", label = "Powers" },
-	{ id = "Theme", icon = "🗺", label = "Themes" },
-	{ id = "History", icon = "🧾", label = "History" },
+	{ id = "Offers", icon = "gift", label = "Offers" },
+	{ id = "Today", icon = "reroll", label = "Today" },
+	{ id = "Flag", icon = "flag", label = "Flags" },
+	{ id = "Border", icon = "border", label = "Borders" },
+	{ id = "Shades", icon = "palette", label = "Shades" },
+	{ id = "Token", icon = "sword", label = "Tokens" },
+	{ id = "Emote", icon = "smile", label = "Emotes" },
+	{ id = "Victory", icon = "trophy", label = "Victory" },
+	{ id = "Frame", icon = "frame", label = "Frames" },
+	{ id = "PowerFx", icon = "meteor", label = "Powers" },
+	{ id = "Theme", icon = "map", label = "Themes" },
+	{ id = "History", icon = "scroll", label = "History" },
 }
+-- the selected tab is twice as wide (its icon and name), the others show their icon
+local TAB_UNITS = #TABS + 1
 
 local SLOT_NAMES: { [string]: string } = {
 	Flag = "Flag",
@@ -83,6 +93,22 @@ local SLOT_NAMES: { [string]: string } = {
 	PowerFx = "Effect",
 	Theme = "Theme",
 }
+local SLOT_ICONS: { [string]: string } = {}
+for _, t in TABS do
+	SLOT_ICONS[t.id] = t.icon
+end
+
+-- The open panel's pieces (nil while the shop is closed: its contents are dropped).
+type Refs = {
+	glory: TextLabel,
+	vip: TextLabel,
+	test: TextLabel,
+	pager: Frame,
+	page: TextLabel,
+	tabs: Frame,
+	content: Frame,
+	footer: TextLabel,
+}
 
 local ShopUI = {}
 
@@ -90,14 +116,8 @@ local toast: (string) -> () = function(_text: string) end
 local gui: ScreenGui
 local openButton: TextButton
 local panel: Frame
-local gloryLabel: TextLabel
-local vipLabel: TextLabel
-local testLabel: TextLabel
-local pageLabel: TextLabel
-local tabRow: Frame
-local content: Frame
-local footer: TextLabel
 local offerPanel: Frame
+local ui: Refs? = nil
 local tab = "Offers"
 local page = 1
 local livePrices: { [string]: number } = {} -- live Robux prices by item or offer id
@@ -158,69 +178,127 @@ local function buyRobux(id: string)
 	Intents.buy(id, "Robux")
 end
 
-local function cardButton(parent: Instance, text: string, color: Color3, onPress: () -> ()): TextButton
-	local b = Widgets.button(parent, text, 0, color, onPress)
-	b.Size = UDim2.new(1, 0, 0, 40)
-	b.TextSize = 15
-	return b
-end
-
-local function stateButton(parent: Instance, text: string)
-	local b = cardButton(parent, text, Widgets.BUTTON_OFF, function() end)
-	b.AutoButtonColor = false
-	b.TextColor3 = OFF_TEXT
-end
-
-local function centred(parent: Instance, text: string, size: number, height: number, color: Color3?): TextLabel
+-- A text line centred in its parent, cut with … when too long.
+local function centred(
+	parent: Instance,
+	text: string,
+	size: number,
+	height: number,
+	color: Color3?,
+	wrapped: boolean?
+): TextLabel
 	local l = Widgets.label(parent, text, size, height)
 	l.TextXAlignment = Enum.TextXAlignment.Center
+	l.TextWrapped = wrapped == true
+	l.TextTruncate = Enum.TextTruncate.AtEnd
 	if color then
 		l.TextColor3 = color
 	end
 	return l
 end
 
--- The little picture on a card.
-local function preview(parent: Instance, item: Types.CatalogueItem)
+-- Stack a card's buttons and tags from the bottom of its button area up, each centred.
+local function stack(items: { GuiObject })
+	local y = BUTTONS_HEIGHT
+	for i = #items, 1, -1 do
+		local item = items[i]
+		local h = item.Size.Y.Offset
+		y -= h
+		item.AnchorPoint = Vector2.new(0.5, 0)
+		item.Position = UDim2.new(0.5, 0, 0, y)
+		y -= Theme.space.s
+	end
+end
+
+local function buttonArea(card: Frame): Frame
+	local area = Instance.new("Frame")
+	area.Name = "Buttons"
+	area.BackgroundTransparency = 1
+	area.AnchorPoint = Vector2.new(0, 1)
+	area.Position = UDim2.fromScale(0, 1)
+	area.Size = UDim2.new(1, 0, 0, BUTTONS_HEIGHT)
+	area.Parent = card
+	return area
+end
+
+-- A raised card (Widgets.card) sized by the grid it sits in, outlined in its rarity's colour.
+local function newCard(parent: Instance, name: string, order: number, outline: Color3?): Frame
+	local card = Widgets.card(parent)
+	card.Name = name
+	card.LayoutOrder = order
+	card.AutomaticSize = Enum.AutomaticSize.None -- the grid's cell is its size
+	local pad = card:FindFirstChildOfClass("UIPadding")
+	if pad then
+		pad.PaddingLeft = UDim.new(0, Theme.space.s)
+		pad.PaddingRight = UDim.new(0, Theme.space.s)
+		pad.PaddingTop = UDim.new(0, Theme.space.s)
+		pad.PaddingBottom = UDim.new(0, Theme.space.s)
+	end
+	local stroke = card:FindFirstChild("Outline")
+	if outline and stroke and stroke:IsA("UIStroke") then
+		stroke.Color = outline
+	end
+	return card
+end
+
+-- The Robux price button (greyed out during a match: a tap explains why).
+local function robuxButton(parent: Instance, id: string, listPrice: number): TextButton
+	local b = Widgets.fitButton(
+		parent,
+		nil,
+		ROBUX .. " " .. formatNumber(robuxPrice(id, listPrice)),
+		Widgets.BUTTON,
+		function()
+			buyRobux(id)
+		end,
+		"BuyRobux"
+	)
+	if not robuxOpen() then
+		Widgets.setEnabled(b, false)
+	end
+	return b
+end
+
+-- The little picture on a card, `height` px tall (pictures are 4 px less, 4:3 for flags).
+local function preview(parent: Instance, item: Types.CatalogueItem, height: number)
 	local holder = Instance.new("Frame")
 	holder.Name = "Preview"
 	holder.BackgroundTransparency = 1
-	holder.Size = UDim2.new(1, 0, 0, 56)
-	holder.LayoutOrder = 1
+	holder.Size = UDim2.new(1, 0, 0, height)
 	holder.Parent = parent
 	local color = myColor()
+	local h = height - 4
+	local function size(aspect: number): UDim2
+		return UDim2.fromOffset(math.floor(h * aspect), h)
+	end
 	local thing: GuiObject
 	if item.slot == "Flag" then
-		thing = Cosmetics.flagLabel(holder, item.id, color, UDim2.fromOffset(64, 48))
+		thing = Cosmetics.flagLabel(holder, item.id, color, size(4 / 3))
 	elseif item.slot == "Border" then
-		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, UDim2.fromOffset(72, 48))
+		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, size(1.5))
 	elseif item.slot == "Shades" then
-		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, UDim2.fromOffset(72, 48))
+		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, size(1.5))
 	elseif item.slot == "Token" then
-		thing = Cosmetics.tokenLabel(holder, item.id, color, UDim2.fromOffset(48, 48))
+		thing = Cosmetics.tokenLabel(holder, item.id, color, size(1))
 	elseif item.slot == "PowerFx" then
-		thing = Cosmetics.effectLabel(holder, item.id, UDim2.fromOffset(64, 48))
+		thing = Cosmetics.effectLabel(holder, item.id, size(4 / 3))
 	elseif item.slot == "Theme" then
-		thing = Cosmetics.themeLabel(holder, item.id, UDim2.fromOffset(96, 48))
+		thing = Cosmetics.themeLabel(holder, item.id, size(1.75))
 	elseif item.slot == "Frame" then
-		local l = centred(holder, Players.LocalPlayer.Name, 14, 28)
-		l.Size = UDim2.fromOffset(110, 28)
+		local l = centred(holder, Players.LocalPlayer.Name, Theme.text.small, 28)
+		l.Size = UDim2.new(1, -Theme.space.m, 0, 28)
+		l.BackgroundColor3 = Theme.color.navyDeep
+		l.BackgroundTransparency = 0
 		local frameColor = Cosmetics.frameColor(item.id)
 		if frameColor then
-			l.BackgroundTransparency = 0.85
 			l.BackgroundColor3 = frameColor
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = frameColor
-			stroke.Thickness = 2
-			stroke.Parent = l
+			l.BackgroundTransparency = 0.8
+			Widgets.stroke(l, frameColor)
 		end
-		Widgets.corner(l, 6)
+		Widgets.corner(l, Theme.radius.m)
 		thing = l
-	else -- emotes and victory animations: their icon (the first frame)
-		local icon = string.split(item.art, " ")[1]
-		local l = centred(holder, icon, 34, 48)
-		l.Size = UDim2.fromOffset(80, 48)
-		thing = l
+	else -- emotes and victory animations are emoji over a capital: their first frame
+		thing = centred(holder, string.split(item.art, " ")[1], math.floor(h * 0.7), h)
 	end
 	thing.AnchorPoint = Vector2.new(0.5, 0.5)
 	thing.Position = UDim2.fromScale(0.5, 0.5)
@@ -233,23 +311,14 @@ local function onSaleToday(id: string): boolean
 	return rotation == nil or ShopRotation.onSale(id, rotation.day)
 end
 
-local function itemCard(item: Types.CatalogueItem, order: number, parent: Instance?)
-	local card = Instance.new("Frame")
-	card.Name = "Card_" .. item.id
-	card.BackgroundColor3 = CARD
-	card.LayoutOrder = order
-	card.Parent = parent or content
-	Widgets.corner(card, 10)
-	Widgets.padding(card, 6)
-	local list = Widgets.list(card, false, 4)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = RARITY_COLORS[item.rarity] or Widgets.BUTTON_OFF
-	stroke.Thickness = 1
-	stroke.Parent = card
-
-	preview(card, item)
-	centred(card, item.name, 14, 18).LayoutOrder = 2
+local function itemCard(item: Types.CatalogueItem, order: number, parent: Instance, compact: boolean?)
+	local rarity = Theme.rarity[item.rarity] or Theme.color.textDim
+	local card = newCard(parent, "Card_" .. item.id, order, if item.rarity ~= "Common" then rarity else nil)
+	local top = if compact then COMPACT_PREVIEW else PREVIEW_HEIGHT
+	preview(card, item, top)
+	local name = centred(card, item.name, Theme.text.body, 18)
+	name.Name = "Name"
+	name.Position = UDim2.fromOffset(0, top + 2)
 	local detail = item.rarity
 	if item.power then
 		detail ..= " · " .. item.power
@@ -264,92 +333,111 @@ local function itemCard(item: Types.CatalogueItem, order: number, parent: Instan
 	elseif item.earned then
 		detail ..= " · earned"
 	end
-	centred(card, detail, 12, 14, RARITY_COLORS[item.rarity]).LayoutOrder = 3
+	local line = centred(
+		card,
+		detail,
+		Theme.text.small,
+		16,
+		if item.free then Theme.color.textDim elseif item.vipOnly then Theme.color.gold else rarity
+	)
+	line.Name = "Rarity"
+	line.Position = UDim2.fromOffset(0, top + 20)
 
-	local buttons = Instance.new("Frame")
-	buttons.Name = "Buttons"
-	buttons.BackgroundTransparency = 1
-	buttons.Size = UDim2.new(1, 0, 0, 84)
-	buttons.LayoutOrder = 4
-	buttons.Parent = card
-	Widgets.list(buttons, false, 4)
-
+	local area = buttonArea(card)
+	local items: { GuiObject } = {}
 	if ShopState.owns(item.id) then
 		if item.slot == "Emote" then
-			stateButton(buttons, "✅ Owned")
+			table.insert(items, Widgets.tag(area, "check", "Owned", TAG_HEIGHT))
 		elseif ShopState.isEquipped(item) then
-			stateButton(buttons, "✅ Equipped")
+			local t = Widgets.tag(area, "check", "Equipped", TAG_HEIGHT)
+			t.TextColor3 = Theme.color.goldPale
+			table.insert(items, t)
 		else
-			cardButton(buttons, "Equip", Widgets.GOOD, function()
-				Intents.equip(item.id)
-			end)
+			table.insert(
+				items,
+				Widgets.fitButton(area, nil, "Equip", Widgets.GOOD, function()
+					Intents.equip(item.id)
+				end, "Equip")
+			)
 		end
-		return
-	end
-	if item.earned then -- never sold: an achievement (🏆 Trophies) or the weekly top 100
-		stateButton(buttons, if item.id == "frame_warlord" then "⚔ Weekly top 100" else "🏆 Achievement")
-		return
-	end
-	if item.vipOnly then
-		cardButton(buttons, "👑 Comes with VIP", Widgets.BUTTON_OFF, function()
-			tab, page = "Offers", 1
-			render()
-		end)
-		return
-	end
-	if item.season then
-		stateButton(buttons, "🎟 Season pass")
-		return
-	end
-	if not onSaleToday(item.id) then
-		stateButton(buttons, "🔄 Not today")
-		centred(buttons, string.format("Back within %d days", RETURN_DAYS), 12, 36, OFF_TEXT)
-		return
-	end
-	if item.robux then
-		local price = robuxPrice(item.id, item.robux)
-		cardButton(
-			buttons,
-			ROBUX .. " " .. formatNumber(price),
-			if robuxOpen() then Widgets.BUTTON else Widgets.BUTTON_OFF,
-			function()
-				buyRobux(item.id)
-			end
+	elseif item.earned then -- never sold: an achievement (the Trophies screen) or the weekly top 100
+		if item.id == "frame_warlord" then
+			table.insert(items, Widgets.tag(area, "war", "Top 100", TAG_HEIGHT))
+		else
+			table.insert(items, Widgets.tag(area, "trophy", "Trophy", TAG_HEIGHT))
+		end
+	elseif item.vipOnly then
+		table.insert(
+			items,
+			Widgets.fitButton(area, "crown", "Get VIP", Widgets.BUTTON_OFF, function()
+				tab, page = "Offers", 1
+				render()
+			end, "GetVip")
 		)
-	end
-	if item.glory then
-		local summary = ProfileState.summary()
-		local enough = summary ~= nil and summary.glory >= item.glory
-		local b = cardButton(
-			buttons,
-			GLORY .. " " .. formatNumber(item.glory),
-			if enough then GOLD else Widgets.BUTTON_OFF,
-			function()
+	elseif item.season then
+		table.insert(items, Widgets.tag(area, "ticket", "Season", TAG_HEIGHT))
+	elseif not onSaleToday(item.id) then
+		table.insert(items, Widgets.tag(area, "reroll", "Not today", TAG_HEIGHT))
+		local back = centred(area, string.format("Back within %d days", RETURN_DAYS), Theme.text.small, 2 * LINE)
+		back.TextWrapped = true
+		back.TextColor3 = Theme.color.textDim
+		back.FontFace = Theme.font.bodyLight
+		table.insert(items, back)
+	else
+		if item.robux then
+			table.insert(items, robuxButton(area, item.id, item.robux))
+		end
+		if item.glory then
+			local summary = ProfileState.summary()
+			local cost = item.glory
+			local b = Widgets.fitButton(area, "medal", formatNumber(cost), Widgets.GOLD, function()
 				Intents.buy(item.id, "Glory")
+			end, "BuyGlory")
+			if summary == nil or summary.glory < cost then
+				Widgets.setEnabled(b, false) -- still sends: the server says "Not enough Glory"
 			end
-		)
-		b.TextColor3 = if enough then Color3.fromRGB(40, 28, 0) else OFF_TEXT
+			table.insert(items, b)
+		end
 	end
+	stack(items)
 end
 
-local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance?)
-	local card = Instance.new("Frame")
-	card.Name = "Card_" .. offer.id
-	card.BackgroundColor3 = CARD
-	card.LayoutOrder = order
-	card.Parent = parent or content
-	Widgets.corner(card, 10)
-	Widgets.padding(card, 6)
-	local list = Widgets.list(card, false, 3)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = GOLD
-	stroke.Thickness = 1
-	stroke.Parent = card
+-- An offer card's top: its pixel icon and name.
+local function offerTitle(card: Frame, icon: string, name: string)
+	local title = Widgets.title(card, name, Theme.text.heading, TITLE_HEIGHT)
+	title.Name = "Title"
+	Widgets.leadIcon(title, icon, Theme.size.iconLarge, Theme.space.s)
+end
 
-	centred(card, offer.icon, 28, 34).LayoutOrder = 1
-	centred(card, offer.name, 15, 18).LayoutOrder = 2
-	-- what's inside, one line each (short lines: they must fit a phone card)
+-- A dim block of short lines (what's inside), then a gold note under it.
+local function offerText(card: Frame, lines: { string }, note: string)
+	local list = Widgets.label(card, table.concat(lines, "\n"), Theme.text.small, LINE * #lines)
+	list.Name = "Contents"
+	list.FontFace = Theme.font.bodyLight
+	list.TextColor3 = Theme.color.textDim
+	list.TextYAlignment = Enum.TextYAlignment.Top
+	list.TextTruncate = Enum.TextTruncate.AtEnd
+	list.Position = UDim2.fromOffset(0, TITLE_HEIGHT + Theme.space.xs)
+	local noteLines = #string.split(note, "\n")
+	local n = Widgets.label(card, note, Theme.text.small, LINE * noteLines)
+	n.Name = "Note"
+	n.TextColor3 = Theme.color.gold
+	n.TextYAlignment = Enum.TextYAlignment.Top
+	n.Position = UDim2.fromOffset(0, TITLE_HEIGHT + 2 * Theme.space.xs + LINE * #lines)
+end
+
+local function itemLine(id: string): string?
+	local item = Catalogue.item(id)
+	return if item then item.name .. " " .. (SLOT_NAMES[item.slot] or "") else nil
+end
+
+local OFFER_ICONS: { [string]: string } = { vip = "crown", starter = "gift" }
+
+local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance)
+	local card = newCard(parent, "Card_" .. offer.id, order, Theme.color.gold)
+	local icon = OFFER_ICONS[offer.id] or Icons.fromEmoji(offer.icon) or "gift"
+	offerTitle(card, icon, offer.name)
+	-- what's inside, one short line each (they must fit a phone card)
 	local lines = {}
 	if offer.kind == "Pass" then
 		lines = {
@@ -360,62 +448,35 @@ local function offerCard(offer: Types.ShopOffer, order: number, parent: Instance
 		}
 	else
 		for _, id in offer.items do
-			local item = Catalogue.item(id)
-			if item then
-				table.insert(lines, item.name .. " " .. (SLOT_NAMES[item.slot] or ""))
+			local line = itemLine(id)
+			if line then
+				table.insert(lines, line)
 			end
 		end
 	end
-	centred(card, table.concat(lines, "\n"), 12, 78, OFF_TEXT).LayoutOrder = 3
 	local note = if offer.kind == "Pass"
 		then "Yours forever"
 		else string.format("Bought separately: %s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id, robuxPrice)))
 	if offer.oncePerAccount and offer.kind == "Product" then
 		note ..= "\nOne per account"
 	end
-	centred(card, note, 12, 30, GOLD).LayoutOrder = 4
-	local buttons = Instance.new("Frame")
-	buttons.BackgroundTransparency = 1
-	buttons.Size = UDim2.new(1, 0, 0, 40)
-	buttons.LayoutOrder = 5
-	buttons.Parent = card
-	Widgets.list(buttons, false, 4)
+	offerText(card, lines, note)
+	local area = buttonArea(card)
 	if ShopState.owns(offer.id) then
-		stateButton(buttons, "✅ Owned")
+		stack({ Widgets.tag(area, "check", "Owned", TAG_HEIGHT) })
 	else
-		local price = robuxPrice(offer.id, offer.robux)
-		cardButton(
-			buttons,
-			ROBUX .. " " .. formatNumber(price),
-			if robuxOpen() then Widgets.BUTTON else Widgets.BUTTON_OFF,
-			function()
-				buyRobux(offer.id)
-			end
-		)
+		stack({ robuxButton(area, offer.id, offer.robux) })
 	end
 end
 
 -- The Offers tab's season pass card: what the pass holds, and the way to its screen (bought there).
-local function seasonCard(order: number)
+local function seasonCard(order: number, parent: Instance)
 	local view = SeasonState.view()
 	if view == nil or view.id == "" then
 		return
 	end
-	local card = Instance.new("Frame")
-	card.Name = "Card_season_pass"
-	card.BackgroundColor3 = CARD
-	card.LayoutOrder = order
-	card.Parent = content
-	Widgets.corner(card, 10)
-	Widgets.padding(card, 6)
-	local list = Widgets.list(card, false, 3)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = GOLD
-	stroke.Thickness = 1
-	stroke.Parent = card
-	centred(card, "🎟", 28, 34).LayoutOrder = 1
-	centred(card, "Season Pass", 15, 18).LayoutOrder = 2
+	local card = newCard(parent, "Card_season_pass", order, Theme.color.gold)
+	offerTitle(card, "ticket", SEASON_PASS)
 	-- what the premium track holds, counted from the season's reward list
 	local items, glory = 0, 0
 	local def = Season.def(view.id)
@@ -427,44 +488,34 @@ local function seasonCard(order: number)
 			end
 		end
 	end
-	local lines = {
+	offerText(card, {
 		view.name,
 		string.format("%d cosmetics, a title", items),
 		string.format("%s Glory on the way", formatNumber(glory)),
 		"Only this season",
-	}
-	centred(card, table.concat(lines, "\n"), 12, 78, OFF_TEXT).LayoutOrder = 3
-	centred(card, "No tier skips\nBundle: pass + 10 tiers", 12, 30, GOLD).LayoutOrder = 4
-	local buttons = Instance.new("Frame")
-	buttons.BackgroundTransparency = 1
-	buttons.Size = UDim2.new(1, 0, 0, 40)
-	buttons.LayoutOrder = 5
-	buttons.Parent = card
-	Widgets.list(buttons, false, 4)
-	cardButton(buttons, if view.premium then "✅ See your pass" else "🎟 See the pass", Widgets.BUTTON, function()
-		if openSeason then
-			openSeason()
-		end
-	end)
+	}, string.format("No tier skips\nBundle: pass + %d tiers", Config.Season.BundleTiers))
+	local area = buttonArea(card)
+	local b = Widgets.fitButton(
+		area,
+		if view.premium then "check" else "ticket",
+		if view.premium then "See your pass" else "See the pass",
+		Widgets.SPECIAL,
+		function()
+			if openSeason then
+				openSeason()
+			end
+		end,
+		"SeeSeason"
+	)
+	stack({ b })
 end
 
--- The weekly bundle on the 🔄 Today tab: the offer card, narrow enough for a sixth of the screen.
+-- The weekly bundle on the Today tab: the offer card, narrow enough for a sixth of the screen.
 local function bundleCard(offer: Types.ShopOffer, order: number, parent: Instance)
-	local card = Instance.new("Frame")
-	card.Name = "Card_" .. offer.id
-	card.BackgroundColor3 = CARD
-	card.LayoutOrder = order
-	card.Parent = parent
-	Widgets.corner(card, 10)
-	Widgets.padding(card, 6)
-	local list = Widgets.list(card, false, 3)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = GOLD
-	stroke.Thickness = 1
-	stroke.Parent = card
-	centred(card, offer.icon, 28, 34).LayoutOrder = 1
-	centred(card, offer.name, 15, 18).LayoutOrder = 2
+	local card = newCard(parent, "Card_" .. offer.id, order, Theme.color.gold)
+	local title = Widgets.title(card, offer.name, Theme.text.small, TITLE_HEIGHT)
+	title.Name = "Title"
+	Widgets.leadIcon(title, Icons.fromEmoji(offer.icon) or "gift", Theme.size.icon, Theme.space.xs)
 	local names = {}
 	for _, id in offer.items do
 		local item = Catalogue.item(id)
@@ -472,34 +523,23 @@ local function bundleCard(offer: Types.ShopOffer, order: number, parent: Instanc
 			table.insert(names, item.name)
 		end
 	end
-	centred(card, table.concat(names, "\n"), 12, 52, OFF_TEXT).LayoutOrder = 3
-	local sum = string.format("Separately: %s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id)))
-	centred(card, sum, 12, 16, GOLD).LayoutOrder = 4
-	local buttons = Instance.new("Frame")
-	buttons.BackgroundTransparency = 1
-	buttons.Size = UDim2.new(1, 0, 0, 40)
-	buttons.LayoutOrder = 5
-	buttons.Parent = card
-	Widgets.list(buttons, false, 4)
+	offerText(
+		card,
+		names,
+		string.format("Separately:\n%s %s", ROBUX, formatNumber(Shop.bundleValue(offer.id, robuxPrice)))
+	)
+	local area = buttonArea(card)
 	if ShopState.owns(offer.id) then
-		stateButton(buttons, "✅ Owned")
+		stack({ Widgets.tag(area, "check", "Owned", TAG_HEIGHT) })
 	else
-		local price = robuxPrice(offer.id, offer.robux)
-		cardButton(
-			buttons,
-			ROBUX .. " " .. formatNumber(price),
-			if robuxOpen() then Widgets.BUTTON else Widgets.BUTTON_OFF,
-			function()
-				buyRobux(offer.id)
-			end
-		)
+		stack({ robuxButton(area, offer.id, offer.robux) })
 	end
 end
 
 -- "5 h 12 min" / "3 d 4 h": how long until a rotating slot changes (a fact on the screen, never a ticking timer).
 local function timeLeft(seconds: number): string
 	local s = math.max(0, math.floor(seconds - (os.clock() - rotationAt)))
-	local d, h, m = s // 86400, (s % 86400) // 3600, (s % 3600) // 60
+	local d, h, m = s // SECONDS_PER_DAY, (s % SECONDS_PER_DAY) // 3600, (s % 3600) // 60
 	if d > 0 then
 		return string.format("%d d %d h", d, h)
 	elseif h > 0 then
@@ -508,21 +548,30 @@ local function timeLeft(seconds: number): string
 	return string.format("%d min", math.max(1, m))
 end
 
--- The 🔄 Today tab: the 4 daily slots and the 2 weekly ones, each section with the time until it changes.
-local function renderToday()
+local function sectionTitle(parent: Instance, name: string, icon: string, text: string): TextLabel
+	local l = Widgets.label(parent, text, Theme.text.small, 20)
+	l.Name = name
+	l.TextWrapped = false
+	l.TextTruncate = Enum.TextTruncate.AtEnd
+	Widgets.leadIcon(l, icon, 16, Theme.space.xs)
+	return l
+end
+
+-- The Today tab: the 4 daily slots and the 2 weekly ones, each section with the time until it changes.
+local function renderToday(content: Frame)
 	local view = ShopState.view()
 	local rotation = if view then view.rotation else nil
 	if rotation == nil then
-		Widgets.label(content, "⏳ Loading today's shop…", 15, 30)
+		sectionTitle(content, "Loading", "hourglass", "Loading today's shop…")
 		return
 	end
-	local daily = Widgets.label(content, "☀ Daily · new items in " .. timeLeft(rotation.dailyLeft), 14, 20)
-	daily.Name = "DailyTitle"
-	daily.Size = UDim2.new(4 / 6, -6, 0, 20)
-	local weekly = Widgets.label(content, "📅 Weekly · new in " .. timeLeft(rotation.weeklyLeft), 14, 20)
-	weekly.Name = "WeeklyTitle"
-	weekly.Position = UDim2.fromScale(4 / 6, 0)
-	weekly.Size = UDim2.new(2 / 6, 0, 0, 20)
+	local share = #rotation.daily / TODAY_COLUMNS
+	local daily = sectionTitle(content, "DailyTitle", "clock", "Daily · new items in " .. timeLeft(rotation.dailyLeft))
+	daily.Size = UDim2.new(share, -TODAY_GAP, 0, 20)
+	local weekly =
+		sectionTitle(content, "WeeklyTitle", "calendar", "Weekly · new in " .. timeLeft(rotation.weeklyLeft))
+	weekly.Position = UDim2.fromScale(share, 0)
+	weekly.Size = UDim2.new(1 - share, 0, 0, 20)
 	local cards = Instance.new("Frame")
 	cards.Name = "Rotation"
 	cards.BackgroundTransparency = 1
@@ -530,8 +579,8 @@ local function renderToday()
 	cards.Size = UDim2.new(1, 0, 1, -24)
 	cards.Parent = content
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.new(1 / 6, -6, 1, 0)
-	grid.CellPadding = UDim2.fromOffset(6, 6)
+	grid.CellSize = UDim2.new(1 / TODAY_COLUMNS, -TODAY_GAP, 1, 0)
+	grid.CellPadding = UDim2.fromOffset(TODAY_GAP, 0)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = cards
 	local order = 0
@@ -539,7 +588,7 @@ local function renderToday()
 		local item = Catalogue.item(id)
 		if item then
 			order += 1
-			itemCard(item, order, cards)
+			itemCard(item, order, cards, true)
 		end
 	end
 	for _, id in rotation.weekly do
@@ -547,7 +596,7 @@ local function renderToday()
 		local item = Catalogue.item(id)
 		local offer = Catalogue.offer(id)
 		if item then
-			itemCard(item, order, cards)
+			itemCard(item, order, cards, true)
 		elseif offer then
 			bundleCard(offer, order, cards)
 		end
@@ -555,115 +604,190 @@ local function renderToday()
 end
 
 -- The Themes tab's last card: what you see when a theme wins the vote (the opt-out, saved in your profile).
-local function themeSettingCard(order: number)
-	local card = Instance.new("Frame")
-	card.Name = "Card_ThemeSetting"
-	card.BackgroundColor3 = CARD
-	card.LayoutOrder = order
-	card.Parent = content
-	Widgets.corner(card, 10)
-	Widgets.padding(card, 6)
-	local list = Widgets.list(card, false, 4)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	centred(card, "👁", 28, 40).LayoutOrder = 1
-	centred(card, "What you see", 14, 18).LayoutOrder = 2
+local function themeSettingCard(order: number, parent: Instance)
+	local card = newCard(parent, "Card_ThemeSetting", order, nil)
+	local eye = Widgets.icon(card, "eye", Theme.size.iconLarge)
+	eye.AnchorPoint = Vector2.new(0.5, 0)
+	eye.Position = UDim2.new(0.5, 0, 0, Theme.space.s)
+	local title = centred(card, "What you see", Theme.text.body, 18)
+	title.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT + 2)
 	local classic = Cosmetics.classicOnly()
 	-- short lines: they must fit a phone card
 	local text = if classic
-		then "Always the classic map,\nwhatever theme wins"
-		else "The theme the map's\nvoters bring wins"
-	centred(card, text, 12, 48, OFF_TEXT).LayoutOrder = 3
-	local buttons = Instance.new("Frame")
-	buttons.BackgroundTransparency = 1
-	buttons.Size = UDim2.new(1, 0, 0, 84)
-	buttons.LayoutOrder = 4
-	buttons.Parent = card
-	Widgets.list(buttons, false, 4)
-	cardButton(buttons, if classic then "Show themes" else "Always classic", Widgets.BUTTON, function()
-		Intents.defaultTheme(not classic)
-	end)
+		then "Always the classic map, whatever theme wins"
+		else "The theme the map's voters bring wins"
+	local line = centred(card, text, Theme.text.small, 3 * LINE, Theme.color.textDim, true)
+	line.FontFace = Theme.font.bodyLight
+	line.TextYAlignment = Enum.TextYAlignment.Top
+	line.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT + 22)
+	local area = buttonArea(card)
+	local b = Widgets.fitButton(
+		area,
+		nil,
+		if classic then "Show themes" else "Always classic",
+		Widgets.BUTTON,
+		function()
+			Intents.defaultTheme(not classic)
+		end,
+		"ThemeSetting"
+	)
+	b.TextSize = Theme.text.small
+	stack({ b })
 end
 
-local function historyName(id: string?): string
+-- A readable name for a Robux product that isn't a catalogue item or offer (the season pass and its bundle are
+-- named with the season they were bought in, the rewarded video's product as on the store page).
+local function productName(id: string, at: number): string?
+	if id == "season_pass" or id == "season_bundle" then
+		local name = if id == "season_bundle"
+			then string.format("%s + %d tiers", SEASON_PASS, Config.Season.BundleTiers)
+			else SEASON_PASS
+		local def = Season.current(at // SECONDS_PER_DAY)
+		return if def then name .. " · " .. def.name else name
+	elseif id == SimAds.PRODUCT then
+		return "Quest reroll"
+	end
+	return nil
+end
+
+-- A history row's pixel icon and name.
+local function historyName(id: string?, at: number): (string, string)
 	if id == nil then
-		return "?"
+		return "gift", "?"
 	end
 	local item = Catalogue.item(id)
 	if item then
-		return item.name .. " " .. (SLOT_NAMES[item.slot] or "")
+		return SLOT_ICONS[item.slot] or "gift", item.name .. " " .. (SLOT_NAMES[item.slot] or "")
 	end
 	local offer = Catalogue.offer(id)
-	return if offer then offer.icon .. " " .. offer.name else id
+	if offer then
+		return OFFER_ICONS[offer.id] or Icons.fromEmoji(offer.icon) or "gift", offer.name
+	end
+	local product = productName(id, at)
+	if product then
+		return if id == SimAds.PRODUCT then "reroll" else "ticket", product
+	end
+	return "gift", id
 end
 
-local function renderHistory(): number
+local function renderHistory(content: Frame): number
 	local view = ShopState.view()
 	local history = if view then view.history else {}
 	local pages = math.max(1, math.ceil(#history / HISTORY_PER_PAGE))
 	page = math.clamp(page, 1, pages)
-	local list = Widgets.list(content, false, 4)
+	local list = Widgets.list(content, false, Theme.space.xs)
 	list.Name = "HistoryList"
 	if #history == 0 then
-		Widgets.label(content, "🧾 No purchases yet. Every Robux purchase will be listed here.", 15, 30)
+		local empty = Widgets.label(content, "No purchases yet. Every Robux purchase will be listed here.", nil, 30)
+		empty.TextColor3 = Theme.color.textDim
+		Widgets.leadIcon(empty, "scroll", Theme.size.icon)
 		return pages
 	end
 	for i = (page - 1) * HISTORY_PER_PAGE + 1, math.min(#history, page * HISTORY_PER_PAGE) do
 		local h = history[i]
 		local row = Instance.new("Frame")
 		row.Name = "Purchase"
-		row.BackgroundColor3 = CARD
-		row.Size = UDim2.new(1, 0, 0, 30)
+		row.BackgroundColor3 = Theme.color.navyRaised
+		row.BorderSizePixel = 0
+		row.Size = UDim2.new(1, 0, 0, HISTORY_ROW)
 		row.LayoutOrder = i
 		row.Parent = content
-		Widgets.corner(row, 8)
-		Widgets.padding(row, 4)
-		Widgets.list(row, true, 12)
+		Widgets.corner(row, Theme.radius.m)
+		Widgets.padding(row, Theme.space.m, 0)
 		local t = os.date("!*t", h.at) :: any -- Roblox's os.date only takes "*t" and "!*t"
-		local date = Widgets.label(row, string.format("%04d-%02d-%02d", t.year, t.month, t.day), 14, 22)
-		date.Size = UDim2.fromOffset(110, 22)
-		local name = Widgets.label(row, historyName(h.item), 14, 22)
-		name.Size = UDim2.fromOffset(360, 22)
-		local price = Widgets.label(row, ROBUX .. " " .. formatNumber(h.robux), 14, 22)
-		price.Size = UDim2.fromOffset(120, 22)
+		local date = Widgets.label(row, string.format("%04d-%02d-%02d", t.year, t.month, t.day), nil, HISTORY_ROW)
+		date.Size = UDim2.fromOffset(DATE_WIDTH, HISTORY_ROW)
+		date.TextColor3 = Theme.color.textDim
+		local icon, text = historyName(h.item, h.at)
+		local name = Widgets.label(row, text, nil, HISTORY_ROW)
+		name.Name = "Item"
+		name.Position = UDim2.fromOffset(DATE_WIDTH, 0)
+		name.Size = UDim2.new(1, -(DATE_WIDTH + PRICE_WIDTH), 1, 0)
+		name.TextWrapped = false
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		Widgets.leadIcon(name, icon, Theme.size.icon)
+		local price = Widgets.label(row, ROBUX .. " " .. formatNumber(h.robux), nil, HISTORY_ROW)
+		price.FontFace = Theme.font.display
+		price.AnchorPoint = Vector2.new(1, 0)
+		price.Position = UDim2.fromScale(1, 0)
+		price.Size = UDim2.fromOffset(PRICE_WIDTH, HISTORY_ROW)
+		price.TextXAlignment = Enum.TextXAlignment.Right
+		price.TextColor3 = Theme.color.goldPale
 	end
 	return pages
 end
 
+local function selectTab(id: string)
+	tab, page = id, 1
+	Intents.signal("ItemViewed", tab) -- analytics
+	render()
+end
+
+-- The tab row: the selected tab gold with its icon and name, the others dark wells with their icon.
+local function renderTabs(r: Refs)
+	Widgets.clear(r.tabs)
+	for i, t in TABS do
+		local selected = t.id == tab
+		local b = Widgets.tab(r.tabs, "", 0, selected, function()
+			selectTab(t.id)
+		end)
+		b.Name = "Tab_" .. t.id
+		b.LayoutOrder = i
+		b.Size = UDim2.new((if selected then 2 else 1) / TAB_UNITS, -TAB_GAP, 0, BAR)
+		local icon: GuiObject
+		if selected then
+			local label = Widgets.label(b, t.label, Theme.text.small, BAR)
+			label.Name = "Label"
+			label.FontFace = Theme.font.display
+			label.TextColor3 = Theme.color.textDark
+			label.TextWrapped = false
+			label.AnchorPoint = Vector2.new(0.5, 0.5)
+			label.Position = UDim2.fromScale(0.5, 0.5)
+			label.Size = UDim2.fromOffset(0, BAR)
+			label.AutomaticSize = Enum.AutomaticSize.X
+			icon = Widgets.leadIcon(label, t.icon, Theme.size.icon, Theme.space.xs)
+		else
+			icon = Icons.label(b, t.icon, Theme.size.iconButton)
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			icon.Position = UDim2.fromScale(0.5, 0.5)
+		end
+	end
+end
+
 render = function()
-	if panel == nil or not panel.Visible then
+	local r = ui
+	if r == nil or not panel.Visible then
 		return
 	end
 	local summary = ProfileState.summary()
-	gloryLabel.Text = GLORY .. " " .. formatNumber(if summary then summary.glory else 0)
+	r.glory.Text = formatNumber(if summary then summary.glory else 0)
 	local view = ShopState.view()
-	vipLabel.Visible = view ~= nil and view.vip
-	testLabel.Visible = view ~= nil and view.testMode
-	for _, b in tabRow:GetChildren() do
-		if b:IsA("TextButton") then
-			b.BackgroundColor3 = if b.Name == "Tab_" .. tab then Widgets.BUTTON else Widgets.BUTTON_OFF
-		end
-	end
+	r.vip.Visible = view ~= nil and view.vip
+	r.test.Visible = view ~= nil and view.testMode
+	renderTabs(r)
+	local content = r.content
 	content:ClearAllChildren()
 	local pages = 1
 	if tab == "History" then
-		pages = renderHistory()
-		footer.Text = "Purchase history: your Robux purchases, newest first"
+		pages = renderHistory(content)
+		r.footer.Text = "Purchase history: your Robux purchases, newest first"
 	elseif tab == "Today" then
-		renderToday()
-		footer.Text = string.format(
+		renderToday(content)
+		r.footer.Text = string.format(
 			"The same shop for everyone, nothing random. Every item comes back within %d days.",
 			RETURN_DAYS
 		)
 	else
+		local perPage = if tab == "Offers" then OFFERS_PER_PAGE else PER_PAGE
 		local grid = Instance.new("UIGridLayout")
-		grid.CellSize = UDim2.new(1 / PER_PAGE, -6, 1, 0)
-		grid.CellPadding = UDim2.fromOffset(6, 6)
+		grid.CellSize = UDim2.new(1 / perPage, -GAP, 1, 0)
+		grid.CellPadding = UDim2.fromOffset(GAP, 0)
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.Parent = content
 		local entries: { any } = {}
 		if tab == "Offers" then
 			for _, offer in Catalogue.OFFERS do
-				if not offer.weekly then -- bundles are in the 🔄 Today tab in their weeks
+				if not offer.weekly then -- bundles are in the Today tab in their weeks
 					table.insert(entries, offer)
 				end
 			end
@@ -674,44 +798,141 @@ render = function()
 				end
 			end
 		end
-		local extra = if tab == "Offers" and SeasonState.active() then 1 else 0
-		pages = math.max(1, math.ceil((#entries + extra) / PER_PAGE))
+		local extra = if (tab == "Offers" and SeasonState.active()) or tab == "Theme" then 1 else 0
+		pages = math.max(1, math.ceil((#entries + extra) / perPage))
 		page = math.clamp(page, 1, pages)
-		for i = (page - 1) * PER_PAGE + 1, math.min(#entries, page * PER_PAGE) do
+		for i = (page - 1) * perPage + 1, math.min(#entries, page * perPage) do
 			if tab == "Offers" then
-				offerCard(entries[i], i)
+				offerCard(entries[i], i, content)
 			else
-				itemCard(entries[i], i)
+				itemCard(entries[i], i, content)
 			end
 		end
-		if tab == "Theme" and page == pages then
-			themeSettingCard(#entries + 1)
-		end
 		if extra > 0 and page == pages then
-			seasonCard(#entries + 1)
+			if tab == "Theme" then
+				themeSettingCard(#entries + 1, content)
+			else
+				seasonCard(#entries + 1, content)
+			end
 		end
-		footer.Text = if robuxOpen()
+		r.footer.Text = if robuxOpen()
 			then "No random items: you always see what you get. Glory is earned by playing, never sold."
 			else "Robux purchases open after the match. Glory purchases and equipping work any time."
 	end
-	pageLabel.Text = string.format("%d/%d", page, pages)
+	r.pager.Visible = pages > 1
+	r.page.Text = string.format("%d/%d", page, pages)
 end
 
--- The floating 🛒 button is for the lobby screens, which cover the top bar; in a match the top bar has its own.
+local setOpen: (boolean) -> ()
+
+-- The panel's contents, built when it opens: header (title, Glory, VIP, test mode, pager, close), tabs, the
+-- page of cards and a footer line.
+local function build(): Refs
+	local header = Instance.new("Frame")
+	header.Name = "Header"
+	header.BackgroundTransparency = 1
+	header.Size = UDim2.new(1, 0, 0, BAR)
+	header.LayoutOrder = 1
+	header.Parent = panel
+	local close = Widgets.iconButton(header, "close", "✕", BAR, nil, function()
+		setOpen(false)
+	end)
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.fromScale(1, 0)
+	local pager, pageLabel = Widgets.pager(header, function()
+		page -= 1
+		Intents.signal("ItemViewed", tab) -- analytics
+		render()
+	end, function()
+		page += 1
+		Intents.signal("ItemViewed", tab) -- analytics
+		render()
+	end)
+	pager.AnchorPoint = Vector2.new(1, 0)
+	pager.Position = UDim2.new(1, -(BAR + Theme.space.m), 0, 0)
+	local info = Instance.new("Frame")
+	info.Name = "Info"
+	info.BackgroundTransparency = 1
+	info.Size = UDim2.new(1, -(BAR + pager.Size.X.Offset + 2 * Theme.space.m), 1, 0)
+	info.Parent = header
+	Widgets.list(info, true, Theme.space.m)
+	local title = Widgets.title(info, "Shop", Theme.text.title, BAR)
+	title.Size = UDim2.fromOffset(0, BAR)
+	title.AutomaticSize = Enum.AutomaticSize.X
+	title.TextTruncate = Enum.TextTruncate.None
+	title.LayoutOrder = 1
+	Widgets.leadIcon(title, "cart", Theme.size.iconButton)
+	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
+	glory.Name = "Glory"
+	glory.LayoutOrder = 2
+	local vip = Widgets.chip(info, "crown", "VIP", nil, Theme.size.chip)
+	vip.Name = "Vip"
+	vip.TextColor3 = Theme.color.gold
+	vip.LayoutOrder = 3
+	local test = Widgets.hint(info, "Studio test mode: purchases are free", Theme.text.small, BAR)
+	test.Name = "TestMode"
+	test.Size = UDim2.fromOffset(TEST_WIDTH, BAR)
+	test.LayoutOrder = 4
+
+	local tabs = Instance.new("Frame")
+	tabs.Name = "Tabs"
+	tabs.BackgroundTransparency = 1
+	tabs.Size = UDim2.new(1, 0, 0, BAR)
+	tabs.LayoutOrder = 2
+	tabs.Parent = panel
+	Widgets.list(tabs, true, TAB_GAP)
+
+	local content = Instance.new("Frame")
+	content.Name = "Content"
+	content.BackgroundTransparency = 1
+	content.Size = UDim2.new(1, 0, 1, -(2 * BAR + FOOTER_HEIGHT + 3 * Theme.space.s))
+	content.LayoutOrder = 3
+	content.Parent = panel
+
+	local footer = Widgets.hint(panel, "", Theme.text.small, FOOTER_HEIGHT)
+	footer.Name = "Footer"
+	footer.TextWrapped = false
+	footer.TextTruncate = Enum.TextTruncate.AtEnd
+	footer.LayoutOrder = 4
+
+	return {
+		glory = glory,
+		vip = vip,
+		test = test,
+		pager = pager,
+		page = pageLabel,
+		tabs = tabs,
+		content = content,
+		footer = footer,
+	}
+end
+
+-- The floating cart button is for the lobby screens, which cover the top bar; in a match the top bar has its own.
 local function refreshButton()
 	local inLobby = LobbyState.phase() ~= "None" or ClientState.snapshot() == nil
 	openButton.Visible = inLobby and not panel.Visible
 end
 
-local function setOpen(open: boolean)
+setOpen = function(open: boolean)
 	if open and not panel.Visible then
 		Intents.signal("ShopOpened") -- analytics: a new Shop funnel session
 	end
 	panel.Visible = open
+	if open and ui == nil then
+		ui = build()
+	elseif not open and ui ~= nil then
+		Widgets.clear(panel) -- a closed shop keeps no cards or buttons (rebuilt when it opens)
+		ui = nil
+	end
 	refreshButton()
 	if open then
 		render()
 	end
+end
+
+local function hideStarterOffer()
+	offerPanel.Visible = false
+	Widgets.clear(offerPanel)
 end
 
 -- The starter-pack pop-up: what's inside, the real sum, the price; no timer.
@@ -721,43 +942,62 @@ local function showStarterOffer()
 		return
 	end
 	Widgets.clear(offerPanel)
-	Widgets.list(offerPanel, false, 6)
-	Widgets.label(offerPanel, "🎁 Starter Pack", 20, 28).LayoutOrder = 1
-	local names = {}
-	for _, id in offer.items do
+	local title = Widgets.title(offerPanel, offer.name, Theme.text.title, TITLE_HEIGHT)
+	title.Name = "Title"
+	title.LayoutOrder = 1
+	Widgets.leadIcon(title, "gift", Theme.size.iconButton)
+	-- what's inside, two columns, each with its slot's icon
+	local items = Instance.new("Frame")
+	items.Name = "Items"
+	items.BackgroundTransparency = 1
+	items.Size = UDim2.fromScale(1, 0)
+	items.AutomaticSize = Enum.AutomaticSize.Y
+	items.LayoutOrder = 2
+	items.Parent = offerPanel
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(0.5, -Theme.space.xs, 0, 24)
+	grid.CellPadding = UDim2.fromOffset(Theme.space.m, Theme.space.xs)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = items
+	for i, id in offer.items do
 		local item = Catalogue.item(id)
 		if item then
-			table.insert(names, item.name .. " " .. (SLOT_NAMES[item.slot] or ""))
+			local l = Widgets.label(items, item.name .. " " .. (SLOT_NAMES[item.slot] or ""), nil, 24)
+			l.LayoutOrder = i
+			l.TextWrapped = false
+			l.TextTruncate = Enum.TextTruncate.AtEnd
+			Widgets.leadIcon(l, SLOT_ICONS[item.slot] or "gift", Theme.size.icon)
 		end
 	end
-	local what = Widgets.label(offerPanel, table.concat(names, "\n"), 14, 18 * #names)
-	what.LayoutOrder = 2
-	local sum = Widgets.label(
+	local sum = Widgets.hint(
 		offerPanel,
 		string.format(
 			"Bought separately: %s %s · one per account",
 			ROBUX,
 			formatNumber(Shop.bundleValue("starter", robuxPrice))
 		),
-		13,
+		Theme.text.small,
 		20
 	)
-	sum.TextColor3 = OFF_TEXT
+	sum.Name = "Sum"
 	sum.LayoutOrder = 3
 	local row = Instance.new("Frame")
+	row.Name = "Buttons"
 	row.BackgroundTransparency = 1
 	row.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
 	row.LayoutOrder = 4
 	row.Parent = offerPanel
-	Widgets.list(row, true, 8)
+	Widgets.list(row, true, Theme.space.m)
 	local price = robuxPrice("starter", offer.robux)
-	Widgets.button(row, ROBUX .. " " .. formatNumber(price) .. "  Buy", 170, Widgets.BUTTON, function()
-		offerPanel.Visible = false
+	local buy = Widgets.button(row, "Buy  " .. ROBUX .. " " .. formatNumber(price), 176, Widgets.GOOD, function()
+		hideStarterOffer()
 		buyRobux("starter")
 	end)
-	Widgets.button(row, "Not now", 150, Widgets.BUTTON_OFF, function()
-		offerPanel.Visible = false
-	end)
+	buy.Name = "BuyStarter"
+	buy.LayoutOrder = 1
+	local later = Widgets.button(row, "Not now", 150, Widgets.BUTTON_OFF, hideStarterOffer)
+	later.Name = "NotNow"
+	later.LayoutOrder = 2
 	offerPanel.Visible = true
 	Intents.signal("OfferOpened") -- analytics
 end
@@ -783,7 +1023,7 @@ function ShopUI.close()
 	setOpen(false)
 end
 
--- The top bar's 🛒 button.
+-- The top bar's cart button.
 function ShopUI.toggle()
 	setOpen(not panel.Visible)
 end
@@ -792,123 +1032,19 @@ function ShopUI.init(showToast: (string) -> ())
 	toast = showToast
 	gui = Widgets.screen("Shop", 30) -- above the lobby screens: the shop opens in the lobby too
 
-	openButton = Instance.new("TextButton")
-	openButton.Name = "ShopButton"
-	openButton.AnchorPoint = Vector2.new(0, 1)
-	openButton.Position = UDim2.new(0, 12, 1, -12)
-	openButton.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
-	openButton.BackgroundColor3 = Color3.fromRGB(46, 120, 90)
-	openButton.Font = Enum.Font.GothamBold
-	openButton.TextSize = 24
-	openButton.TextColor3 = Color3.new(1, 1, 1)
-	openButton.Text = "🛒"
-	openButton.Parent = gui
-	Widgets.corner(openButton, BUTTON_SIZE // 2)
-	openButton.Activated:Connect(function()
+	openButton = Widgets.cornerButton(gui, 0, "cart", "ShopButton", Theme.color.good, function()
 		setOpen(true)
 	end)
 
-	panel = Instance.new("Frame")
-	panel.Name = "ShopPanel"
-	panel.Active = true
-	panel.AnchorPoint = Vector2.new(0.5, 0.5)
-	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.new(1, -16, 1, -16)
-	panel.BackgroundColor3 = Widgets.PANEL
-	panel.BorderSizePixel = 0
-	panel.Visible = false
-	panel.Parent = gui
-	Widgets.corner(panel, 12)
-	Widgets.padding(panel, 10)
-	Widgets.list(panel, false, 6)
-
-	local header = Instance.new("Frame")
-	header.Name = "Header"
-	header.BackgroundTransparency = 1
-	header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
-	header.LayoutOrder = 1
-	header.Parent = panel
-	Widgets.list(header, true, 8)
-	local title = Widgets.label(header, "🛒 Shop", 20, HEADER_HEIGHT)
-	title.Size = UDim2.fromOffset(110, HEADER_HEIGHT)
-	title.LayoutOrder = 1
-	gloryLabel = Widgets.label(header, "", 18, HEADER_HEIGHT)
-	gloryLabel.Name = "Glory"
-	gloryLabel.Size = UDim2.fromOffset(110, HEADER_HEIGHT)
-	gloryLabel.TextColor3 = GOLD
-	gloryLabel.LayoutOrder = 2
-	vipLabel = Widgets.label(header, "👑 VIP", 16, HEADER_HEIGHT)
-	vipLabel.Size = UDim2.fromOffset(80, HEADER_HEIGHT)
-	vipLabel.TextColor3 = GOLD
-	vipLabel.LayoutOrder = 3
-	testLabel = Widgets.label(header, "🧪 Studio test mode: purchases are free", 13, HEADER_HEIGHT)
-	testLabel.Size = UDim2.fromOffset(250, HEADER_HEIGHT)
-	testLabel.TextColor3 = OFF_TEXT
-	testLabel.LayoutOrder = 4
-	local prev = Widgets.button(header, "◀", 44, Widgets.BUTTON_OFF, function()
-		page -= 1
-		Intents.signal("ItemViewed", tab) -- analytics
-		render()
-	end)
-	prev.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
-	prev.LayoutOrder = 5
-	pageLabel = Widgets.label(header, "1/1", 15, HEADER_HEIGHT)
-	pageLabel.Size = UDim2.fromOffset(40, HEADER_HEIGHT)
-	pageLabel.TextXAlignment = Enum.TextXAlignment.Center
-	pageLabel.LayoutOrder = 6
-	local nextButton = Widgets.button(header, "▶", 44, Widgets.BUTTON_OFF, function()
-		page += 1
-		Intents.signal("ItemViewed", tab) -- analytics
-		render()
-	end)
-	nextButton.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
-	nextButton.LayoutOrder = 7
-	local close = Widgets.button(header, "✕", 44, Widgets.DANGER, function()
-		setOpen(false)
-	end)
-	close.Name = "Close"
-	close.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
-	close.LayoutOrder = 8
-
-	tabRow = Instance.new("Frame")
-	tabRow.Name = "Tabs"
-	tabRow.BackgroundTransparency = 1
-	tabRow.Size = UDim2.new(1, 0, 0, TAB_HEIGHT)
-	tabRow.LayoutOrder = 2
-	tabRow.Parent = panel
-	local tabGrid = Instance.new("UIGridLayout")
-	tabGrid.CellSize = UDim2.new(1 / #TABS, -4, 0, TAB_HEIGHT)
-	tabGrid.CellPadding = UDim2.fromOffset(4, 0)
-	tabGrid.SortOrder = Enum.SortOrder.LayoutOrder
-	tabGrid.Parent = tabRow
-	for i, t in TABS do
-		local b = Widgets.button(tabRow, t.icon .. "\n" .. t.label, 0, Widgets.BUTTON_OFF, function()
-			tab, page = t.id, 1
-			Intents.signal("ItemViewed", tab) -- analytics
-			render()
-		end)
-		b.Name = "Tab_" .. t.id
-		b.TextSize = 12
-		b.LayoutOrder = i
-	end
-
-	content = Instance.new("Frame")
-	content.Name = "Content"
-	content.BackgroundTransparency = 1
-	content.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + TAB_HEIGHT + FOOTER_HEIGHT + 18))
-	content.LayoutOrder = 3
-	content.Parent = panel
-
-	footer = Widgets.label(panel, "", 12, FOOTER_HEIGHT)
-	footer.Name = "Footer"
-	footer.TextColor3 = OFF_TEXT
-	footer.LayoutOrder = 4
+	panel = Widgets.window(gui, "ShopPanel")
+	Widgets.list(panel, false, Theme.space.s)
 
 	offerPanel = Widgets.panel(gui, 400)
 	offerPanel.Name = "StarterOffer"
 	offerPanel.AnchorPoint = Vector2.new(0.5, 0.5)
 	offerPanel.Position = UDim2.fromScale(0.5, 0.5)
 	offerPanel.Visible = false
+	Widgets.list(offerPanel, false, Theme.space.s)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -917,7 +1053,7 @@ function ShopUI.init(showToast: (string) -> ())
 		if offer then
 			showStarterOffer()
 		elseif offerPanel.Visible and ShopState.owns("starter") then
-			offerPanel.Visible = false
+			hideStarterOffer()
 		end
 		render()
 	end)

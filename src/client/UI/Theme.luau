@@ -59,4 +59,12 @@ Theme.size = {
 	bar = 44, -- the HUD's top bar
 }
 
+-- Cosmetic rarities (shop cards, season pass rewards): the card outline and the rarity line.
+Theme.rarity = {
+	Common = hex("#c9cde0"),
+	Rare = hex("#5aa8ff"),
+	Epic = hex("#b36ff2"),
+	Legendary = hex("#ff9f3a"),
+} :: { [string]: Color3 }
+
 return Theme

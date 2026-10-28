@@ -1,10 +1,13 @@
 --!strict
 -- The season pass screen (docs/MONETIZATION.md 6), phone first: the free track above the premium one, eight tiers a
--- page, each reward with its picture and a Claim button once reached (and, on the premium track, with the pass). The
--- header has your tier and season XP bar and the days left; the footer the pass and the pass bundle (Robux, only
--- outside a match like every purchase), the "pass rewards are exclusive" label shown before buying, and Claim all.
--- Opens from the 🎟 button in the Lobby, the Results screen and the shop's Offers tab. No single tier skips are sold.
--- No pressure (section 10): the days left are a fact, not a countdown, and nothing pops up on its own.
+-- page, each reward with its picture and a Claim button once reached (and, on the premium track, with the pass); a
+-- claimable reward's whole cell is the button. The header has the season, your tier and season XP bar and the days
+-- left; the footer the pass and the pass bundle (Robux, only outside a match like every purchase), the "pass rewards
+-- are only in this season" label shown before buying, and Claim all.
+-- Opens from the ticket button in the Lobby, the Results screen and the shop's Offers tab. No single tier skips are
+-- sold. No pressure (section 10): the days left are a fact, not a countdown, and nothing pops up on its own.
+-- Built from the UI kit (docs/DESIGN.md "UI style"); the panel's contents are built when it opens and dropped when
+-- it closes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,28 +30,35 @@ local ShopState = require(Client.ShopState)
 local Shop = require(script.Parent.Shop)
 local Widgets = require(script.Parent.Widgets)
 
+local Theme = Widgets.Theme
 local ROBUX = utf8.char(0xE002) -- Roblox's Robux icon in every Roblox font
-local GLORY = "🏅"
 local TIERS_PER_PAGE = 8
-local BUTTON_SIZE = 52
-local HEADER_HEIGHT = 40
-local FOOTER_HEIGHT = 44
+local BAR = Widgets.BUTTON_HEIGHT -- the header and the footer
 local TIER_HEADER = 18
-local LABEL_WIDTH = 64
-local GAP = 4
-local CARD = Color3.fromRGB(32, 35, 50)
-local EMPTY = Color3.fromRGB(24, 26, 38)
-local GOLD = Color3.fromRGB(242, 193, 78)
-local OFF_TEXT = Color3.fromRGB(150, 152, 165)
-local BAR_BACK = Color3.fromRGB(50, 54, 70)
-local PREMIUM = Color3.fromRGB(120, 70, 160)
+local LABEL_WIDTH = 52 -- "Free" and "Pass" left of the tracks
+local GAP = Theme.space.xs
+local HALF = (TIER_HEADER + 2 * GAP) // 2 -- each track row is half of what is left under the tier numbers, less this
+local TIER_BOX = 172
+local PREVIEW_HEIGHT = 30
+local NAME_HEIGHT = 34 -- two 14 px lines
+local PILL = 30 -- a cell's Claim button or state tag (the whole claimable cell is the touch target)
+local PASS_WIDTH = 128
+local BUNDLE_WIDTH = 188
+local STATUS_WIDTH = 220
+local CLAIM_WIDTH = 108
+local SECONDS_PER_DAY = 86400
 local DEFAULT_COLOR = 1 -- previews use your nation's colour, or red before you have one
 
-local RARITY_COLORS: { [string]: Color3 } = {
-	Common = Color3.fromRGB(190, 194, 205),
-	Rare = Color3.fromRGB(90, 160, 255),
-	Epic = Color3.fromRGB(190, 110, 255),
-	Legendary = Color3.fromRGB(255, 170, 60),
+-- The open panel's pieces (nil while the screen is closed: its contents are dropped).
+type Refs = {
+	title: TextLabel,
+	tier: TextLabel,
+	tierBar: Frame,
+	days: TextLabel,
+	pager: Frame,
+	page: TextLabel,
+	track: Frame,
+	footer: Frame,
 }
 
 local SeasonUI = {}
@@ -57,13 +67,7 @@ local gui: ScreenGui
 local openButton: TextButton
 local badge: TextLabel
 local panel: Frame
-local titleLabel: TextLabel
-local tierLabel: TextLabel
-local tierFill: Frame
-local daysLabel: TextLabel
-local pageLabel: TextLabel
-local track: Frame
-local footer: Frame
+local ui: Refs? = nil
 local page = 1
 local toast: (string) -> () = function(_text: string) end
 
@@ -81,6 +85,7 @@ end
 local function centred(parent: Instance, text: string, size: number, height: number, color: Color3?): TextLabel
 	local l = Widgets.label(parent, text, size, height)
 	l.TextXAlignment = Enum.TextXAlignment.Center
+	l.TextTruncate = Enum.TextTruncate.AtEnd
 	if color then
 		l.TextColor3 = color
 	end
@@ -104,119 +109,140 @@ local function rewardName(r: Types.SeasonReward): string
 	return "Season badge"
 end
 
--- A reward's little picture: the cosmetic as the shop draws it, or an icon.
+-- A reward's little picture: the cosmetic as the shop draws it, or a pixel icon.
 local function preview(parent: Instance, r: Types.SeasonReward)
 	local holder = Instance.new("Frame")
 	holder.Name = "Preview"
 	holder.BackgroundTransparency = 1
-	holder.Size = UDim2.new(1, 0, 0, 40)
-	holder.LayoutOrder = 1
+	holder.Size = UDim2.new(1, 0, 0, PREVIEW_HEIGHT)
 	holder.Parent = parent
 	local item = if r.item then Catalogue.item(r.item) else nil
 	local color = myColor()
 	local thing: GuiObject
 	if item and item.slot == "Flag" then
-		thing = Cosmetics.flagLabel(holder, item.id, color, UDim2.fromOffset(48, 36))
+		thing = Cosmetics.flagLabel(holder, item.id, color, UDim2.fromOffset(40, 30))
 	elseif item and item.slot == "Token" then
-		thing = Cosmetics.tokenLabel(holder, item.id, color, UDim2.fromOffset(36, 36))
+		thing = Cosmetics.tokenLabel(holder, item.id, color, UDim2.fromOffset(30, 30))
 	elseif item and item.slot == "Border" then
-		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, UDim2.fromOffset(54, 36))
+		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, UDim2.fromOffset(45, 30))
 	elseif item and item.slot == "Shades" then
-		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, UDim2.fromOffset(54, 36))
+		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, UDim2.fromOffset(45, 30))
 	elseif item and item.slot == "PowerFx" then
-		thing = Cosmetics.effectLabel(holder, item.id, UDim2.fromOffset(48, 36))
+		thing = Cosmetics.effectLabel(holder, item.id, UDim2.fromOffset(40, 30))
 	elseif item and item.slot == "Theme" then
-		thing = Cosmetics.themeLabel(holder, item.id, UDim2.fromOffset(72, 36))
+		thing = Cosmetics.themeLabel(holder, item.id, UDim2.fromOffset(60, 30))
 	elseif item and item.slot == "Frame" then
-		local l = centred(holder, "Name", 12, 22)
-		l.Size = UDim2.fromOffset(64, 22)
+		local l = centred(holder, "Name", Theme.text.small, 22)
+		l.FontFace = Theme.font.display
+		l.Size = UDim2.new(1, -Theme.space.xs, 0, 22)
+		l.BackgroundColor3 = Theme.color.navyDeep
+		l.BackgroundTransparency = 0
 		local frameColor = Cosmetics.frameColor(item.id)
 		if frameColor then
-			l.BackgroundTransparency = 0.85
 			l.BackgroundColor3 = frameColor
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = frameColor
-			stroke.Thickness = 2
-			stroke.Parent = l
+			l.BackgroundTransparency = 0.8
+			Widgets.stroke(l, frameColor)
 		end
-		Widgets.corner(l, 6)
+		Widgets.corner(l, Theme.radius.m)
 		thing = l
+	elseif item then -- emotes and victory animations are emoji over a capital: their first frame
+		thing = centred(holder, string.split(item.art, " ")[1], 24, PREVIEW_HEIGHT)
 	else
-		local icon = if item
-			then string.split(item.art, " ")[1]
-			elseif r.glory then GLORY
-			elseif r.title then "🏷"
-			else "🎖"
-		local l = centred(holder, icon, 26, 36)
-		l.Size = UDim2.fromOffset(60, 36)
-		thing = l
+		thing = Widgets.icon(holder, if r.glory then "medal" elseif r.title then "crown" else "star", 24)
 	end
 	thing.AnchorPoint = Vector2.new(0.5, 0.5)
 	thing.Position = UDim2.fromScale(0.5, 0.5)
 end
 
-local function cellButton(parent: Instance, text: string, color: Color3, onPress: () -> ()): TextButton
-	local b = Widgets.button(parent, text, 0, color, onPress)
-	b.Name = "Action"
-	b.Size = UDim2.new(1, 0, 0, 30)
-	b.TextSize = 13
-	b.LayoutOrder = 3
-	return b
+-- A cell's state at its bottom: a Claim button, or a tag (claimed, locked, needs the pass). Named "Action".
+local function action(cell: GuiObject, icon: string?, text: string?, onClaim: (() -> ())?)
+	local a: GuiObject
+	if onClaim then
+		local b = Widgets.fitButton(cell, nil, text or "Claim", Widgets.GOOD, onClaim)
+		b.TextSize = Theme.text.small
+		b.Size = UDim2.fromOffset(0, PILL)
+		a = b
+	else
+		a = Widgets.tag(cell, icon or "lock", text, PILL)
+	end
+	a.Name = "Action"
+	a.AnchorPoint = Vector2.new(0.5, 1)
+	a.Position = UDim2.fromScale(0.5, 1)
 end
 
-local function stateButton(parent: Instance, text: string)
-	local b = cellButton(parent, text, Widgets.BUTTON_OFF, function() end)
-	b.AutoButtonColor = false
-	b.TextColor3 = OFF_TEXT
-end
-
--- One reward cell: picture, name and Claim / ✅ / 🔒.
+-- One reward cell: picture, name and Claim / claimed / locked / needs the pass. A claimable cell is a button.
 local function rewardCell(
-	parent: Instance,
+	column: Frame,
 	view: Types.SeasonView,
 	tier: number,
 	which: Types.SeasonTrack,
-	order: number
+	position: UDim2
 )
 	local def = Season.def(view.id)
 	local rewards = if def then Season.rewards(def, tier, which) else {}
-	local cell = Instance.new("Frame")
-	cell.Name = string.format("Reward_%s%d", if which == "Free" then "F" else "P", tier)
-	cell.BackgroundColor3 = if #rewards > 0 then CARD else EMPTY
-	cell.LayoutOrder = order
-	cell.Parent = parent
-	Widgets.corner(cell, 8)
-	if #rewards == 0 then
+	local name = string.format("Reward_%s%d", if which == "Free" then "F" else "P", tier)
+	local size = UDim2.new(1, 0, 0.5, -HALF)
+	if #rewards == 0 then -- nothing on this track at this tier: an empty slot
+		local slot = Instance.new("Frame")
+		slot.Name = name
+		slot.BackgroundColor3 = Theme.color.navyDeep
+		slot.BackgroundTransparency = 0.4
+		slot.BorderSizePixel = 0
+		slot.Position = position
+		slot.Size = size
+		slot.Parent = column
+		Widgets.corner(slot, Theme.radius.m)
 		return
 	end
-	Widgets.padding(cell, 4)
-	local list = Widgets.list(cell, false, 2)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local key = Season.key(tier, which)
+	local claimed = SeasonState.claimed(key)
+	local locked = tier > view.tier
+	local needsPass = which == "Premium" and not view.premium
+	local function claim()
+		Intents.claimSeason(tier, which)
+	end
+	local cell: GuiObject
+	if not claimed and not locked and not needsPass then
+		cell = Widgets.button(column, "", 0, Theme.color.navyRaised, claim)
+	else
+		local card = Widgets.card(column)
+		card.AutomaticSize = Enum.AutomaticSize.None
+		cell = card
+	end
+	cell.Name = name
+	cell.Position = position
+	cell.Size = size
+	local pad = cell:FindFirstChildOfClass("UIPadding") or Widgets.padding(cell, GAP)
+	pad.PaddingLeft, pad.PaddingRight = UDim.new(0, GAP), UDim.new(0, GAP)
+	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, GAP), UDim.new(0, GAP)
 	local first = rewards[1]
 	local item = if first.item then Catalogue.item(first.item) else nil
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = if item
-		then RARITY_COLORS[item.rarity] or Widgets.BUTTON_OFF
-		elseif first.glory then GOLD
-		else PREMIUM
-	stroke.Thickness = 1
-	stroke.Parent = cell
+	local stroke = cell:FindFirstChild("Outline")
+	if stroke and stroke:IsA("UIStroke") then
+		stroke.Color = if item
+			then Theme.rarity[item.rarity] or Theme.color.ink
+			elseif first.glory then Theme.color.gold
+			else Theme.color.special
+	end
 	preview(cell, first)
-	local name = rewardName(first) .. (if #rewards > 1 then string.format(" +%d", #rewards - 1) else "")
-	local label = centred(cell, name, 12, 28)
-	label.LayoutOrder = 2
+	local label = Widgets.label(
+		cell,
+		rewardName(first) .. (if #rewards > 1 then string.format(" +%d", #rewards - 1) else ""),
+		Theme.text.small,
+		NAME_HEIGHT
+	)
+	label.Name = "Name"
+	label.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT + 1)
+	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextTruncate = Enum.TextTruncate.AtEnd
-	local key = Season.key(tier, which)
-	if SeasonState.claimed(key) then
-		stateButton(cell, "✅")
-	elseif tier > view.tier then
-		stateButton(cell, "🔒")
-	elseif which == "Premium" and not view.premium then
-		stateButton(cell, "🎟 Pass")
+	if claimed then
+		action(cell, "check", nil, nil)
+	elseif locked then
+		action(cell, "lock", nil, nil)
+	elseif needsPass then
+		action(cell, "ticket", "Pass", nil)
 	else
-		cellButton(cell, "Claim", Widgets.GOOD, function()
-			Intents.claimSeason(tier, which)
-		end)
+		action(cell, nil, "Claim", claim)
 	end
 end
 
@@ -227,48 +253,77 @@ local function bonusColumn(parent: Instance, view: Types.SeasonView, order: numb
 	column.BackgroundTransparency = 1
 	column.LayoutOrder = order
 	column.Parent = parent
-	Widgets.list(column, false, GAP)
-	local head = centred(column, "⭐ Bonus", 12, TIER_HEADER, GOLD)
-	head.LayoutOrder = 0
-	local cell = Instance.new("Frame")
+	local head = centred(column, "Bonus", Theme.text.small, TIER_HEADER, Theme.color.gold)
+	head.FontFace = Theme.font.display
+	head.Size = UDim2.fromOffset(0, TIER_HEADER)
+	head.AutomaticSize = Enum.AutomaticSize.X
+	head.AnchorPoint = Vector2.new(0.5, 0)
+	head.Position = UDim2.fromScale(0.5, 0)
+	Widgets.leadIcon(head, "star", 14, 2)
+	local cell = Widgets.card(column)
 	cell.Name = "Reward_Bonus"
-	cell.BackgroundColor3 = CARD
+	cell.AutomaticSize = Enum.AutomaticSize.None
+	cell.Position = UDim2.fromOffset(0, TIER_HEADER + GAP)
 	cell.Size = UDim2.new(1, 0, 1, -(TIER_HEADER + GAP))
-	cell.LayoutOrder = 1
-	cell.Parent = column
-	Widgets.corner(cell, 8)
-	Widgets.padding(cell, 4)
-	Widgets.list(cell, false, 4).HorizontalAlignment = Enum.HorizontalAlignment.Center
-	centred(cell, GLORY, 26, 40).LayoutOrder = 1
-	local text = string.format(
-		"%d Glory\nevery %s XP\nafter tier %d",
-		Config.Season.BonusGlory,
-		formatNumber(Config.Season.BonusXp),
-		Config.Season.Tiers
+	local outline = cell:FindFirstChild("Outline")
+	if outline and outline:IsA("UIStroke") then
+		outline.Color = Theme.color.gold
+	end
+	local pad = cell:FindFirstChildOfClass("UIPadding")
+	if pad then
+		pad.PaddingLeft, pad.PaddingRight = UDim.new(0, GAP), UDim.new(0, GAP)
+	end
+	local medal = Widgets.icon(cell, "medal", Theme.size.iconLarge)
+	medal.AnchorPoint = Vector2.new(0.5, 0)
+	medal.Position = UDim2.fromScale(0.5, 0)
+	local text = Widgets.label(
+		cell,
+		string.format(
+			"%d Glory every %s XP after tier %d",
+			Config.Season.BonusGlory,
+			formatNumber(Config.Season.BonusXp),
+			Config.Season.Tiers
+		),
+		Theme.text.small,
+		5 * 17
 	)
-	centred(cell, text, 12, 64, OFF_TEXT).LayoutOrder = 2
+	text.Name = "Text"
+	text.FontFace = Theme.font.bodyLight
+	text.TextColor3 = Theme.color.textDim
+	text.TextXAlignment = Enum.TextXAlignment.Center
+	text.TextYAlignment = Enum.TextYAlignment.Top
+	text.Position = UDim2.fromOffset(0, Theme.size.iconLarge + GAP)
 	if view.bonusReady > 0 then
-		cellButton(cell, string.format("Claim %d", view.bonusReady), Widgets.GOOD, Intents.claimAllSeason)
+		action(cell, nil, string.format("Claim %d", view.bonusReady), Intents.claimAllSeason)
 	else
-		stateButton(cell, if view.tier >= Config.Season.Tiers then "⏳" else "🔒")
+		action(cell, if view.tier >= Config.Season.Tiers then "hourglass" else "lock", nil, nil)
 	end
 end
 
 -- The page of tiers: a header row of tier numbers, the free track, the premium track.
-local function renderTrack(view: Types.SeasonView)
+local function renderTrack(track: Frame, view: Types.SeasonView)
 	Widgets.clear(track)
 	local labels = Instance.new("Frame")
 	labels.Name = "Labels"
 	labels.BackgroundTransparency = 1
 	labels.Size = UDim2.new(0, LABEL_WIDTH, 1, 0)
 	labels.Parent = track
-	-- two rows under the tier numbers, each half of what is left
-	local half = (TIER_HEADER + 2 * GAP) // 2
-	local rowSize = UDim2.new(1, 0, 0.5, -half)
-	for i, info in { { "Free", Color3.fromRGB(90, 200, 120) }, { "🎟 Pass", GOLD } } do
-		local l = centred(labels, info[1] :: string, 13, 0, info[2] :: Color3)
-		l.Position = if i == 1 then UDim2.fromOffset(0, TIER_HEADER + GAP) else UDim2.new(0, 0, 0.5, half)
-		l.Size = rowSize
+	for i, info in { { "Free", Theme.color.good }, { "Pass", Theme.color.gold } } do
+		local row = Instance.new("Frame")
+		row.BackgroundTransparency = 1
+		row.Position = if i == 1 then UDim2.fromOffset(0, TIER_HEADER + GAP) else UDim2.new(0, 0, 0.5, HALF)
+		row.Size = UDim2.new(1, 0, 0.5, -HALF)
+		row.Parent = labels
+		local l = centred(row, info[1] :: string, Theme.text.body, 20, info[2] :: Color3)
+		l.FontFace = Theme.font.display
+		l.AnchorPoint = Vector2.new(0, 0.5)
+		l.Position = UDim2.fromScale(0, 0.5)
+		if i == 2 then -- the premium track: the ticket above its name
+			l.Position = UDim2.new(0, 0, 0.5, 12)
+			local icon = Widgets.icon(row, "ticket", Theme.size.iconButton)
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			icon.Position = UDim2.new(0.5, 0, 0.5, -10)
+		end
 	end
 	local columns = Instance.new("Frame")
 	columns.Name = "Tiers"
@@ -288,137 +343,245 @@ local function renderTrack(view: Types.SeasonView)
 		column.BackgroundTransparency = 1
 		column.LayoutOrder = tier
 		column.Parent = columns
-		local list = Widgets.list(column, false, GAP)
-		list.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		local reached = tier <= view.tier
-		local head = centred(column, tostring(tier), 13, TIER_HEADER, if reached then GOLD else OFF_TEXT)
-		head.LayoutOrder = 0
-		if tier == view.tier then
-			head.Text = "▶ " .. tier
+		local head = centred(
+			column,
+			tostring(tier),
+			Theme.text.small,
+			TIER_HEADER,
+			if reached then Theme.color.gold else Theme.color.textDim
+		)
+		head.Name = "Head"
+		head.FontFace = Theme.font.display
+		if tier == view.tier then -- your tier: a gold pill
+			head.BackgroundColor3 = Theme.color.gold
+			head.BackgroundTransparency = 0
+			head.TextColor3 = Theme.color.textDark
+			Widgets.corner(head, Theme.radius.s)
 		end
-		for i, which in Season.TRACKS do
-			rewardCell(column, view, tier, which, i)
-		end
-		for _, child in column:GetChildren() do
-			if child:IsA("Frame") then
-				child.Size = rowSize
-			end
-		end
+		rewardCell(column, view, tier, "Free", UDim2.fromOffset(0, TIER_HEADER + GAP))
+		rewardCell(column, view, tier, "Premium", UDim2.new(0, 0, 0.5, HALF))
 	end
 	if firstTier + TIERS_PER_PAGE - 1 > view.maxTier then
 		bonusColumn(columns, view, view.maxTier + 1)
 	end
 end
 
-local function renderFooter(view: Types.SeasonView)
+local function renderFooter(footer: Frame, view: Types.SeasonView)
 	Widgets.clear(footer)
-	local robuxOpen = ShopState.view() ~= nil and (ShopState.view() :: Types.ShopView).robuxOpen
+	local shop = ShopState.view()
+	local robuxOpen = shop ~= nil and shop.robuxOpen
+	local left: number
 	if view.premium then
-		local l = Widgets.label(
+		local status = Widgets.chip(
 			footer,
-			if view.bundle then "🎟 Premium pass + 10 tiers ✅" else "🎟 Premium pass ✅",
-			14,
-			FOOTER_HEIGHT
+			"ticket",
+			if view.bundle
+				then string.format("Pass + %d tiers active", Config.Season.BundleTiers)
+				else "Premium pass active",
+			STATUS_WIDTH,
+			BAR
 		)
-		l.Size = UDim2.fromOffset(230, FOOTER_HEIGHT)
-		l.TextColor3 = GOLD
-		l.LayoutOrder = 1
+		status.Name = "PassStatus"
+		status.TextSize = Theme.text.small
+		status.TextColor3 = Theme.color.gold
+		left = STATUS_WIDTH
 	else
+		local x = 0
 		for i, info in
 			{
-				{ "season_pass", Config.Season.PassRobux, "🎟 Pass" },
-				{ "season_bundle", Config.Season.BundleRobux, "🎟 Pass +10 tiers" },
+				{ "season_pass", Config.Season.PassRobux, "Pass", PASS_WIDTH, "BuyPass" },
+				{
+					"season_bundle",
+					Config.Season.BundleRobux,
+					string.format("Pass +%d tiers", Config.Season.BundleTiers),
+					BUNDLE_WIDTH,
+					"BuyBundle",
+				},
 			}
 		do
 			local id, listPrice, text = info[1] :: string, info[2] :: number, info[3] :: string
+			local width = info[4] :: number
 			local price = Shop.robuxPrice(id, listPrice)
-			local b = Widgets.button(
+			local b = Widgets.iconTextButton(
 				footer,
-				string.format("%s  %s %s", text, ROBUX, formatNumber(price)),
-				if i == 1 then 150 else 200,
-				if robuxOpen then PREMIUM else Widgets.BUTTON_OFF,
+				"ticket",
+				string.format("%s %s %s", text, ROBUX, formatNumber(price)),
+				width,
+				Widgets.SPECIAL,
 				function()
 					if not robuxOpen then
 						toast("🛒 Robux purchases open after the match")
 						return
 					end
 					Intents.buy(id, "Robux")
-				end
+				end,
+				info[5] :: string
 			)
-			b.Name = if i == 1 then "BuyPass" else "BuyBundle"
-			b.TextSize = 14
+			b.TextSize = Theme.text.small
+			b.TextWrapped = false
+			b.Position = UDim2.fromOffset(x, 0)
 			b.LayoutOrder = i
+			if not robuxOpen then
+				Widgets.setEnabled(b, false) -- purchases open in the Lobby, the draft and on Results
+			end
+			x += width + Theme.space.m
 		end
+		left = x - Theme.space.m
 	end
-	local note = Widgets.label(
+	local note = Widgets.hint(
 		footer,
 		if view.premium
-			then "Pass rewards are only in this season and never sold later.\nTiers are earned by playing: no tier skips are sold."
-			else "Pass rewards are only in this season,\nnever sold later. Buying late opens all\nyou reached. No tier skips.",
-		11,
-		FOOTER_HEIGHT
+			then "Pass rewards are only in this season. Tiers come from playing: no tier skips."
+			else "Pass rewards are only in this season. No tier skips.",
+		Theme.text.small,
+		BAR
 	)
 	note.Name = "PassNote"
-	note.Size = UDim2.new(1, -(if view.premium then 230 else 358) - 160 - 3 * 8, 0, FOOTER_HEIGHT)
-	note.TextColor3 = OFF_TEXT
-	note.LayoutOrder = 3
+	note.Position = UDim2.fromOffset(left + Theme.space.m, 0)
+	note.Size = UDim2.new(1, -(left + CLAIM_WIDTH + 2 * Theme.space.m), 1, 0)
+	note.TextTruncate = Enum.TextTruncate.AtEnd
 	local claimAll = Widgets.button(
 		footer,
 		if view.ready > 0 then string.format("Claim all (%d)", view.ready) else "Claim all",
-		160,
-		if view.ready > 0 then Widgets.GOOD else Widgets.BUTTON_OFF,
+		CLAIM_WIDTH,
+		Widgets.GOOD,
 		Intents.claimAllSeason
 	)
 	claimAll.Name = "ClaimAll"
-	claimAll.TextSize = 14
-	claimAll.LayoutOrder = 4
+	claimAll.TextSize = Theme.text.small
+	claimAll.AnchorPoint = Vector2.new(1, 0)
+	claimAll.Position = UDim2.fromScale(1, 0)
+	if view.ready == 0 then
+		Widgets.setEnabled(claimAll, false)
+	end
 end
 
 local function render()
-	if panel == nil or not panel.Visible then
+	local r = ui
+	if r == nil or not panel.Visible then
 		return
 	end
 	local view = SeasonState.view()
-	Widgets.clear(track)
-	Widgets.clear(footer)
+	Widgets.clear(r.track)
+	Widgets.clear(r.footer)
 	if view == nil or view.id == "" then
-		titleLabel.Text = "🎟 Season pass"
-		tierLabel.Text = ""
-		tierFill.Size = UDim2.fromScale(0, 1)
-		daysLabel.Text = ""
-		pageLabel.Text = ""
-		local text = "⏳ Loading the season…"
+		r.title.Text = "Season pass"
+		r.tier.Text = ""
+		Widgets.setProgress(r.tierBar, 0)
+		r.days.Text = ""
+		r.pager.Visible = false
+		local text = "Loading the season…"
 		if view and view.nextStartDay then
-			local t = os.date("!*t", view.nextStartDay * 86400) :: any
-			text = string.format("🎟 The next season starts on %04d-%02d-%02d", t.year, t.month, t.day)
+			local t = os.date("!*t", view.nextStartDay * SECONDS_PER_DAY) :: any
+			text = string.format("The next season starts on %04d-%02d-%02d", t.year, t.month, t.day)
 		elseif view then
-			text = "🎟 The next season is coming soon"
+			text = "The next season is coming soon"
 		end
-		Widgets.label(track, text, 16, 30)
+		local l = Widgets.label(r.track, text, Theme.text.body, 30)
+		Widgets.leadIcon(l, if view then "calendar" else "hourglass", Theme.size.icon)
 		return
 	end
 	page = math.clamp(page, 1, pages())
-	titleLabel.Text = "🎟 " .. view.name
-	tierLabel.Text =
+	r.title.Text = view.name
+	r.tier.Text =
 		string.format("Tier %d · %s/%s XP", view.tier, formatNumber(view.xpIntoTier), formatNumber(view.xpForTier))
-	tierFill.Size = UDim2.fromScale(math.clamp(view.xpIntoTier / math.max(1, view.xpForTier), 0, 1), 1)
-	daysLabel.Text = string.format("📅 %d day%s left", view.daysLeft, if view.daysLeft == 1 then "" else "s")
-	pageLabel.Text = string.format("%d/%d", page, pages())
-	renderTrack(view)
-	renderFooter(view)
+	Widgets.setProgress(r.tierBar, view.xpIntoTier / math.max(1, view.xpForTier))
+	r.days.Text = string.format("%d day%s left", view.daysLeft, if view.daysLeft == 1 then "" else "s")
+	r.pager.Visible = true
+	r.page.Text = string.format("%d/%d", page, pages())
+	renderTrack(r.track, view)
+	renderFooter(r.footer, view)
 end
 
 local function refreshButton()
-	-- the map vote only: during the draft the bottom row holds the "✔ Pick" button
+	-- the map vote only: during the draft the bottom row holds the "Pick" button
 	local phase = LobbyState.phase()
 	local inLobby = phase == "Lobby" or (phase ~= "Pick" and ClientState.snapshot() == nil)
 	openButton.Visible = inLobby and not panel.Visible and SeasonState.view() ~= nil
-	local ready = SeasonState.readyCount()
-	badge.Visible = ready > 0
-	badge.Text = tostring(ready)
+	Widgets.setCount(badge, SeasonState.readyCount())
 end
 
-local function setOpen(open: boolean)
+local setOpen: (boolean) -> ()
+
+-- The panel's contents, built when it opens: header (season, tier and XP bar, days left, pager, close), the page of
+-- tiers and the footer.
+local function build(): Refs
+	local header = Instance.new("Frame")
+	header.Name = "Header"
+	header.BackgroundTransparency = 1
+	header.Size = UDim2.new(1, 0, 0, BAR)
+	header.LayoutOrder = 1
+	header.Parent = panel
+	local close = Widgets.iconButton(header, "close", "✕", BAR, nil, function()
+		setOpen(false)
+	end)
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.fromScale(1, 0)
+	local pager, pageLabel = Widgets.pager(header, function()
+		page = math.max(1, page - 1)
+		render()
+	end, function()
+		page = math.min(pages(), page + 1)
+		render()
+	end, "Prev", "Next")
+	pager.AnchorPoint = Vector2.new(1, 0)
+	pager.Position = UDim2.new(1, -(BAR + Theme.space.m), 0, 0)
+	local right = BAR + pager.Size.X.Offset + 2 * Theme.space.m
+	-- your tier: "Tier 6 · 300/1,200 XP", the bar, the days left
+	local tierBox = Instance.new("Frame")
+	tierBox.Name = "TierBox"
+	tierBox.BackgroundTransparency = 1
+	tierBox.AnchorPoint = Vector2.new(1, 0)
+	tierBox.Position = UDim2.new(1, -right, 0, 0)
+	tierBox.Size = UDim2.fromOffset(TIER_BOX, BAR)
+	tierBox.Parent = header
+	local tier = Widgets.label(tierBox, "", Theme.text.small, 16)
+	tier.Name = "Tier"
+	tier.FontFace = Theme.font.display
+	tier.TextColor3 = Theme.color.gold
+	tier.TextWrapped = false
+	tier.TextTruncate = Enum.TextTruncate.AtEnd
+	local bar = Widgets.progress(tierBox, nil, 8)
+	bar.Name = "TierBar"
+	bar.Position = UDim2.fromOffset(0, 19)
+	local days = Widgets.hint(tierBox, "", Theme.text.small, 16)
+	days.Name = "Days"
+	days.Position = UDim2.fromOffset(0, 29)
+	days.TextWrapped = false
+	Widgets.leadIcon(days, "calendar", 14, Theme.space.xs)
+	local title = Widgets.title(header, "", Theme.text.heading, BAR) -- a season's name can be long
+	title.Name = "Title"
+	title.Size = UDim2.new(1, -(right + TIER_BOX + Theme.space.m), 1, 0)
+	Widgets.leadIcon(title, "ticket", Theme.size.iconButton)
+
+	local track = Instance.new("Frame")
+	track.Name = "Track"
+	track.BackgroundTransparency = 1
+	track.Size = UDim2.new(1, 0, 1, -(2 * BAR + 2 * Theme.space.s))
+	track.LayoutOrder = 2
+	track.Parent = panel
+
+	local footer = Instance.new("Frame")
+	footer.Name = "Footer"
+	footer.BackgroundTransparency = 1
+	footer.Size = UDim2.new(1, 0, 0, BAR)
+	footer.LayoutOrder = 3
+	footer.Parent = panel
+
+	return {
+		title = title,
+		tier = tier,
+		tierBar = bar,
+		days = days,
+		pager = pager,
+		page = pageLabel,
+		track = track,
+		footer = footer,
+	}
+end
+
+setOpen = function(open: boolean)
 	if open and not panel.Visible then
 		local view = SeasonState.view()
 		-- start on the page with the first reward to claim, else the current tier
@@ -443,6 +606,12 @@ local function setOpen(open: boolean)
 		Intents.seasonViewed() -- analytics: SeasonPass pass_viewed
 	end
 	panel.Visible = open
+	if open and ui == nil then
+		ui = build()
+	elseif not open and ui ~= nil then
+		Widgets.clear(panel) -- a closed screen keeps no cells or buttons (rebuilt when it opens)
+		ui = nil
+	end
 	refreshButton()
 	if open then
 		render()
@@ -461,7 +630,7 @@ function SeasonUI.isOpen(): boolean
 	return panel.Visible
 end
 
--- "🎟 Season · tier 3", or with the rewards waiting (for buttons in other panels).
+-- "🎟 Season · tier 3", or with the rewards waiting (for buttons in other panels; the emoji becomes the ticket icon).
 function SeasonUI.buttonText(): string
 	local view = SeasonState.view()
 	if view == nil or view.id == "" then
@@ -476,133 +645,17 @@ end
 function SeasonUI.init(showToast: (string) -> ())
 	toast = showToast
 	gui = Widgets.screen("Season", 32) -- above the shop (30) and the quests (31): it opens from the shop's Offers tab
-	-- the Lobby's 🎟 button, after 🛒, 📜 and 🏆, in a screen under the full-screen panels (like the 📜 button)
+	-- the Lobby's ticket button, after the shop, quests and trophies, in a screen under the full-screen panels
 	local buttonGui = Widgets.screen("SeasonButton", 29)
 
-	openButton = Instance.new("TextButton")
-	openButton.Name = "SeasonButton"
-	openButton.AnchorPoint = Vector2.new(0, 1)
-	openButton.Position = UDim2.new(0, 12 + 3 * (BUTTON_SIZE + 10), 1, -12)
-	openButton.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
-	openButton.BackgroundColor3 = PREMIUM
-	openButton.Font = Enum.Font.GothamBold
-	openButton.TextSize = 24
-	openButton.TextColor3 = Color3.new(1, 1, 1)
-	openButton.Text = "🎟"
-	openButton.Visible = false
-	openButton.Parent = buttonGui
-	Widgets.corner(openButton, BUTTON_SIZE // 2)
-	openButton.Activated:Connect(function()
+	openButton = Widgets.cornerButton(buttonGui, 3, "ticket", "SeasonButton", Theme.color.special, function()
 		setOpen(true)
 	end)
-	badge = Instance.new("TextLabel")
-	badge.Name = "Badge"
-	badge.AnchorPoint = Vector2.new(1, 0)
-	badge.Position = UDim2.new(1, 4, 0, -4)
-	badge.Size = UDim2.fromOffset(20, 20)
-	badge.BackgroundColor3 = Widgets.DANGER
-	badge.Font = Enum.Font.GothamBold
-	badge.TextSize = 12
-	badge.TextColor3 = Color3.new(1, 1, 1)
-	badge.Visible = false
-	badge.Parent = openButton
-	Widgets.corner(badge, 10)
+	openButton.Visible = false
+	badge = Widgets.countBadge(openButton)
 
-	panel = Instance.new("Frame")
-	panel.Name = "SeasonPanel"
-	panel.Active = true
-	panel.AnchorPoint = Vector2.new(0.5, 0.5)
-	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.new(1, -16, 1, -16)
-	panel.BackgroundColor3 = Widgets.PANEL
-	panel.BorderSizePixel = 0
-	panel.Visible = false
-	panel.Parent = gui
-	Widgets.corner(panel, 12)
-	Widgets.padding(panel, 10)
-	Widgets.list(panel, false, 6)
-
-	local header = Instance.new("Frame")
-	header.Name = "Header"
-	header.BackgroundTransparency = 1
-	header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
-	header.LayoutOrder = 1
-	header.Parent = panel
-	Widgets.list(header, true, 6)
-	titleLabel = Widgets.label(header, "", 17, HEADER_HEIGHT)
-	titleLabel.Name = "Title"
-	titleLabel.Size = UDim2.fromOffset(250, HEADER_HEIGHT)
-	titleLabel.TextWrapped = false
-	titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	titleLabel.LayoutOrder = 1
-	local tierBox = Instance.new("Frame")
-	tierBox.Name = "TierBox"
-	tierBox.BackgroundTransparency = 1
-	tierBox.Size = UDim2.fromOffset(190, HEADER_HEIGHT)
-	tierBox.LayoutOrder = 2
-	tierBox.Parent = header
-	tierLabel = Widgets.label(tierBox, "", 13, 22)
-	tierLabel.Name = "Tier"
-	tierLabel.TextColor3 = GOLD
-	local bar = Instance.new("Frame")
-	bar.Name = "TierBar"
-	bar.Position = UDim2.fromOffset(0, 26)
-	bar.Size = UDim2.new(1, 0, 0, 8)
-	bar.BackgroundColor3 = BAR_BACK
-	bar.BorderSizePixel = 0
-	bar.Parent = tierBox
-	Widgets.corner(bar, 4)
-	tierFill = Instance.new("Frame")
-	tierFill.Name = "Fill"
-	tierFill.Size = UDim2.fromScale(0, 1)
-	tierFill.BackgroundColor3 = GOLD
-	tierFill.BorderSizePixel = 0
-	tierFill.Parent = bar
-	Widgets.corner(tierFill, 4)
-	daysLabel = Widgets.label(header, "", 13, HEADER_HEIGHT)
-	daysLabel.Name = "Days"
-	daysLabel.Size = UDim2.fromOffset(110, HEADER_HEIGHT)
-	daysLabel.TextColor3 = OFF_TEXT
-	daysLabel.LayoutOrder = 3
-	local prev = Widgets.button(header, "◀", 44, Widgets.BUTTON_OFF, function()
-		page = math.max(1, page - 1)
-		render()
-	end)
-	prev.Name = "Prev"
-	prev.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
-	prev.LayoutOrder = 4
-	pageLabel = Widgets.label(header, "", 15, HEADER_HEIGHT)
-	pageLabel.Size = UDim2.fromOffset(40, HEADER_HEIGHT)
-	pageLabel.TextXAlignment = Enum.TextXAlignment.Center
-	pageLabel.LayoutOrder = 5
-	local nextButton = Widgets.button(header, "▶", 44, Widgets.BUTTON_OFF, function()
-		page = math.min(pages(), page + 1)
-		render()
-	end)
-	nextButton.Name = "Next"
-	nextButton.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
-	nextButton.LayoutOrder = 6
-	local close = Widgets.button(header, "✕", 44, Widgets.DANGER, function()
-		setOpen(false)
-	end)
-	close.Name = "Close"
-	close.Size = UDim2.fromOffset(44, HEADER_HEIGHT)
-	close.LayoutOrder = 7
-
-	track = Instance.new("Frame")
-	track.Name = "Track"
-	track.BackgroundTransparency = 1
-	track.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + FOOTER_HEIGHT + 12))
-	track.LayoutOrder = 2
-	track.Parent = panel
-
-	footer = Instance.new("Frame")
-	footer.Name = "Footer"
-	footer.BackgroundTransparency = 1
-	footer.Size = UDim2.new(1, 0, 0, FOOTER_HEIGHT)
-	footer.LayoutOrder = 3
-	footer.Parent = panel
-	Widgets.list(footer, true, 8)
+	panel = Widgets.window(gui, "SeasonPanel")
+	Widgets.list(panel, false, Theme.space.s)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	buttonGui.Parent = gui.Parent
