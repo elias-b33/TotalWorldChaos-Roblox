@@ -16,10 +16,12 @@ import numpy as np
 from layout import (
     Layout,
     Seed,
+    ZoneSeed,
     assign_start_territories,
     auto_connect,
     balance_start_development,
     build_regions,
+    build_sea_zones,
     components,
     finalize,
 )
@@ -129,6 +131,22 @@ TERRAIN = {
     "highlands": "Hills", "ashlands": "Hills",
     "peaks": "Mountain",
 }
+
+# Navies (docs/DESIGN.md "Navies"): the map's one ship type, and its sea zones round the continent: a name and seed
+# points (layout pixels), the first where the zone's name and fleets stand. Moonmere is a lake (no zone, no ships).
+SHIP = "Dragonship"
+SEA_ZONES = [
+    ("Frostwater", [(900, 40), (720, 60)]),
+    ("Wyrmdeep", [(300, 200)]),
+    ("Sea of Whispers", [(140, 470)]),
+    ("Corsair Shallows", [(330, 790)]),
+    ("Sunscorch Sea", [(700, 985)]),
+    ("Cinder Gulf", [(1150, 960), (1500, 980)]),
+    ("Sunrise Sea", [(1760, 820), (1980, 600)]),
+    ("Mistwater", [(1690, 330)]),
+    ("Stormreach", [(1450, 60), (1140, 110)]),
+    ("Pearl Sea", [(1990, 160)]),
+]
 
 
 def land_mask() -> np.ndarray:
@@ -272,6 +290,8 @@ def build() -> Layout:
     # passes start neutral; slots keep their numbers (colours) when a capital moves
     assign_start_territories(lay, allowed=lambda slot, q: q not in passes, order=SLOTS, races=RACES)
     balance_start_development(lay)
+    build_sea_zones(lay, [ZoneSeed(name, points) for name, points in SEA_ZONES], zone_range=(8, 12))
+    lay.ship = SHIP
     return lay
 
 

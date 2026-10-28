@@ -65,6 +65,26 @@ function Match.new(map: MapDef, setup: Types.MatchSetup?): MatchState
 			battlesWon = 0,
 		}
 	end
+	-- the sea (docs/DESIGN.md "Navies"): zones, which zones each coast touches (its port first), each strait's zone
+	local zones: { [number]: Types.SeaZone } = {}
+	for _, z in map.seaZones or {} do
+		zones[z.id] = { id = z.id, name = z.name, neighbors = table.clone(z.neighbors), coasts = table.clone(z.coasts) }
+	end
+	local shores: { [number]: { number } } = {}
+	for _, def in map.provinces do
+		if def.zones and #def.zones > 0 then
+			shores[def.id] = table.clone(def.zones)
+		end
+	end
+	local straits: { [number]: { [number]: number } } = {}
+	for _, s in map.straits do
+		if s.zone then
+			straits[s.a] = straits[s.a] or {}
+			straits[s.a][s.b] = s.zone
+			straits[s.b] = straits[s.b] or {}
+			straits[s.b][s.a] = s.zone
+		end
+	end
 	local matchSetup = setup or Settings.setup(false)
 	local state: MatchState = {
 		mapId = map.id,
@@ -82,6 +102,13 @@ function Match.new(map: MapDef, setup: Types.MatchSetup?): MatchState
 		nextArmyId = 1,
 		mergedInto = {},
 		battles = {},
+		zones = zones,
+		shores = shores,
+		straits = straits,
+		fleets = {},
+		nextFleetId = 1,
+		fleetMergedInto = {},
+		seaBattles = {},
 		offers = {},
 		events = {},
 		result = nil,

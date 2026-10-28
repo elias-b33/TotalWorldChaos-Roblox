@@ -1,5 +1,6 @@
 --!strict
--- Breadth-first paths along province neighbours (docs/DESIGN.md "Armies and combat").
+-- Breadth-first paths along province neighbours (docs/DESIGN.md "Armies and combat"). A strait whose sea zone holds
+-- a fleet at war with the army's owner is closed to it (docs/DESIGN.md "Navies", Diplomacy.crossable).
 
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
@@ -48,24 +49,77 @@ function Pathing.search(
 	return nil
 end
 
+-- A province's neighbours an army may step to: all of them, minus straits in `blocked` sea zones
+-- (Diplomacy.blockedZones). The neighbour list itself when nothing is blocked.
+function Pathing.open(state: MatchState, blocked: { [number]: boolean }, id: number): { number }
+	local neighbors = state.provinces[id].neighbors
+	if next(blocked) == nil then
+		return neighbors
+	end
+	local out = {}
+	for _, n in neighbors do
+		if Diplomacy.crossable(state, blocked, id, n) then
+			table.insert(out, n)
+		end
+	end
+	return out
+end
+
 function Pathing.find(state: MatchState, nationId: number, from: number, to: number): { number }?
+	local blocked = Diplomacy.blockedZones(state, nationId)
 	return Pathing.search(function(id)
-		return state.provinces[id].neighbors
+		return Pathing.open(state, blocked, id)
 	end, function(id)
 		return Diplomacy.canEnter(state, nationId, id)
 	end, from, to)
 end
 
--- The route to the nearest province `owner` holds, other than `from`, over land its armies may enter (fewest
--- steps; ties go to the lower province id). nil if there is none. Used for retreats.
-function Pathing.retreatPath(state: MatchState, owner: number, from: number): { number }?
+-- The route to the nearest province `want` accepts, over land this nation's armies may enter (fewest steps; ties go
+-- to the lower province id): {} if `from` itself is wanted, nil if none is reachable. Embarking uses it to find a
+-- coast of the fleet's zone.
+function Pathing.nearest(state: MatchState, nationId: number, from: number, want: (number) -> boolean): { number }?
+	if want(from) then
+		return {}
+	end
+	local blocked = Diplomacy.blockedZones(state, nationId)
 	local cameFrom: { [number]: number } = { [from] = from }
 	local queue = { from }
 	local head = 1
 	while head <= #queue do
 		local cur = queue[head]
 		head += 1
-		local next = table.clone(state.provinces[cur].neighbors)
+		local nexts = table.clone(Pathing.open(state, blocked, cur))
+		table.sort(nexts)
+		for _, n in nexts do
+			if cameFrom[n] == nil and Diplomacy.canEnter(state, nationId, n) then
+				cameFrom[n] = cur
+				if want(n) then
+					local path = { n }
+					local step = cur
+					while step ~= from do
+						table.insert(path, 1, step)
+						step = cameFrom[step]
+					end
+					return path
+				end
+				table.insert(queue, n)
+			end
+		end
+	end
+	return nil
+end
+
+-- The route to the nearest province `owner` holds, other than `from`, over land its armies may enter (fewest
+-- steps; ties go to the lower province id). nil if there is none. Used for retreats.
+function Pathing.retreatPath(state: MatchState, owner: number, from: number): { number }?
+	local blocked = Diplomacy.blockedZones(state, owner)
+	local cameFrom: { [number]: number } = { [from] = from }
+	local queue = { from }
+	local head = 1
+	while head <= #queue do
+		local cur = queue[head]
+		head += 1
+		local next = table.clone(Pathing.open(state, blocked, cur))
 		table.sort(next)
 		for _, n in next do
 			if cameFrom[n] == nil and Diplomacy.canEnter(state, owner, n) then

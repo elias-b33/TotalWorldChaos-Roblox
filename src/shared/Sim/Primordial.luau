@@ -13,6 +13,7 @@
 local Army = require("./Army")
 local Config = require("../Config")
 local Events = require("./Events")
+local Navy = require("./Navy")
 local Rng = require("./Rng")
 local Settings = require("./Settings")
 local Types = require("../Types")
@@ -299,6 +300,7 @@ function Primordial.eliminate(state: MatchState, nationId: number)
 			state.armies[id] = nil
 		end
 	end
+	Navy.disband(state, nationId) -- its fleets too, with everyone aboard
 
 	for id, war in state.wars do
 		local att = table.find(war.attackers, nationId)

@@ -6,13 +6,16 @@
   2048,
   1024
  ],
+ "ship": "Dragonship",
  "summary": {
   "provinces": 147,
   "Plains": 66,
   "Forest": 35,
   "Hills": 35,
   "Mountain": 11,
-  "neutralAtStart": 56
+  "neutralAtStart": 56,
+  "seaZones": 10,
+  "coastal": 60
  },
  "nations": [
   {
@@ -436,7 +439,10 @@
     113
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 17,
@@ -501,7 +507,10 @@
     131
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 20,
@@ -519,7 +528,10 @@
     91
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 21,
@@ -560,7 +572,10 @@
     146
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 23,
@@ -690,7 +705,11 @@
     136
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7,
+    8
+   ]
   },
   {
    "id": 29,
@@ -819,7 +838,10 @@
     142
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 35,
@@ -840,7 +862,10 @@
     139
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 36,
@@ -995,7 +1020,10 @@
     145
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 43,
@@ -1104,7 +1132,10 @@
     146
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 48,
@@ -1145,7 +1176,10 @@
     144
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 50,
@@ -1163,7 +1197,11 @@
     82
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6,
+    5
+   ]
   },
   {
    "id": 51,
@@ -1206,7 +1244,10 @@
     108
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    3
+   ]
   },
   {
    "id": 53,
@@ -1248,7 +1289,10 @@
     136
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8
+   ]
   },
   {
    "id": 55,
@@ -1289,7 +1333,10 @@
     81
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    3
+   ]
   },
   {
    "id": 57,
@@ -1309,7 +1356,10 @@
     131
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 58,
@@ -1327,7 +1377,10 @@
     128
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 59,
@@ -1391,7 +1444,11 @@
     113
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7,
+    6
+   ]
   },
   {
    "id": 62,
@@ -1498,7 +1555,10 @@
     134
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 67,
@@ -1562,7 +1622,10 @@
     144
    ],
    "startOwner": 5,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 70,
@@ -1582,7 +1645,10 @@
     128
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 71,
@@ -1603,7 +1669,10 @@
     141
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 72,
@@ -1646,7 +1715,10 @@
     127
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 74,
@@ -1691,7 +1763,10 @@
     137
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 76,
@@ -1712,7 +1787,10 @@
     132
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 77,
@@ -1776,7 +1854,10 @@
     141
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 80,
@@ -1799,7 +1880,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    8
+   ]
   },
   {
    "id": 81,
@@ -1819,7 +1903,11 @@
     119
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2,
+    3
+   ]
   },
   {
    "id": 82,
@@ -1841,7 +1929,10 @@
     126
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 83,
@@ -1859,7 +1950,11 @@
     118
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    3,
+    4
+   ]
   },
   {
    "id": 84,
@@ -1901,7 +1996,10 @@
     112
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 86,
@@ -1962,7 +2060,11 @@
     147
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8,
+    10
+   ]
   },
   {
    "id": 89,
@@ -1981,7 +2083,10 @@
     75
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 90,
@@ -2002,7 +2107,10 @@
     147
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8
+   ]
   },
   {
    "id": 91,
@@ -2021,7 +2129,10 @@
     146
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 92,
@@ -2087,7 +2198,10 @@
     134
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 95,
@@ -2127,7 +2241,10 @@
     125
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2
+   ]
   },
   {
    "id": 97,
@@ -2214,7 +2331,11 @@
     142
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1,
+    9
+   ]
   },
   {
    "id": 101,
@@ -2234,7 +2355,10 @@
     103
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 102,
@@ -2298,7 +2422,10 @@
     123
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 105,
@@ -2362,7 +2489,10 @@
     123
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 108,
@@ -2427,7 +2557,10 @@
     85
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 111,
@@ -2470,7 +2603,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 113,
@@ -2511,7 +2647,11 @@
     138
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8,
+    10
+   ]
   },
   {
    "id": 115,
@@ -2596,7 +2736,10 @@
     146
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 119,
@@ -2615,7 +2758,10 @@
     125
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2
+   ]
   },
   {
    "id": 120,
@@ -2743,7 +2889,10 @@
     119
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2
+   ]
   },
   {
    "id": 126,
@@ -2786,7 +2935,10 @@
     92
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 128,
@@ -2804,7 +2956,10 @@
     70
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 129,
@@ -2824,7 +2979,10 @@
     105
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 130,
@@ -2844,7 +3002,10 @@
     131
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 131,
@@ -2928,7 +3089,11 @@
     94
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    4
+   ]
   },
   {
    "id": 135,
@@ -2972,7 +3137,10 @@
     103
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8
+   ]
   },
   {
    "id": 137,
@@ -3013,7 +3181,10 @@
     114
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 139,
@@ -3032,7 +3203,11 @@
     80
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9,
+    8
+   ]
   },
   {
    "id": 140,
@@ -3073,7 +3248,10 @@
     111
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 142,
@@ -3092,7 +3270,10 @@
     100
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 143,
@@ -3133,7 +3314,10 @@
     69
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 145,
@@ -3151,7 +3335,10 @@
     88
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 146,
@@ -3171,7 +3358,10 @@
     118
    ],
    "startOwner": 10,
-   "isCapital": true
+   "isCapital": true,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 147,
@@ -3190,7 +3380,10 @@
     90
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8
+   ]
   }
  ],
  "straits": [
@@ -3206,7 +3399,8 @@
     314
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 8
   },
   {
    "a": 20,
@@ -3220,7 +3414,8 @@
     837
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 4
   },
   {
    "a": 146,
@@ -3234,7 +3429,8 @@
     872
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 4
   },
   {
    "a": 22,
@@ -3248,7 +3444,8 @@
     922
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 4
   },
   {
    "a": 70,
@@ -3262,7 +3459,8 @@
     638
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 7
   },
   {
    "a": 90,
@@ -3276,7 +3474,8 @@
     292
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 8
   },
   {
    "a": 146,
@@ -3290,7 +3489,8 @@
     888
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 4
   },
   {
    "a": 70,
@@ -3304,7 +3504,234 @@
     686
    ],
    "wrap": false,
-   "auto": true
+   "auto": true,
+   "zone": 7
+  }
+ ],
+ "seaZones": [
+  {
+   "id": 1,
+   "name": "Frostwater",
+   "center": [
+    900,
+    40
+   ],
+   "area": 49220,
+   "neighbors": [
+    2,
+    9
+   ],
+   "coasts": [
+    34,
+    71,
+    79,
+    100,
+    129,
+    141,
+    142
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Wyrmdeep",
+   "center": [
+    300,
+    200
+   ],
+   "area": 120044,
+   "neighbors": [
+    1,
+    3
+   ],
+   "coasts": [
+    81,
+    96,
+    119,
+    125
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Sea of Whispers",
+   "center": [
+    140,
+    470
+   ],
+   "area": 101092,
+   "neighbors": [
+    2,
+    4
+   ],
+   "coasts": [
+    52,
+    56,
+    81,
+    83
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Corsair Shallows",
+   "center": [
+    330,
+    790
+   ],
+   "area": 118968,
+   "neighbors": [
+    3,
+    5
+   ],
+   "coasts": [
+    20,
+    22,
+    47,
+    49,
+    66,
+    69,
+    83,
+    91,
+    118,
+    134,
+    144,
+    146
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Sunscorch Sea",
+   "center": [
+    700,
+    984
+   ],
+   "area": 34716,
+   "neighbors": [
+    4,
+    6
+   ],
+   "coasts": [
+    50,
+    82,
+    94,
+    104,
+    107,
+    134
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Cinder Gulf",
+   "center": [
+    1150,
+    960
+   ],
+   "area": 79084,
+   "neighbors": [
+    5,
+    7
+   ],
+   "coasts": [
+    19,
+    50,
+    57,
+    61,
+    73,
+    75,
+    89,
+    127,
+    130
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Sunrise Sea",
+   "center": [
+    1760,
+    820
+   ],
+   "area": 191208,
+   "neighbors": [
+    6,
+    8,
+    10
+   ],
+   "coasts": [
+    16,
+    28,
+    58,
+    61,
+    70,
+    101,
+    128
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Mistwater",
+   "center": [
+    1704,
+    334
+   ],
+   "area": 30976,
+   "neighbors": [
+    7,
+    9,
+    10
+   ],
+   "coasts": [
+    28,
+    54,
+    80,
+    88,
+    90,
+    114,
+    136,
+    139,
+    147
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Stormreach",
+   "center": [
+    1450,
+    60
+   ],
+   "area": 86308,
+   "neighbors": [
+    1,
+    8,
+    10
+   ],
+   "coasts": [
+    35,
+    76,
+    85,
+    100,
+    110,
+    112,
+    139
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Pearl Sea",
+   "center": [
+    1990,
+    160
+   ],
+   "area": 74248,
+   "neighbors": [
+    7,
+    8,
+    9
+   ],
+   "coasts": [
+    42,
+    88,
+    114,
+    138,
+    145
+   ]
   }
  ],
  "notes": [

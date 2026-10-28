@@ -10,6 +10,8 @@ Total World Chaos ships with three maps. All three play by the same rules in `DE
 | Idea | The real world, 1:1 coastlines | Fantasy continent around a rich heartland | A shattered world of floating islands |
 | Provinces | 150 (11 mountains) | 147 (11 mountains) | 131 (11 mountains) |
 | Straits | 25 sea lanes (1 wraps around the map) | 8 sea lanes | 30 rope bridges |
+| Sea zones (docs/DESIGN.md "Navies") | 22 seas and oceans | 10 seas | 10 space zones |
+| Ship | Galleon | Dragonship | Starship |
 | Neutral at start | 59 | 56 | 40 |
 | Fairness | Asymmetric geography, equal start | Semi-balanced | Perfectly symmetric |
 | Feel | Familiar, epic, great for clips | Chokepoint fights over the centre | Fast and aggressive, competitive |
@@ -32,6 +34,25 @@ These are checked by the generator (`tools/mapgen/layout.py`), so a map that bre
 - **Neutral garrisons** default to one regiment (1,000 men, `Config.NeutralGarrison`). A map can give a province a bigger garrison: the two map centres (the Crownlands and the Heartstone) and a few provinces set for start-position balance (see each map).
 - **Races** (docs/DESIGN.md "Races"): every map has its own cast of five peoples, two nations each: realistic civilisations on Earth, fantasy peoples on Eldmoor, sci-fi peoples on Skyshards. The generator sets them per nation (`CAST` and `RACES` in each `tools/mapgen/maps/*.py`, written into `layout.json` and `MapData` as the nation's `race`; `Config.Casts` lists the same five per map), fitted to the land where it makes sense (Forest races on the forest starts, Hills races in the hills) and spread so every race gets strong and weak start positions. The validator flags a nation whose race isn't of the map's cast and a race without exactly two nations. The race also picks what the nation's capital and armies look like ("Capitals and armies by race").
 - **Start-position balance** is measured, not assumed: `lune run tools/harness/tournament 200 <map>` plays 200 bot matches and prints each slot's wins against its fair share. The goal (`docs/BALANCE.md` section 17) is that no slot wins more than about twice its share and none (almost) never wins. Fixes go into the generator (garrisons, passes, sea lanes, where a capital sits), never into special rules.
+- **Sea zones** (docs/DESIGN.md "Navies", "Sea zones" below): the water is split into named zones, as many as the map wants (Earth 15–22, Eldmoor and Skyshards 8–12), each in one piece with at least one coast, all of them one connected sea, and every strait lies in a zone whose coasts hold both its ends. The validator prints a `PROBLEM` line for any zone that breaks one, and names the map's ship.
+
+## Sea zones
+
+Each map's water (Skyshards' void) is split into named zones for navies (docs/DESIGN.md "Navies"). The generator (`build_sea_zones` in `tools/mapgen/layout.py`) grows the zones over the water from seed points listed in each map's module (`SEA_ZONES`), every water pixel going to the nearest seed along a path over water, so a zone never jumps across land; the first seed is where the zone's name and fleets stand. Then it lists each zone's neighbours, its coasts (provinces with at least 3 pixels and 10% of their shore on it) and the zone each strait crosses. Water no seed reaches is a lake with no zone: the Caspian, Moonmere.
+
+| Map | Zones |
+| --- | --- |
+| Earth (22) | Arctic Ocean, Norwegian Sea, North Sea, Baltic Sea, North Atlantic, Hudson Bay, Caribbean Sea, South Atlantic, Gulf of Guinea, Mediterranean, Black Sea, Arabian Sea, Indian Ocean, Bay of Bengal, Java Sea, South China Sea, East China Sea, Sea of Japan, North Pacific, Coral Sea, East Pacific, South Pacific |
+| Eldmoor (10) | Frostwater, Wyrmdeep, Sea of Whispers, Corsair Shallows, Sunscorch Sea, Cinder Gulf, Sunrise Sea, Mistwater, Stormreach, Pearl Sea |
+| Skyshards (10) | Vega Drift, Lyra Reach, Orion Span, Draco Rift, Cygnus Deep, Altair Gulf, Rigel Void, Sirius Verge, Nova Expanse, Polaris Abyss |
+
+- **Earth:** the Pacific runs on across the map's left and right edges (the North Pacific holds the Bering Strait, which wraps). At this scale Gibraltar, the Bosporus and the Øresund are land borders, so the Mediterranean, the Black Sea and the Baltic are water of their own: `SEA_LINKS` joins them to the North Atlantic, the Mediterranean and the North Sea like the real channels. The Canadian Arctic is split between the North Pacific (the Beaufort Sea) and the North Atlantic (Baffin Bay), a Northwest Passage. At the start the Americas share the North Atlantic with Europe and North Africa (Rhine, Niger), and the Caribbean and the Pacific between themselves.
+- **Eldmoor:** ten seas in a ring round the continent; the Isle of Mists has the Mistwater on the mainland side and the Pearl Sea outside, the Corsair Isles the Corsair Shallows and the Sea of Whispers.
+- **Skyshards:** one 36° wedge of space round each home shard, cut by angle from the centre rather than grown (`assign` in `build_sea_zones`), so the map stays exactly symmetric: each zone touches its shard's 8 provinces, its Heartstone Approach and the near half of each drift isle beside it, and holds the shard's three bridges (the Gate bridge and the bridges to both drift isles). A space fleet off a shard closes all three.
+
+![Earth's sea zones](../assets/maps/earth/zones.jpg)
+
+`assets/maps/<map>/zones.jpg` shows each map's zones (a faint dotted line where two meet, and their names).
 
 ## Earth
 
@@ -223,8 +244,10 @@ Everything here comes from `python3 tools/mapgen/generate.py` (about 1–2 minut
 
 | File | What it is | Used by |
 | --- | --- | --- |
-| `assets/maps/<map>/layout.json` | Provinces, neighbours, straits, nations (with their race), start owners, development, garrisons | Converted into `src/shared/MapData/<Map>.luau` |
+| `assets/maps/<map>/layout.json` | Provinces, neighbours, straits (with their sea zone), sea zones, the ship's name, nations (with their race), start owners, development, garrisons | Converted into `src/shared/MapData/<Map>.luau` |
 | `assets/maps/<map>/province_ids.png` | Every pixel's province id (`R + 256·G`, 0 = none) | The province grid in `MapData` (half resolution) |
+| `assets/maps/<map>/sea_ids.png` | Every pixel's sea zone id (`R + 256·G`, 0 = land or a lake) | The sea grid in `MapData` (`seaGrid`, half resolution): taps on the sea, zone lines in the pixel art |
+| `assets/maps/<map>/zones.jpg` | The political view with the sea zones and their names | Reviews (docs/MAPS.md "Sea zones") |
 | `assets/maps/<map>/terrain.jpg`, `political.jpg` | Full-size previews | Reviews and Studio reference |
 | `assets/maps/<map>/atlas.jpg` | Terrain view with province ids printed | Debugging, bug reports ("army stuck in 57") |
 | `assets/maps/<map>/vote_card.jpg` | 1024×512 lobby card | Map vote |

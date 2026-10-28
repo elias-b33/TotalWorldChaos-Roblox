@@ -8,6 +8,7 @@ The result is written as layout.json, the draft that MapData is built from.
 from __future__ import annotations
 
 import json
+import math
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -30,6 +31,15 @@ class Seed:
 
 
 @dataclass
+class ZoneSeed:
+    """A named sea zone (docs/DESIGN.md "Navies"): water goes to the nearest of its seed points along a path over
+    water. The first point is where its name and its fleets stand."""
+
+    name: str
+    points: list[tuple[float, float]]  # layout pixels
+
+
+@dataclass
 class Layout:
     map_id: str
     title: str
@@ -48,6 +58,17 @@ class Layout:
     nations: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     cast: tuple[str, ...] = ()  # the map's five races (Config.Casts in src/shared/Config.luau lists the same ones)
+    # sea zones (build_sea_zones): zone index (0-based) per layout pixel, -1 on land and on water no zone reaches
+    zones: np.ndarray | None = None
+    zone_names: list[str] = field(default_factory=list)
+    zone_centers: list[tuple[int, int]] = field(default_factory=list)
+    zone_areas: list[int] = field(default_factory=list)
+    zone_neighbors: list[set[int]] = field(default_factory=list)
+    zone_coasts: list[list[int]] = field(default_factory=list)  # provinces touching each zone, by province index
+    province_zones: list[list[int]] = field(default_factory=list)  # zones each province touches, most coast first
+    zone_range: tuple[int, int] = (0, 0)  # how many zones the map should have (validate)
+    zone_wrap: bool = False  # the sea runs on across the map's left and right edges (Earth)
+    ship: str = ""  # the map's one ship type, by name (docs/DESIGN.md "Navies")
 
     def terrain(self, i: int) -> str:
         return self.terrain_of[self.seeds[i].biome]
@@ -438,6 +459,192 @@ def finalize(lay: Layout) -> None:
     lay.centers, lay.areas = find_centers(lay.labels, lay.seeds)
 
 
+# ---------------------------------------------------------------- sea zones
+
+GRID_STEP = 2  # layout pixels per pixel of the game's map grid (export_luau.GRID_STEP)
+MIN_COAST = 3  # shared edge pixels (layout) before a province counts as a coast of a zone...
+MIN_COAST_SHARE = 0.1  # ...and at least this share of the province's whole shore (not a corner grazing a zone)
+MIN_ZONE_BORDER = 2  # shared edge pixels (game grid) before two zones count as neighbours
+
+
+def _shift(a: np.ndarray, dy: int, dx: int, wrap_x: bool, fill: int = -1) -> np.ndarray:
+    """a moved by (dy, dx): out[y, x] = a[y - dy, x - dx]. Off-map pixels read `fill`, except across the left and
+    right edges of a map that wraps around (Earth: the Pacific)."""
+    out = np.roll(np.roll(a, dy, 0), dx, 1)
+    if dy > 0:
+        out[:dy, :] = fill
+    elif dy < 0:
+        out[dy:, :] = fill
+    if not wrap_x:
+        if dx > 0:
+            out[:, :dx] = fill
+        elif dx < 0:
+            out[:, dx:] = fill
+    return out
+
+
+STEPS4 = ((0, 1), (0, -1), (1, 0), (-1, 0))
+STEPS8 = STEPS4 + ((1, 1), (1, -1), (-1, 1), (-1, -1))
+
+
+def grow_zones(water: np.ndarray, seeds: list[tuple[int, int, int]], wrap_x: bool) -> np.ndarray:
+    """Zone index per pixel: every water pixel takes the zone of the nearest seed (x, y, zone) along a path over
+    water, so a zone never jumps across land. The front grows one pixel a step, alternating 4- and 8-neighbour
+    steps so zones come out round. Water no seed reaches (lakes) keeps -1, and so does land."""
+    zones = np.full(water.shape, -1, dtype=np.int32)
+    for x, y, z in seeds:
+        zones[y, x] = z
+    step = 0
+    while True:
+        free = water & (zones < 0)
+        if not free.any():
+            break
+        new = zones.copy()
+        changed = False
+        for dy, dx in STEPS4 if step % 2 == 0 else STEPS8:
+            src = _shift(zones, dy, dx, wrap_x)
+            take = free & (src >= 0) & (new < 0)
+            if take.any():
+                new[take] = src[take]
+                changed = True
+        zones = new
+        step += 1
+        if not changed:
+            break
+    return zones
+
+
+def _nearest(mask: np.ndarray, x: float, y: float) -> tuple[int, int]:
+    ys, xs = np.nonzero(mask)
+    k = int(np.argmin((xs - x) ** 2 + (ys - y) ** 2))
+    return int(xs[k]), int(ys[k])
+
+
+def build_sea_zones(
+    lay: Layout,
+    zone_seeds: list[ZoneSeed],
+    links: list[tuple[str, str]] = (),
+    wrap_x: bool = False,
+    zone_range: tuple[int, int] = (1, 30),
+    assign=None,
+) -> None:
+    """Split the water (or Skyshards' void) into named sea zones (docs/DESIGN.md "Navies").
+
+    Zones are grown on the game's map grid (every GRID_STEP-th layout pixel, the province grid MapData carries), so
+    the zone grid lines up with it exactly, then spread to every layout pixel. `assign(xs, ys)` (layout pixels ->
+    zone index per pixel) replaces the growth where geometry should decide (Skyshards' symmetric wedges). Each zone
+    gets its neighbours (zones whose water touches, plus `links`: channels too narrow for the map's pixels, like
+    Gibraltar), its coasts (land provinces with MIN_COAST pixels and MIN_COAST_SHARE of their shore on it), its
+    centre (its first seed point) and its area. Every strait gets the zone it crosses. Water no seed reaches (lakes)
+    has no zone.
+    """
+    lay.zone_range = zone_range
+    lay.zone_wrap = wrap_x
+    water_full = lay.labels < 0
+    water = water_full[::GRID_STEP, ::GRID_STEP]
+    if assign is not None:
+        gy, gx = np.mgrid[0 : water.shape[0], 0 : water.shape[1]]
+        small = np.where(water, assign(gx * GRID_STEP, gy * GRID_STEP), -1).astype(np.int32)
+    else:
+        starts = []
+        for z, zs in enumerate(zone_seeds):
+            for px, py in zs.points:
+                sx, sy = _nearest(water, px / GRID_STEP, py / GRID_STEP)
+                starts.append((sx, sy, z))
+        small = grow_zones(water, starts, wrap_x)
+    # every layout pixel: the grid pixel's zone, then a few steps of growth over the water pixels the grid skipped
+    full = np.repeat(np.repeat(small, GRID_STEP, 0), GRID_STEP, 1)[: lay.height, : lay.width]
+    full = np.where(water_full, full, -1)
+    for _ in range(4 * GRID_STEP):
+        free = water_full & (full < 0)
+        if not free.any():
+            break
+        for dy, dx in STEPS4:
+            src = _shift(full, dy, dx, wrap_x)
+            take = free & (src >= 0) & (full < 0)
+            full[take] = src[take]
+    lay.zones = full
+    n = len(zone_seeds)
+    lay.zone_names = [zs.name for zs in zone_seeds]
+    lay.zone_areas = (np.bincount(small[small >= 0].ravel(), minlength=n) * GRID_STEP * GRID_STEP).tolist()
+    centers = []
+    for z, zs in enumerate(zone_seeds):
+        px, py = zs.points[0]
+        gx, gy = _nearest(small == z, px / GRID_STEP, py / GRID_STEP)
+        centers.append((gx * GRID_STEP, gy * GRID_STEP))
+    lay.zone_centers = centers
+
+    # neighbours: zones whose grid pixels touch (across the map edge too on a wrapping map), plus the links
+    nb: list[set[int]] = [set() for _ in range(n)]
+    pairs = []
+    for dy, dx in ((0, 1), (1, 0)):
+        other = _shift(small, -dy, -dx, wrap_x)
+        m = (small >= 0) & (other >= 0) & (small != other)
+        pairs.append(np.minimum(small[m], other[m]).astype(np.int64) * 1000 + np.maximum(small[m], other[m]))
+    codes, counts = np.unique(np.concatenate(pairs), return_counts=True)
+    for c, k in zip(codes.tolist(), counts.tolist()):
+        if k >= MIN_ZONE_BORDER:
+            a, b = divmod(c, 1000)
+            nb[a].add(b)
+            nb[b].add(a)
+    by_name = {name: z for z, name in enumerate(lay.zone_names)}
+    for a, b in links:
+        za, zb = by_name[a], by_name[b]
+        nb[za].add(zb)
+        nb[zb].add(za)
+    lay.zone_neighbors = nb
+
+    # coasts: land pixels with a 4-neighbour of the zone, counted per (province, zone)
+    contact: dict[tuple[int, int], int] = {}
+    for dy, dx in STEPS4:
+        other = _shift(full, dy, dx, wrap_x)
+        m = (lay.labels >= 0) & (other >= 0)
+        codes, counts = np.unique(lay.labels[m].astype(np.int64) * 1000 + other[m], return_counts=True)
+        for c, k in zip(codes.tolist(), counts.tolist()):
+            key = divmod(c, 1000)
+            contact[key] = contact.get(key, 0) + k
+    coasts: list[list[int]] = [[] for _ in range(n)]
+    per_province: list[list[tuple[int, int]]] = [[] for _ in range(len(lay.seeds))]
+    shore = [0] * len(lay.seeds)
+    for (p, _), k in contact.items():
+        shore[p] += k
+    for (p, z), k in sorted(contact.items()):
+        if k >= MIN_COAST and k >= MIN_COAST_SHARE * shore[p] and lay.passable(p):
+            coasts[z].append(p)
+            per_province[p].append((k, z))
+    lay.zone_coasts = coasts
+    lay.province_zones = [[z for _, z in sorted(lst, key=lambda t: (-t[0], t[1]))] for lst in per_province]
+
+    # the zone each strait crosses: the zone most of the water along it belongs to, if both shores are its coasts;
+    # else the zone both shores touch that lies nearest the strait's middle
+    for st in lay.straits:
+        a, b = st["a"], st["b"]
+        shared = [z for z in lay.province_zones[a] if z in lay.province_zones[b]]
+        zone = None
+        if not st["wrap"]:
+            (x0, y0), (x1, y1) = st["from"], st["to"]
+            votes: dict[int, int] = {}
+            steps = max(2, int(math.hypot(x1 - x0, y1 - y0)))
+            for i in range(steps + 1):
+                x = int(round(x0 + (x1 - x0) * i / steps))
+                y = int(round(y0 + (y1 - y0) * i / steps))
+                ys0, ys1 = max(0, y - 3), min(lay.height, y + 4)
+                xs0, xs1 = max(0, x - 3), min(lay.width, x + 4)
+                for v in full[ys0:ys1, xs0:xs1].ravel().tolist():
+                    if v >= 0:
+                        votes[v] = votes.get(v, 0) + 1
+            for v, _ in sorted(votes.items(), key=lambda t: (-t[1], t[0])):
+                if v in shared:
+                    zone = v
+                    break
+            if zone is None and shared:
+                mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+                zone = min(shared, key=lambda z: (lambda p: (p[0] - mx) ** 2 + (p[1] - my) ** 2)(_nearest(full == z, mx, my)))
+        elif shared:
+            zone = shared[0]
+        st["zone"] = zone
+
+
 def validate(lay: Layout) -> list[str]:
     problems = []
     comps = passable_components(lay)
@@ -463,6 +670,89 @@ def validate(lay: Layout) -> list[str]:
         count = sum(1 for n in lay.nations if n.get("race") == r)
         if count != NATIONS_PER_RACE:
             problems.append(f"race {r} has {count} nations (should be {NATIONS_PER_RACE})")
+    problems += validate_zones(lay)
+    return problems
+
+
+def zone_pieces(mask: np.ndarray, wrap_x: bool, min_share: float = 0.01) -> list[int]:
+    """Sizes of the separate pieces of one zone (grid pixels), ignoring slivers under min_share of it (a pixel of
+    water cut off in a fjord). Water touching only at a corner counts as touching (zones grow over corners), and so
+    does water on both sides of a map that wraps around."""
+    m = mask.copy()
+    # close corner-only links: where two diagonal pixels are in and their two neighbours out, take one neighbour in
+    a, b = m[:-1, :-1], m[1:, 1:]
+    c, d = m[:-1, 1:], m[1:, :-1]
+    m[:-1, 1:] |= a & b
+    m[:-1, :-1] |= c & d
+    comp = components(np.where(m, 0, -1))
+    count = int(comp.max()) + 1
+    if count <= 0:
+        return []
+    parent = list(range(count))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    if wrap_x:
+        left, right = comp[:, 0], comp[:, -1]
+        for y in np.flatnonzero((left >= 0) & (right >= 0)).tolist():
+            ra, rb = find(int(left[y])), find(int(right[y]))
+            if ra != rb:
+                parent[ra] = rb
+    sizes: dict[int, int] = {}
+    labels, counts = np.unique(comp[(comp >= 0) & mask], return_counts=True)
+    for k, n in zip(labels.tolist(), counts.tolist()):
+        r = find(int(k))
+        sizes[r] = sizes.get(r, 0) + n
+    total = sum(sizes.values())
+    return sorted((n for n in sizes.values() if n >= min_share * total), reverse=True)
+
+
+def validate_zones(lay: Layout) -> list[str]:
+    """The sea-zone rules (docs/DESIGN.md "Navies", docs/MAPS.md): the map's zone count, unique names, every zone in
+    one piece with a coast, one connected sea, every strait in a zone whose coasts hold both its ends."""
+    problems = []
+    n = len(lay.zone_names)
+    lo, hi = lay.zone_range
+    if lay.zones is None or n == 0:
+        return ["no sea zones (build_sea_zones)"]
+    if not lo <= n <= hi:
+        problems.append(f"{n} sea zones (this map wants {lo}-{hi})")
+    if not lay.ship:
+        problems.append("the map names no ship")
+    names = set(s.name for s in lay.seeds)
+    if len(set(lay.zone_names)) != n:
+        problems.append("duplicate sea zone names")
+    grid = lay.zones[::GRID_STEP, ::GRID_STEP]
+    for z, name in enumerate(lay.zone_names):
+        if name in names:
+            problems.append(f"sea zone '{name}' has a province's name")
+        if not lay.zone_coasts[z]:
+            problems.append(f"sea zone '{name}' touches no province")
+        pieces = zone_pieces(grid == z, lay.zone_wrap)
+        if len(pieces) > 1:
+            problems.append(f"sea zone '{name}' is in {len(pieces)} pieces: {pieces}")
+    seen = {0}
+    queue = deque([0])
+    while queue:
+        a = queue.popleft()
+        for b in lay.zone_neighbors[a]:
+            if b not in seen:
+                seen.add(b)
+                queue.append(b)
+    if len(seen) != n:
+        cut = sorted(lay.zone_names[z] for z in range(n) if z not in seen)
+        problems.append(f"sea zones cut off from the rest: {', '.join(cut)}")
+    for st in lay.straits:
+        na, nb = lay.seeds[st["a"]].name, lay.seeds[st["b"]].name
+        z = st.get("zone")
+        if z is None:
+            problems.append(f"strait {na}-{nb} lies in no sea zone")
+        elif st["a"] not in lay.zone_coasts[z] or st["b"] not in lay.zone_coasts[z]:
+            problems.append(f"strait {na}-{nb}: both ends must be coasts of {lay.zone_names[z]}")
     return problems
 
 
@@ -483,25 +773,49 @@ def to_json(lay: Layout) -> dict:
                 "startOwner": None if lay.owner[i] is None else lay.owner[i] + 1,
                 "isCapital": bool(s.nation),
                 **({"garrison": s.garrison} if s.garrison else {}),
+                **({"zones": [z + 1 for z in lay.province_zones[i]]} if lay.province_zones and lay.province_zones[i] else {}),
             }
         )
     straits = [
-        {"a": st["a"] + 1, "b": st["b"] + 1, "from": st["from"], "to": st["to"], "wrap": st["wrap"], "auto": st["auto"]}
+        {
+            "a": st["a"] + 1,
+            "b": st["b"] + 1,
+            "from": st["from"],
+            "to": st["to"],
+            "wrap": st["wrap"],
+            "auto": st["auto"],
+            "zone": None if st.get("zone") is None else st["zone"] + 1,
+        }
         for st in lay.straits
+    ]
+    zones = [
+        {
+            "id": z + 1,
+            "name": lay.zone_names[z],
+            "center": list(lay.zone_centers[z]),
+            "area": int(lay.zone_areas[z]),
+            "neighbors": sorted(b + 1 for b in lay.zone_neighbors[z]),
+            "coasts": sorted(p + 1 for p in lay.zone_coasts[z]),
+        }
+        for z in range(len(lay.zone_names))
     ]
     counts = {"provinces": len(provinces)}
     for t in ("Plains", "Forest", "Hills", "Mountain"):
         counts[t] = sum(1 for p in provinces if p["terrain"] == t)
     counts["neutralAtStart"] = sum(1 for p in provinces if p["startOwner"] is None and p["terrain"] != "Mountain")
+    counts["seaZones"] = len(zones)
+    counts["coastal"] = sum(1 for p in provinces if p.get("zones"))
     return {
         "id": lay.map_id,
         "title": lay.title,
         "theme": lay.theme,
         "imageSize": [lay.width, lay.height],
+        "ship": lay.ship,
         "summary": counts,
         "nations": [{**n, "capital": n["capital"] + 1} for n in lay.nations],
         "provinces": provinces,
         "straits": straits,
+        "seaZones": zones,
         "notes": lay.notes,
     }
 

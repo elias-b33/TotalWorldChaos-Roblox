@@ -6,7 +6,8 @@
 -- besieger at peace with it waits instead of blocking. An interrupted siege (a battle, a defender, the besieger
 -- leaving) keeps its progress for Config.Siege.GraceTicks, then resets. Retreating armies are ignored.
 -- Army size doesn't matter, but troops do: while an army with a siege troop in it (Ironguard, Legionaries) besieges
--- (the holder's or an ally's), the siege moves that troop's Config.Troops siegeSpeed times as fast.
+-- (the holder's or an ally's), the siege moves that troop's Config.Troops siegeSpeed times as fast. A province the
+-- besieger's side blockades from the sea (Sim.Navy) falls Config.Navy.BlockadeSiegeSpeed times as fast on top of that.
 
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
@@ -95,6 +96,11 @@ function Siege.step(state: MatchState)
 				if Diplomacy.friendly(state, leader, a.owner) then
 					speed = math.max(speed, Troops.siegeSpeed(a.troops))
 				end
+			end
+			-- and faster still where the leader's side blockades the province from the sea (Sim.Navy)
+			local blockade = province.blockade
+			if blockade ~= nil and Diplomacy.friendly(state, leader, blockade) then
+				speed *= Config.Navy.BlockadeSiegeSpeed
 			end
 			siege.progress += speed
 			siege.lastTick = state.tick

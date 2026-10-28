@@ -73,6 +73,13 @@ local function attackerWins(att: Types.Troop, attMen: number, def: Types.Troop):
 		nextArmyId = 1,
 		mergedInto = {},
 		battles = {},
+		zones = {}, -- no sea in the arena
+		shores = {},
+		straits = {},
+		fleets = {},
+		nextFleetId = 1,
+		fleetMergedInto = {},
+		seaBattles = {},
 		offers = {},
 		events = {},
 		result = nil,

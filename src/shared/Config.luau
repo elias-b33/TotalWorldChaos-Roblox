@@ -203,6 +203,21 @@ Config.Siege = {
 	GraceTicks = 10, -- an interrupted siege keeps its progress this long
 }
 
+-- Navies (docs/DESIGN.md "Navies"): one ship type per map (Galleon, Dragonship, Starship; MapDef.ship), the same
+-- numbers on every map. A sea battle is a land battle's rule with a fleet's hull as its men. First numbers, to be
+-- tuned with bot tournaments once bots sail (navies stage 3).
+Config.Navy = {
+	ShipGold = 25, -- one ship (no manpower)
+	ShipUpkeep = 1, -- gold per ship per month (a damaged fleet pays for what is left of it)
+	ShipHull = 1000, -- one ship's strength in a sea battle, like a regiment's men (attack and defence 1)
+	ShipCapacity = 1000, -- men one ship carries: one regiment of any troop type
+	MaxShipsPerCommand = 5, -- ships in one BuildShips order
+	MoveTicks = 8, -- to sail into the next sea zone
+	MinHull = 500, -- a fleet left with less than half a ship sinks after a battle, with everyone aboard
+	BlockadeGoldLoss = 0.5, -- a blockaded province loses this share of its gold income
+	BlockadeSiegeSpeed = 1.25, -- the blockader's side besieges a blockaded province this much faster
+}
+
 -- Diplomacy --------------------------------------------------------------------------------------
 
 Config.Diplomacy = {

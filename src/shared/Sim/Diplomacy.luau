@@ -70,6 +70,44 @@ function Diplomacy.borders(state: MatchState, a: number, b: number): boolean
 	return false
 end
 
+-- True if a and b both hold a coast of the same sea zone (docs/DESIGN.md "Navies"): fleets can carry their armies to
+-- each other, so they may go to war like neighbours by land.
+function Diplomacy.sharesSea(state: MatchState, a: number, b: number): boolean
+	for _, zone in state.zones or {} do
+		local aHere, bHere = false, false
+		for _, p in zone.coasts do
+			local owner = state.provinces[p].owner
+			aHere = aHere or owner == a
+			bHere = bHere or owner == b
+		end
+		if aHere and bHere then
+			return true
+		end
+	end
+	return false
+end
+
+-- Sea zones where a fleet at war with this nation stands (not retreating): its armies can't cross the straits
+-- there (Diplomacy.crossable, docs/DESIGN.md "Navies").
+function Diplomacy.blockedZones(state: MatchState, nationId: number): { [number]: boolean }
+	local out: { [number]: boolean } = {}
+	for _, fleet in state.fleets or {} do
+		if not fleet.retreating and Diplomacy.atWar(state, nationId, fleet.owner) then
+			out[fleet.zone] = true
+		end
+	end
+	return out
+end
+
+-- May an army step from a province to its neighbour? Always by land; across a strait only while its sea zone isn't
+-- in `blocked` (Diplomacy.blockedZones of the army's owner).
+function Diplomacy.crossable(state: MatchState, blocked: { [number]: boolean }, from: number, to: number): boolean
+	local straits = state.straits
+	local ends = if straits then straits[from] else nil
+	local zone = if ends then ends[to] else nil
+	return zone == nil or not blocked[zone]
+end
+
 -- Armies may enter their own, allied, neutral and enemy (at war) land; never mountains or peaceful foreign land.
 function Diplomacy.canEnter(state: MatchState, nationId: number, provinceId: number): boolean
 	local p = state.provinces[provinceId]
@@ -106,7 +144,8 @@ local function living(state: MatchState, id: number): boolean
 	return n ~= nil and not n.eliminated
 end
 
--- Declare war on a nation you border. Your allies join you and theirs join them.
+-- Declare war on a nation you border, by land or by sea (Diplomacy.sharesSea). Your allies join you and theirs
+-- join them.
 function Diplomacy.declareWar(state: MatchState, a: number, b: number): (boolean, string?)
 	if a == b or not living(state, b) then
 		return false, "BadTarget"
@@ -123,7 +162,7 @@ function Diplomacy.declareWar(state: MatchState, a: number, b: number): (boolean
 	if Diplomacy.hasTruce(state, a, b) then
 		return false, "Truce"
 	end
-	if not Diplomacy.borders(state, a, b) then
+	if not Diplomacy.borders(state, a, b) and not Diplomacy.sharesSea(state, a, b) then
 		return false, "NoBorder"
 	end
 	local attackers = Diplomacy.allianceMembers(state, a)

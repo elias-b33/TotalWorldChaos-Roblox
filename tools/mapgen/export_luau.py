@@ -7,6 +7,8 @@ generate.py also calls this after every map build, so the Luau data never drifts
 Besides the JSON, each module carries the map's province grid (`grid`): which province every pixel of the 2D
 pixel-art map belongs to, at half the resolution of province_ids.png (1 grid pixel = 2x2 map pixels = 1 stud).
 It is run-length encoded as (id: u8, length: u16 little-endian) triples over the rows top to bottom, in base64.
+`seaGrid` is the same for the sea zones (from sea_ids.png): which zone every water pixel belongs to (0 = land, or a
+lake), so a tap on the sea finds its zone the way a tap on land finds its province.
 """
 
 from __future__ import annotations
@@ -67,7 +69,7 @@ def grid_of(ids_path: str) -> tuple[int, int, str]:
     return ids.shape[1], ids.shape[0], base64.b64encode(bytes(out)).decode("ascii")
 
 
-def to_luau(layout: dict, ids_path: str) -> str:
+def to_luau(layout: dict, ids_path: str, sea_path: str) -> str:
     key = layout["id"]
     lines = [
         "--!strict",
@@ -81,6 +83,7 @@ def to_luau(layout: dict, ids_path: str) -> str:
         f"\ttitle = {lua_str(layout['title'])},",
         f"\ttheme = {lua_str(layout['theme'])},",
         f"\timageSize = {point(layout['imageSize'])},",
+        f"\tship = {lua_str(layout['ship'])},",
         "\tnations = {",
     ]
     for n in layout["nations"]:
@@ -107,17 +110,28 @@ def to_luau(layout: dict, ids_path: str) -> str:
         fields.append(f"isCapital = {'true' if p['isCapital'] else 'false'}")
         if p.get("garrison"):
             fields.append(f"garrison = {p['garrison']}")
+        if p.get("zones"):
+            fields.append(f"zones = {ids(p['zones'])}")
         lines.append("\t\t{ " + ", ".join(fields) + " },")
     lines.append("\t},")
     lines.append("\tstraits = {")
     for s in layout["straits"]:
         lines.append(
             f"\t\t{{ a = {s['a']}, b = {s['b']}, from = {point(s['from'])}, to = {point(s['to'])}, "
-            f"wrap = {'true' if s['wrap'] else 'false'} }},"
+            f"wrap = {'true' if s['wrap'] else 'false'}, zone = {s['zone']} }},"
+        )
+    lines.append("\t},")
+    lines.append("\tseaZones = {")
+    for z in layout["seaZones"]:
+        lines.append(
+            f"\t\t{{ id = {z['id']}, name = {lua_str(z['name'])}, center = {point(z['center'])}, area = {z['area']}, "
+            f"neighbors = {ids(z['neighbors'])}, coasts = {ids(z['coasts'])} }},"
         )
     lines.append("\t},")
     width, height, rle = grid_of(ids_path)
     lines.append(f'\tgrid = {{ width = {width}, height = {height}, rle = "{rle}" }},')
+    width, height, rle = grid_of(sea_path)
+    lines.append(f'\tseaGrid = {{ width = {width}, height = {height}, rle = "{rle}" }},')
     lines.append("}")
     lines.append("")
     lines.append("return map")
@@ -128,9 +142,9 @@ def to_luau(layout: dict, ids_path: str) -> str:
 def write(layout: dict) -> str:
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, MODULE_NAMES[layout["id"]] + ".luau")
-    ids_path = os.path.join(ROOT, "assets", "maps", layout["id"], "province_ids.png")
+    folder = os.path.join(ROOT, "assets", "maps", layout["id"])
     with open(path, "w") as f:
-        f.write(to_luau(layout, ids_path))
+        f.write(to_luau(layout, os.path.join(folder, "province_ids.png"), os.path.join(folder, "sea_ids.png")))
     return path
 
 
