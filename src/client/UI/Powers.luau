@@ -22,9 +22,12 @@ local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local BUTTON_SIZE = 68
-local PICK_WIDTH = 150
-local PICK_HEIGHT = 56 -- big touch targets
+local BUTTON_MARGIN = Vector2.new(14, 24) -- the power button from the screen's right and bottom (its charges under it)
+local BUTTON_SIZE = 64 -- the large medallion
+local PICK_COLUMNS = 3 -- the six powers in two rows
+local PICK_WIDTH = 132 -- a slot tile
+local PICK_GAP = Theme.space.m
+local BUTTON_WIDTH = 200 -- Confirm and Cancel side by side fill the targeting sheet
 local FLASH_SECONDS = 4 -- a strike's badge stays this long on the map
 
 local ICONS: { [string]: string } = {
@@ -57,6 +60,7 @@ local Powers = {}
 local powerButton: TextButton
 local chargesLabel: TextLabel
 local picker: Frame
+local pickerTiles: Frame
 local bar: Frame
 local barTitle: TextLabel
 local barTitleIcon: GuiObject
@@ -101,7 +105,7 @@ local function closeAll()
 	picker.Visible = false
 	bar.Visible = false
 	-- hidden panels drop their buttons (they are rebuilt on open), so they don't count against the GUI budget
-	Widgets.clear(picker)
+	Widgets.clear(pickerTiles)
 	Widgets.clear(barButtons)
 	clearHighlight()
 end
@@ -123,19 +127,25 @@ local function refreshButton()
 	end
 end
 
+-- The six powers as slot tiles on a royal base: the icon, the name and the charges it costs (in red when you have
+-- fewer; the tile greys out but still explains in a toast).
 local function renderPicker()
-	Widgets.clear(picker)
+	Widgets.clear(pickerTiles)
 	local charges = if free() then math.huge else ClientState.myCharges() or 0
 	for i, power in Primordial.POWERS do
 		local cost = Primordial.cost(power)
 		local enough = charges >= cost
-		local b = Widgets.actionButton(
-			picker,
+		local b = Widgets.slotTile(
+			pickerTiles,
 			POWER_ICONS[power],
 			power,
-			if free() then {} else { { "charge", tostring(cost) } },
-			Vector2.new(PICK_WIDTH, PICK_HEIGHT),
-			Widgets.SPECIAL,
+			-- free in a sandbox: no cost to show
+			if free()
+				then {}
+				elseif enough then { { "charge", tostring(cost) } }
+				else { { "charge", tostring(cost), "short" } },
+			Vector2.new(PICK_WIDTH, Widgets.TILE_HEIGHT),
+			"powers",
 			function()
 				if not enough then
 					toast("⚡ Not enough charges")
@@ -170,12 +180,12 @@ local function renderBar()
 	Widgets.clear(barButtons)
 	local chosen = target
 	if chosen then
-		Widgets.iconTextButton(barButtons, "check", "Confirm", 140, Widgets.GOOD, function()
+		Widgets.iconTextButton(barButtons, "check", "Confirm", BUTTON_WIDTH, Widgets.GOOD, function()
 			Intents.power(power, chosen)
 			closeAll()
 		end, "✅ Confirm")
 	end
-	Widgets.iconTextButton(barButtons, "close", "Cancel", 120, Widgets.BUTTON_OFF, closeAll, "✕ Cancel")
+	Widgets.iconTextButton(barButtons, "close", "Cancel", BUTTON_WIDTH, Widgets.BUTTON_OFF, closeAll, "✕ Cancel")
 	bar.Visible = true
 end
 
@@ -185,7 +195,7 @@ function Powers.choose(power: Types.PrimordialPower)
 	target = nil
 	blocked = nil
 	picker.Visible = false
-	Widgets.clear(picker)
+	Widgets.clear(pickerTiles)
 	clearHighlight()
 	renderBar()
 end
@@ -259,9 +269,25 @@ function Powers.tap(kind: "Army" | "Province" | nil, id: number?)
 	-- a harmful power can't hit a nation that is still immune (the server would refuse it): no Confirm
 	local victim = if hit ~= 0 then ClientState.nation(hit) else nil
 	local immuneFor = if victim then victim.powerImmuneUntil - ClientState.tick() else 0
+	-- nor one this player hit less than Config.Primordial.TargetCooldownTicks ago (Primordial.casterKey)
+	local cooldownFor = 0
+	if target and Primordial.HARMFUL[power] and victim then
+		local snap = ClientState.snapshot()
+		local mine = ClientState.myPrimordial()
+		local key = if mine then "u" .. mine.userId else "n" .. tostring(ClientState.myNation())
+		for _, c in if snap then snap.powerCooldowns or {} else {} do
+			if c.caster == key and c.target == hit then
+				cooldownFor = c.untilTick - ClientState.tick()
+			end
+		end
+	end
 	if target and Primordial.HARMFUL[power] and immuneFor > 0 then
 		target = nil
 		blocked = string.format("🛡 %s is immune for %d s", nationName(hit), immuneFor)
+		toast(blocked)
+	elseif target and Primordial.HARMFUL[power] and cooldownFor > 0 then
+		target = nil
+		blocked = string.format("⏳ You can hit %s again in %d s", nationName(hit), cooldownFor)
 		toast(blocked)
 	elseif target == nil then
 		toast(HINTS[want])
@@ -385,10 +411,11 @@ function Powers.isOpen(): boolean
 	return picker.Visible
 end
 
--- Move the picker (the sandbox panel opens it beside itself instead of above the power button).
+-- Move the picker (the sandbox panel opens it beside itself instead of beside the power button). The picker is a
+-- fitted root (tablets): Widgets.fit keeps its new place when the UI's scale changes.
 function Powers.placePicker(anchor: Vector2, position: UDim2)
 	picker.AnchorPoint = anchor
-	picker.Position = position
+	Widgets.fit(picker, nil, position)
 end
 
 function Powers.init(showToast: (string) -> (), openHandler: () -> ())
@@ -396,33 +423,36 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	onOpen = openHandler
 	local gui = Widgets.screen("Powers", 4)
 
-	-- the power button: a big purple sparkle with your charges in a badge
-	powerButton = Widgets.iconButton(gui, "sparkles", "PowerButton", BUTTON_SIZE, Widgets.SPECIAL, Powers.toggle)
+	-- the power button: the large royal medallion with the sparkles, your charges in a well under it
+	powerButton = Widgets.medallionButton(gui, "large", "power", "sparkles", "PowerButton", Powers.toggle)
 	powerButton.AnchorPoint = Vector2.new(1, 1)
-	powerButton.Position = UDim2.new(1, -14, 1, -14)
+	powerButton.Position = UDim2.new(1, -BUTTON_MARGIN.X, 1, -BUTTON_MARGIN.Y)
 	powerButton.Visible = false
-	local round = powerButton:FindFirstChildOfClass("UICorner")
-	if round then
-		round.CornerRadius = UDim.new(0.5, 0)
-	end
 	chargesLabel = Widgets.chip(powerButton, "charge", "0", nil, 24)
 	chargesLabel.Name = "Charges"
-	chargesLabel.BackgroundColor3 = Theme.color.ink
-	chargesLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-	chargesLabel.Position = UDim2.new(0.5, 0, 1, -2)
-	Widgets.stroke(chargesLabel, Theme.color.gold)
+	chargesLabel.AnchorPoint = Vector2.new(0.5, 0)
+	chargesLabel.Position = UDim2.new(0.5, 0, 1, -8)
+	chargesLabel.ZIndex = 5
 
-	-- the picker: 2 columns × 3 rows above the button
-	picker = Widgets.panel(gui, 2 * PICK_WIDTH + 8 + 2 * Widgets.PANEL_PAD) -- two columns
+	-- the picker: an iron panel docked at the bottom beside the power button (clear of the toasts and offers under the
+	-- top bar), the six powers in a 3 x 2 grid of slot tiles
+	picker = Widgets.panel(gui, PICK_COLUMNS * PICK_WIDTH + (PICK_COLUMNS - 1) * PICK_GAP + 2 * Widgets.PANEL_PAD)
 	picker.Name = "Picker"
 	picker.AnchorPoint = Vector2.new(1, 1)
-	picker.Position = UDim2.new(1, -12, 1, -BUTTON_SIZE - 30)
+	picker.Position = UDim2.new(1, -(BUTTON_MARGIN.X + BUTTON_SIZE + Theme.space.m), 1, -Theme.space.m)
 	picker.Visible = false
+	Widgets.header(picker, "Powers", "sparkles")
+	pickerTiles = Instance.new("Frame")
+	pickerTiles.Name = "Tiles"
+	pickerTiles.BackgroundTransparency = 1
+	pickerTiles.Size = UDim2.fromScale(1, 0)
+	pickerTiles.AutomaticSize = Enum.AutomaticSize.Y
+	pickerTiles.Parent = picker
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(PICK_WIDTH, PICK_HEIGHT)
-	grid.CellPadding = UDim2.fromOffset(8, 8)
+	grid.CellSize = UDim2.fromOffset(PICK_WIDTH, Widgets.TILE_HEIGHT)
+	grid.CellPadding = UDim2.fromOffset(PICK_GAP, PICK_GAP)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
-	grid.Parent = picker
+	grid.Parent = pickerTiles
 
 	-- the targeting bar: which power, what to tap, Confirm / Cancel
 	bar = Widgets.sheet(gui, 444)
@@ -453,18 +483,21 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	barButtons.Parent = bar
 	Widgets.list(barButtons, true, 8)
 
-	banner = Widgets.label(gui, "You rose as a Primordial", Theme.text.body, 34)
+	-- a status plate (not a button): the sparkles and the line, on the slate plate toasts use
+	banner = Widgets.label(gui, "You rose as a Primordial", Theme.text.body, 36)
 	banner.Name = "PrimordialBanner"
-	banner.Size = UDim2.fromOffset(270, 34)
+	banner.Size = UDim2.fromOffset(270, 36)
 	banner.BackgroundColor3 = Widgets.SPECIAL
 	banner.BackgroundTransparency = 0.05
 	banner.FontFace = Theme.font.display
 	banner.TextWrapped = false
 	banner.Visible = false
-	Widgets.corner(banner, Theme.radius.m)
+	Widgets.corner(banner, Theme.radius.s)
 	Widgets.stroke(banner)
 	Widgets.padding(banner, Theme.space.m, 0)
 	Widgets.leadIcon(banner, "sparkles", Theme.size.icon)
+	Widgets.skin(banner, "plate", "plate")
+	Widgets.shadow(banner, "plate")
 
 	-- the banner at the top left under the top bar, clear of toasts, offers and the picker
 	local function place()

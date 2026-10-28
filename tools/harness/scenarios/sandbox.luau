@@ -64,7 +64,9 @@ local function run()
 		"the server seats her"
 	)
 	H.expect(H.myNation(alice) == first, "Alice leads " .. state.nations[first].name)
-	H.expect(H.textOf(alice, "Nation") == state.nations[first].name, "her top bar names it")
+	-- (a small phone's top bar hides the name to make room, but it is still set)
+	local nationLabel = alice.localPlayer.PlayerGui:FindFirstChild("Nation", true)
+	H.expect(nationLabel ~= nil and nationLabel.Text == state.nations[first].name, "her top bar names it")
 	H.expect(Emulator.findText(alice, "You lead " .. state.nations[first].name) ~= nil, "a toast says so")
 	H.shot(alice, "lead")
 

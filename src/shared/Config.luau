@@ -14,6 +14,10 @@ Config.MonthTicks = 10 -- income and upkeep are paid every month
 
 Config.Phases = {
 	LobbyTicks = 60, -- the map vote (also after Results, for the next map)
+	-- a server's first match has no vote: the first player to choose Play online picks the map within this long
+	-- (the clock starts when they choose it), else a random map. Under Config.Ads.MinVoteSecondsLeft, so no rewarded
+	-- video starts during it (the pick can end at any second).
+	FirstPickTicks = 20,
 	PickTicks = 30, -- the whole nation draft; whoever is still waiting when it runs out gets a random nation
 	PickTurnMaxTicks = 8, -- one player's turn in the draft: PickTicks / players, within these bounds
 	PickTurnMinTicks = 3,
@@ -233,7 +237,8 @@ Config.Diplomacy = {
 Config.Primordial = {
 	NationChargeTicks = 4 * 60,
 	PrimordialChargeTicks = 60,
-	ImmunityTicks = 30, -- a nation is hit at most once per 30 s (by a harmful power)
+	ImmunityTicks = 60, -- a nation is hit by a harmful power at most once per 60 s, from anyone
+	TargetCooldownTicks = 120, -- and by the same caster at most once per 2 minutes: nobody can focus one nation
 	MaxCharges = 5, -- charges stop piling up here (nations and Primordials alike)
 	EliminationProvinces = 3, -- a nation without its capital and with fewer provinces than this is eliminated
 	CataclysmChargeMultiplier = 2,

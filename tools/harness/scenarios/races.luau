@@ -107,11 +107,15 @@ local function run()
 	H.expect(H.iconIn(alice, "ArmyChip" .. army.id, "ironguard"), "so does its chip on the province sheet")
 	H.expect(H.iconIn(alice, "Owner", "dwarves"), "the owner chip shows the Dwarves' icon")
 
-	-- the army sheet shows the composition as chips
+	-- the army sheet shows the composition as chips: each troop's icon and its men
 	Emulator.press(alice, "Move")
 	Emulator.run(0.5)
 	for _, troop in { "Infantry", "Archers", "Cavalry", "Ironguard" } do
-		H.expect(Emulator.findText(alice, "1k " .. troop) ~= nil, "the army sheet shows 1k " .. troop)
+		local chip = "Troop_" .. troop
+		H.expect(
+			H.hasText(alice, chip, "1k") and H.iconIn(alice, chip, string.lower(troop)),
+			"the army sheet shows 1k " .. troop
+		)
 	end
 	H.shot(alice, "army_composition")
 	Emulator.press(alice, "Cancel")

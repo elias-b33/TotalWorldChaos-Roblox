@@ -48,7 +48,7 @@ export type Nation = {
 	manpower: number,
 	charges: number,
 	allianceId: number?,
-	powerImmuneUntil: number, -- 30 s Primordial-power protection
+	powerImmuneUntil: number, -- 60 s protection from harmful Primordial powers
 	plagueUntil: number?, -- tick when a Plague ends (nil = none)
 	eliminated: boolean,
 	battlesWon: number, -- counts towards the score
@@ -186,6 +186,11 @@ export type SandboxIntent =
 	| { kind: "Disasters", on: boolean }
 	| { kind: "NewWorld", map: string } -- start the world again on this map ("" = the same map)
 
+-- What a player chooses in the start menu (the RequestMenu remote; MenuService): "Online" joins this server's
+-- matches (the first pick, the vote, the draft, or a bot's nation mid-match). Singleplayer is the sandbox's own
+-- "Enter" (SandboxIntent) and How to play changes nothing.
+export type MenuAction = "Online"
+
 export type MatchState = {
 	mapId: string,
 	setup: MatchSetup, -- the private server's settings (the defaults on a public server)
@@ -198,6 +203,9 @@ export type MatchState = {
 	alliances: { [number]: Alliance },
 	truces: { Truce },
 	primordials: { [number]: Primordial }, -- keyed by userId
+	-- when each caster may next hit each nation with a harmful power ("<caster>><nation>" -> tick); a caster is
+	-- "n<nation id>" for a living nation or "u<userId>" for a Primordial (Sim.Primordial.casterKey)
+	powerCooldowns: { [string]: number }?,
 	seats: { [number]: NationId }, -- userId -> the nation that player last held (a rejoining player gets it back)
 	nextArmyId: ArmyId, -- army ids are never reused (clients and queued commands refer to armies by id)
 	mergedInto: { [ArmyId]: ArmyId }, -- an army merged into another stack -> the army that took its men (Army.resolve)
@@ -220,6 +228,8 @@ export type MatchState = {
 
 -- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside
 -- MatchState because the vote happens before there is a map; the draft seats players in the new match.
+-- A server's first lobby (`first`) has no vote: the first player to choose Play online in the start menu picks the
+-- map alone (the "first pick"), within Config.Phases.FirstPickTicks, else the map is random.
 export type LobbyState = {
 	phase: "Lobby" | "Pick",
 	ticksLeft: number, -- until this phase ends
@@ -237,6 +247,8 @@ export type LobbyState = {
 	settings: MatchSettings, -- the next match's settings (changed only during the vote)
 	theme: string?, -- the theme vote's result for the chosen map (Sim.Lobby.chooseTheme), once the vote is over
 	themeBy: { number }?, -- the voters whose equipped theme won (credited on the draft screen)
+	first: boolean, -- the server's first pick instead of a vote (phase "Lobby"; its pick is kept in votes)
+	queue: { number }, -- the first pick: players who chose Play online, in order; queue[1] picks the map
 }
 
 -- Lobby intents: CommandRouter checks the shape, Sim/Lobby (and Sim/Settings) the rules. A Setting names a

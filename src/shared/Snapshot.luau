@@ -55,8 +55,8 @@ export type ArmyRecord = {
 	retreating: boolean, -- beaten and walking home: takes no orders
 }
 
--- A fleet (docs/DESIGN.md "Navies"). Moving fleets change every tick (`progress`), so clients glide their tokens
--- from zone centre to zone centre without a channel of their own.
+-- A fleet (docs/DESIGN.md "Navies"). A sailing fleet's progress towards its next zone goes with the moving armies'
+-- positions (Snapshot.positions), so its record only changes when something else about it does.
 export type FleetRecord = {
 	id: number,
 	owner: number,
@@ -67,7 +67,6 @@ export type FleetRecord = {
 	troops: string, -- the men aboard by troop type, like ArmyRecord.troops
 	next: number, -- next zone on its route, 0 = standing still
 	dest: number, -- where it is heading (Sim.Navy.destination): its own zone while standing still
-	progress: number, -- percent of the way to `next`
 	landAt: number, -- the province it is sailing to land its men on, 0 = none
 	inBattle: boolean,
 	retreating: boolean, -- beaten and sailing off: takes no orders
@@ -83,9 +82,13 @@ export type DiplomacyData = {
 
 -- An eliminated player's Primordial: only charges change, so the list is sent whole whenever it changes.
 export type PrimordialRecord = { userId: number, charges: number }
+-- A caster (Sim.Primordial.casterKey) that may not hit `target` with a harmful power before `untilTick`.
+export type CooldownRecord = { caster: string, target: number, untilTick: number }
 
--- Unreliable position updates for moving armies: the client slides tokens between province centres.
-export type ArmyPosition = { id: number, from: number, to: number, progress: number }
+-- Unreliable position updates for moving armies and sailing fleets: the client slides army tokens between province
+-- centres and fleet tokens between zone centres. Army and fleet ids are counted apart, so `fleet` tells them apart
+-- (a fleet's `from` and `to` are zones).
+export type Position = { id: number, from: number, to: number, progress: number, fleet: boolean }
 
 export type SnapshotData = {
 	mapId: string,
@@ -98,6 +101,7 @@ export type SnapshotData = {
 	fleets: { FleetRecord }, -- the fleets the viewer sees (Sim.Navy.visible)
 	diplomacy: DiplomacyData,
 	primordials: { PrimordialRecord },
+	powerCooldowns: { CooldownRecord }, -- the power picker greys these targets out for their caster
 	result: Types.MatchResult?,
 	cosmetics: { Types.NationCosmetics }, -- each nation's equipped looks, next to MatchState (Sim.Shop)
 	theme: string, -- the map theme everyone sees (MatchState.theme; "" = classic). Set before the match starts.
@@ -115,6 +119,7 @@ export type DeltaData = {
 	removedFleets: { number }, -- sunk, merged into another fleet (a FleetMerged event) or out of sight
 	diplomacy: DiplomacyData?, -- only when it changed
 	primordials: { PrimordialRecord }?, -- only when it changed
+	powerCooldowns: { CooldownRecord }?, -- only when it changed
 	result: Types.MatchResult?, -- only when it changed
 	cosmetics: { Types.NationCosmetics }?, -- only when it changed
 	sandbox: Types.SandboxState?, -- only when it changed
@@ -150,9 +155,6 @@ function Snapshot.fleets(state: MatchState, viewer: number): { FleetRecord }
 				troops = Troops.encode(f.troops),
 				next = nextZone or 0,
 				dest = Navy.destination(f),
-				progress = if nextZone
-					then math.clamp(math.floor(100 * f.moveProgress / Config.Navy.MoveTicks + 0.5), 0, 100)
-					else 0,
 				landAt = f.landAt or 0,
 				inBattle = f.inBattle,
 				retreating = f.retreating == true,
@@ -232,12 +234,27 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?,
 		fleets = Snapshot.fleets(state, viewer or 0),
 		diplomacy = Snapshot.diplomacy(state),
 		primordials = Snapshot.primordials(state),
+		powerCooldowns = Snapshot.powerCooldowns(state),
 		result = state.result,
 		cosmetics = cosmetics or {},
 		theme = state.theme or "",
 		-- a copy: the last snapshot sent is the baseline the next delta is diffed against
 		sandbox = if state.sandbox then table.clone(state.sandbox) else nil,
 	}
+end
+
+function Snapshot.powerCooldowns(state: MatchState): { CooldownRecord }
+	local out = {}
+	for key, ends in state.powerCooldowns or {} do
+		local caster, target = string.match(key, "^(%w+)>(%d+)$")
+		if caster and target and ends > state.tick then
+			table.insert(out, { caster = caster, target = tonumber(target) :: number, untilTick = ends })
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.caster < b.caster or (a.caster == b.caster and a.target < b.target)
+	end)
+	return out
 end
 
 function Snapshot.primordials(state: MatchState): { PrimordialRecord }
@@ -270,9 +287,14 @@ function Snapshot.diplomacy(state: MatchState): DiplomacyData
 	return { wars = wars, alliances = alliances, truces = truces, offers = offers }
 end
 
--- Moving armies, for the unreliable ArmyPositions remote. `progress` is 0..1 towards `to`. ticksToEnter(province,
--- army): the ticks that army takes to step into that province (Sim.Movement.moveTicks).
-function Snapshot.positions(state: MatchState, ticksToEnter: (number, Types.Army) -> number): { ArmyPosition }
+-- Moving armies, then the sailing fleets `viewer` sees (as Snapshot.fleets), for the unreliable ArmyPositions remote.
+-- `progress` is 0..1 towards `to`. ticksToEnter(province, army): the ticks that army takes to step into that province
+-- (Sim.Movement.moveTicks); a fleet takes Config.Navy.MoveTicks to sail into the next zone.
+function Snapshot.positions(
+	state: MatchState,
+	ticksToEnter: (number, Types.Army) -> number,
+	viewer: number?
+): { Position }
 	local out = {}
 	for _, id in sortedKeys(state.armies) do
 		local a = state.armies[id]
@@ -283,6 +305,21 @@ function Snapshot.positions(state: MatchState, ticksToEnter: (number, Types.Army
 				from = a.location,
 				to = nextId,
 				progress = math.clamp(a.moveProgress / ticksToEnter(nextId, a), 0, 1),
+				fleet = false,
+			})
+		end
+	end
+	local fleets = state.fleets or {}
+	for _, id in sortedKeys(fleets) do
+		local f = fleets[id]
+		local nextZone = f.path[1]
+		if nextZone and not f.inBattle and Navy.visible(state, viewer or 0, f) then
+			table.insert(out, {
+				id = f.id,
+				from = f.zone,
+				to = nextZone,
+				progress = math.clamp(f.moveProgress / Config.Navy.MoveTicks, 0, 1),
+				fleet = true,
 			})
 		end
 	end
@@ -370,6 +407,9 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		removedFleets = removedFleets,
 		diplomacy = if encode(before.diplomacy) ~= encode(after.diplomacy) then after.diplomacy else nil,
 		primordials = if encode(before.primordials) ~= encode(after.primordials) then after.primordials else nil,
+		powerCooldowns = if encode(before.powerCooldowns or {}) ~= encode(after.powerCooldowns or {})
+			then after.powerCooldowns
+			else nil,
 		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
 		cosmetics = if encode(before.cosmetics) ~= encode(after.cosmetics) then after.cosmetics else nil,
 		sandbox = if encode(before.sandbox) ~= encode(after.sandbox) then after.sandbox else nil,
@@ -385,6 +425,7 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		and before.phase == after.phase
 		and delta.diplomacy == nil
 		and delta.primordials == nil
+		and delta.powerCooldowns == nil
 		and delta.result == nil
 		and delta.cosmetics == nil
 		and delta.sandbox == nil
@@ -443,6 +484,9 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	end
 	if delta.primordials then
 		snapshot.primordials = delta.primordials
+	end
+	if delta.powerCooldowns then
+		snapshot.powerCooldowns = delta.powerCooldowns
 	end
 	if delta.result then
 		snapshot.result = delta.result

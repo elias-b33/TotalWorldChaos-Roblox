@@ -23,14 +23,31 @@ local tickReceivedAt = os.clock()
 
 local resetListeners: { Listener<Snapshot.SnapshotData> } = {}
 local deltaListeners: { Listener<Snapshot.DeltaData> } = {}
-local positionListeners: { Listener<{ [number]: Snapshot.ArmyPosition }> } = {}
+-- What one positions message moved: armies and fleets by id.
+export type Moved = { armies: { [number]: Snapshot.Position }, fleets: { [number]: Snapshot.Position } }
+local positionListeners: { Listener<Moved> } = {}
 
--- Latest unreliable position per moving army (cleared when an army stops; see Snapshot.ArmyRecord.next).
-local positions: { [number]: Snapshot.ArmyPosition } = {}
+-- Latest unreliable position per moving army and per sailing fleet (cleared when it stops; see the records' `next`).
+local positions: { [number]: Snapshot.Position } = {}
+local fleetPositions: { [number]: Snapshot.Position } = {}
 
 local function emit<T>(listeners: { Listener<T> }, value: T)
 	for _, fn in listeners do
 		task.spawn(fn, value)
+	end
+end
+
+-- flat: id, from, to, progress in percent, repeated (Replicator.broadcast)
+local function readPositions(
+	flat: { number },
+	fleet: boolean,
+	latest: { [number]: Snapshot.Position },
+	moved: { [number]: Snapshot.Position }
+)
+	for i = 1, #flat - 3, 4 do
+		local p = { id = flat[i], from = flat[i + 1], to = flat[i + 2], progress = flat[i + 3] / 100, fleet = fleet }
+		latest[p.id] = p
+		moved[p.id] = p
 	end
 end
 
@@ -41,17 +58,16 @@ function ClientState.init()
 		myNationId = nationId
 		tickReceivedAt = os.clock()
 		positions = {}
+		fleetPositions = {}
 		emit(resetListeners, data)
 	end)
-	Remotes.unreliableEvent("ArmyPositions").OnClientEvent:Connect(function(_tick: number, flat: { number })
-		-- flat: id, from, to, progress% repeated
-		local changed: { [number]: Snapshot.ArmyPosition } = {}
-		for i = 1, #flat - 3, 4 do
-			local p = { id = flat[i], from = flat[i + 1], to = flat[i + 2], progress = flat[i + 3] / 100 }
-			positions[p.id] = p
-			changed[p.id] = p
-		end
-		emit(positionListeners, changed)
+	local positionsEvent = Remotes.unreliableEvent("ArmyPositions")
+	positionsEvent.OnClientEvent:Connect(function(_tick: number, armies: { number }, fleets: { number })
+		-- moving armies between provinces, sailing fleets between zones
+		local moved: Moved = { armies = {}, fleets = {} }
+		readPositions(armies, false, positions, moved.armies)
+		readPositions(fleets, true, fleetPositions, moved.fleets)
+		emit(positionListeners, moved)
 	end)
 	Remotes.event("Delta").OnClientEvent:Connect(function(delta: Snapshot.DeltaData)
 		local current = snapshot
@@ -78,6 +94,14 @@ function ClientState.init()
 		for _, id in delta.removedArmies do
 			positions[id] = nil
 		end
+		for _, f in delta.fleets do
+			if f.next == 0 then
+				fleetPositions[f.id] = nil
+			end
+		end
+		for _, id in delta.removedFleets do
+			fleetPositions[id] = nil
+		end
 		emit(deltaListeners, delta)
 	end)
 end
@@ -94,13 +118,18 @@ function ClientState.onDelta(fn: Listener<Snapshot.DeltaData>)
 	table.insert(deltaListeners, fn)
 end
 
--- Called with the positions that just arrived for moving armies.
-function ClientState.onPositions(fn: Listener<{ [number]: Snapshot.ArmyPosition }>)
+-- Called with the armies and fleets each positions message moved.
+function ClientState.onPositions(fn: Listener<Moved>)
 	table.insert(positionListeners, fn)
 end
 
-function ClientState.position(armyId: number): Snapshot.ArmyPosition?
+function ClientState.position(armyId: number): Snapshot.Position?
 	return positions[armyId]
+end
+
+-- A sailing fleet's latest position: zone `from` to zone `to`, `progress` 0..1 (nil while it stands still).
+function ClientState.fleetPosition(fleetId: number): Snapshot.Position?
+	return fleetPositions[fleetId]
 end
 
 function ClientState.army(armyId: number): Snapshot.ArmyRecord?

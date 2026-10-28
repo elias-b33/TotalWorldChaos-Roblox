@@ -133,6 +133,7 @@ T.test("Meteor's development loss respects the province owner's immunity, and do
 	-- once C's immunity is over the province loses a level, and C does not become immune
 	state.tick += 10
 	state.nations[B].powerImmuneUntil = 0
+	state.powerCooldowns = {} -- and A's own cooldown on B
 	T.expect((cast(state, A, "Meteor", army.id)))
 	T.equal(state.provinces[where].development, dev - 1)
 	T.expect(state.nations[C].powerImmuneUntil <= state.tick, "C is still fair game")
@@ -328,6 +329,38 @@ T.test("a nation is hit by a harmful power at most once per 30 s; gifts ignore i
 	T.expect(not cast(state, C, "Rebels", where), "still immune one tick before the end")
 	state.tick += 1
 	T.expect((cast(state, C, "Rebels", where)))
+end)
+
+T.test("one caster hits the same nation at most once per 2 minutes; others only wait out the immunity", function()
+	local state = fresh()
+	state.nations[A].charges = 5
+	state.nations[C].charges = 5
+	state.primordials[BOB] = { userId = BOB, charges = 6, chargeTicks = 0 }
+	local function primordial(power: Types.PrimordialPower, target: number): (boolean, string?)
+		return Commands.applyPrimordial(state, BOB, { kind = "Power", power = power, target = target })
+	end
+	T.expect((primordial("Plague", B)))
+	T.equal(Primordial.cooldownLeft(state, { userId = BOB }, B), Config.Primordial.TargetCooldownTicks)
+	T.equal(Primordial.cooldownLeft(state, { userId = BOB }, C), 0, "only on the nation it hit")
+	T.equal(Primordial.cooldownLeft(state, { nation = A }, B), 0, "and only for the one who cast it")
+	state.tick += Config.Primordial.ImmunityTicks
+	local ok, err = primordial("Plague", B)
+	T.expect(not ok and err == "Cooldown", "the immunity is over, the caster's own cooldown isn't")
+	T.equal(state.primordials[BOB].charges, 4, "a refused power costs nothing")
+	T.expect((primordial("Plague", C)), "another nation is fair game")
+	T.expect((cast(state, A, "Plague", B)), "another caster only waits out the immunity")
+	state.tick += Config.Primordial.TargetCooldownTicks - Config.Primordial.ImmunityTicks
+	T.expect((primordial("Plague", B)), "two minutes on (and A's immunity over): Bob may hit B again")
+	-- gifts are never limited
+	T.expect((cast(state, C, "Blessing", plainProvince(state, C))))
+	T.expect((cast(state, C, "Blessing", plainProvince(state, C))))
+	-- the cooldowns expire from the state and reach the clients until then
+	local sent = Snapshot.full(state).powerCooldowns
+	T.expect(#sent >= 1 and sent[1].caster ~= nil, "cooldowns are in the snapshot")
+	state.tick += Config.Primordial.TargetCooldownTicks
+	Primordial.expire(state)
+	T.equal(next(state.powerCooldowns or {}), nil, "expired cooldowns are dropped")
+	T.equal(#Snapshot.full(state).powerCooldowns, 0)
 end)
 
 -- Charges --------------------------------------------------------------------------------------------
@@ -528,6 +561,7 @@ T.test("a Primordial earns charges and casts powers, and can do nothing else", f
 	-- the nation that eliminated him is a fair target
 	state.primordials[BOB].charges = 2
 	state.nations[A].powerImmuneUntil = 0
+	state.powerCooldowns = {} -- and Bob's own cooldown on A (from the Meteor)
 	T.expect((Commands.applyPrimordial(state, BOB, { kind = "Power", power = "Plague", target = A })))
 end)
 

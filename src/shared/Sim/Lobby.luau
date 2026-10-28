@@ -3,6 +3,9 @@
 -- 1. Lobby: players join and vote on the map. Most votes wins; a tie (or no votes) is settled by the Rng.
 --    A map the server set (Workspace "MapId", a private server's map setting) skips the vote. On a private server
 --    the owner changes the next match's settings during the vote (Sim.Settings).
+--    A public server's first lobby has no vote (the "first pick"): players who choose Play online in the start
+--    menu get in line, and the first in line picks the map alone within Config.Phases.FirstPickTicks (a random map
+--    when the time runs out). Its clock waits until someone is in line; a chooser who leaves passes the pick on.
 --    Theme vote (docs/MONETIZATION.md 3.2): the winning map is painted in the theme equipped by most of its voters.
 -- 2. Pick: on the chosen map, players pick a start nation one at a time in a random draft order. A turn that runs
 --    out picks a random free nation for that player. Bots keep every nation nobody picked.
@@ -36,18 +39,30 @@ export type LobbyView = {
 	players: { { userId: number, name: string } }, -- everyone in the server (the settings sheet's team list)
 	theme: string, -- the theme the drafted map is painted in ("" until the vote is over)
 	themeBy: { string }, -- names of the voters whose equipped theme won
+	first: boolean, -- the server's first pick: no vote, `chooser` picks the map
+	chooser: number, -- who picks the map in the first pick (userId), 0 = nobody has chosen Play online yet
+	chooserName: string, -- their display name ("" = nobody)
 }
 
 local Lobby = {}
 
 -- A fresh lobby: the vote on these maps, or no vote when the server locked one. A private server passes its owner
--- and its settings (kept from the last lobby): a map setting locks the map too.
-function Lobby.new(maps: { string }, locked: string?, owner: number?, settings: Types.MatchSettings?): LobbyState
+-- and its settings (kept from the last lobby): a map setting locks the map too. `first`: the server's first lobby
+-- with the start menu on, which is a first pick instead of a vote, unless the map is locked or it's a private
+-- server (one passes its settings: the owner's flow stays as it is).
+function Lobby.new(
+	maps: { string },
+	locked: string?,
+	owner: number?,
+	settings: Types.MatchSettings?,
+	first: boolean?
+): LobbyState
 	local s = settings or Settings.defaults()
 	local lock = locked or (if s.map ~= "" then s.map else nil)
+	local firstPick = first == true and lock == nil and owner == nil and settings == nil
 	return {
 		phase = "Lobby",
-		ticksLeft = Config.Phases.LobbyTicks,
+		ticksLeft = if firstPick then Config.Phases.FirstPickTicks else Config.Phases.LobbyTicks,
 		maps = if lock then { lock } else table.clone(maps),
 		pool = table.clone(maps),
 		locked = lock,
@@ -60,7 +75,18 @@ function Lobby.new(maps: { string }, locked: string?, owner: number?, settings: 
 		picks = {},
 		owner = owner,
 		settings = s,
+		first = firstPick,
+		queue = {},
 	}
+end
+
+-- Who picks the map in the first pick: the first player in line (nil when it isn't a first pick, or nobody has
+-- chosen Play online yet).
+function Lobby.chooser(lobby: LobbyState): number?
+	if not lobby.first or lobby.phase ~= "Lobby" then
+		return nil
+	end
+	return lobby.queue[1]
 end
 
 -- Lock the vote to one map (nil: vote on every map again).
@@ -124,9 +150,14 @@ function Lobby.winner(lobby: LobbyState, rng: Rng.Rng): string
 	return tied[Rng.int(rng, 1, #tied)]
 end
 
+-- A vote, or in the first pick the chooser's pick (anyone else waits: "NotYourTurn"). A pick ends the first pick at
+-- the next Lobby.step.
 function Lobby.vote(lobby: LobbyState, userId: number, mapId: string): (boolean, string?)
 	if lobby.phase ~= "Lobby" then
 		return false, "WrongPhase"
+	end
+	if lobby.first and Lobby.chooser(lobby) ~= userId then
+		return false, "NotYourTurn"
 	end
 	if lobby.locked then
 		return false, "Locked"
@@ -307,9 +338,19 @@ function Lobby.apply(
 	return false, "BadRequest"
 end
 
--- A player joined. While voting there is nothing to do; during the draft they join the end of the order if a
--- nation is left for them.
+-- A player joined this server's matches (arrived, or chose Play online in the start menu). In the first pick they
+-- get in line (the first in line picks, and a new chooser starts a full clock); while voting there is nothing to
+-- do; during the draft they join the end of the order if a nation is left for them.
 function Lobby.join(lobby: LobbyState, match: MatchState?, userId: number)
+	if lobby.first and lobby.phase == "Lobby" then
+		if table.find(lobby.queue, userId) == nil then
+			table.insert(lobby.queue, userId)
+			if #lobby.queue == 1 then
+				lobby.ticksLeft = Config.Phases.FirstPickTicks
+			end
+		end
+		return
+	end
 	if lobby.phase ~= "Pick" or match == nil or table.find(lobby.order, userId) then
 		return
 	end
@@ -318,9 +359,17 @@ function Lobby.join(lobby: LobbyState, match: MatchState?, userId: number)
 	end
 end
 
--- A player left: their vote goes, and during the draft their place in the order and any nation they picked.
+-- A player left: their vote (or first pick) goes, their place in the first pick's line (the next in line picks,
+-- with a full clock), and during the draft their place in the order and any nation they picked.
 function Lobby.leave(lobby: LobbyState, match: MatchState?, userId: number)
 	lobby.votes[userId] = nil
+	local queued = table.find(lobby.queue, userId)
+	if queued then
+		table.remove(lobby.queue, queued)
+		if queued == 1 then
+			lobby.ticksLeft = Config.Phases.FirstPickTicks
+		end
+	end
 	local index = table.find(lobby.order, userId)
 	if lobby.phase ~= "Pick" or index == nil then
 		return
@@ -340,14 +389,24 @@ function Lobby.leave(lobby: LobbyState, match: MatchState?, userId: number)
 	end
 end
 
--- One second of lobby time. Returns true when this phase is over: the vote (then call Lobby.startPick) or the
--- draft (then Lobby.finish). During the draft a turn that runs out picks for that player, and when the whole
--- draft time runs out everyone still waiting gets a random nation.
+-- One second of lobby time. Returns true when this phase is over: the vote or the first pick (then call
+-- Lobby.startPick) or the draft (then Lobby.finish). The first pick waits without a clock until someone is in line,
+-- and ends as soon as the chooser has picked. During the draft a turn that runs out picks for that player, and when
+-- the whole draft time runs out everyone still waiting gets a random nation.
 function Lobby.step(lobby: LobbyState, match: MatchState?, rng: Rng.Rng): boolean
-	lobby.ticksLeft -= 1
 	if lobby.phase == "Lobby" then
+		if lobby.first then
+			local chooser = lobby.queue[1]
+			if chooser == nil then
+				return false -- nobody has chosen Play online yet
+			elseif lobby.votes[chooser] then
+				return true -- picked: the draft starts now
+			end
+		end
+		lobby.ticksLeft -= 1
 		return lobby.ticksLeft <= 0
 	end
+	lobby.ticksLeft -= 1
 	if match == nil then
 		return true
 	end
@@ -405,6 +464,9 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: bo
 			players = {},
 			theme = "",
 			themeBy = {},
+			first = false,
+			chooser = 0,
+			chooserName = "",
 		}
 	end
 	local tally = Lobby.tally(lobby)
@@ -423,6 +485,7 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: bo
 	for _, userId in lobby.themeBy or {} do
 		table.insert(themeBy, names[userId] or "?")
 	end
+	local chooser = Lobby.chooser(lobby)
 	local order = {}
 	for _, userId in lobby.order do
 		table.insert(order, { userId = userId, name = names[userId] or "?", nation = lobby.picks[userId] or 0 })
@@ -444,6 +507,9 @@ function Lobby.view(lobby: LobbyState?, names: { [number]: string }, private: bo
 		players = playerList(names),
 		theme = lobby.theme or "",
 		themeBy = themeBy,
+		first = lobby.first and lobby.phase == "Lobby",
+		chooser = chooser or 0,
+		chooserName = if chooser then names[chooser] or "?" else "",
 	}
 end
 

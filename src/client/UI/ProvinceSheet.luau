@@ -4,7 +4,10 @@
 -- your race can raise, under the names and icons the map gives them, move an army) and diplomacy on foreign ones
 -- (war, ally, peace). Every button shows its price; the server decides. On an owned coast, "Ships" opens the choice of
 -- how many of the map's ships to launch (docs/DESIGN.md "Navies"); a blockaded coast's tile is greyed with an anchor.
--- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
+-- Built from the UI kit (docs/UI_DIRECTION.md 7.10): the province's name on a title plate, a row of chips (icon +
+-- value, the development as the map's pip bar) and rows of slot tiles, five to a row: routine actions on calm slate
+-- tiles whose base says their group (build bronze, recruit green), decisions (war, ally, peace) in full colour.
+-- Every tile shows its price in gold (in red when you can't pay it) and greys out when it can't be done.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,13 +25,20 @@ local Intents = require(Client.Intents)
 local Palette = require(Client.Palette)
 local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
+local MapRenderer = require(Client.MapRenderer)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local SHEET_WIDTH = 560
-local CELL = Vector2.new(126, 52) -- action tiles: four fill the sheet inside its frame, at least 44 px tall
-local CHIP_HEIGHT = 26
+-- As wide as a centred sheet can be and still clear the power button on an 844 px phone: five tiles of 124 px. On a
+-- 667 px phone it docks left at 566 px, and the tiles are 102 px (Widgets.tileWidth).
+local SHEET_WIDTH = 676
+local COLUMNS = 5 -- tiles to a row: five troops, or Develop, the three buildings and Move
+local MIN_TILE = 100 -- a sixth tile (a coast's Ships) joins its row when tiles stay this wide ("Horse archers" fits)
+local GAP = Theme.space.s -- between tiles
+local CHIP_HEIGHT = Theme.size.chip
+local CHIP_GAP = Theme.space.s
+local PIP_SCALE = 2 -- the pip bar at the map's scale, in a well 10 px wider each side
 
 local TERRAIN_ICONS: { [string]: string } = { Plains = "farm", Forest = "tree", Hills = "hills", Mountain = "mountain" }
 local BUILDING_ICONS: { [string]: string } = { Farm = "farm", Barracks = "sword", Fort = "castle" }
@@ -42,6 +52,12 @@ local titleIcon: GuiObject
 local info: Frame
 local status: Frame
 local actions: Frame
+-- the rows of tiles: build (Develop, the buildings, Move) and recruit (bronze and green slot tiles), diplomacy with a
+-- foreign owner (full colour)
+local buildRow: Frame
+local recruitRow: Frame
+local diplomacyRow: Frame
+local grids: { UIGridLayout } = {}
 local selected: number? = nil
 local shipPicker = false -- "Ships" was pressed: the actions are the 1-5 ships to launch, and Back
 local onClose: (() -> ())? = nil
@@ -51,23 +67,31 @@ local function shortMen(men: number): string
 	return if men >= 1000 then string.format("%gk", math.floor(men / 100) / 10) else tostring(men)
 end
 
--- An action button: a pixel icon, a caption and its cost (icon + number pairs) under the caption. Greyed out when
--- you can't afford it (a tap still goes to the server, which explains in a toast). `name` keeps the old caption
--- the tutorial and the harness look for.
+-- A slot tile in a row: a pixel icon, a caption and its costs (icon + number pairs; a third entry "short" shows the
+-- number in red). `style` is the row's group ("build", "recruit") or a decision's colour. Greyed out when it can't
+-- be done (a tap still goes to the server, which explains in a toast). `name` keeps the old caption the tutorial
+-- and the harness look for.
 local function action(
+	row: Frame,
 	icon: string,
 	caption: string,
 	costs: { { string } },
-	color: Color3,
+	style: string | Color3,
 	enabled: boolean,
 	onPress: () -> (),
 	name: string?
 )
-	local b = Widgets.actionButton(actions, icon, caption, costs, CELL, color, onPress, name)
-	b.LayoutOrder = #actions:GetChildren()
+	local size = Vector2.new(grids[1].CellSize.X.Offset, Widgets.TILE_HEIGHT)
+	local b = Widgets.slotTile(row, icon, caption, costs, size, style, onPress, name)
+	b.LayoutOrder = #row:GetChildren()
 	if not enabled then
 		Widgets.setEnabled(b, false)
 	end
+end
+
+-- A cost you may not be able to pay: { icon, number, "short" when `have` is under `need` }.
+local function cost(icon: string, text: string, have: number, need: number): { string }
+	return if have < need then { icon, text, "short" } else { icon, text }
 end
 
 local function chip(parent: Instance, icon: string, text: string, color: Color3?): TextLabel
@@ -79,49 +103,78 @@ local function chip(parent: Instance, icon: string, text: string, color: Color3?
 	return c
 end
 
--- Battle, siege and the armies standing here, as chips.
+-- A chip's width, estimated (TextService isn't available everywhere this runs) and erring wide: its padding, icon
+-- and gap, then Fredoka One 15 at about 8 px a character.
+local function textChipWidth(text: string): number
+	return 36 + 8 * (utf8.len(text) or #text)
+end
+
+local function chipWidth(c: GuiObject): number
+	return if c:IsA("TextLabel") then textChipWidth(c.Text) else c.Size.X.Offset
+end
+
+-- The width inside the sheet's frame.
+local function innerWidth(): number
+	local pad = sheet:FindFirstChildOfClass("UIPadding")
+	return sheet.Size.X.Offset - (if pad then pad.PaddingLeft.Offset + pad.PaddingRight.Offset else 0)
+end
+
+-- Battle, siege and the armies standing here, as chips: on the info row when they fit beside its chips (most of the
+-- time: the sheet stays short), else on a row of their own.
 local function renderStatus(provinceId: number, record: Snapshot.ProvinceRecord)
 	Widgets.clear(status)
 	local snap = ClientState.snapshot()
+	local chips: { { icon: string, text: string, color: Color3?, name: string? } } = {}
 	if record.battle then
-		chip(status, "battle", "Battle")
+		table.insert(chips, { icon = "battle", text = "Battle" })
 	elseif record.siegeRequired > 0 then -- siegeBy is 0 for Rebels
 		local by = ClientState.nation(record.siegeBy)
-		chip(
-			status,
-			"hourglass",
-			string.format(
-				"%s siege %d%%",
-				if by then by.name else "Rebels",
-				math.floor(100 * record.siegeProgress / record.siegeRequired)
-			)
-		)
+		local progress = math.floor(100 * record.siegeProgress / record.siegeRequired)
+		local text = string.format("%s siege %d%%", if by then by.name else "Rebels", progress)
+		table.insert(chips, { icon = "hourglass", text = text })
 	end
 	if record.blockade ~= 0 then -- an enemy fleet off this coast (docs/DESIGN.md "Navies")
 		local by = ClientState.nation(record.blockade)
-		local c = chip(status, "anchor", "Blockade: " .. (if by then by.name else "?"))
-		c.Name = "Blockade"
+		table.insert(
+			chips,
+			{ icon = "anchor", text = "Blockade: " .. (if by then by.name else "?"), name = "Blockade" }
+		)
 	end
 	if snap then
 		for _, a in snap.armies do
 			if a.location == provinceId then
 				local owner = ClientState.nation(a.owner)
 				if a.rebel then
-					chip(status, "rebels", shortMen(a.men) .. " Rebels")
+					table.insert(chips, { icon = "rebels", text = shortMen(a.men) .. " Rebels" })
 				elseif a.owner == 0 then
-					chip(status, "shield", shortMen(a.men) .. " garrison")
+					table.insert(chips, { icon = "shield", text = shortMen(a.men) .. " garrison" })
 				else
 					-- the icon of the troop type it is mostly made of, as on its badge on the map
 					local tint = if owner then Palette.nation(owner.colorIndex):Lerp(Color3.new(1, 1, 1), 0.45) else nil
-					local c = chip(
-						status,
-						RaceInfo.mainTroopIcon(a.troops),
-						shortMen(a.men) .. " " .. (if owner then owner.name else "?"),
-						tint
-					)
-					c.Name = "ArmyChip" .. a.id
+					table.insert(chips, {
+						icon = RaceInfo.mainTroopIcon(a.troops),
+						text = shortMen(a.men) .. " " .. (if owner then owner.name else "?"),
+						color = tint,
+						name = "ArmyChip" .. a.id,
+					})
 				end
 			end
+		end
+	end
+	local used = -CHIP_GAP
+	for _, c in info:GetChildren() do
+		if c:IsA("GuiObject") then
+			used += chipWidth(c) + CHIP_GAP
+		end
+	end
+	for _, c in chips do
+		used += textChipWidth(c.text) + CHIP_GAP
+	end
+	local row = if used <= innerWidth() then info else status
+	for _, c in chips do
+		local made = chip(row, c.icon, c.text, c.color)
+		if c.name then
+			made.Name = c.name
 		end
 	end
 	status.Visible = #status:GetChildren() > 1 -- more than its layout
@@ -129,6 +182,66 @@ end
 
 local function pips(development: number): string
 	return string.rep("●", development) .. string.rep("○", Config.Economy.MaxDevelopment - development)
+end
+
+-- The development: the map's pixel pip bar in a well, or gold text pips without EditableImage.
+local function pipChip(parent: Instance, development: number)
+	local content, size = MapRenderer.pipBar(development)
+	if content == nil then
+		chip(parent, "up", pips(development), Theme.color.gold).Name = "Development"
+		return
+	end
+	local well = Instance.new("ImageLabel")
+	well.Name = "Development"
+	well.BorderSizePixel = 0
+	well.Size = UDim2.fromOffset(size.X * PIP_SCALE + 20, CHIP_HEIGHT)
+	well.LayoutOrder = #parent:GetChildren()
+	well.Parent = parent
+	Widgets.material(well, "well")
+	local bar = Instance.new("ImageLabel")
+	bar.Name = "Pips"
+	bar.BackgroundTransparency = 1
+	bar.ResampleMode = Enum.ResamplerMode.Pixelated
+	bar.ImageContent = content
+	bar.AnchorPoint = Vector2.new(0.5, 0.5)
+	bar.Position = UDim2.fromScale(0.5, 0.5)
+	bar.Size = UDim2.fromOffset(size.X * PIP_SCALE, size.Y * PIP_SCALE)
+	bar.Parent = well
+end
+
+-- How many tiles a row holds: five, or six when a row has six (a coast's Ships tile) and they still fit at
+-- MIN_TILE (an 844 px phone); else the sixth wraps onto a new row.
+local function sizeTiles()
+	local most = COLUMNS
+	for _, row in { buildRow, recruitRow, diplomacyRow } do
+		most = math.max(most, #row:GetChildren() - 1) -- less its grid
+	end
+	local columns = COLUMNS
+	if most > COLUMNS and Widgets.tileWidth(innerWidth(), most, GAP) >= MIN_TILE then
+		columns = most
+	end
+	local cell = UDim2.fromOffset(Widgets.tileWidth(innerWidth(), columns, GAP), Widgets.TILE_HEIGHT)
+	for _, grid in grids do
+		grid.CellSize = cell
+	end
+end
+
+-- Show the rows that have tiles, sized to fill the sheet, and the sheet.
+local function showRows()
+	local any = false
+	for _, row in { buildRow, recruitRow, diplomacyRow } do
+		row.Visible = #row:GetChildren() > 1 -- more than its grid
+		any = any or row.Visible
+	end
+	sizeTiles()
+	actions.Visible = any
+	sheet.Visible = true
+end
+
+local function clearActions()
+	Widgets.clear(buildRow)
+	Widgets.clear(recruitRow)
+	Widgets.clear(diplomacyRow)
 end
 
 local function render()
@@ -140,7 +253,7 @@ local function render()
 		-- a hidden sheet keeps no chips or buttons (they are rebuilt when it opens): fewer GUI objects
 		Widgets.clear(info)
 		Widgets.clear(status)
-		Widgets.clear(actions)
+		clearActions()
 		return
 	end
 	local provinceId: number = id -- non-optional copy for the button callbacks
@@ -167,7 +280,7 @@ local function render()
 	else
 		chip(info, "flag", if def.terrain == "Mountain" then "Impassable" else "Neutral", Theme.color.textDim)
 	end
-	chip(info, "up", pips(record.development), Theme.color.gold)
+	pipChip(info, record.development)
 	if record.building ~= "None" then
 		chip(info, BUILDING_ICONS[record.building] or "castle", record.building)
 	else
@@ -175,18 +288,20 @@ local function render()
 	end
 	renderStatus(provinceId, record)
 
-	Widgets.clear(actions)
+	clearActions()
 	local coastal = def.zones ~= nil and #def.zones > 0
 	if shipPicker and mine and me and coastal then
-		-- how many ships to launch into the port zone, Config.Navy.ShipGold each (MaxShipsPerCommand at most)
+		-- how many ships to launch into the port zone, Config.Navy.ShipGold each (MaxShipsPerCommand at most), in
+		-- place of the build row; Back returns to it
 		for n = 1, Config.Navy.MaxShipsPerCommand do
-			local cost = n * Config.Navy.ShipGold
+			local price = n * Config.Navy.ShipGold
 			action(
+				buildRow,
 				"ship",
 				if n == 1 then "1 ship" else n .. " ships",
-				{ { "gold", tostring(cost) } },
-				Widgets.GOOD,
-				me.gold >= cost,
+				{ cost("gold", tostring(price), me.gold, price) },
+				"build",
+				me.gold >= price,
 				function()
 					shipPicker = false
 					Intents.buildShips(provinceId, n)
@@ -195,68 +310,43 @@ local function render()
 				"Ships_" .. n
 			)
 		end
-		action("back", "Back", {}, Widgets.BUTTON_OFF, true, function()
+		action(buildRow, "back", "Back", {}, Widgets.BUTTON_OFF, true, function()
 			shipPicker = false
 			render()
 		end, "ShipsBack")
-		actions.Visible = true
-		sheet.Visible = true
+		showRows()
 		return
 	end
 	shipPicker = false
 	if mine and me then
 		local gold = me.gold
 		if record.development < Config.Economy.MaxDevelopment then
-			local cost = Economy.developCost(record.development)
-			action("up", "Develop", { { "gold", tostring(cost) } }, Widgets.BUTTON, gold >= cost, function()
+			local price = Economy.developCost(record.development)
+			local costs = { cost("gold", tostring(price), gold, price) }
+			action(buildRow, "up", "Develop", costs, "build", gold >= price, function()
 				Intents.develop(provinceId)
 			end)
 		end
 		if record.building == "None" then
 			for _, building in BUILDABLE do
-				local cost = Economy.buildingCost(building, me.race :: Types.Race) or 0 -- Hills races: cheaper forts
-				action(
-					BUILDING_ICONS[building],
-					building,
-					{ { "gold", tostring(cost) } },
-					Widgets.BUTTON,
-					gold >= cost,
-					function()
-						Intents.build(provinceId, building)
-					end
-				)
+				local price = Economy.buildingCost(building, me.race :: Types.Race) or 0 -- Hills races: cheaper forts
+				local costs = { cost("gold", tostring(price), gold, price) }
+				action(buildRow, BUILDING_ICONS[building], building, costs, "build", gold >= price, function()
+					Intents.build(provinceId, building)
+				end)
 			end
 		end
-		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite, as the map
-		-- names them (Skyshards: troopers, gunners, hover bikes). The infantry button keeps the name "Regiment" (the
-		-- tutorial and the harness look for it), the others "Recruit_<troop id>"
-		for _, troop in RaceInfo.troops(me.race) do
-			local recruitGold, recruitManpower = Economy.recruitCost(1, troop)
-			local manpowerText = if recruitManpower % 1000 == 0
-				then recruitManpower // 1000 .. "k"
-				else tostring(recruitManpower) -- Berserkers: 750
-			action(
-				RaceInfo.troopIcon(troop),
-				RaceInfo.troopName(troop),
-				{ { "gold", tostring(recruitGold) }, { "manpower", manpowerText } },
-				Widgets.GOOD,
-				gold >= recruitGold and me.manpower >= recruitManpower,
-				function()
-					Intents.recruit(provinceId, 1, troop)
-				end,
-				if troop == "Infantry" then "Regiment" else "Recruit_" .. troop
-			)
-		end
-		-- ships on a coast: the tile opens the 1-5 choice. A blockaded coast launches nothing: greyed, with the
-		-- anchor and why (a tap asks the server anyway, which says so in a toast)
+		-- ships on a coast: the tile opens the 1-5 choice. A blockaded coast launches nothing: greyed, saying so,
+		-- with the anchor (a tap asks the server anyway, which says why in a toast)
 		if coastal then
 			local blockaded = record.blockade ~= 0
 			local shipGold = Config.Navy.ShipGold
 			action(
+				buildRow,
 				"ship",
-				"Ships",
-				{ if blockaded then { "anchor", "Blockaded" } else { "gold", tostring(shipGold) } },
-				Widgets.BUTTON,
+				if blockaded then "Blockaded" else "Ships",
+				{ if blockaded then { "anchor", "" } else cost("gold", tostring(shipGold), gold, shipGold) },
+				"build",
 				not blockaded and gold >= shipGold,
 				function()
 					if blockaded then
@@ -269,18 +359,43 @@ local function render()
 				"Ships"
 			)
 		end
+		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite, as the map
+		-- names them (Skyshards: troopers, gunners, hover bikes). The infantry button keeps the name "Regiment" (the
+		-- tutorial and the harness look for it), the others "Recruit_<troop id>"
+		for _, troop in RaceInfo.troops(me.race) do
+			local recruitGold, recruitManpower = Economy.recruitCost(1, troop)
+			local manpowerText = if recruitManpower % 1000 == 0
+				then recruitManpower // 1000 .. "k"
+				else tostring(recruitManpower) -- Berserkers: 750
+			action(
+				recruitRow,
+				RaceInfo.troopIcon(troop),
+				RaceInfo.troopName(troop),
+				{
+					cost("gold", tostring(recruitGold), gold, recruitGold),
+					cost("manpower", manpowerText, me.manpower, recruitManpower),
+				},
+				"recruit",
+				gold >= recruitGold and me.manpower >= recruitManpower,
+				function()
+					Intents.recruit(provinceId, 1, troop)
+				end,
+				if troop == "Infantry" then "Regiment" else "Recruit_" .. troop
+			)
+		end
 	end
-	-- your armies standing here: tap to pick one up and send it somewhere
+	-- your armies standing here: tap to pick one up and send it somewhere (last in the build row, by the thumb)
 	local snap = ClientState.snapshot()
 	if me and snap then
 		for _, a in snap.armies do
 			if a.location == provinceId and a.owner == me.id then
 				local armyId = a.id
 				action(
+					buildRow,
 					"arrow",
 					"Move",
 					{ { RaceInfo.mainTroopIcon(a.troops), shortMen(a.men) } },
-					Widgets.GOOD,
+					"build",
 					not a.inBattle and not a.retreating,
 					function()
 						if onSelectArmy then
@@ -292,13 +407,14 @@ local function render()
 			end
 		end
 	end
-	-- diplomacy with the owner of a foreign province
+	-- diplomacy with the owner of a foreign province: decisions, in full colour (war crimson, ally azure, peace
+	-- emerald)
 	if owner and me and owner.id ~= me.id and snap then
 		local target = owner.id
 		if Relations.atWar(me.id, target) then
 			for _, tribute in Config.Diplomacy.PeaceTributes do
-				local costs = if tribute == 0 then {} else { { "gold", "+" .. tribute } }
-				action("peace", "Peace", costs, Widgets.BUTTON, me.gold >= tribute, function()
+				local costs = if tribute == 0 then {} else { cost("gold", "+" .. tribute, me.gold, tribute) }
+				action(diplomacyRow, "peace", "Peace", costs, Widgets.GOOD, me.gold >= tribute, function()
 					Intents.diplomacy("Peace", target, tribute)
 				end, "Peace_" .. tribute)
 			end
@@ -307,18 +423,17 @@ local function render()
 				and not Relations.allied(me.id, target)
 				and not Relations.truce(me.id, target)
 				and Relations.borders(me.id, target)
-			action("war", "Declare war", {}, Widgets.DANGER, canWar, function()
+			action(diplomacyRow, "war", "Declare war", {}, Widgets.DANGER, canWar, function()
 				Intents.diplomacy("War", target)
 			end)
 			if not Relations.allied(me.id, target) then
-				action("handshake", "Ally", {}, Widgets.BUTTON, true, function()
+				action(diplomacyRow, "handshake", "Ally", {}, Widgets.BUTTON, true, function()
 					Intents.diplomacy("Ally", target)
 				end, "🤝 Ally")
 			end
 		end
 	end
-	actions.Visible = #actions:GetChildren() > 1
-	sheet.Visible = true
+	showRows()
 end
 
 function ProvinceSheet.show(provinceId: number?)
@@ -336,7 +451,7 @@ local function chipRow(order: number, name: string): Frame
 	row.Size = UDim2.new(1, 0, 0, CHIP_HEIGHT)
 	row.LayoutOrder = order
 	row.Parent = sheet
-	Widgets.list(row, true, Theme.space.s)
+	Widgets.list(row, true, CHIP_GAP)
 	return row
 end
 
@@ -370,11 +485,29 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 	actions.AutomaticSize = Enum.AutomaticSize.Y
 	actions.LayoutOrder = 4
 	actions.Parent = sheet
-	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(CELL.X, CELL.Y)
-	grid.CellPadding = UDim2.fromOffset(Theme.space.m, Theme.space.m)
-	grid.SortOrder = Enum.SortOrder.LayoutOrder
-	grid.Parent = actions
+	Widgets.list(actions, false, GAP)
+	local function tileRow(order: number, name: string): Frame
+		local row = Instance.new("Frame")
+		row.Name = name
+		row.BackgroundTransparency = 1
+		row.Size = UDim2.fromScale(1, 0)
+		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.LayoutOrder = order
+		row.Visible = false
+		row.Parent = actions
+		local grid = Instance.new("UIGridLayout")
+		grid.CellPadding = UDim2.fromOffset(GAP, GAP)
+		grid.SortOrder = Enum.SortOrder.LayoutOrder
+		grid.Parent = row
+		table.insert(grids, grid)
+		return row
+	end
+	buildRow = tileRow(1, "Build")
+	recruitRow = tileRow(2, "Recruit")
+	diplomacyRow = tileRow(3, "Diplomacy")
+	-- five (or six) tiles fill a row inside the sheet's frame, however wide the sheet docks
+	sizeTiles()
+	sheet:GetPropertyChangedSignal("Size"):Connect(sizeTiles)
 
 	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

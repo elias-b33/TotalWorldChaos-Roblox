@@ -422,6 +422,27 @@ function CommandRouter.onSandbox(handler: (Player, Types.SandboxIntent) -> (bool
 		end)
 end
 
+-- Start-menu choices (docs/DESIGN.md "Match structure"): "Online". The shape and the rate limit are checked here,
+-- then `handler` (MenuService) runs at once: a player arriving mid-match takes over a bot's nation without waiting
+-- for a tick, and the first pick's line changes before the next Lobby second. The player gets CommandResult with
+-- its answer.
+function CommandRouter.onMenu(handler: (Player, Types.MenuAction) -> (boolean, string?))
+	Remotes.event("RequestMenu").OnServerEvent:Connect(function(player: Player, requestId: unknown, action: unknown)
+		if not isId(requestId) then
+			return
+		end
+		local id = requestId :: number
+		if not RateLimit.allow(limiter, player.UserId, os.clock()) then
+			reply(player, id, false, "TooFast")
+		elseif action ~= "Online" then
+			reply(player, id, false, "BadRequest")
+		else
+			local ok, reason = handler(player, action :: Types.MenuAction)
+			reply(player, id, ok, reason)
+		end
+	end)
+end
+
 -- Rewarded video requests (the placement name, at most MAX_ITEM_ID long): the shape and the rate limit are checked
 -- here, then `handler` runs in its own thread (it yields while the ad plays) and the player gets CommandResult with
 -- its answer. AdRewardService checks the rules (Sim.Ads).

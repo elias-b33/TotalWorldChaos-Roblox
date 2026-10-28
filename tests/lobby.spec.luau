@@ -4,6 +4,7 @@ local Lobby = require("../src/shared/Sim/Lobby")
 local Maps = require("../src/shared/Maps")
 local Match = require("../src/shared/Sim/Match")
 local Rng = require("../src/shared/Sim/Rng")
+local Settings = require("../src/shared/Sim/Settings")
 local T = require("./TestKit")
 
 local function newLobby()
@@ -227,6 +228,127 @@ T.test("the view is flat and names who picked what", function()
 	T.equal(v.counts[table.find(v.maps, "earth") :: number], 1)
 	T.equal(v.votes[1].map, "earth")
 	T.equal(Lobby.view(nil, {}).phase, "None")
+end)
+
+-- The first pick (a server's first match with the start menu on) --------------------------------------------------
+
+local function firstLobby()
+	return Lobby.new(Maps.ids, nil, nil, nil, true)
+end
+
+T.test("first pick: only a public server's first lobby with no locked map, on all three maps", function()
+	local lobby = firstLobby()
+	T.equal(lobby.first, true)
+	T.equal(lobby.phase, "Lobby")
+	T.equal(#lobby.maps, 3)
+	T.equal(lobby.ticksLeft, Config.Phases.FirstPickTicks)
+	T.equal(Lobby.new(Maps.ids, "earth", nil, nil, true).first, false, "a locked map keeps the usual lobby")
+	T.equal(Lobby.new(Maps.ids, nil, 77, Settings.defaults(), true).first, false, "a private server keeps its own")
+	T.equal(Lobby.new(Maps.ids, nil, nil, Settings.defaults(), true).first, false, "a private server, owner away")
+	T.equal(newLobby().first, false, "later lobbies vote")
+end)
+
+T.test("first pick: the clock waits for the first player to choose Play online, who picks the map", function()
+	local lobby = firstLobby()
+	local rng = Rng.new(1)
+	for _ = 1, 3 * Config.Phases.FirstPickTicks do
+		T.equal(Lobby.step(lobby, nil, rng), false, "nobody in line: no clock")
+	end
+	T.equal(lobby.ticksLeft, Config.Phases.FirstPickTicks)
+	T.equal(Lobby.chooser(lobby), nil)
+	Lobby.join(lobby, nil, 7)
+	Lobby.join(lobby, nil, 8)
+	Lobby.join(lobby, nil, 7) -- a second Play online changes nothing
+	T.equal(#lobby.queue, 2)
+	T.equal(Lobby.chooser(lobby), 7, "the first in line picks")
+	T.equal(Lobby.step(lobby, nil, rng), false)
+	T.equal(lobby.ticksLeft, Config.Phases.FirstPickTicks - 1, "the clock runs once someone is in line")
+	local ok, reason = Lobby.vote(lobby, 8, "earth")
+	T.equal(ok, false)
+	T.equal(reason, "NotYourTurn", "the others wait")
+	T.equal(Lobby.vote(lobby, 7, "atlantis"), false)
+	T.expect((Lobby.vote(lobby, 7, "eldmoor")), "the chooser picks")
+	T.equal(Lobby.step(lobby, nil, rng), true, "the pick ends the first pick at once")
+	for seed = 1, 10 do
+		T.equal(Lobby.winner(lobby, Rng.new(seed * 104729)), "eldmoor", "no vote: the pick wins")
+	end
+end)
+
+T.test("first pick: when the chooser's time runs out the map is random", function()
+	local seen: { [string]: boolean } = {}
+	for seed = 1, 40 do
+		local lobby = firstLobby()
+		local rng = Rng.new(seed * 104729)
+		Lobby.join(lobby, nil, 7)
+		for _ = 1, Config.Phases.FirstPickTicks - 1 do
+			T.equal(Lobby.step(lobby, nil, rng), false)
+		end
+		T.equal(Lobby.step(lobby, nil, rng), true, "FirstPickTicks after the chooser came in line")
+		seen[Lobby.winner(lobby, rng)] = true
+	end
+	T.expect(seen.earth and seen.eldmoor and seen.skyshards, "any map can come up")
+end)
+
+T.test("first pick: a chooser who leaves passes the pick on with a full clock", function()
+	local lobby = firstLobby()
+	local rng = Rng.new(1)
+	Lobby.join(lobby, nil, 7)
+	Lobby.join(lobby, nil, 8)
+	Lobby.join(lobby, nil, 9)
+	for _ = 1, 5 do
+		Lobby.step(lobby, nil, rng)
+	end
+	Lobby.vote(lobby, 7, "earth")
+	Lobby.leave(lobby, nil, 7)
+	T.equal(Lobby.chooser(lobby), 8)
+	T.equal(lobby.ticksLeft, Config.Phases.FirstPickTicks)
+	T.equal(Lobby.step(lobby, nil, rng), false, "the leaver's pick went with them")
+	Lobby.leave(lobby, nil, 9) -- leaving the line further back changes nothing for the chooser
+	T.equal(Lobby.chooser(lobby), 8)
+	T.equal(lobby.ticksLeft, Config.Phases.FirstPickTicks - 1)
+	Lobby.leave(lobby, nil, 8)
+	T.equal(Lobby.chooser(lobby), nil)
+	T.equal(Lobby.step(lobby, nil, rng), false, "an empty line waits again")
+end)
+
+T.test("first pick: the draft follows on the picked map with those in line, and later joiners go to its end", function()
+	local lobby = firstLobby()
+	Lobby.join(lobby, nil, 7)
+	Lobby.join(lobby, nil, 8)
+	Lobby.vote(lobby, 7, "skyshards")
+	local match = Match.new(Maps.get(Lobby.winner(lobby, Rng.new(1))))
+	Lobby.startPick(lobby, match, { 7, 8 }, Rng.new(3))
+	T.equal(lobby.phase, "Pick")
+	T.equal(match.mapId, "skyshards")
+	T.equal(Lobby.chooser(lobby), nil, "no chooser once the draft runs")
+	Lobby.join(lobby, match, 9)
+	T.equal(#lobby.order, 3)
+	T.equal(lobby.order[3], 9)
+	T.equal(Lobby.vote(lobby, 7, "earth"), false, "no more picks")
+end)
+
+T.test("first pick: the view names the chooser", function()
+	local lobby = firstLobby()
+	local empty = Lobby.view(lobby, { [7] = "Alice" })
+	T.equal(empty.first, true)
+	T.equal(empty.chooser, 0)
+	T.equal(empty.chooserName, "")
+	Lobby.join(lobby, nil, 7)
+	local view = Lobby.view(lobby, { [7] = "Alice", [8] = "Bob" })
+	T.equal(view.chooser, 7)
+	T.equal(view.chooserName, "Alice")
+	T.equal(view.ticksLeft, Config.Phases.FirstPickTicks)
+	T.equal(Lobby.view(newLobby(), {}).first, false)
+	T.equal(Lobby.view(nil, {}).first, false)
+end)
+
+T.test("first pick: the chooser's equipped theme paints the map, as a vote would", function()
+	local lobby = firstLobby()
+	Lobby.join(lobby, nil, 7)
+	Lobby.join(lobby, nil, 8)
+	Lobby.vote(lobby, 7, "earth")
+	local theme = Lobby.chooseTheme(lobby, "earth", { [7] = "theme_night", [8] = "theme_winter" })
+	T.equal(theme, "theme_night")
 end)
 
 T.test("theme vote: the winning map uses the theme equipped by most of its voters", function()

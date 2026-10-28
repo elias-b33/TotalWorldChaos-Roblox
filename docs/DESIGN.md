@@ -33,7 +33,7 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 
 **Phases**
 
-1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, teams, map and theme.
+1. **Lobby (60 s):** players join and vote on the map with three cards (tap a card, tap it again to vote). Most votes wins; a tie, or no votes, is settled at random. A server locked to one map (Workspace `MapId`, or a private server's map setting) shows only that card and skips the vote. On a private server the owner changes the next match's settings here (`docs/MONETIZATION.md` 3.4): length, Peace, bots, powers, disasters, teams, map and theme. A public server's first match has no vote: the first player to choose Play online picks the map ("Start menu" below).
 2. **Pick (up to 30 s):** the chosen map shows every nation's start territory, and players pick a start nation one at a time in a random draft order, by tapping its land (then confirming) or its name in the list. Each turn lasts 30 s ÷ players (3–8 s); a turn that runs out picks a random free nation. Someone who joins during the draft goes to the end of the order. Bots take the rest. The match clock starts at 0:00 when the draft ends.
 3. **Peace (0–3 min):** no wars between nations; expand into neutral provinces and build.
 4. **Open war (3–20 min):** everything unlocked.
@@ -41,6 +41,19 @@ A match runs 25 minutes in six phases and always ends with a winner: a nation ho
 6. **Results (30 s):** winner, stats and XP. Then the Lobby opens again to vote on the next map; everyone stays in the server.
 
 Joining mid-match takes over a bot's nation. For Studio solo tests (and the harness) the Workspace attribute `SkipLobby` starts every match straight in Peace.
+
+**Start menu**
+
+A player arriving on a public or private server first sees a brass window over the map (or the Lobby) with three big tiles, **Play online** (gold), **Singleplayer** and **How to play**, and under them one line saying what the server is doing: who is picking the map, the vote's clock, the draft, or a match on. New players still go to the tutorial first, as before (`TutorialService`); the menu is for everyone else. Tutorial and sandbox servers have no menu.
+
+- **Play online** (`RequestMenu "Online"` through `CommandRouter`, then `MenuService`, at once): the server closes the menu and the player joins this server's matches: the first pick's line, the vote, the end of the draft, or mid-match a bot's nation straight away (as joining did before). Until then the player only watches: not drafted, not seated, and a bot keeps playing the nation they will get.
+- **Singleplayer:** three map cards (Earth, Eldmoor, Skyshards, with their thumbnails): tap one, tap it again, and `Intents.enterSandbox(map)` sends the player to a world of their own ("Sandbox"). Studio can't teleport: the menu's line says so.
+- **How to play:** five pages of three steps, each an icon and one short line: Grow (recruit, march, win the siege), War and sieges, Allies, Primordial powers, How to win. A pager turns the pages; ✕ goes back. Its numbers come from `Config`. There is no "Play the tutorial" button: a tutorial match pays like any match, against 5 Easy bots, so replaying it would be an easy Glory farm until a replayed tutorial pays nothing.
+- **First pick:** a public server's first Lobby is a first pick instead of a vote. Players who choose Play online get in line, and the first in line picks the map on the vote's three cards (tap, tap again); the pick starts the draft at once, with everyone in line. The clock (`Config.Phases.FirstPickTicks`, 20 s) runs only while someone is in line; when it runs out the map is random. A chooser who leaves passes the pick to the next in line with a full clock. Everyone else in line sees "Alice is picking the map" on the cards (and the menu's line says it too), and everyone hears the result: "Alice picked Eldmoor", or "Time's up: Eldmoor it is". The server keeps the line and refuses anyone else's pick (`NotYourTurn`; `Sim/Lobby`). Later matches vote as before.
+- **Private servers and locked maps:** the menu shows, but a private server (the owner's settings and map, the owner's flow) and a server locked to a map (`MapId`) keep the usual Lobby for every match, the first included.
+- **Studio:** `SkipLobby` turns the menu off too. The Workspace attribute `Menu` decides it: `true` shows it even with `SkipLobby` (an arrival during a solo match), `false` hides it and the first match votes. The harness boots every scenario with `Menu` = false except `menu`.
+- **Analytics:** `menu_shown`, `menu_choice` and `first_pick` (`docs/LAUNCH.md`).
+- **UI:** `UI/Menu` above every other screen, the screen dimmed behind it; every decision two taps, text at least 14 px, buttons at least 44 px; it fits 844×390, 667×375 and the tablets (`Widgets.fit`). The first pick reuses the vote screen (`UI/MapVote`).
 
 **Win conditions**
 
@@ -64,7 +77,7 @@ A world of your own, WorldBox style: the ten nations of a map play as bots while
 - **Where:** a sandbox needs a server of its own, so it runs on a reserved server of the same place, like the tutorial. The entry point is `Intents.enterSandbox(mapId?)` on the client (`RequestSandbox "Enter"` → `SandboxService.enter(player, mapId?)`): from any server it teleports the player to a fresh reserved server with teleport data `{ mode = "sandbox", map = mapId }`; on a sandbox server it starts a new world instead. The start menu's Singleplayer button calls it. A reserved server learns what it is for from its first player's teleport data (`ServerMode`); without `mode = "sandbox"` it plays the tutorial as before. The data comes through the client, so a forged one could only swap a tutorial for a sandbox, and neither pays anything. A new player sent to a sandbox is never sent on to the tutorial. **World → Play online** goes back to a public server; a failed teleport is a toast and the button works again. In Studio (no teleports, no reserved servers) the Workspace attribute `Sandbox` (`true`, or a map id) makes the server a sandbox from the start; `MapId` works too.
 - **The world:** the map the player was sent with (the default map otherwise), all ten nations as Normal bots (`Config.Sandbox.Difficulty`), no Lobby. A player arrives **watching**. **World → New world** starts over on any of the three maps, at 1× with disasters off, everyone watching again.
 - **Play as (take over any nation):** two taps, Play as then a nation, any time. The player leads that nation from then on, with its land, armies, gold, wars and alliances; the nation they leave goes back to a bot at once (the bots plan for it from the next tick). **Watch** gives the nation back and keeps only the powers. Every people of the map is playable this way, one after another. Only a living nation nobody else holds can be taken (another player's is "Taken": only Studio tests have two). A player whose nation falls goes back to watching: no Primordial rises, since their powers are free anyway.
-- **Free powers:** all six Primordial powers, with no charges, in every phase (Peace too), whether the player leads a nation or watches. The targeting rules stay: never a mountain, Earthquake only on a province with a building, Rebels, Blessing and Shield on a nation's province, Meteor on an army, Plague on a nation. The 30 s immunity is off for the whole world, and a harmful power may hit the player's own nation (it's their world). Bots still pay with their nations' charges and wait for War, as in a match.
+- **Free powers:** all six Primordial powers, with no charges, in every phase (Peace too), whether the player leads a nation or watches. The targeting rules stay: never a mountain, Earthquake only on a province with a building, Rebels, Blessing and Shield on a nation's province, Meteor on an army, Plague on a nation. The immunity and the per-caster cooldown are off for the whole world, and a harmful power may hit the player's own nation (it's their world). Bots still pay with their nations' charges and wait for War, as in a match.
 - **Time:** pause, 1×, 2× and 4× (`Config.Sandbox.Speeds`): the server runs that many ticks a second. Its loop wakes every `Config.Sandbox.BeatSeconds` (0.25 s) and runs a tick whenever the speed has gathered a game second; a late beat catches up at most `MaxTicksPerBeat` ticks. Paused, the clock stops and the bots wait, but orders and powers still land within a beat. The controls travel in the snapshot and its deltas (`MatchState.sandbox`), so the client's clock and the armies' glide follow the speed, and stand still when paused.
 - **Phases:** the usual Peace (3:00, so the peoples spread over the neutral land first), then War for ever. No Cataclysm, no Results, no win check: domination, alliance victory and 25:00 end nothing. The top bar's clock counts up.
 - **Disasters:** off at the start. **World → Disasters** switches them on: a random harmful power on a random valid target (the Cataclysm's rule) every 60 s from that moment, in any phase, until switched off.
@@ -237,7 +250,7 @@ Each map's water is split into named **sea zones** (on Skyshards, **space zones*
 
 ### Primordial powers
 
-Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s, counted from the moment they rose (each Primordial has its own clock; nations share the match clock because they all start at 0:00). A nation can be hit by a Primordial power at most once per 30 s.
+Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60 s, counted from the moment they rose (each Primordial has its own clock; nations share the match clock because they all start at 0:00). A nation can be hit by a harmful power at most once per 60 s, from anyone, and the same caster can hit the same nation at most once per 2 minutes, so no Primordial can focus one nation (`Config.Primordial.ImmunityTicks`, `TargetCooldownTicks`; owner request).
 
 | Power | Effect | Charges |
 | --- | --- | --- |
@@ -250,9 +263,9 @@ Living nations earn 1 charge every 4 minutes; Primordials earn 1 charge every 60
 
 - Targets: Meteor an army; Plague a nation; Rebels, Blessing and Shield a nation's province; Earthquake a province with a building. Mountains are never a target.
 - Powers work in War and Cataclysm, not in Peace. Charges stop at `Config.Primordial.MaxCharges` (5).
-- The 30 s limit applies to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Shield are gifts and ignore it.
+- Both limits apply to the harmful powers (Meteor, Plague, Rebels, Earthquake), which can't target your own nation; Blessing and Shield are gifts and ignore them. A Cataclysm disaster has no caster, so only the immunity applies to it. A caster is a living nation, or a Primordial (a player keeps one cooldown clock per target while a nation and gets a fresh one on rising).
 - Meteor's limit is checked for the army's owner, who then becomes immune. The province it stands in loses its development level only if that province's owner isn't immune, and that loss doesn't make the owner immune.
-- The power picker shows an immune nation as unavailable (with the seconds left) instead of sending a power the server would refuse.
+- The power picker shows an immune nation as unavailable (with the seconds left), and a nation you hit less than 2 minutes ago as "You can hit X again in N s", instead of sending a power the server would refuse.
 - Rebels besiege the province they rise in; when the siege ends it turns neutral. On the map they are a black 🏴 token that always shows, unlike neutral garrisons.
 - A Primordial may target anyone, including the nation that eliminated them.
 - Cataclysm disasters are a random harmful power on a random valid nation target (seeded), every 60 s from 21:00.
@@ -334,10 +347,10 @@ A sandbox server ("Sandbox") runs the same order at the speed its player sets (n
 
 ### Networking
 
-- **On join:** one full snapshot of provinces, nations and armies.
+- **On join:** one full snapshot of provinces, nations, armies and fleets.
 - **Every tick:** one batched delta with only what changed (owners, development, blockades, armies, fleets, battle events).
 - **Army movement:** an `UnreliableRemoteEvent` with progress between province centres; the client interpolates the token.
-- **Fleet movement:** a sailing fleet's record carries its progress towards the next zone, so it is in every delta while it sails (fleets are few); the client glides the token between zone centres. The snapshot holds only the fleets `Navy.visible` shows (everyone sees every fleet for now, so one delta still goes to everyone; fog of war will need one per viewer).
+- **Fleet movement:** a sailing fleet's progress towards its next zone goes on the same unreliable channel as the moving armies (in a list of its own), so its record is in a delta only when something else changes: a new zone, a battle, its hull, cargo or orders. The client glides the token between zone centres. The snapshot and the positions hold only the fleets `Navy.visible` shows (everyone sees every fleet for now, so one delta and one positions stream go to everyone; fog of war will need one per viewer). A sailing fleet costs about 36 bytes a tick (4 numbers) plus its record once per zone it enters, where it cost a whole record every tick before.
 - **Intents:** the client fires `Request…` remotes; the server answers with `CommandResult` (ok or reason).
 
 ### Security
@@ -433,7 +446,7 @@ export type Nation = {
     manpower: number,
     charges: number,
     allianceId: number?,
-    powerImmuneUntil: number,  -- 30 s Primordial-power protection
+    powerImmuneUntil: number,  -- 60 s protection from harmful Primordial powers
     eliminated: boolean,
 }
 
@@ -566,7 +579,7 @@ export type Command =
 | `CommandResult` | server → client | requestId, ok, reason |
 | `Snapshot` | server → client | full match state, sent on join (every nation's race, every army's composition, the fleets you see with the men aboard) |
 | `Delta` | server → client | changed provinces (with their blockade), nations, armies (with their composition), fleets (with their progress while sailing), events |
-| `ArmyPositions` (unreliable) | server → client | armyId, from, to, progress |
+| `ArmyPositions` (unreliable) | server → client | tick; moving armies (id, from, to, progress %) and sailing fleets (id, from zone, to zone, progress %), two flat arrays, 16 a message |
 | `Notify` | server → client | toast type and text |
 | `RequestBuy` | client → server | itemId, "Glory" or "Robux" |
 | `RequestEquip` | client → server | itemId |
@@ -577,6 +590,8 @@ export type Command =
 | `RequestAd` | client → server | the rewarded video placement (`quest_reroll`); the reply comes when the video ends |
 | `NotificationPrompt` | server → client | after your first finished match: ask to turn on experience notifications (once per profile) |
 | `RequestSandbox` | client → server | `Enter` map (from any server: off to a new sandbox world), `Leave`, `Speed` 0/1/2/4, `Play` nation (0 = watch), `Disasters` on, `NewWorld` map; all but `Enter` only on a sandbox server ("Sandbox") |
+| `RequestMenu` | client → server | `Online`: the start menu's Play online (join this server's matches) |
+| `Menu` | server → client | true = show your start menu, false = close it |
 
 ## UI and controls
 
@@ -738,6 +753,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] `AIService` on Normal; bots fill empty slots and replace leavers
 - [x] Elimination and the Primordial role
 - [x] 6 Primordial powers with charges and cooldowns
+- [x] No focus-firing: a 60 s immunity after any harmful power, and a 2-minute cooldown per caster per nation (owner request; the power picker shows both)
 - [x] Catch-up rules: overextension, underdog, coalition
 - [x] Cataclysm phase
 
@@ -764,6 +780,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] "Slate & Brass" GUI (`docs/UI_DIRECTION.md` section 8), step 1: painted pixel frames (`FrameArt`, `Frames`, `Widgets.skin`) and enamel buttons everywhere; the harness draws 9-slice frames, shadows and stacked strokes
 - [x] "Slate & Brass" GUI step 2: every window, sheet and panel framed (brass for meta and reward screens, iron in the match, plates for popovers and toasts), titles on brass plates on the frame's edge with the corner close gem, hard pixel shadows, dimmed modal windows, the province sheet docked left of the power button on small phones
 - [x] "Slate & Brass" GUI step 3: the top bar as plates in Roblox's own top-bar row (`GuiService.TopbarInset`, with a fallback row under it), a scrim, counters with riding icons, the clock in a phase medallion, the `fitBar` order on small phones, one `Hud.contentTop()` for everything under the bar; on tablets the whole UI scales up with the screen's short side (`Theme.uiScale`, phones stay at 1)
+- [x] "Slate & Brass" GUI step 4: the province sheet's actions as slot tiles five to a row (`Widgets.slotTile`: build bronze, recruit green, diplomacy in full colour; gold costs, red when short, greyed when not possible), a coast's Ships tile in the build row (six to a row when they fit), the development as the map's pip bar in a well, status chips on the info row when they fit; army and fleet composition as icon + men chips and a route line; the power button as a royal medallion with the picker docked beside it; your row raised in the nations drawer; offers on plates with a counter, under the toasts' line
 - [x] A cast of five peoples for every map, data-driven (`Config.Races`, `Config.Casts`): human civilisations on Earth, the fantasy peoples and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards with troopers, gunners and hover bikes; seven passive kinds; an elite, a soldier, a capital and icons for each (evidence: `docs/BALANCE.md` section 19)
 
 **Gate 4:** 10 testers who have never played finish the tutorial without help.
@@ -779,6 +796,7 @@ Five phases, each ending in a playtest gate the owner runs in Studio.
 - [x] Weekly, friends and global leaderboards; achievements
 - [x] Rewarded video quest reroll; experience notifications
 - [x] Singleplayer sandbox ("Sandbox"): a reserved server of your own, all ten nations as bots, Play as any nation, free powers, pause to 4×, no end and no rewards (harness scenario `sandbox`)
+- [x] Start menu ("Match structure"): Play online, Singleplayer (three map cards, then the sandbox) and How to play (five pages); a server's first match on the first player's map pick, with no vote; later matches vote (harness scenario `menu`)
 - [ ] Soft-launch gates met (`docs/LAUNCH.md`) before Season 1
 - [x] Navies, stage 1: sea and space zones in the map data (generator, validator, `MapData`), the rules for ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades and war across the sea (`Sim/Navy.luau`, tests in `tests/navy.spec.luau`)
 - [x] Navies, stage 2: the orders through `CommandRouter`, fleets in the snapshot, the ship art for each map, fleet tokens and sea zones on the map, the fleet sheet, toasts, a harness scenario (`tools/harness/scenarios/navy.luau`), a `docs/STUDIO.md` recipe

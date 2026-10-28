@@ -2,10 +2,12 @@
 -- Boots the server and runs the 1-second tick (docs/DESIGN.md "Tick order").
 -- Step 1 is CommandRouter, steps 2-8 are Shared.Sim.Tick (via MatchService), step 7 (bots) is AIService, step 9 is
 -- Replicator. Between matches the Lobby runs instead (map vote, then nation draft; LobbyService), unless Workspace
--- has SkipLobby set, which starts every match straight away. A tutorial server (TutorialService) skips the Lobby too
--- and plays the tutorial match. A sandbox server (SandboxService) plays one never-ending world in its own loop, at
--- the speed its player sets. A reserved server first waits for its player to learn which of the two it is
--- (ServerMode).
+-- has SkipLobby set, which starts every match straight away. Players arriving on a public or private server see the
+-- start menu first (MenuService) and join the matches when they choose Play online; a public server's first lobby is
+-- then a first pick (the first of them picks the map) instead of a vote. A tutorial server (TutorialService) skips
+-- the Lobby too and plays the tutorial match. A sandbox server (SandboxService) plays one never-ending world in its
+-- own loop, at the speed its player sets. A reserved server first waits for its player to learn which of the two it
+-- is (ServerMode).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
+local Maps = require(Shared.Maps)
 local Remotes = require(Shared.Remotes)
 local Sandbox = require(Shared.Sim.Sandbox)
 local Types = require(Shared.Types)
@@ -26,6 +29,7 @@ local CommandRouter = require(Server.CommandRouter)
 local DevService = require(Server.Services.DevService)
 local LobbyService = require(Server.Services.LobbyService)
 local MatchService = require(Server.Services.MatchService)
+local MenuService = require(Server.Services.MenuService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
@@ -46,6 +50,8 @@ local PHASE_TOASTS = {
 	Results = "The match is over",
 }
 
+local firstLobby = true -- with the start menu on, the server's first lobby is a first pick instead of a vote
+
 -- A tutorial match seats its player in the tutorial nation; a sandbox player arrives watching.
 local function seat(player: Player): number?
 	if SandboxService.enabled() then
@@ -56,11 +62,11 @@ local function seat(player: Player): number?
 	return MatchService.seat(player)
 end
 
--- Seat everyone who is already here (in join order), apply a private server's bot count and teams, then send
--- each their snapshot.
+-- Seat everyone who is already here and has joined the matches (in join order; players still in the start menu
+-- watch), apply a private server's bot count and teams, then send each their snapshot.
 local function seatAll(state: Types.MatchState, prepare: boolean)
 	local seats: { [Player]: number? } = {}
-	for _, player in Players:GetPlayers() do
+	for _, player in MenuService.onlinePlayers() do
 		seats[player] = seat(player)
 	end
 	if prepare then
@@ -94,25 +100,55 @@ end
 -- Lobby, part 1: the map vote (also after Results, for the next map). Everyone stays in the server.
 local function openLobby()
 	TutorialService.stop()
-	LobbyService.open(MatchService.lockedMap())
+	LobbyService.open(MatchService.lockedMap(), firstLobby and MenuService.enabled())
+	firstLobby = false
 	CommandRouter.clear()
 	Replicator.sendLobby(LobbyService.view())
 	ShopService.onPhase("Lobby")
 	TelemetryService.lobbyOpened() -- analytics: a new MatchFlow session for everyone here
-	print("[server] lobby open: vote on the map")
+	local lobby = assert(LobbyService.state())
+	print(
+		if lobby.first
+			then "[server] lobby open: the first to choose Play online picks the map"
+			else "[server] lobby open: vote on the map"
+	)
 end
 
--- Lobby, part 2: the vote is over; the draft runs on a fresh match of the winning map, shown to everyone.
+local function nameOf(player: Player): string
+	return if player.DisplayName ~= "" then player.DisplayName else player.Name
+end
+
+-- The first pick is over: everyone hears the map and who picked it (or that the time ran out).
+local function announceFirstPick(lobby: Types.LobbyState, mapId: string)
+	local chooser = Players:GetPlayerByUserId(lobby.queue[1] or 0)
+	local title = Maps.get(mapId).title
+	if chooser and lobby.votes[chooser.UserId] then
+		Replicator.notifyAll("Lobby", string.format("🗺 %s picked %s", nameOf(chooser), title))
+		print(string.format("[server] first pick: %s picked %s", chooser.Name, mapId))
+	else
+		Replicator.notifyAll("Lobby", string.format("⏳ Time's up: %s it is", title))
+		print(string.format("[server] first pick: time's up, %s at random", mapId))
+	end
+end
+
+-- Lobby, part 2: the vote (or the first pick) is over; the draft runs on a fresh match of the winning map, shown to
+-- everyone. Those who joined the matches are drafted; anyone still in the start menu joins the draft's end later.
 local function startPick()
+	local lobby = assert(LobbyService.state())
 	local mapId = LobbyService.winner()
 	local setup = LobbyService.setup()
 	-- the theme vote: the theme most of the map's voters have equipped (or the server's setting)
 	LobbyService.chooseTheme(mapId, ShopService.themesByUser(), MatchService.forcedTheme(setup))
 	local state = MatchService.start(mapId, setup)
-	TelemetryService.voteOver(assert(LobbyService.state())) -- analytics: map_vote for every voter
+	if lobby.first then
+		TelemetryService.firstPick(lobby, mapId) -- analytics: first_pick for the chooser
+		announceFirstPick(lobby, mapId)
+	else
+		TelemetryService.voteOver(lobby) -- analytics: map_vote for every voter
+	end
 	CommandRouter.clear()
 	AIService.reset(state.setup.settings.difficulty)
-	LobbyService.startPick(state) -- also paints the match in the chosen theme
+	LobbyService.startPick(state, MenuService.onlinePlayers()) -- also paints the match in the chosen theme
 	Replicator.reset(state)
 	for _, player in Players:GetPlayers() do
 		Replicator.sendSnapshot(player, state, nil)
@@ -120,7 +156,8 @@ local function startPick()
 	print(string.format("[server] draft on %s", state.mapId))
 end
 
--- The draft is over: the match starts in Peace at tick 0. Anyone who didn't get a turn takes a bot's nation.
+-- The draft is over: the match starts in Peace at tick 0. Anyone who joined but didn't get a turn takes a bot's
+-- nation.
 local function startDraftedMatch()
 	LobbyService.finish()
 	local state = MatchService.state()
@@ -212,6 +249,38 @@ local function nextMatch()
 	end
 end
 
+-- A player joins this server's matches (on arrival, or with the start menu's Play online): the first pick's line,
+-- the vote, the end of the draft, or a bot's nation mid-match. `arriving`: they have been sent nothing yet.
+local function join(player: Player, arriving: boolean)
+	if LobbyService.active() then
+		LobbyService.join(player)
+		local drafted = LobbyService.match()
+		if drafted and arriving then
+			Replicator.sendSnapshot(player, drafted, nil)
+		end
+		Replicator.sendLobby(LobbyService.view()) -- everyone: the first pick's chooser may be new
+		return
+	end
+	local nationId = seat(player)
+	if arriving or nationId ~= nil then
+		Replicator.sendSnapshot(player, MatchService.state(), nationId)
+	end
+end
+
+-- A player arriving with the start menu on watches what the server is doing behind it until Play online.
+local function arriveAtMenu(player: Player)
+	if LobbyService.active() then
+		local drafted = LobbyService.match()
+		if drafted then
+			Replicator.sendSnapshot(player, drafted, nil)
+		end
+		Replicator.sendLobby(LobbyService.view(), player)
+	else
+		Replicator.sendSnapshot(player, MatchService.state(), nil)
+	end
+	MenuService.show(player)
+end
+
 Replicator.init()
 CommandRouter.init(MatchService.nationOf)
 PlayerDataService.init()
@@ -232,6 +301,9 @@ LeaderboardService.init()
 Replicator.setCosmetics(ShopService.cosmetics)
 TelemetryService.init()
 SandboxService.init()
+MenuService.init(function(player: Player)
+	join(player, false)
+end)
 ServerMode.await() -- a reserved server learns from its first player whether it plays the tutorial or a sandbox
 if SandboxService.enabled() then
 	startSandbox(SandboxService.firstMap())
@@ -240,19 +312,17 @@ else
 end
 
 Players.PlayerAdded:Connect(function(player)
-	if LobbyService.active() then
-		-- joining the vote or the draft: the lobby, and the drafted map if there is one
-		LobbyService.join(player)
-		local drafted = LobbyService.match()
-		if drafted then
-			Replicator.sendSnapshot(player, drafted, nil)
-		end
-		Replicator.sendLobby(LobbyService.view(), player)
-		return
+	if MenuService.enabled() then
+		arriveAtMenu(player)
+	else
+		join(player, true)
 	end
-	local nationId = seat(player)
-	Replicator.sendSnapshot(player, MatchService.state(), nationId)
 end)
+if MenuService.enabled() then
+	for _, player in Players:GetPlayers() do
+		arriveAtMenu(player) -- arrived while the server was starting
+	end
+end
 
 Players.PlayerRemoving:Connect(function(player)
 	if LobbyService.active() then

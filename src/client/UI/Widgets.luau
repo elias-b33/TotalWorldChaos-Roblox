@@ -825,18 +825,22 @@ local function pressable(b: GuiButton, gradient: UIGradient?)
 	end)
 end
 
--- Paint a button: the enamel frame in its colour's style, its caption on the face.
-local function skinButton(b: GuiObject, color: Color3)
-	if Widgets.skin(b, "button", Widgets.styleOf(color)) then
+-- Paint a button: the enamel frame in its colour's style (or `style`, e.g. a slot tile's), its caption on the face.
+local function skinButton(b: GuiObject, color: Color3, style: Frames.Style?)
+	if Widgets.skin(b, "button", style or Widgets.styleOf(color)) then
 		setInsets(b, FACE_TOP, FACE_BOTTOM)
 	end
 end
 
--- A button at least 44 px tall: an enamel face in its role's colour (Widgets.GOLD for the screen's one primary
--- action, GOOD to confirm or buy, DANGER for war and close, BUTTON for diplomacy and info, SPECIAL for Primordial
--- and season, BUTTON_OFF for secondary) on a thick base, with an outlined Fredoka One caption. Gold gets dark text.
-function Widgets.button(parent: Instance, text: string, width: number, color: Color3?, onPress: () -> ()): TextButton
-	local c = color or Widgets.BUTTON
+-- A button whose enamel can be a style of its own (a slot tile's), `color` being its flat look's fill.
+local function newButton(
+	parent: Instance,
+	text: string,
+	width: number,
+	c: Color3,
+	style: Frames.Style?,
+	onPress: () -> ()
+): TextButton
 	local b = Instance.new("TextButton")
 	b.Size = UDim2.fromOffset(width, Widgets.BUTTON_HEIGHT)
 	b.BackgroundColor3 = c
@@ -851,10 +855,17 @@ function Widgets.button(parent: Instance, text: string, width: number, color: Co
 	Widgets.corner(b, Theme.radius.s)
 	Widgets.stroke(b)
 	local bevel = Widgets.bevel(b)
-	skinButton(b, c)
+	skinButton(b, c, style)
 	pressable(b, bevel)
 	b.Activated:Connect(onPress)
 	return b
+end
+
+-- A button at least 44 px tall: an enamel face in its role's colour (Widgets.GOLD for the screen's one primary
+-- action, GOOD to confirm or buy, DANGER for war and close, BUTTON for diplomacy and info, SPECIAL for Primordial
+-- and season, BUTTON_OFF for secondary) on a thick base, with an outlined Fredoka One caption. Gold gets dark text.
+function Widgets.button(parent: Instance, text: string, width: number, color: Color3?, onPress: () -> ()): TextButton
+	return newButton(parent, text, width, color or Widgets.BUTTON, nil, onPress)
 end
 
 -- A button with a pixel icon (16 px) before its text. `name` (optional) is the button's Name, e.g. its old emoji
@@ -941,6 +952,80 @@ function Widgets.actionButton(
 		b.Name = name
 	end
 	return b
+end
+
+-- Slot tiles (docs/UI_DIRECTION.md 7.10): routine actions (build, recruit, powers) on calm slate tiles whose base
+-- says their group, and decisions (war, ally, peace) on the same tile in full colour. The caption runs across the
+-- top in Fredoka One 14 (room for "Horse archers" on a 102 px tile), the 32 px icon sits under it at the left and
+-- the costs stack to its right.
+Widgets.TILE_HEIGHT = 64
+local TILE_PAD = 6 -- left and right, inside the tile's 2 px outline
+local TILE_TOP = 4 -- the caption's top, under the face's lit edge
+local TILE_ICON_Y = 15 -- the icon (and the costs beside it) under the caption: 32 px down to the tile's base
+local TILE_COST_X = Theme.size.iconButton + 4
+local TILE_LINE = 16 -- a cost's line
+
+-- A slot tile `size` px (Widgets.TILE_HEIGHT tall): `style` is a group ("build" bronze, "recruit" green, "powers"
+-- royal: slate faces that differ only in their base) or a colour for a decision (Widgets.DANGER...). `costs` are
+-- icon + number pairs ({ { "gold", "40" }, { "manpower", "1k" } }); a third entry "short" shows that number in
+-- red (you can't pay it). Grey it out with Widgets.setEnabled(tile, false). `name` (optional) is its Name.
+function Widgets.slotTile(
+	parent: Instance,
+	icon: string,
+	caption: string,
+	costs: { { string } },
+	size: Vector2,
+	style: string | Color3,
+	onPress: () -> (),
+	name: string?
+): TextButton
+	local group = if typeof(style) == "string" then style else nil
+	local base = if group then FrameArt.TILE_BASES[group] else nil
+	-- the flat look (no painted frames) fills the tile with its group's base colour
+	local flat = if base then Color3.fromHex(string.format("%06x", base.B)) else style :: Color3
+	local b = newButton(parent, caption, size.X, flat, if group then "tile:" .. group else nil, onPress)
+	b.Size = UDim2.fromOffset(size.X, size.Y)
+	b.TextSize = Theme.text.small
+	b.TextWrapped = false
+	b.TextTruncate = Enum.TextTruncate.AtEnd
+	b.TextXAlignment = Enum.TextXAlignment.Left
+	b.TextYAlignment = Enum.TextYAlignment.Top
+	-- the caption under the face's lit edge, everything clear of the base (the flat look's darker band too)
+	local pad = Widgets.padding(b, TILE_PAD, 0)
+	pad.PaddingTop = UDim.new(0, TILE_TOP)
+	pad.PaddingBottom = UDim.new(0, FACE_BOTTOM)
+	local i = Icons.label(b, icon, Theme.size.iconButton)
+	i.Position = UDim2.fromOffset(0, TILE_ICON_Y)
+	i.ZIndex = 2
+	for k, cost in costs do
+		local l = Widgets.label(b, cost[2], Theme.text.small, TILE_LINE)
+		l.Name = "Cost"
+		l.FontFace = Theme.font.display
+		l.TextColor3 = if cost[3] == "short"
+			then Theme.color.negative
+			elseif cost[1] == "gold" then Theme.color.gold
+			else Theme.color.text
+		l.Size = UDim2.fromOffset(0, TILE_LINE)
+		l.AutomaticSize = Enum.AutomaticSize.X
+		l.TextWrapped = false
+		-- one cost sits level with the icon's middle; two share its height
+		local y = if #costs == 1 then TILE_ICON_Y + TILE_LINE // 2 else TILE_ICON_Y + (k - 1) * TILE_LINE
+		l.Position = UDim2.fromOffset(TILE_COST_X, y)
+		l.ZIndex = 2
+		Widgets.textStroke(l, 1.5)
+		Widgets.leadIcon(l, cost[1], Theme.size.icon, 2)
+	end
+	if name then
+		b.Name = name
+	end
+	return b
+end
+
+-- The width of `columns` slot tiles side by side in `width` px, `gap` apart: an even number, so frames stay on the
+-- pixel grid.
+function Widgets.tileWidth(width: number, columns: number, gap: number): number
+	local w = math.floor((width - (columns - 1) * gap) / columns)
+	return w - w % 2
 end
 
 -- A square button showing just an icon (32 px on a 44 px gem). `name` is the button's Name (what the harness and
@@ -1140,6 +1225,34 @@ function Widgets.medallion(parent: Instance, size: string, style: Frames.Style, 
 	i.Position = UDim2.fromScale(0.5, 0.5)
 	i.ZIndex = 4
 	return m, i
+end
+
+-- A medallion you press (the power button): a transparent button `name` holding the medallion, with a hard
+-- shadow under its round outline. Returns the button and the medallion.
+function Widgets.medallionButton(
+	parent: Instance,
+	size: string,
+	style: Frames.Style,
+	icon: string,
+	name: string,
+	onPress: () -> ()
+): (TextButton, ImageLabel)
+	local px = Frames.size(MEDALLIONS[size] or "medallion").X
+	local b = Instance.new("TextButton")
+	b.Name = name
+	b.Size = UDim2.fromOffset(px, px)
+	b.BackgroundTransparency = 1
+	b.AutoButtonColor = false
+	b.Text = ""
+	b.Parent = parent
+	local round = Instance.new("UICorner")
+	round.CornerRadius = UDim.new(0.5, 0)
+	round.Parent = b
+	local m = Widgets.medallion(b, size, style, icon)
+	Widgets.shadow(b, "plate")
+	pressable(b, nil)
+	b.Activated:Connect(onPress)
+	return b, m
 end
 
 -- A small badge (a count on a button, "NEW"): Fredoka One 14 on a crimson enamel pill (or `color`; gold gets dark

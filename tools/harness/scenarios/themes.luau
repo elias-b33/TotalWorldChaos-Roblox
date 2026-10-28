@@ -123,6 +123,7 @@ local function run()
 		for _, n in state.nations do
 			n.powerImmuneUntil = 0
 		end
+		state.powerCooldowns = {} -- and each caster's 2-minute cooldown
 		local ok, why = Primordial.use(state, { nation = by }, power, target)
 		H.expect(ok, power .. " was cast (" .. tostring(why) .. ")")
 	end

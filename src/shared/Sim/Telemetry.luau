@@ -39,6 +39,9 @@ Telemetry.CUSTOM_EVENTS = {
 	"notification_opt_in",
 	"tutorial_skipped",
 	"sandbox_started",
+	"menu_shown",
+	"menu_choice",
+	"first_pick",
 }
 
 -- The one-time onboarding funnel (LogOnboardingFunnelStepEvent), in step order.
@@ -72,6 +75,15 @@ Telemetry.CLIENT_SIGNALS = {
 	ItemViewed = true, -- Shop funnel step 2 (another tab or page of items)
 	OfferOpened = true, -- StarterPack funnel step 2 (the pop-up is on screen)
 	NotificationPrompt = true, -- notification_opt_in: "shown" (Roblox's opt-in prompt opened) or "ineligible"
+	MenuChoice = true, -- menu_choice for the start menu's UI-only choices: "singleplayer" or "guide"
+} :: { [string]: boolean }
+
+-- menu_choice's choices: the start menu's three buttons. Play online is logged by the server when it acts on it;
+-- Singleplayer (opening its map cards) and How to play come from the client (MenuChoice).
+Telemetry.MENU_CHOICES = {
+	online = true,
+	singleplayer = true,
+	guide = true,
 } :: { [string]: boolean }
 
 Telemetry.GLORY = "Glory"
@@ -352,6 +364,44 @@ end
 -- No funnels, no onboarding steps, no match or player events: a sandbox is not a match.
 function Telemetry.sandboxAllows(e: Event): boolean
 	return e.kind == "Economy" or (e.kind == "Custom" and e.name == "sandbox_started")
+end
+
+-- The start menu ------------------------------------------------------------------------------------------------
+
+-- What the server is doing while a player looks at the start menu: "first" (the first pick), "lobby" (the vote),
+-- "pick" (the draft), "match" or "results". `lobby` is the open lobby (nil during a match), `matchPhase` the
+-- running match's phase.
+function Telemetry.menuWhere(lobby: Types.LobbyState?, matchPhase: string?): string
+	if lobby then
+		if lobby.phase == "Pick" then
+			return "pick"
+		end
+		return if lobby.first then "first" else "lobby"
+	end
+	return if matchPhase == "Results" then "results" else "match"
+end
+
+-- The start menu opened for a player arriving on a public or private server.
+function Telemetry.menuShown(where: string, private: boolean, userId: number): Event
+	return Telemetry.custom("menu_shown", 1, { where, if private then "private" else "public" }, userId)
+end
+
+-- A start-menu choice (Telemetry.MENU_CHOICES) and what the server was doing (Telemetry.menuWhere).
+function Telemetry.menuChoice(choice: string, where: string, userId: number): Event
+	assert(Telemetry.MENU_CHOICES[choice], "unknown menu choice " .. choice)
+	return Telemetry.custom("menu_choice", 1, { choice, where }, userId)
+end
+
+-- The first pick is over on `mapId`: the seconds the chooser took, the map, and whether they picked it ("picked")
+-- or the time ran out ("timeout"). nil when the lobby wasn't a first pick or nobody was in line.
+function Telemetry.firstPick(lobby: Types.LobbyState, mapId: string): Event?
+	local chooser = lobby.queue[1]
+	if not lobby.first or chooser == nil then
+		return nil
+	end
+	local seconds = Config.Phases.FirstPickTicks - math.max(lobby.ticksLeft, 0)
+	local how = if lobby.votes[chooser] then "picked" else "timeout"
+	return Telemetry.custom("first_pick", seconds, { mapId, how }, chooser)
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

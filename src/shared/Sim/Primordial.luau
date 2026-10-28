@@ -4,8 +4,10 @@
 --
 -- Who casts: a living nation pays with its own charges; an eliminated player rises as a Primordial
 -- (MatchState.primordials) with charges of their own. Powers work in War and Cataclysm, never in Peace.
--- Harmful powers (Meteor, Plague, Rebels, Earthquake) respect the nation's 30 s immunity and start it again;
--- Blessing and Shield are gifts and ignore it. A Primordial may target anyone, the nation that beat them included.
+-- Harmful powers (Meteor, Plague, Rebels, Earthquake) respect the nation's 60 s immunity and start it again, and
+-- one caster may hit the same nation at most once per 2 minutes, so nobody can focus one nation (disasters have
+-- no caster). Blessing and Shield are gifts and ignore both. A Primordial may target anyone, the nation that beat
+-- them included.
 -- Meteor targets an army: the army's owner must not be immune and becomes immune. It kills half of every troop type
 -- in the army. The development level it also costs the province is skipped while that province's owner is immune,
 -- and doesn't start their immunity. Rebels are infantry.
@@ -31,9 +33,29 @@ export type Caster = { nation: number?, userId: number?, free: boolean? }
 
 local Primordial = {}
 
--- The 30 s immunity to harmful powers: on in every match, off in a sandbox world.
+-- The immunity and the per-caster cooldown on harmful powers: on in every match, off in a sandbox world.
 local function immunityOn(state: MatchState): boolean
 	return state.setup.sandbox ~= true
+end
+
+-- A caster's key in MatchState.powerCooldowns: "n<nation>" for a living nation, "u<userId>" for a Primordial.
+function Primordial.casterKey(caster: Caster): string?
+	if caster.nation then
+		return "n" .. caster.nation
+	elseif caster.userId then
+		return "u" .. caster.userId
+	end
+	return nil
+end
+
+-- Ticks until this caster may hit this nation with a harmful power again (0 = now).
+function Primordial.cooldownLeft(state: MatchState, caster: Caster, nationId: number): number
+	local key = Primordial.casterKey(caster)
+	local cooldowns = state.powerCooldowns
+	if key == nil or cooldowns == nil or not immunityOn(state) then
+		return 0
+	end
+	return math.max(0, (cooldowns[key .. ">" .. nationId] or 0) - state.tick)
 end
 
 -- Fixed order: events carry a power as its index in this list.
@@ -229,6 +251,9 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 	if Primordial.HARMFUL[power] and caster.nation ~= nil and hit == caster.nation then
 		return false, "OwnTarget"
 	end
+	if Primordial.HARMFUL[power] and hit ~= 0 and Primordial.cooldownLeft(state, caster, hit) > 0 then
+		return false, "Cooldown" -- this caster hit that nation less than TargetCooldownTicks ago
+	end
 	local cost = Primordial.cost(power)
 	if charges < cost then
 		return false, "NotEnoughCharges"
@@ -239,6 +264,12 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 		state.primordials[caster.userId].charges -= cost
 	end
 	local killed = strike(state, power, target, hit, at)
+	local key = Primordial.casterKey(caster)
+	if Primordial.HARMFUL[power] and hit ~= 0 and key and immunityOn(state) then
+		local cooldowns = state.powerCooldowns or {}
+		cooldowns[key .. ">" .. hit] = state.tick + Config.Primordial.TargetCooldownTicks
+		state.powerCooldowns = cooldowns
+	end
 	-- the caster's nation (a Primordial's: the one it held; a sandbox player's: the one they hold, if any) goes along,
 	-- so clients show its power-effect cosmetic
 	local by = caster.nation or (if caster.userId then state.seats[caster.userId] else nil)
@@ -416,6 +447,14 @@ end
 
 -- Forget plagues, blessings and shields that have run out.
 function Primordial.expire(state: MatchState)
+	local cooldowns = state.powerCooldowns
+	if cooldowns then
+		for key, ends in cooldowns do
+			if ends <= state.tick then
+				cooldowns[key] = nil
+			end
+		end
+	end
 	for _, nation in state.nations do
 		if nation.plagueUntil and nation.plagueUntil <= state.tick then
 			nation.plagueUntil = nil

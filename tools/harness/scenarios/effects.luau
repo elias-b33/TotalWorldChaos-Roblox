@@ -101,11 +101,13 @@ local function run()
 	H.shot(alice, "capture")
 	Emulator.run(2)
 
-	-- Primordial powers, cast by Zephyr's nation through Sim.Primordial (immunity cleared between harmful ones)
+	-- Primordial powers, cast by Zephyr's nation through Sim.Primordial (immunity and the caster's 2-minute cooldown
+	-- cleared between harmful ones)
 	local caster = { nation = 2 }
 	local function cast(power: string, targetId: number)
 		state.nations[2].charges = 5
 		state.nations[A].powerImmuneUntil = 0
+		state.powerCooldowns = {}
 		local ok, why = Primordial.use(state, caster, power, targetId)
 		H.expect(ok, power .. " was cast (" .. tostring(why) .. ")")
 	end

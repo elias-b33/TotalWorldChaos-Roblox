@@ -41,7 +41,8 @@ local REASONS: { [string]: string } = {
 	AllianceFull = "🤝 Alliance is full (3)",
 	NoOffer = "⌛ That offer expired",
 	NotEnoughCharges = "⚡ Not enough charges",
-	Immune = "🛡 Hit by a power less than 30 s ago",
+	Immune = "🛡 Hit by a power less than a minute ago",
+	Cooldown = "⏳ You hit that nation less than 2 minutes ago",
 	NoBuilding = "🏚 No building there",
 	OwnTarget = "🚫 Not on yourself",
 	NoPowersYet = "⏳ Powers unlock when Peace ends",
@@ -182,6 +183,12 @@ end
 -- Tutorial: "Skip" it, or "Leave" for a public server once it is over.
 function Intents.tutorial(action: string)
 	send("RequestTutorial", action)
+end
+
+-- The start menu's Play online: join this server's matches (the first pick, the vote, the draft or a bot's nation).
+-- The server closes the menu (the Menu remote).
+function Intents.playOnline()
+	send("RequestMenu", "Online")
 end
 
 -- Singleplayer: off to a sandbox world of your own on `mapId` (nil = the default map; the player can make a new

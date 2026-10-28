@@ -1,8 +1,9 @@
 --!strict
 -- Sends a full snapshot to a player when they join (or a new match starts), then one delta per tick to everyone.
--- Records carry what clients need: every nation's race, every army's composition, the fleets with the men aboard
--- and their progress while sailing, each coast's blockade (Shared.Snapshot). Everyone sees every fleet for now
--- (Sim.Navy.visible), so one delta goes to all; fog of war will need one per viewer (Snapshot.full's viewer).
+-- Records carry what clients need: every nation's race, every army's composition, the fleets with the men aboard,
+-- each coast's blockade (Shared.Snapshot). Moving armies and sailing fleets report their progress on the unreliable
+-- channel instead, so their records don't change every tick. Everyone sees every fleet for now (Sim.Navy.visible), so
+-- one delta and one positions stream go to all; fog of war will need one per viewer (Snapshot.full's viewer).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -56,7 +57,7 @@ function Replicator.reset(state: Types.MatchState)
 end
 
 -- Tick order step 9: one delta with only what changed since the last tick, plus this tick's events.
--- Then moving armies' positions on the unreliable channel. Events are spent once sent.
+-- Then moving armies' and sailing fleets' positions on the unreliable channel. Events are spent once sent.
 function Replicator.broadcast(state: Types.MatchState)
 	local current = full(state)
 	if lastSent then
@@ -71,16 +72,17 @@ function Replicator.broadcast(state: Types.MatchState)
 	local positions = Snapshot.positions(state, function(provinceId, army)
 		return Movement.moveTicks(state, army, provinceId) -- its slowest troop's speed (Elves: forest as plains)
 	end)
-	local flat = {}
+	-- ArmyPositions(tick, armies, fleets): id, from, to, progress in percent, armies and fleets in separate arrays
+	local armies, fleets = {}, {}
 	for i, p in positions do
-		-- id, from, to, progress in percent
+		local flat = if p.fleet then fleets else armies
 		table.insert(flat, p.id)
 		table.insert(flat, p.from)
 		table.insert(flat, p.to)
 		table.insert(flat, math.floor(p.progress * 100 + 0.5))
 		if i % POSITIONS_PER_MESSAGE == 0 or i == #positions then
-			positionsRemote:FireAllClients(state.tick, flat)
-			flat = {}
+			positionsRemote:FireAllClients(state.tick, armies, fleets)
+			armies, fleets = {}, {}
 		end
 	end
 end

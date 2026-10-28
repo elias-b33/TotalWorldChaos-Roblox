@@ -163,7 +163,7 @@ How it is built:
 - Budget: each server sends at most 120 + 20 × its players per minute and drops the rest (the Output says how many).
 - Every call needs a Player. Match-wide events (`nation_start`, `match_end`, `match_win`, and `player_result` for bot nations) go out for the player in the server with the lowest userId.
 - No names, chat or other personal data: userIds only where AnalyticsService needs the Player. Custom field values are strings (map ids, nation slots, buckets, item ids); match minutes have one decimal.
-- UI-only steps (`lobby_loaded`, `shop_opened`, `item_viewed`, `offer_opened`) come from the client through `RequestTelemetry`, checked and rate-limited by `CommandRouter`. They change nothing in the game.
+- UI-only steps (`lobby_loaded`, `shop_opened`, `item_viewed`, `offer_opened`, and the start menu's Singleplayer and How to play choices) come from the client through `RequestTelemetry`, checked and rate-limited by `CommandRouter`. They change nothing in the game.
 
 ### Onboarding funnel (`LogOnboardingFunnelStepEvent`)
 
@@ -182,7 +182,7 @@ How it is built:
 | 11 | `first_match_finished` |
 | 12 | `second_match_started` |
 
-Steps 5–10 are the tutorial prompts in DESIGN.md, logged as each one is done. Steps are only logged for players with fewer than 2 finished matches. `lobby_loaded` is the client saying its screens are built. Roblox counts a skipped step as done when a later one arrives, so a skipped tutorial also logs `tutorial_skipped` (custom events below). `TutorialService` still prints `[tutorial] … started`, `finished in N s` and `skipped at prompt N` in the Output.
+Step 3 is also logged for the player who picks a server's first map (the first pick has no vote). Steps 5–10 are the tutorial prompts in DESIGN.md, logged as each one is done. Steps are only logged for players with fewer than 2 finished matches. `lobby_loaded` is the client saying its screens are built. Roblox counts a skipped step as done when a later one arrives, so a skipped tutorial also logs `tutorial_skipped` (custom events below). `TutorialService` still prints `[tutorial] … started`, `finished in N s` and `skipped at prompt N` in the Output.
 
 ### Funnels (`LogFunnelStepEvent`, 6 of the 10 allowed)
 
@@ -242,8 +242,11 @@ Always pass the ending balance (Robux: 0, since games can't read a player's Robu
 | `notification_opt_in` | 1 | result (shown, ineligible) | — | — | Notification reach |
 | `tutorial_skipped` | prompt reached (1–6) | prompt name | — | — | Tutorial completion |
 | `sandbox_started` | 1 | map | start (first, new_world) | — | Singleplayer use, map choice |
+| `menu_shown` | 1 | where (first, lobby, pick, match, results) | server (public, private) | — | Menu reach, when players arrive |
+| `menu_choice` | 1 | choice (online, singleplayer, guide) | where (as `menu_shown`) | — | Online vs Singleplayer, guide use |
+| `first_pick` | seconds the chooser took | map | how (picked, timeout) | — | First-match map choice |
 
-That's 18 custom event names out of 100, so there's room for events and new modes. `nation_start` is logged a minute into the match (or at Results, if sooner), so late joiners count as human; `player_result` is logged for every nation. `quest_rerolled` is logged for every reroll with what paid for it (a Glory reroll also logs the `quest_reroll` Glory sink), `ad_rewarded` for every rewarded video and `notification_opt_in` for the notification prompt; `quest_completed` is ready for the quest claim. Roblox doesn't tell the game whether the player accepted the notification prompt, so `notification_opt_in` logs `shown` (the prompt opened) or `ineligible` (Roblox said not to ask); the opt-in count is on the Creator Dashboard (experience notifications analytics, "Opted-in Users"). `sandbox_started` is logged once per player and world in the singleplayer sandbox (DESIGN.md "Sandbox"): `first` when they arrive, `new_world` for each New world. A sandbox server sends nothing else but the economy events of real purchases: no funnels, onboarding steps or match events (`Sim.Telemetry.sandboxAllows`).
+That's 21 custom event names out of 100, so there's room for events and new modes. `nation_start` is logged a minute into the match (or at Results, if sooner), so late joiners count as human; `player_result` is logged for every nation. `quest_rerolled` is logged for every reroll with what paid for it (a Glory reroll also logs the `quest_reroll` Glory sink), `ad_rewarded` for every rewarded video and `notification_opt_in` for the notification prompt; `quest_completed` is ready for the quest claim. Roblox doesn't tell the game whether the player accepted the notification prompt, so `notification_opt_in` logs `shown` (the prompt opened) or `ineligible` (Roblox said not to ask); the opt-in count is on the Creator Dashboard (experience notifications analytics, "Opted-in Users"). `sandbox_started` is logged once per player and world in the singleplayer sandbox (DESIGN.md "Sandbox"): `first` when they arrive, `new_world` for each New world. A sandbox server sends nothing else but the economy events of real purchases: no funnels, onboarding steps or match events (`Sim.Telemetry.sandboxAllows`). The start menu (DESIGN.md "Match structure") logs `menu_shown` when it opens for an arriving player, with what the server was doing (`first` is a server's first pick); `menu_choice` for Play online (logged by the server when it takes the player in), Singleplayer (opening its map cards) and How to play (`guide`; both from the client's `MenuChoice` signal); and `first_pick` once per server, for the player who picked (or was picking when the time ran out). A first pick logs no `map_vote`; later votes do (round `lobby` only if no match was played on the server before).
 
 **Weekly review (every Monday, 30 minutes):**
 
