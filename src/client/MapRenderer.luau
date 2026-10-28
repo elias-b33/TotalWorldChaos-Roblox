@@ -54,6 +54,7 @@ type Token = {
 	target: Vector2,
 	neutral: boolean, -- a neutral garrison: hidden below the region zoom
 	rebel: boolean, -- Rebels: owner 0 too, but always shown, with a 🏴
+	owner: number,
 	province: number,
 	skinned: boolean, -- drawn with a token skin sprite (no square outline unless selected)
 }
@@ -189,13 +190,21 @@ local function layoutNames(z: number, detail: boolean)
 end
 
 -- Everything that depends on the zoom: names, garrisons, and how the pixels are sampled.
+-- An army's size label shows from the region zoom inwards; zoomed out, only on your own armies, Rebels and the
+-- selected army, so a busy map isn't a pile of numbers.
+local function sizeShown(id: number, token: Token, detail: boolean): boolean
+	local me = ClientState.myNation()
+	return detail or token.rebel or id == selectedArmy or (me ~= 0 and token.owner == me)
+end
+
 local function onZoom(z: number)
 	local detail = detailVisible(z)
 	layoutNames(z, detail)
-	for _, token in tokens do
+	for id, token in tokens do
 		if token.neutral then
 			token.frame.Visible = detail
 		end
+		token.label.Visible = sizeShown(id, token, detail)
 	end
 	local label = imageLabel
 	if label then
@@ -652,10 +661,13 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		target = target,
 		neutral = neutral,
 		rebel = rebel,
+		owner = army.owner,
 		province = army.location,
 		skinned = skinned,
 	}
-	frame.Visible = not neutral or detailVisible(MapView.zoom())
+	local detail = detailVisible(MapView.zoom())
+	frame.Visible = not neutral or detail
+	label.Visible = sizeShown(army.id, token, detail)
 	return token
 end
 
@@ -743,18 +755,24 @@ function MapRenderer.select(provinceId: number?)
 end
 
 function MapRenderer.selectArmy(armyId: number?)
-	if selectedArmy and tokens[selectedArmy] then
-		local old = tokens[selectedArmy]
+	local previous = selectedArmy
+	if previous and tokens[previous] then
+		local old = tokens[previous]
 		old.stroke.Color = if old.rebel then Palette.rebelEdge else TOKEN_EDGE
 		old.stroke.Thickness = 2
 		old.stroke.Enabled = not old.skinned
 	end
 	selectedArmy = armyId
+	local detail = detailVisible(MapView.zoom())
+	if previous and tokens[previous] then
+		tokens[previous].label.Visible = sizeShown(previous, tokens[previous], detail)
+	end
 	local token = if armyId then tokens[armyId] else nil
-	if token then
+	if token and armyId then
 		token.stroke.Color = Color3.fromRGB(255, 230, 90)
 		token.stroke.Thickness = 3
 		token.stroke.Enabled = true
+		token.label.Visible = true
 	end
 end
 
