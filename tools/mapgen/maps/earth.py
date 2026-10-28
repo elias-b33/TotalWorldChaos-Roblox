@@ -20,10 +20,12 @@ from PIL import Image, ImageDraw
 from layout import (
     Layout,
     Seed,
+    ZoneSeed,
     assign_start_territories,
     auto_connect,
     balance_start_development,
     build_regions,
+    build_sea_zones,
     curated_straits,
     finalize,
 )
@@ -295,6 +297,38 @@ STRAITS = [
 ]
 WRAP_STRAITS = [("Chukotka", "Alaska")]  # Bering Strait, across the map edge
 
+# Navies (docs/DESIGN.md "Navies"): the map's one ship type, and its sea zones: a name and seed points (lat, lon),
+# the first where the zone's name and fleets stand. Water goes to the nearest seed over water, across the map's
+# left and right edges too (the Pacific). At this scale Gibraltar, the Bosporus and the Øresund are land borders, so
+# the Mediterranean, the Black Sea and the Baltic are water of their own: SEA_LINKS joins them like the real
+# channels. The Caspian is a lake (no zone, no ships).
+SHIP = "Galleon"
+SEA_ZONES = [
+    ("Arctic Ocean", [(79, 75), (77, 140)]),
+    ("Norwegian Sea", [(69, 3), (62, -8)]),
+    ("North Sea", [(56, 3)]),
+    ("Baltic Sea", [(57.5, 19.5)]),
+    ("North Atlantic", [(47, -35), (58, -38), (47, -12), (36, -62), (72, -65)]),
+    ("Hudson Bay", [(60, -86)]),
+    ("Caribbean Sea", [(15, -75), (25, -90)]),
+    ("South Atlantic", [(-25, -15), (-45, -40)]),
+    ("Gulf of Guinea", [(1, 2)]),
+    ("Mediterranean", [(35.5, 18), (34, 28)]),
+    ("Black Sea", [(43.3, 34)]),
+    ("Arabian Sea", [(15, 63), (20, 38), (27, 51)]),
+    ("Indian Ocean", [(-20, 75), (-25, 55), (-30, 105), (-40, 125)]),
+    ("Bay of Bengal", [(14, 88)]),
+    ("Java Sea", [(-5, 112), (-9, 124)]),
+    ("South China Sea", [(13, 114), (20.5, 121)]),
+    ("East China Sea", [(28, 126)]),
+    ("Sea of Japan", [(40, 135), (50, 148)]),
+    ("North Pacific", [(40, 170), (45, -150), (60, -172), (58, -165), (72, -150)]),
+    ("Coral Sea", [(-17, 155), (-38, 162)]),
+    ("East Pacific", [(15, -115)]),
+    ("South Pacific", [(-30, -110), (-35, 178)]),
+]
+SEA_LINKS = [("Mediterranean", "North Atlantic"), ("Black Sea", "Mediterranean"), ("Baltic Sea", "North Sea")]
+
 # Neutral garrisons above the 1,000-man default. Volga and Zambezi had quiet backyards no other nation reaches early
 # (western Siberia; the Horn, Abyssinia and Madagascar) and won about twice their share: these wilds hold out longer.
 GARRISONS = {"Ob": 2000, "Yenisei": 2000, "Madagascar": 2000, "Horn": 2000, "Abyssinia": 2000}
@@ -330,6 +364,9 @@ def build() -> Layout:
     auto_connect(lay)
     assign_start_territories(lay, races=RACES)
     balance_start_development(lay)
+    zone_seeds = [ZoneSeed(name, [project(lon, lat) for lat, lon in points]) for name, points in SEA_ZONES]
+    build_sea_zones(lay, zone_seeds, SEA_LINKS, wrap_x=True, zone_range=(15, 22))
+    lay.ship = SHIP
     return lay
 
 

@@ -4,6 +4,8 @@
 export type ProvinceId = number
 export type NationId = number
 export type ArmyId = number
+export type FleetId = number
+export type ZoneId = number -- a sea zone (docs/DESIGN.md "Navies"; space zones on Skyshards)
 
 export type Terrain = "Plains" | "Forest" | "Hills" | "Mountain"
 export type Building = "None" | "Farm" | "Barracks" | "Fort"
@@ -29,6 +31,7 @@ export type Province = {
 	siege: { by: NationId, progress: number, required: number, lastTick: number }?,
 	shieldUntil: number?, -- tick when a Shield (Primordial power) ends
 	buffs: { [string]: number }, -- buff name -> tick it ends
+	blockade: NationId?, -- an enemy fleet off its coast blockades it (Sim.Navy.blockades): the blockading nation
 }
 
 export type Nation = {
@@ -60,6 +63,36 @@ export type Army = {
 	inBattle: boolean,
 	rebel: boolean?, -- true for the neutral army a Rebels power raised (clients draw it apart from garrisons)
 	retreating: boolean?, -- beaten: walking home on its path; takes no orders, doesn't fight, block or besiege
+	boardFleet: FleetId?, -- walking to the coast to board this fleet (Sim.Navy: the Embark order)
+}
+
+-- Navies (docs/DESIGN.md "Navies"). A fleet is a stack of the map's one ship type in a sea zone, shown as one token:
+-- a nation's fleets that stand still in the same zone merge, like armies. It fights at sea with its hull, carries
+-- Config.Navy.ShipCapacity men per ship, and the men aboard are a composition like an army's (they are no army
+-- while at sea: they land as one).
+export type Fleet = {
+	id: FleetId,
+	owner: NationId,
+	zone: ZoneId,
+	hull: number, -- its strength: Config.Navy.ShipHull per ship; a damaged fleet has less (Navy.ships rounds up)
+	troops: Composition, -- the men aboard, per troop type
+	men: number, -- the men aboard in all; changes only through Navy.setCargo, which keeps it in step with `troops`
+	path: { ZoneId }, -- remaining route
+	moveProgress: number, -- ticks spent toward the next zone
+	inBattle: boolean,
+	retreating: boolean?, -- beaten: sailing to the nearest zone off a friendly coast; no orders, no fighting
+	landAt: ProvinceId?, -- unload the men aboard here on reaching a zone that is its coast
+}
+
+-- A sea zone during a match, from the map's SeaZoneDef (static).
+export type SeaZone = { id: ZoneId, name: string, neighbors: { ZoneId }, coasts: { ProvinceId } }
+
+-- A fight between fleets in one sea zone, like a land Battle (Config.Battle.Rounds rounds, one per tick).
+export type SeaBattle = {
+	zone: ZoneId,
+	round: number,
+	attackerRoll: number,
+	defenderRoll: number,
 }
 
 export type War = { id: number, attackers: { NationId }, defenders: { NationId }, startedAt: number }
@@ -91,8 +124,19 @@ export type Offer = {
 -- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a),
 -- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province, by = the caster's nation, for a
 -- Primordial the nation it last held, so clients show the caster's power-effect cosmetic; men = the men a Meteor
--- killed, for achievements), Disaster (same fields, no caster), Eliminated(a)
-export type MatchEvent = { kind: string, a: number, b: number, province: number, by: number?, men: number? }
+-- killed, for achievements), Disaster (same fields, no caster), Eliminated(a). Navies (zone = the sea zone):
+-- SeaBattle(a won against b), Blockade(a starts blockading b's coast, province = the first province blockaded),
+-- Embarked(a = the army that boarded whole and is gone, b = its fleet, province = where it stood), Landed(a = the
+-- new army, b = the fleet, province), FleetMerged(a = the fleet that stays, b = the one removed).
+export type MatchEvent = {
+	kind: string,
+	a: number,
+	b: number,
+	province: number,
+	by: number?,
+	men: number?,
+	zone: number?,
+}
 
 export type MatchResult = {
 	kind: "Domination" | "Alliance" | "Score",
@@ -139,6 +183,14 @@ export type MatchState = {
 	nextArmyId: ArmyId, -- army ids are never reused (clients and queued commands refer to armies by id)
 	mergedInto: { [ArmyId]: ArmyId }, -- an army merged into another stack -> the army that took its men (Army.resolve)
 	battles: { [ProvinceId]: Battle },
+	-- Navies (docs/DESIGN.md "Navies"). The sea zones and the straits' zones come from the map and never change.
+	zones: { [ZoneId]: SeaZone },
+	shores: { [ProvinceId]: { ZoneId } }, -- the zones each coastal province touches, its port (where ships launch) first
+	straits: { [ProvinceId]: { [ProvinceId]: ZoneId } }, -- a strait's two ends (both ways) -> the zone it crosses
+	fleets: { [FleetId]: Fleet },
+	nextFleetId: FleetId, -- fleet ids are never reused either
+	fleetMergedInto: { [FleetId]: FleetId }, -- like mergedInto, for fleets (Navy.resolve)
+	seaBattles: { [ZoneId]: SeaBattle },
 	offers: { Offer },
 	events: { MatchEvent },
 	result: MatchResult?, -- set when someone has won; the phase is then Results
@@ -212,11 +264,23 @@ export type ProvinceDef = {
 	startOwner: number?, -- start slot 1..10, nil = neutral
 	isCapital: boolean,
 	garrison: number?, -- neutral garrison override, men
+	zones: { ZoneId }?, -- the sea zones it is a coast of, the one it shares most shore with first (its port); nil inland
 }
 
 export type NationDef = { slot: number, name: string, capital: ProvinceId, colorIndex: number, race: Race }
 
-export type StraitDef = { a: ProvinceId, b: ProvinceId, from: Point, to: Point, wrap: boolean }
+-- zone: the sea zone the strait crosses (a hostile fleet there blocks it, docs/DESIGN.md "Navies")
+export type StraitDef = { a: ProvinceId, b: ProvinceId, from: Point, to: Point, wrap: boolean, zone: ZoneId }
+
+-- A sea zone (space zone on Skyshards): its name and fleets stand at `center`; `coasts` are the provinces it touches.
+export type SeaZoneDef = {
+	id: ZoneId,
+	name: string,
+	center: Point, -- map pixels, like ProvinceDef.center
+	area: number, -- map pixels
+	neighbors: { ZoneId },
+	coasts: { ProvinceId },
+}
 
 -- Which province each pixel of the 2D map belongs to (0 = sea or sky), 1 pixel = 1 stud: run-length encoded
 -- (id: u8, length: u16 little-endian) triples in base64, decoded by MapGrid.
@@ -227,10 +291,13 @@ export type MapDef = {
 	title: string,
 	theme: string, -- texture set: "earth" | "fantasy" | "sky"
 	imageSize: Point,
+	ship: string, -- the map's one ship type by name: "Galleon", "Dragonship", "Starship"
 	nations: { NationDef },
 	provinces: { ProvinceDef },
 	straits: { StraitDef },
+	seaZones: { SeaZoneDef },
 	grid: GridDef,
+	seaGrid: GridDef, -- which sea zone each pixel of the 2D map belongs to (0 = land or a lake), like `grid`
 }
 
 -- Intents: what a player or bot asks for. CommandRouter checks the shape, Sim/Commands checks the rules.
@@ -246,6 +313,12 @@ export type Command =
 	| { kind: "Diplomacy", action: DiplomacyAction, target: NationId, gold: number }
 	-- target is an army, nation or province id, depending on the power (Sim.Primordial.TARGETS)
 	| { kind: "Power", power: PrimordialPower, target: number }
+	-- Navies (Sim.Navy): ships launched from a coastal province into its port zone; a fleet sailing to a zone; a fleet
+	-- sailing to a coast and landing the men aboard there; an army walking to the coast and boarding a fleet
+	| { kind: "BuildShips", province: ProvinceId, ships: number }
+	| { kind: "Sail", fleet: FleetId, zone: ZoneId }
+	| { kind: "Land", fleet: FleetId, province: ProvinceId }
+	| { kind: "Embark", army: ArmyId, fleet: FleetId }
 
 -- Progression and saves (docs/MONETIZATION.md 4–5). Profiles are saved; MatchState never is.
 

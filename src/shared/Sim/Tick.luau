@@ -8,6 +8,7 @@ local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Match = require("./Match")
 local Movement = require("./Movement")
+local Navy = require("./Navy")
 local Primordial = require("./Primordial")
 local Rng = require("./Rng")
 local Siege = require("./Siege")
@@ -26,8 +27,11 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	end
 	local before = state.phase
 	state.phase = Match.phaseAt(state.tick, state.setup)
-	Movement.step(state) -- 2
-	Battle.step(state, rng) -- 3
+	Navy.step(state) -- 2: fleets sail, armies board, fleets land...
+	Movement.step(state) -- ...then armies move and stacks merge
+	Battle.step(state, rng) -- 3: land battles, then sea battles
+	Navy.battleStep(state, rng)
+	Navy.blockades(state) -- (before sieges and pay, which they speed up and cut)
 	Siege.step(state) -- 4
 	if state.tick % Config.MonthTicks == 0 then -- 5
 		Economy.payMonth(state)

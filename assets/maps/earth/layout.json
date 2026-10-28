@@ -6,13 +6,16 @@
   2048,
   1024
  ],
+ "ship": "Galleon",
  "summary": {
   "provinces": 150,
   "Plains": 67,
   "Forest": 37,
   "Hills": 35,
   "Mountain": 11,
-  "neutralAtStart": 59
+  "neutralAtStart": 59,
+  "seaZones": 22,
+  "coastal": 110
  },
  "nations": [
   {
@@ -103,7 +106,11 @@
     136
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2,
+    5
+   ]
   },
   {
    "id": 2,
@@ -121,7 +128,12 @@
     3
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2,
+    5,
+    3
+   ]
   },
   {
    "id": 3,
@@ -139,7 +151,11 @@
     4
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    3
+   ]
   },
   {
    "id": 4,
@@ -161,7 +177,11 @@
     14
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    3,
+    5
+   ]
   },
   {
    "id": 5,
@@ -180,7 +200,11 @@
     8
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    10
+   ]
   },
   {
    "id": 6,
@@ -200,7 +224,10 @@
     11
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 7,
@@ -218,7 +245,10 @@
     9
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 8,
@@ -237,7 +267,11 @@
     9
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10,
+    5
+   ]
   },
   {
    "id": 9,
@@ -257,7 +291,11 @@
     96
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10,
+    5
+   ]
   },
   {
    "id": 10,
@@ -299,7 +337,10 @@
     23
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 12,
@@ -317,7 +358,10 @@
     96
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 13,
@@ -336,7 +380,10 @@
     18
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    3
+   ]
   },
   {
    "id": 14,
@@ -400,7 +447,10 @@
     23
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 17,
@@ -421,7 +471,10 @@
     27
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 18,
@@ -441,7 +494,11 @@
     20
    ],
    "startOwner": 1,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    3,
+    4
+   ]
   },
   {
    "id": 19,
@@ -459,7 +516,11 @@
     21
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2,
+    3
+   ]
   },
   {
    "id": 20,
@@ -478,7 +539,10 @@
     21
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 21,
@@ -499,7 +563,11 @@
     30
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    2,
+    4
+   ]
   },
   {
    "id": 22,
@@ -519,7 +587,10 @@
     29
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    4
+   ]
   },
   {
    "id": 23,
@@ -541,7 +612,10 @@
     25
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 24,
@@ -561,7 +635,10 @@
     27
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    11
+   ]
   },
   {
    "id": 25,
@@ -581,7 +658,11 @@
     33
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10,
+    11
+   ]
   },
   {
    "id": 26,
@@ -599,7 +680,10 @@
     33
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 27,
@@ -620,7 +704,10 @@
     29
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    11
+   ]
   },
   {
    "id": 28,
@@ -640,7 +727,10 @@
     34
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    11
+   ]
   },
   {
    "id": 29,
@@ -682,7 +772,10 @@
     32
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 31,
@@ -725,7 +818,10 @@
     54
    ],
    "startOwner": 2,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 33,
@@ -745,7 +841,11 @@
     36
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10,
+    11
+   ]
   },
   {
    "id": 34,
@@ -785,7 +885,10 @@
     41
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    11
+   ]
   },
   {
    "id": 36,
@@ -806,7 +909,10 @@
     98
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 37,
@@ -848,7 +954,10 @@
     98
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 39,
@@ -870,7 +979,10 @@
     89
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 40,
@@ -890,7 +1002,10 @@
     108
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 41,
@@ -931,7 +1046,10 @@
     59
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 43,
@@ -1015,7 +1133,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 47,
@@ -1036,7 +1157,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 48,
@@ -1101,7 +1225,10 @@
     53
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    1
+   ]
   },
   {
    "id": 51,
@@ -1121,7 +1248,10 @@
     75
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    18
+   ]
   },
   {
    "id": 52,
@@ -1138,7 +1268,11 @@
     53
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    18,
+    19
+   ]
   },
   {
    "id": 53,
@@ -1157,7 +1291,12 @@
     118
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    19,
+    1,
+    18
+   ]
   },
   {
    "id": 54,
@@ -1290,7 +1429,10 @@
     62
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 60,
@@ -1332,7 +1474,10 @@
     81
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    14
+   ]
   },
   {
    "id": 62,
@@ -1353,7 +1498,11 @@
     63
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12,
+    14
+   ]
   },
   {
    "id": 63,
@@ -1371,7 +1520,11 @@
     64
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    14,
+    12
+   ]
   },
   {
    "id": 64,
@@ -1388,7 +1541,10 @@
     63
    ],
    "startOwner": 4,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    14
+   ]
   },
   {
    "id": 65,
@@ -1472,7 +1628,11 @@
     78
    ],
    "startOwner": 5,
-   "isCapital": true
+   "isCapital": true,
+   "zones": [
+    17,
+    16
+   ]
   },
   {
    "id": 69,
@@ -1492,7 +1652,10 @@
     77
    ],
    "startOwner": 5,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    17
+   ]
   },
   {
    "id": 70,
@@ -1513,7 +1676,11 @@
     73
    ],
    "startOwner": 5,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    18,
+    17
+   ]
   },
   {
    "id": 71,
@@ -1574,7 +1741,11 @@
     74
    ],
    "startOwner": 5,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    17,
+    18
+   ]
   },
   {
    "id": 74,
@@ -1592,7 +1763,11 @@
     75
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    17,
+    18
+   ]
   },
   {
    "id": 75,
@@ -1610,7 +1785,10 @@
     74
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    18
+   ]
   },
   {
    "id": 76,
@@ -1628,7 +1806,11 @@
     87
    ],
    "startOwner": 5,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    17,
+    16
+   ]
   },
   {
    "id": 77,
@@ -1672,7 +1854,10 @@
     82
    ],
    "startOwner": 5,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    16
+   ]
   },
   {
    "id": 79,
@@ -1711,7 +1896,11 @@
     83
    ],
    "startOwner": 6,
-   "isCapital": true
+   "isCapital": true,
+   "zones": [
+    16,
+    14
+   ]
   },
   {
    "id": 81,
@@ -1731,7 +1920,10 @@
     82
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    14
+   ]
   },
   {
    "id": 82,
@@ -1751,7 +1943,10 @@
     81
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    16
+   ]
   },
   {
    "id": 83,
@@ -1769,7 +1964,12 @@
     84
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    14,
+    15,
+    16
+   ]
   },
   {
    "id": 84,
@@ -1787,7 +1987,11 @@
     85
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    15,
+    14
+   ]
   },
   {
    "id": 85,
@@ -1806,7 +2010,10 @@
     91
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    15
+   ]
   },
   {
    "id": 86,
@@ -1824,7 +2031,11 @@
     87
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    15,
+    16
+   ]
   },
   {
    "id": 87,
@@ -1842,7 +2053,10 @@
     86
    ],
    "startOwner": 6,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    16
+   ]
   },
   {
    "id": 88,
@@ -1859,7 +2073,11 @@
     92
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    20,
+    15
+   ]
   },
   {
    "id": 89,
@@ -1877,7 +2095,10 @@
     40
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 90,
@@ -1896,7 +2117,11 @@
     93
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    13,
+    15
+   ]
   },
   {
    "id": 91,
@@ -1915,7 +2140,10 @@
     92
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    15
+   ]
   },
   {
    "id": 92,
@@ -1935,7 +2163,10 @@
     93
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    20
+   ]
   },
   {
    "id": 93,
@@ -1954,7 +2185,11 @@
     94
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    20,
+    13
+   ]
   },
   {
    "id": 94,
@@ -1971,7 +2206,11 @@
     93
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    22,
+    20
+   ]
   },
   {
    "id": 95,
@@ -1991,7 +2230,10 @@
     145
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 96,
@@ -2012,7 +2254,10 @@
     100
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 97,
@@ -2033,7 +2278,10 @@
     104
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10
+   ]
   },
   {
    "id": 98,
@@ -2053,7 +2301,11 @@
     99
    ],
    "startOwner": 3,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    10,
+    12
+   ]
   },
   {
    "id": 99,
@@ -2074,7 +2326,10 @@
     109
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 100,
@@ -2116,7 +2371,10 @@
     145
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 102,
@@ -2199,7 +2457,10 @@
     106
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 106,
@@ -2221,7 +2482,10 @@
     112
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 107,
@@ -2243,7 +2507,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 108,
@@ -2263,7 +2530,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    12
+   ]
   },
   {
    "id": 109,
@@ -2327,7 +2597,10 @@
     114
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    13
+   ]
   },
   {
    "id": 112,
@@ -2347,7 +2620,10 @@
     115
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 113,
@@ -2390,7 +2666,10 @@
     117
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    13
+   ]
   },
   {
    "id": 115,
@@ -2410,7 +2689,10 @@
     116
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    9
+   ]
   },
   {
    "id": 116,
@@ -2428,7 +2710,11 @@
     115
    ],
    "startOwner": 8,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    13,
+    8
+   ]
   },
   {
    "id": 117,
@@ -2446,7 +2732,10 @@
    ],
    "startOwner": null,
    "isCapital": false,
-   "garrison": 2000
+   "garrison": 2000,
+   "zones": [
+    13
+   ]
   },
   {
    "id": 118,
@@ -2466,7 +2755,10 @@
     135
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    19
+   ]
   },
   {
    "id": 119,
@@ -2487,7 +2779,10 @@
     132
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    19
+   ]
   },
   {
    "id": 120,
@@ -2506,7 +2801,11 @@
     123
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    19,
+    21
+   ]
   },
   {
    "id": 121,
@@ -2569,7 +2868,10 @@
     127
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    21
+   ]
   },
   {
    "id": 124,
@@ -2588,7 +2890,12 @@
     127
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    21,
+    7,
+    22
+   ]
   },
   {
    "id": 125,
@@ -2607,7 +2914,11 @@
     137
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7,
+    21
+   ]
   },
   {
    "id": 126,
@@ -2625,7 +2936,11 @@
     140
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    21,
+    7
+   ]
   },
   {
    "id": 127,
@@ -2646,7 +2961,10 @@
     129
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 128,
@@ -2687,7 +3005,10 @@
     133
    ],
    "startOwner": 9,
-   "isCapital": true
+   "isCapital": true,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 130,
@@ -2707,7 +3028,11 @@
     137
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7,
+    5
+   ]
   },
   {
    "id": 131,
@@ -2726,7 +3051,10 @@
     134
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5
+   ]
   },
   {
    "id": 132,
@@ -2771,7 +3099,10 @@
     135
    ],
    "startOwner": 9,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    6
+   ]
   },
   {
    "id": 134,
@@ -2790,7 +3121,11 @@
     136
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    6
+   ]
   },
   {
    "id": 135,
@@ -2809,7 +3144,12 @@
     133
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    19,
+    6
+   ]
   },
   {
    "id": 136,
@@ -2827,7 +3167,11 @@
     134
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    2
+   ]
   },
   {
    "id": 137,
@@ -2845,7 +3189,10 @@
     130
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 138,
@@ -2864,7 +3211,10 @@
     141
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 139,
@@ -2884,7 +3234,10 @@
     149
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    7
+   ]
   },
   {
    "id": 140,
@@ -2904,7 +3257,11 @@
     142
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    21,
+    7
+   ]
   },
   {
    "id": 141,
@@ -2945,7 +3302,11 @@
     143
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    22,
+    21
+   ]
   },
   {
    "id": 143,
@@ -2984,7 +3345,10 @@
     148
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    22
+   ]
   },
   {
    "id": 145,
@@ -3004,7 +3368,11 @@
     102
    ],
    "startOwner": 7,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    5,
+    9
+   ]
   },
   {
    "id": 146,
@@ -3021,7 +3389,11 @@
     147
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8,
+    22
+   ]
   },
   {
    "id": 147,
@@ -3041,7 +3413,11 @@
     150
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8,
+    22
+   ]
   },
   {
    "id": 148,
@@ -3083,7 +3459,11 @@
     150
    ],
    "startOwner": 10,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8,
+    7
+   ]
   },
   {
    "id": 150,
@@ -3102,7 +3482,10 @@
     149
    ],
    "startOwner": null,
-   "isCapital": false
+   "isCapital": false,
+   "zones": [
+    8
+   ]
   }
  ],
  "straits": [
@@ -3118,7 +3501,8 @@
     238
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 2
   },
   {
    "a": 1,
@@ -3132,7 +3516,8 @@
     77
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 2
   },
   {
    "a": 136,
@@ -3146,7 +3531,8 @@
     300
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 5
   },
   {
    "a": 3,
@@ -3160,7 +3546,8 @@
     340
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 5
   },
   {
    "a": 12,
@@ -3174,7 +3561,8 @@
     426
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 10
   },
   {
    "a": 26,
@@ -3188,7 +3576,8 @@
     423
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 10
   },
   {
    "a": 40,
@@ -3202,7 +3591,8 @@
     584
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 12
   },
   {
    "a": 39,
@@ -3216,7 +3606,8 @@
     484
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 12
   },
   {
    "a": 64,
@@ -3230,7 +3621,8 @@
     587
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 14
   },
   {
    "a": 83,
@@ -3244,7 +3636,8 @@
     632
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 14
   },
   {
    "a": 84,
@@ -3258,7 +3651,8 @@
     680
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 15
   },
   {
    "a": 85,
@@ -3272,7 +3666,8 @@
     687
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 15
   },
   {
    "a": 86,
@@ -3286,7 +3681,8 @@
     598
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 16
   },
   {
    "a": 87,
@@ -3300,7 +3696,8 @@
     528
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 16
   },
   {
    "a": 76,
@@ -3314,7 +3711,8 @@
     504
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 16
   },
   {
    "a": 73,
@@ -3328,7 +3726,8 @@
     463
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 17
   },
   {
    "a": 74,
@@ -3342,7 +3741,8 @@
     396
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 18
   },
   {
    "a": 75,
@@ -3356,7 +3756,8 @@
     321
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 18
   },
   {
    "a": 85,
@@ -3370,7 +3771,8 @@
     696
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 15
   },
   {
    "a": 88,
@@ -3384,7 +3786,8 @@
     708
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 20
   },
   {
    "a": 93,
@@ -3398,7 +3801,8 @@
     763
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 20
   },
   {
    "a": 117,
@@ -3412,7 +3816,8 @@
     727
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 13
   },
   {
    "a": 137,
@@ -3426,7 +3831,8 @@
     500
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 7
   },
   {
    "a": 137,
@@ -3440,7 +3846,8 @@
     523
    ],
    "wrap": false,
-   "auto": false
+   "auto": false,
+   "zone": 7
   },
   {
    "a": 53,
@@ -3454,7 +3861,528 @@
     209
    ],
    "wrap": true,
-   "auto": false
+   "auto": false,
+   "zone": 19
+  }
+ ],
+ "seaZones": [
+  {
+   "id": 1,
+   "name": "Arctic Ocean",
+   "center": [
+    1388,
+    62
+   ],
+   "area": 105988,
+   "neighbors": [
+    2,
+    19
+   ],
+   "coasts": [
+    30,
+    32,
+    46,
+    47,
+    50,
+    53
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Norwegian Sea",
+   "center": [
+    978,
+    174
+   ],
+   "area": 73144,
+   "neighbors": [
+    1,
+    3,
+    5
+   ],
+   "coasts": [
+    1,
+    2,
+    19,
+    21,
+    136
+   ]
+  },
+  {
+   "id": 3,
+   "name": "North Sea",
+   "center": [
+    978,
+    290
+   ],
+   "area": 4288,
+   "neighbors": [
+    2,
+    4,
+    5
+   ],
+   "coasts": [
+    2,
+    3,
+    4,
+    13,
+    18,
+    19
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Baltic Sea",
+   "center": [
+    1072,
+    278
+   ],
+   "area": 2660,
+   "neighbors": [
+    3
+   ],
+   "coasts": [
+    16,
+    17,
+    18,
+    20,
+    21,
+    22
+   ]
+  },
+  {
+   "id": 5,
+   "name": "North Atlantic",
+   "center": [
+    762,
+    358
+   ],
+   "area": 136876,
+   "neighbors": [
+    2,
+    3,
+    6,
+    7,
+    8,
+    9,
+    10,
+    19
+   ],
+   "coasts": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9,
+    95,
+    130,
+    131,
+    134,
+    135,
+    136,
+    145
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Hudson Bay",
+   "center": [
+    472,
+    256
+   ],
+   "area": 9700,
+   "neighbors": [
+    5
+   ],
+   "coasts": [
+    133,
+    134,
+    135
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Caribbean Sea",
+   "center": [
+    534,
+    560
+   ],
+   "area": 24744,
+   "neighbors": [
+    5,
+    8
+   ],
+   "coasts": [
+    124,
+    125,
+    126,
+    127,
+    129,
+    130,
+    137,
+    138,
+    139,
+    140,
+    149
+   ]
+  },
+  {
+   "id": 8,
+   "name": "South Atlantic",
+   "center": [
+    876,
+    792
+   ],
+   "area": 139116,
+   "neighbors": [
+    5,
+    7,
+    9,
+    13,
+    22
+   ],
+   "coasts": [
+    116,
+    146,
+    147,
+    149,
+    150
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Gulf of Guinea",
+   "center": [
+    972,
+    640
+   ],
+   "area": 29304,
+   "neighbors": [
+    5,
+    8
+   ],
+   "coasts": [
+    101,
+    105,
+    106,
+    112,
+    115,
+    145
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Mediterranean",
+   "center": [
+    1064,
+    436
+   ],
+   "area": 9044,
+   "neighbors": [
+    5,
+    11
+   ],
+   "coasts": [
+    5,
+    6,
+    8,
+    9,
+    11,
+    12,
+    23,
+    25,
+    26,
+    33,
+    36,
+    96,
+    97,
+    98
+   ]
+  },
+  {
+   "id": 11,
+   "name": "Black Sea",
+   "center": [
+    1154,
+    384
+   ],
+   "area": 1756,
+   "neighbors": [
+    10
+   ],
+   "coasts": [
+    24,
+    25,
+    27,
+    28,
+    33,
+    35
+   ]
+  },
+  {
+   "id": 12,
+   "name": "Arabian Sea",
+   "center": [
+    1320,
+    560
+   ],
+   "area": 24268,
+   "neighbors": [
+    13,
+    14
+   ],
+   "coasts": [
+    38,
+    39,
+    40,
+    42,
+    59,
+    62,
+    63,
+    89,
+    98,
+    99,
+    107,
+    108
+   ]
+  },
+  {
+   "id": 13,
+   "name": "Indian Ocean",
+   "center": [
+    1388,
+    762
+   ],
+   "area": 194416,
+   "neighbors": [
+    8,
+    12,
+    14,
+    15,
+    20
+   ],
+   "coasts": [
+    90,
+    93,
+    111,
+    114,
+    116,
+    117
+   ]
+  },
+  {
+   "id": 14,
+   "name": "Bay of Bengal",
+   "center": [
+    1462,
+    566
+   ],
+   "area": 15028,
+   "neighbors": [
+    12,
+    13,
+    15
+   ],
+   "coasts": [
+    61,
+    62,
+    63,
+    64,
+    80,
+    81,
+    83,
+    84
+   ]
+  },
+  {
+   "id": 15,
+   "name": "Java Sea",
+   "center": [
+    1598,
+    676
+   ],
+   "area": 25152,
+   "neighbors": [
+    13,
+    14,
+    16,
+    20
+   ],
+   "coasts": [
+    83,
+    84,
+    85,
+    86,
+    88,
+    90,
+    91
+   ]
+  },
+  {
+   "id": 16,
+   "name": "South China Sea",
+   "center": [
+    1610,
+    572
+   ],
+   "area": 18512,
+   "neighbors": [
+    15,
+    17,
+    20
+   ],
+   "coasts": [
+    68,
+    76,
+    78,
+    80,
+    82,
+    83,
+    86,
+    87
+   ]
+  },
+  {
+   "id": 17,
+   "name": "East China Sea",
+   "center": [
+    1678,
+    484
+   ],
+   "area": 18476,
+   "neighbors": [
+    16,
+    18,
+    19,
+    20
+   ],
+   "coasts": [
+    68,
+    69,
+    70,
+    73,
+    74,
+    76
+   ]
+  },
+  {
+   "id": 18,
+   "name": "Sea of Japan",
+   "center": [
+    1730,
+    406
+   ],
+   "area": 23780,
+   "neighbors": [
+    17,
+    19
+   ],
+   "coasts": [
+    51,
+    52,
+    53,
+    70,
+    73,
+    74,
+    75
+   ]
+  },
+  {
+   "id": 19,
+   "name": "North Pacific",
+   "center": [
+    1928,
+    406
+   ],
+   "area": 210312,
+   "neighbors": [
+    1,
+    5,
+    17,
+    18,
+    20,
+    21,
+    22
+   ],
+   "coasts": [
+    52,
+    53,
+    118,
+    119,
+    120,
+    135
+   ]
+  },
+  {
+   "id": 20,
+   "name": "Coral Sea",
+   "center": [
+    1844,
+    744
+   ],
+   "area": 75964,
+   "neighbors": [
+    13,
+    15,
+    16,
+    17,
+    19,
+    22
+   ],
+   "coasts": [
+    88,
+    92,
+    93,
+    94
+   ]
+  },
+  {
+   "id": 21,
+   "name": "East Pacific",
+   "center": [
+    308,
+    560
+   ],
+   "area": 74600,
+   "neighbors": [
+    19,
+    22
+   ],
+   "coasts": [
+    120,
+    123,
+    124,
+    125,
+    126,
+    140,
+    142
+   ]
+  },
+  {
+   "id": 22,
+   "name": "South Pacific",
+   "center": [
+    336,
+    822
+   ],
+   "area": 216292,
+   "neighbors": [
+    8,
+    19,
+    20,
+    21
+   ],
+   "coasts": [
+    94,
+    124,
+    142,
+    144,
+    146,
+    147
+   ]
   }
  ],
  "notes": [

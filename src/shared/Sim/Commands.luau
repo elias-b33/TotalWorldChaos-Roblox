@@ -8,6 +8,7 @@ local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Movement = require("./Movement")
+local Navy = require("./Navy")
 local Primordial = require("./Primordial")
 local Troops = require("./Troops")
 local Types = require("../Types")
@@ -127,6 +128,14 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 		return recruit(state, nationId, command.province, command.regiments, command.troop)
 	elseif command.kind == "Move" then
 		return Movement.order(state, nationId, command.army, command.to)
+	elseif command.kind == "BuildShips" then
+		return Navy.build(state, nationId, command.province, command.ships)
+	elseif command.kind == "Sail" then
+		return Navy.sail(state, nationId, command.fleet, command.zone)
+	elseif command.kind == "Land" then
+		return Navy.land(state, nationId, command.fleet, command.province)
+	elseif command.kind == "Embark" then
+		return Navy.embark(state, nationId, command.army, command.fleet)
 	elseif command.kind == "Power" then
 		return Primordial.use(state, { nation = nationId }, command.power, command.target)
 	elseif command.kind == "Diplomacy" then

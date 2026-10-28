@@ -71,11 +71,12 @@ end
 
 -- Dry run --------------------------------------------------------------------------------------------
 
--- Neighbour lists never change during a match, so the copy shares them.
+-- Neighbour lists and the sea's layout never change during a match, so the copy shares them.
+local STATIC = { neighbors = true, zones = true, shores = true, straits = true }
 local function copy(t: { [any]: any }): any
 	local out = table.clone(t)
 	for k, x in out do
-		if type(x) == "table" and k ~= "neighbors" then
+		if type(x) == "table" and not STATIC[k] then
 			out[k] = copy(x)
 		end
 	end

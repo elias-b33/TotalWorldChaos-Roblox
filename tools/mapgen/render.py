@@ -217,6 +217,35 @@ def id_map(lay: Layout) -> Image.Image:
     return Image.fromarray(rgb)
 
 
+def sea_id_map(lay: Layout) -> Image.Image:
+    """Sea zone id per pixel in the red and green channels like id_map (0 = land, or a lake no zone reaches)."""
+    ids = (lay.zones + 1).astype(np.int64)
+    rgb = np.zeros(lay.zones.shape + (3,), dtype=np.uint8)
+    rgb[..., 0] = ids % 256
+    rgb[..., 1] = ids // 256
+    return Image.fromarray(rgb)
+
+
+def zone_view(base: Image.Image, lay: Layout) -> Image.Image:
+    """A preview with the sea zones: a faint dotted line where two zones meet and each zone's name at its centre."""
+    img = base.copy()
+    z = lay.zones
+    edge = np.zeros(z.shape, dtype=bool)
+    for dy, dx in ((0, 1), (1, 0)):
+        nb = np.roll(np.roll(z, -dy, 0), -dx, 1)
+        edge |= (z >= 0) & (nb >= 0) & (z != nb)
+    yy, xx = np.mgrid[0 : z.shape[0], 0 : z.shape[1]]
+    edge &= ((xx + yy) // 3) % 2 == 0
+    arr = np.asarray(img).astype(np.float64)
+    arr[edge] = arr[edge] * 0.35 + 255 * 0.65
+    img = Image.fromarray(arr.astype(np.uint8))
+    d = ImageDraw.Draw(img)
+    f = font(22)
+    for name, (x, y) in zip(lay.zone_names, lay.zone_centers):
+        d.text((x, y), name, font=f, fill=(225, 240, 255), anchor="mm", stroke_width=3, stroke_fill=(10, 25, 45))
+    return img
+
+
 def atlas(base: Image.Image, lay: Layout) -> Image.Image:
     img = base.copy()
     d = ImageDraw.Draw(img)
