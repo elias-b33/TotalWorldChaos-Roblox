@@ -1,8 +1,8 @@
 --!strict
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
--- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each troop
--- your race can raise, under the names and icons the map gives them, move an army) and diplomacy on foreign ones
--- (war, ally, peace). Every button shows its price; the server decides.
+-- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each of
+-- the five troops of your race's roster, move an army) and diplomacy on foreign ones (war, ally, peace). Every button
+-- shows its price; the server decides.
 -- Built from the UI kit: a header, a row of chips (icon + value) and big icon buttons with their cost.
 
 local Players = game:GetService("Players")
@@ -192,9 +192,8 @@ local function render()
 				)
 			end
 		end
-		-- one regiment of each troop your race recruits: infantry, archers, cavalry and your race's elite, as the map
-		-- names them (Skyshards: troopers, gunners, hover bikes). The infantry button keeps the name "Regiment" (the
-		-- tutorial and the harness look for it), the others "Recruit_<troop id>"
+		-- one regiment of each troop of your race's roster: line, ranged, fast, elite and special, each button named
+		-- "Recruit_<troop id>" (the tutorial and the harness look for them)
 		for _, troop in RaceInfo.troops(me.race) do
 			local recruitGold, recruitManpower = Economy.recruitCost(1, troop)
 			local manpowerText = if recruitManpower % 1000 == 0
@@ -209,7 +208,7 @@ local function render()
 				function()
 					Intents.recruit(provinceId, 1, troop)
 				end,
-				if troop == "Infantry" then "Regiment" else "Recruit_" .. troop
+				"Recruit_" .. troop
 			)
 		end
 	end

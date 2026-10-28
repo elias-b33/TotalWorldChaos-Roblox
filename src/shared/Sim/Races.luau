@@ -2,8 +2,8 @@
 -- Races (docs/DESIGN.md "Races"): the peoples nations belong to. Data-driven: every race is an entry of Config.Races
 -- and every map has its own cast of five (Config.Casts: realistic civilisations on Earth, fantasy peoples on Eldmoor,
 -- sci-fi peoples on Skyshards), set per nation in the map data, so picking a nation picks its race. Neutral garrisons
--- and Rebels have none. Each race has one passive, one of a few kinds (PASSIVES, numbers in Config.Races), plus one
--- elite troop (Config.Races[race].elite, Sim.Troops):
+-- and Rebels have none. Each race recruits a roster of five troops, one per role (Config.Races[race].roster,
+-- Sim.Troops), and has one passive, one of a few kinds (PASSIVES, numbers in Config.Races):
 --   Gold      more gold income (gross: provinces and capital, before upkeep)
 --   Manpower  more manpower income
 --   Forest    cross forest at plains speed; more combat strength in battles in forest provinces
@@ -26,7 +26,7 @@ export type Passive = "Gold" | "Manpower" | "Forest" | "Hills" | "Upkeep" | "Swi
 export type RaceDef = {
 	name: string,
 	passive: Passive,
-	elite: string,
+	roster: { [string]: string }, -- role -> troop: line, ranged, fast, elite, special (Sim.Troops.ROLES)
 	goldBonus: number?,
 	manpowerBonus: number?,
 	forestBonus: number?,
@@ -37,9 +37,8 @@ export type RaceDef = {
 	attackBonus: number?,
 }
 
--- A map's cast in Config.Casts: its races, and the names and icons it gives the shared troop roles (when not the
--- defaults).
-export type Cast = { races: { Race }, troops: { [string]: { name: string, icon: string } }? }
+-- A map's cast in Config.Casts: its five races.
+export type Cast = { races: { Race } }
 
 local DEFS = Config.Races :: { [string]: RaceDef }
 local CASTS = Config.Casts :: { [string]: Cast }
