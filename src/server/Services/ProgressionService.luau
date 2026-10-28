@@ -22,7 +22,9 @@ local ProgressionService = {}
 
 local getState: () -> Types.MatchState? -- nil before the first match (the first Lobby)
 local current: Types.MatchState? = nil
-local stats: { [number]: Types.PlayerMatchStats } = {} -- by userId, for the current match
+local stats: { [number]: Types.PlayerMatchStats } = {} -- by userId, for the current match (leavers too)
+-- Results rewards for players whose profile was still loading: paid when it loads (or dropped if they leave).
+local owed: { [number]: { state: Types.MatchState, entry: Types.PlayerMatchStats } } = {}
 local rewardRemote: RemoteEvent
 
 local function today(): number
@@ -49,18 +51,24 @@ local function startTracking(state: Types.MatchState)
 	end
 end
 
--- Results: pay everyone who is still here, save, and show them the reward.
+-- Pay one player's Results reward, save, and show it. False if their profile isn't loaded yet.
+local function pay(player: Player, state: Types.MatchState, entry: Types.PlayerMatchStats): boolean
+	local report = PlayerDataService.update(player, function(data)
+		local reward = Progression.matchReward(state, entry, options(player, data))
+		return Progression.grant(data, entry, reward, today())
+	end)
+	if report then
+		rewardRemote:FireClient(player, report)
+	end
+	return report ~= nil
+end
+
+-- Results: pay everyone who is still here (or as soon as a still-loading profile is ready).
 local function payAll(state: Types.MatchState)
 	for _, player in Players:GetPlayers() do
 		local entry = stats[player.UserId]
-		if entry then
-			local report = PlayerDataService.update(player, function(data)
-				local reward = Progression.matchReward(state, entry, options(player, data))
-				return Progression.grant(data, entry, reward, today())
-			end)
-			if report then
-				rewardRemote:FireClient(player, report)
-			end
+		if entry and entry.leftAt == nil and not pay(player, state, entry) then
+			owed[player.UserId] = { state = state, entry = entry }
 		end
 	end
 	stats = {}
@@ -72,7 +80,22 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 	Players.PlayerAdded:Connect(function(player)
 		local state = getState()
 		if state and state == current and state.result == nil then
-			stats[player.UserId] = Progression.newStats(player.UserId, state.tick)
+			local entry = stats[player.UserId]
+			if entry then
+				Progression.rejoin(entry, state.tick) -- back in the same match: one record, caps count once
+			else
+				stats[player.UserId] = Progression.newStats(player.UserId, state.tick)
+			end
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		owed[player.UserId] = nil -- their profile never loaded here: nothing to write the reward to
+	end)
+	PlayerDataService.onLoaded(function(player)
+		local due = owed[player.UserId]
+		if due then
+			owed[player.UserId] = nil
+			pay(player, due.state, due.entry)
 		end
 	end)
 	CommandRouter.observe(function(player: Player, command: Types.Command, ok: boolean)
@@ -88,8 +111,7 @@ function ProgressionService.init(stateGetter: () -> Types.MatchState?)
 		if entry == nil or state == nil or state.result ~= nil then
 			return
 		end
-		stats[player.UserId] = nil -- rejoining starts a fresh count
-		Progression.leave(entry, state.tick)
+		Progression.leave(entry, state.tick) -- the record stays: rejoining carries on with it
 		Progression.grant(data, entry, Progression.matchReward(state, entry, options(player, data)), today())
 	end)
 end

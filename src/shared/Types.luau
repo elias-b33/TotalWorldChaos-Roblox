@@ -179,17 +179,21 @@ export type Command =
 -- What one player did in the current match (kept by the server, never sent by the client). Ticks are match ticks.
 export type PlayerMatchStats = {
 	userId: number,
-	joinedAt: number,
-	leftAt: number?, -- set when they leave before Results
+	joinedAt: number, -- start of the current stretch in the server
+	leftAt: number?, -- set when they leave before Results (cleared if they rejoin)
+	playedTicks: number, -- ticks played in earlier stretches, before leaving and rejoining
+	seated: boolean, -- had a nation or a Primordial at some point in the match
 	lastCommandAt: number,
 	longestIdle: number, -- longest run of ticks without a command so far
 	provincesTaken: number,
 	battlesWon: number,
 	powersUsed: number,
+	paidXp: number, -- already paid this match, when they left earlier
+	paidGlory: number,
 }
 
 -- One row of a reward breakdown. kind: Finish, Placement, Provinces, Battles, Primordial, Powers, FirstMatch,
--- Vip, CustomRules, LevelUp, RankUp.
+-- Vip, CustomRules, PaidEarlier (what an earlier leave already paid, negative), LevelUp, RankUp.
 export type RewardLine = { kind: string, xp: number, glory: number }
 
 export type MatchReward = {

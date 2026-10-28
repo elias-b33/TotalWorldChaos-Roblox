@@ -600,6 +600,14 @@ function scenarios.progression()
 	H.expect(H.state().result == nil, "a new match started")
 	H.expect(Emulator.findText(again, "🎖 2") ~= nil, "the HUD shows level 2 after rejoining")
 	H.shot(again, "rejoined")
+
+	-- the server shuts down a minute into the match, before Alice leaves: she gets what leaving pays (4 XP of
+	-- the finish reward), and no wrong kick message (a kick counts as a warning and fails the scenario)
+	Emulator.run(60)
+	Emulator.shutdown()
+	saved = Emulator.dataStores.PlayerData["Player_" .. userId].value
+	H.expect(saved.Data.xp > 460, string.format("the shutdown paid the match so far (%d XP)", saved.Data.xp))
+	H.expect(saved.MetaData.ActiveSession == nil, "and released the session lock")
 end
 
 -- Phase 4: the Lobby. Three players vote (majority wins), the draft gives everyone the nation they tapped, a

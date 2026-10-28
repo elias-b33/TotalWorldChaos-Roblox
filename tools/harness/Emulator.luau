@@ -1112,6 +1112,21 @@ function Emulator.findText(client: Machine, needle: string): string?
 end
 
 -- Fail loudly with everything that went wrong so far.
+-- Shut the server down the way Roblox may: every BindToClose callback first (each in its own thread), then the
+-- players still here leave.
+function Emulator.shutdown(seconds: number?)
+	for _, fn in closeCallbacks do
+		resume(newThread(fn, Emulator.server))
+	end
+	Emulator.run(seconds or 3)
+	for _, m in machines do
+		if m.serverPlayer and m.serverPlayer.Parent then
+			Emulator.removeClient(m)
+		end
+	end
+	Emulator.run(1)
+end
+
 function Emulator.assertClean(label: string)
 	if #errors > 0 or #warnings > 0 then
 		stdio.ewrite(string.format("\n%s: %d errors, %d warnings\n", label, #errors, #warnings))

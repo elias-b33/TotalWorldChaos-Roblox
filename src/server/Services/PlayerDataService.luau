@@ -5,7 +5,8 @@
 --
 -- Session lock: only one server at a time can hold a profile; a second server waits, then takes it over and the
 -- first one ends its session (and kicks the player there). Autosave every 5 minutes, a save after every reward,
--- and a final save on leave and on shutdown are ProfileStore's.
+-- and a final save on leave and on shutdown are ProfileStore's. The leave hooks run once per session: when the
+-- player leaves, or just before the final save if the server shuts down first.
 -- Without DataStore access (Studio with "Enable Studio Access to API Services" off) ProfileStore switches to its
 -- in-memory mock store by itself: everything works, nothing outlives the test. The harness emulates DataStoreService.
 
@@ -34,10 +35,30 @@ local PlayerDataService = {}
 local store = ProfileStore.New(STORE_NAME, Progression.newProfile())
 local profiles: { [Player]: Profile } = {}
 local leaveHooks: { (Player, Data) -> () } = {}
+local loadHooks: { (Player, Data) -> () } = {}
+local leaveHooksRan: { [Profile]: boolean } = {}
 local profileRemote: RemoteEvent
 
 local function sendSummary(player: Player, data: Data)
 	profileRemote:FireClient(player, Progression.summary(data))
+end
+
+local function runHooks(hooks: { (Player, Data) -> () }, player: Player, data: Data, what: string)
+	for _, hook in hooks do
+		local ok, err = pcall(hook, player, data)
+		if not ok then
+			warn(string.format("[data] %s hook failed: %s", what, tostring(err)))
+		end
+	end
+end
+
+-- Once per session: a leaver's prorated match reward and the like, written before the final save.
+local function runLeaveHooks(player: Player, profile: Profile)
+	if leaveHooksRan[profile] then
+		return
+	end
+	leaveHooksRan[profile] = true
+	runHooks(leaveHooks, player, profile.Data, "leave")
 end
 
 local function load(player: Player)
@@ -56,11 +77,20 @@ local function load(player: Player)
 	profile:AddUserId(player.UserId) -- GDPR: lets a data-erasure request find this key
 	profile:Reconcile() -- fields added to the template since the last save
 	Progression.migrate(profile.Data)
+	profile.OnLastSave:Connect(function(reason)
+		-- the server is shutting down before the player left: pay what leaving would have paid, before the save
+		if reason == "Shutdown" then
+			runLeaveHooks(player, profile)
+		end
+	end)
 	profile.OnSessionEnd:Connect(function()
-		-- still in the table: another server took the profile while the player is here
+		leaveHooksRan[profile] = nil
 		if profiles[player] == profile then
 			profiles[player] = nil
-			player:Kick(SESSION_TAKEN)
+			-- still here: another server took the profile (on shutdown everyone is leaving anyway)
+			if not ProfileStore.IsClosing then
+				player:Kick(SESSION_TAKEN)
+			end
 		end
 	end)
 	if player.Parent ~= Players then
@@ -69,6 +99,7 @@ local function load(player: Player)
 	end
 	profiles[player] = profile
 	sendSummary(player, profile.Data)
+	runHooks(loadHooks, player, profile.Data, "load")
 end
 
 local function release(player: Player)
@@ -77,12 +108,7 @@ local function release(player: Player)
 		return
 	end
 	profiles[player] = nil -- first, so OnSessionEnd doesn't kick a player who is leaving anyway
-	for _, hook in leaveHooks do
-		local ok, err = pcall(hook, player, profile.Data)
-		if not ok then
-			warn("[data] leave hook failed: " .. tostring(err))
-		end
-	end
+	runLeaveHooks(player, profile)
 	profile:EndSession() -- saves and releases the session lock
 end
 
@@ -117,6 +143,11 @@ end
 -- Run `hook` with a leaving player's profile just before its final save (e.g. a leaver's prorated reward).
 function PlayerDataService.onLeaving(hook: (Player, Data) -> ())
 	table.insert(leaveHooks, hook)
+end
+
+-- Run `hook` once a joining player's profile has loaded (e.g. a reward that waited for it).
+function PlayerDataService.onLoaded(hook: (Player, Data) -> ())
+	table.insert(loadHooks, hook)
 end
 
 local function trimReceipts(data: Data)

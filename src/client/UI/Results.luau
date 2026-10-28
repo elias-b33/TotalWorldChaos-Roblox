@@ -31,6 +31,7 @@ local LINE_LABELS: { [string]: string } = {
 	FirstMatch = "☀ First match today",
 	Vip = "💎 VIP",
 	CustomRules = "⚙ Custom rules",
+	PaidEarlier = "↩ Paid when you left",
 	LevelUp = "⬆ Level up",
 	RankUp = "👑 Rank up",
 }

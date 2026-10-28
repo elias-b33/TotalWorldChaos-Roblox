@@ -213,7 +213,7 @@ Why one earned currency instead of Robux only:
 
 An average match pays **about 49 Glory** (20 + 17 average placement + 8 activity + 4 Primordial). A match takes about 27.5 minutes with lobby, pick and Results, so matches alone pay about **107 Glory per hour**. Daily bonuses make the first hour of each day worth much more.
 
-Leaving early pays nothing from placement or Primordial play, and match Glory is prorated by minutes played.
+Leaving early pays nothing from placement or Primordial play; the finish Glory is prorated by minutes played, and activity Glory is what the player earned before leaving. Leaving and rejoining the same match carries on one record, so the caps apply once per match. Finishing pays only players who had a nation or a Primordial at some point (spectators earn nothing for watching), and a server shutdown pays what leaving would have.
 
 ### 4.2 Earn per week and time to earn
 

@@ -245,11 +245,22 @@ T.test("an eliminated player who rose as a Primordial", function()
 	T.equal(r.xp, 100 + 25 + 50 + 20)
 end)
 
-T.test("a spectator without a nation only gets the finish reward", function()
+T.test("a spectator who never had a nation earns nothing for finishing", function()
 	local state = finished({ 1 }, scoresFor({ 300, 200 }))
-	local r = Progression.matchReward(state, busy(999), STANDARD)
+	local r = Progression.matchReward(state, busy(999), { vip = false, firstMatchToday = true, standardRules = true })
 	T.equal(r.placement, nil)
-	T.equal(r.xp, P.FinishXp)
+	T.equal(r.xp, 0, "no finish or first-match XP")
+	T.equal(r.glory, 0)
+end)
+
+T.test("a player who had a nation earlier in the match still gets the finish reward", function()
+	local state = finished({ 1 }, scoresFor({ 300, 200 }))
+	local stats = busy(103)
+	Match.seatPlayer(state, 103) -- seated during the match...
+	Progression.observe(state, { [103] = stats })
+	Match.unseatPlayer(state, 103) -- ...and no longer at the end
+	T.expect(stats.seated, "observe noted the seat")
+	T.equal((line(Progression.matchReward(state, stats, STANDARD), "Finish") :: Types.RewardLine).xp, P.FinishXp)
 end)
 
 T.test("VIP adds 25% of the match reward, not of the first-match bonus; custom rules pay half", function()
@@ -351,6 +362,76 @@ T.test("migrate keeps a v1 profile and recomputes the level from XP", function()
 	Progression.migrate(profile)
 	T.equal(profile.version, Progression.PROFILE_VERSION)
 	T.equal(profile.level, 3)
+end)
+
+-- Leaving and rejoining ------------------------------------------------------------------------------------
+
+local function command(stats: Types.PlayerMatchStats, from: number, to: number)
+	for t = from, to, 100 do
+		Progression.recordCommand(stats, t, { kind = "Develop", province = 1 }, true)
+	end
+end
+
+T.test("leaving and rejoining pays the caps once: the same play pays the same as one session", function()
+	local state = finished({ 1 }, scoresFor({ 300, 200 }))
+	-- one session: 40 captures and 20 battles won
+	local whole = busy(101)
+	whole.provincesTaken, whole.battlesWon = 40, 20
+	local single = Progression.newProfile()
+	Progression.grant(single, whole, Progression.matchReward(state, whole, STANDARD), 1)
+
+	-- the same play with three leaves (each paid at once) and a rejoin 10 s after each
+	local split = Progression.newProfile()
+	local stats = Progression.newStats(101, 0)
+	for _, cut in { 300, 600, 900 } do
+		command(stats, stats.joinedAt, cut)
+		stats.provincesTaken += 10
+		stats.battlesWon += 5
+		Progression.leave(stats, cut)
+		Progression.grant(split, stats, Progression.matchReward(state, stats, STANDARD), 1)
+		Progression.rejoin(stats, cut + 10)
+	end
+	command(stats, stats.joinedAt, END)
+	stats.provincesTaken += 10
+	stats.battlesWon += 5
+	local final = Progression.matchReward(state, stats, STANDARD)
+	T.expect(line(final, "PaidEarlier") ~= nil, "Results takes off what the leaves paid")
+	Progression.grant(split, stats, final, 1)
+	T.equal(split.xp, single.xp, "same XP")
+	T.equal(split.glory, single.glory, "same Glory")
+end)
+
+T.test("a rejoin carries on the finish share instead of starting a new one", function()
+	local state = finished({ 1 }, scoresFor({ 300, 200 }))
+	local stats = Progression.newStats(101, 0)
+	command(stats, 0, 400)
+	Progression.leave(stats, 400)
+	Progression.rejoin(stats, 700)
+	command(stats, 700, 1000)
+	Progression.leave(stats, 1000)
+	-- played 400 + 300 ticks
+	local share = 700 / (END - P.LateJoinGraceTicks)
+	local r = Progression.matchReward(state, stats, STANDARD)
+	T.equal((line(r, "Finish") :: Types.RewardLine).xp, math.floor(P.FinishXp * share + 0.5))
+end)
+
+T.test("time away isn't idle: rejoining after 10 minutes isn't AFK", function()
+	local state = finished({ 1 }, scoresFor({ 300, 200 }))
+	local stats = Progression.newStats(101, 0)
+	command(stats, 0, 300)
+	Progression.leave(stats, 300)
+	Progression.rejoin(stats, 900)
+	command(stats, 900, END)
+	T.expect(not Progression.matchReward(state, stats, STANDARD).afk)
+end)
+
+T.test("what was paid earlier never makes a reward negative", function()
+	local state = finished({ 1 }, scoresFor({ 300, 200 }))
+	local stats = busy(101)
+	stats.paidXp, stats.paidGlory = 10000, 10000
+	local r = Progression.matchReward(state, stats, STANDARD)
+	T.equal(r.xp, 0)
+	T.equal(r.glory, 0)
 end)
 
 T.finish()
