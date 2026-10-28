@@ -458,7 +458,7 @@ function Tutorial.init(selectedArmy: () -> number?)
 	Widgets.list(doneCard, false, Theme.space.m)
 	local doneTitle = Widgets.title(doneCard, "Tutorial done!", Theme.text.hero, 36)
 	doneTitle.LayoutOrder = 1
-	Widgets.leadIcon(doneTitle, "trophy", Theme.size.iconLarge)
+	Widgets.leadIcon(doneTitle, "trophy", Theme.icon.medium)
 	Widgets.label(doneCard, "Now go rule the world!", Theme.text.heading, 26).LayoutOrder = 2
 	doneButtons = Instance.new("Frame")
 	doneButtons.Name = "Buttons"

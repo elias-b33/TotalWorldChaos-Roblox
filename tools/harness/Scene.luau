@@ -74,20 +74,43 @@ local function dumpGui(inst)
 					color = c3(inst.ImageColor3),
 					transparency = inst.ImageTransparency,
 				}
+				if enumName(inst.ScaleType) == "Slice" then -- a 9-slice frame (FrameArt)
+					local r = inst.SliceCenter
+					node.image.slice = { r.Min.X, r.Min.Y, r.Max.X, r.Max.Y }
+					node.image.sliceScale = inst.SliceScale
+				end
 			end
 		end
-		-- the stroke Roblox draws: the last enabled one (Widgets' outline steps aside for the tutorial's glow)
-		for _, stroke in inst:GetChildren() do
-			if stroke:IsA("UIStroke") and stroke.Enabled then
-				node.uiStroke = {
-					color = c3(stroke.Color),
-					thickness = stroke.Thickness,
-					transparency = stroke.Transparency,
+		-- every enabled stroke (an object may have several: an ink outline and a glow), and its drop shadows
+		local strokes, shadows = {}, {}
+		for _, child in inst:GetChildren() do
+			if child:IsA("UIStroke") and child.Enabled then
+				table.insert(strokes, {
+					color = c3(child.Color),
+					thickness = child.Thickness,
+					transparency = child.Transparency,
 					-- Contextual on a text object outlines the text, not the box
-					text = enumName(stroke.ApplyStrokeMode) == "Contextual"
+					text = enumName(child.ApplyStrokeMode) == "Contextual"
 						and (inst:IsA("TextLabel") or inst:IsA("TextButton")),
-				}
+					position = enumName(child.BorderStrokePosition), -- Outer, Center or Inner
+					zIndex = child.ZIndex,
+				})
+			elseif child:IsA("UIShadow") and child.Enabled then
+				table.insert(shadows, {
+					color = c3(child.Color),
+					transparency = child.Transparency,
+					offset = { child.Offset.X.Offset, child.Offset.Y.Offset },
+					blur = child.BlurRadius.Offset,
+					spread = { child.Spread.X.Offset, child.Spread.Y.Offset },
+				})
 			end
+		end
+		if #strokes > 0 then
+			node.uiStrokes = strokes
+			node.uiStroke = strokes[#strokes]
+		end
+		if #shadows > 0 then
+			node.shadows = shadows
 		end
 		local gradient = inst:FindFirstChildOfClass("UIGradient")
 		if gradient and gradient.Enabled then
@@ -125,7 +148,20 @@ local function dumpGui(inst)
 			inst.PaddingRight.Offset,
 		}
 	elseif inst:IsA("UICorner") then
-		node.radius = { inst.CornerRadius.Scale, inst.CornerRadius.Offset }
+		-- CornerRadius sets all four corners; an object that sets corners one by one never touches it (Lune then
+		-- has no value for it), so read the four instead
+		local ok, radius = pcall(function()
+			return inst.CornerRadius
+		end)
+		if ok then
+			node.radius = { radius.Scale, radius.Offset }
+		else
+			node.radius = { 0, 0 }
+			node.corners = {}
+			for i, c in { inst.TopLeftRadius, inst.TopRightRadius, inst.BottomRightRadius, inst.BottomLeftRadius } do
+				node.corners[i] = { c.Scale, c.Offset }
+			end
+		end
 	elseif inst:IsA("UISizeConstraint") then
 		node.maxSize = { inst.MaxSize.X, inst.MaxSize.Y }
 	elseif inst:IsA("ScreenGui") then
@@ -220,6 +256,7 @@ function Scene.capture(client)
 end
 
 function Scene.save(client, path: string)
+	Emulator.flushProperties() -- captions catch up with their roots' text (see Emulator.flushProperties)
 	images = {}
 	local scene = Scene.capture(client)
 	for i, image in images do

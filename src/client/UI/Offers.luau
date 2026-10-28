@@ -45,7 +45,7 @@ local function render()
 			else name .. " offers peace" .. (if o.tribute > 0 then " +" .. o.tribute .. " gold" else "")
 		local line = Widgets.label(card, text, Theme.text.body, 36)
 		line.LayoutOrder = 1
-		Widgets.leadIcon(line, if o.kind == "Ally" then "handshake" else "peace", Theme.size.iconButton)
+		Widgets.leadIcon(line, if o.kind == "Ally" then "handshake" else "peace", Theme.icon.small)
 		local footer = Instance.new("Frame")
 		footer.BackgroundTransparency = 1
 		footer.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)

@@ -406,7 +406,7 @@ end
 local function offerTitle(card: Frame, icon: string, name: string)
 	local title = Widgets.title(card, name, Theme.text.heading, TITLE_HEIGHT)
 	title.Name = "Title"
-	Widgets.leadIcon(title, icon, Theme.size.iconLarge, Theme.space.s)
+	Widgets.leadIcon(title, icon, Theme.icon.medium, Theme.space.s)
 end
 
 -- A dim block of short lines (what's inside), then a gold note under it.
@@ -606,7 +606,7 @@ end
 -- The Themes tab's last card: what you see when a theme wins the vote (the opt-out, saved in your profile).
 local function themeSettingCard(order: number, parent: Instance)
 	local card = newCard(parent, "Card_ThemeSetting", order, nil)
-	local eye = Widgets.icon(card, "eye", Theme.size.iconLarge)
+	local eye = Widgets.icon(card, "eye", Theme.icon.medium)
 	eye.AnchorPoint = Vector2.new(0.5, 0)
 	eye.Position = UDim2.new(0.5, 0, 0, Theme.space.s)
 	local title = centred(card, "What you see", Theme.text.body, 18)
@@ -861,7 +861,7 @@ local function build(): Refs
 	title.AutomaticSize = Enum.AutomaticSize.X
 	title.TextTruncate = Enum.TextTruncate.None
 	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "cart", Theme.size.iconButton)
+	Widgets.leadIcon(title, "cart", Theme.icon.small)
 	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
 	glory.Name = "Glory"
 	glory.LayoutOrder = 2
@@ -945,7 +945,7 @@ local function showStarterOffer()
 	local title = Widgets.title(offerPanel, offer.name, Theme.text.title, TITLE_HEIGHT)
 	title.Name = "Title"
 	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "gift", Theme.size.iconButton)
+	Widgets.leadIcon(title, "gift", Theme.icon.small)
 	-- what's inside, two columns, each with its slot's icon
 	local items = Instance.new("Frame")
 	items.Name = "Items"

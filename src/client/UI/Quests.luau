@@ -407,7 +407,7 @@ local function build(): Refs
 	title.AutomaticSize = Enum.AutomaticSize.X
 	title.TextTruncate = Enum.TextTruncate.None
 	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "scroll", Theme.size.iconButton)
+	Widgets.leadIcon(title, "scroll", Theme.icon.small)
 	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
 	glory.Name = "Glory"
 	glory.LayoutOrder = 2

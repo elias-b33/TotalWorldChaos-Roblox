@@ -273,7 +273,7 @@ local function bonusColumn(parent: Instance, view: Types.SeasonView, order: numb
 	if pad then
 		pad.PaddingLeft, pad.PaddingRight = UDim.new(0, GAP), UDim.new(0, GAP)
 	end
-	local medal = Widgets.icon(cell, "medal", Theme.size.iconLarge)
+	local medal = Widgets.icon(cell, "medal", Theme.icon.medium)
 	medal.AnchorPoint = Vector2.new(0.5, 0)
 	medal.Position = UDim2.fromScale(0.5, 0)
 	local text = Widgets.label(
@@ -292,7 +292,7 @@ local function bonusColumn(parent: Instance, view: Types.SeasonView, order: numb
 	text.TextColor3 = Theme.color.textDim
 	text.TextXAlignment = Enum.TextXAlignment.Center
 	text.TextYAlignment = Enum.TextYAlignment.Top
-	text.Position = UDim2.fromOffset(0, Theme.size.iconLarge + GAP)
+	text.Position = UDim2.fromOffset(0, Theme.icon.medium + GAP)
 	if view.bonusReady > 0 then
 		action(cell, nil, string.format("Claim %d", view.bonusReady), Intents.claimAllSeason)
 	else
@@ -320,7 +320,7 @@ local function renderTrack(track: Frame, view: Types.SeasonView)
 		l.Position = UDim2.fromScale(0, 0.5)
 		if i == 2 then -- the premium track: the ticket above its name
 			l.Position = UDim2.new(0, 0, 0.5, 12)
-			local icon = Widgets.icon(row, "ticket", Theme.size.iconButton)
+			local icon = Widgets.icon(row, "ticket", Theme.icon.small)
 			icon.AnchorPoint = Vector2.new(0.5, 0.5)
 			icon.Position = UDim2.new(0.5, 0, 0.5, -10)
 		end
@@ -553,7 +553,7 @@ local function build(): Refs
 	local title = Widgets.title(header, "", Theme.text.heading, BAR) -- a season's name can be long
 	title.Name = "Title"
 	title.Size = UDim2.new(1, -(right + TIER_BOX + Theme.space.m), 1, 0)
-	Widgets.leadIcon(title, "ticket", Theme.size.iconButton)
+	Widgets.leadIcon(title, "ticket", Theme.icon.small)
 
 	local track = Instance.new("Frame")
 	track.Name = "Track"

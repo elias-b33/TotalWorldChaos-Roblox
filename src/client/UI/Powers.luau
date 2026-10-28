@@ -416,7 +416,7 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	barTitle = Widgets.title(titleRow, "", Theme.text.title, 30)
 	barTitle.Size = UDim2.fromOffset(0, 30)
 	barTitle.AutomaticSize = Enum.AutomaticSize.X
-	barTitleIcon = Widgets.leadIcon(barTitle, "sparkles", Theme.size.iconButton)
+	barTitleIcon = Widgets.leadIcon(barTitle, "sparkles", Theme.icon.small)
 	barCost = Widgets.chip(titleRow, "charge", "", nil, 26)
 	barCost.LayoutOrder = 2
 	barHint = Widgets.label(bar, "", Theme.text.body, 22)
