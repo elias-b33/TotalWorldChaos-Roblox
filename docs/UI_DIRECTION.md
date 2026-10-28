@@ -488,6 +488,18 @@ Keep the shapes, the stacking and `MapBadges` as they are. They are the best par
 | **Footer** | One hint line, `textDim`, no icon. |
 | **Objects** | About 9–13 per card (today 7–10). A page of five is about +25, and the shop is never open during the soak. |
 
+**As built (step 5).**
+
+- **Window size:** the shop's window is at most 828×366 phone px, the size it has on an 844×390 phone. A tablet shows the same window larger through its DeviceScale, so the cards never stretch (on a 1366×1024 iPad it is 1159×512 on screen). The cards' row is the window less 32×160 px of padding, header, tabs and footer: 796×206 on an 844 px phone, 619×191 on a 667 px one.
+- **Card size:** item cards are `Widgets.tileWidth(row, 5, 9)` wide (152, or 116 on a small phone) and the row's height less 10 px for the tags.
+- **Two-pass layout:** a page lays out its cards together, so wells, names and detail lines line up across the row. The tallest bottom area on the page sets where the names go, and the well takes what is left, with a preview at most 48 px tall.
+- **Prices:** side by side is decided by an estimate of Fredoka One 14 widths, with 6 px button sides. Everything fits side by side on an 844 px phone, and prices stack on a 667 px one.
+- **Detail line:** what the old rarity line said beyond the rarity ("Meteor", "Any map", "Animated") is now a dim line under the name, shown when there is room.
+- **Tags and frames:** the rarity tag is the title plate grid in the rarity's ramp (`FrameArt.palette("titlePlate", colour)`). It reads FREE (slate) on free items, VIP (gold) on VIP items, and the rarity otherwise. Free and earned items use the plain plate frame, VIP items brass, and Rare and better get the glow.
+- **The Today tab's six cards** have no tags and tighter spacing (the frame and glow carry the rarity). Their prices always stack, so the picture is small: about 32 px on 844 and 16 px on 667.
+- **Offer cards:** brass cards with their title plate on the top edge and a gold glow. More than four content lines go into two columns. Bundles on the Today tab are narrow brass cards with no plate.
+- The starter-pack pop-up dims the screen behind it and centres its two buttons. The Glory value is a counter (`Glory`). History rows are raised plates.
+
 **Offer cards** (VIP, starter pack, season pass): the brass window with an icon and the title on a title plate. The contents as `textDim` lines, a `gold` note, and one price button at the bottom. The **starter-pack pop-up** is a brass window, 400 wide, with "Buy R$ 149" (emerald) and "Not now" (slate).
 
 ### 7.13 Results

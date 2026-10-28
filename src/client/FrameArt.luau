@@ -456,6 +456,11 @@ function FrameArt.palette(frame: string, style: string | number): Palette
 	if WINDOWS[frame] then
 		return FrameArt.rarityWindow(face)
 	end
+	if frame == "titlePlate" then
+		-- a small plate in an enamel colour (the shop's rarity tags): its lit top, face, shaded and dark base rows
+		local r = FrameArt.ramp(face)
+		return { K = FrameArt.INK, y = r.H, Y = r.F, O = r.S, o = r.B }
+	end
 	local p = FrameArt.ramp(face)
 	if MEDALLIONS[frame] then
 		p = table.clone(p)

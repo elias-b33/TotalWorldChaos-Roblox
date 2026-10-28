@@ -31,7 +31,7 @@ local USES: { [string]: { string | number } } = {
 	plate = { "plate", "plateRaised" },
 	window = { "window", "windowIron", "common", "rare", "epic", "legendary" },
 	well = { "well" },
-	titlePlate = { "titlePlate" },
+	titlePlate = { "titlePlate", "common", "rare", "epic", "legendary", "slate", "gold" },
 	badge = { "crimson", "gold" },
 	ribbon = { "war", "cataclysm", "gold" },
 	medallionSmall = { "war", "peace", "gold", "slate", "azure", "royal" },
@@ -189,6 +189,14 @@ T.test("slot tiles swap only their base; the power medallion has a purple well",
 	T.equal(FrameArt.palette("medallion", "peace").w, FrameArt.COLORS.slate900)
 	-- a colour on a window is a rarity band
 	T.equal(FrameArt.palette("window", "rare").Y, FrameArt.COLORS.rare)
+	-- and on a title plate, a rarity tag: the plate's grid in the colour's ramp (face, lit top, shaded base)
+	local epic = FrameArt.ramp(FrameArt.COLORS.epic)
+	local tag = FrameArt.palette("titlePlate", "epic")
+	T.equal(tag.Y, epic.F)
+	T.equal(tag.y, epic.H)
+	T.equal(tag.O, epic.S)
+	T.equal(tag.o, epic.B)
+	T.equal(FrameArt.palette("titlePlate", "titlePlate").Y, FrameArt.COLORS.brass300)
 end)
 
 T.test("octagons are mirror-symmetric and match the doc's example", function()
