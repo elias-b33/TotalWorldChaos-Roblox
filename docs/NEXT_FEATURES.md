@@ -736,6 +736,49 @@ Three slices, each S:
 
 **Platform.** A separate "Ranked" place; **Custom Matchmaking** with a custom signal from a player attribute (the rating, stored in a DataStore), one of the two custom signals a configuration allows (the other stays free). Server attributes (`MatchmakingService:SetServerAttribute`) can mark a ranked server's state. Analytics `ranked_match` (rating change bucket). **Size** L; after launch.
 
+### 9.9 The owner's brainstorm (October 2026): later, not planned yet
+
+Three ideas from the owner to come back to after launch. They're recorded here so they aren't lost; none is in the build order.
+
+**A true grand strategy mode, PC and tablet first.**
+- The deep, slow game the Conquer The World and Rise of Nations crowd plays (docs/RIVALS.md), built as a separate mode or place. It would use the same maps and peoples.
+- Additions: more nations, longer sessions (an hour or more, maybe saved and resumed), technology and production, and a denser UI with mouse hover and tooltips.
+- Phones can join, but the layout targets bigger screens. The 25-minute match stays the main mode.
+- **Hard parts:**
+  - a second UI density alongside Slate & Brass's phone-first one;
+  - saving and resuming a match (DataStore size and server lifetime);
+  - bots good enough for long games (the bot strategy stage helps).
+- **Relation to the planned Long format (task #33):** Long is a 45–60-minute version of today's game. This would be its own game inside the game.
+
+**Earth develops better weapons: eras and super weapons.**
+- Earth's nations could advance through eras (muskets, then artillery, tanks and planes, then rockets), with a late super weapon such as a nuke. RoFront's nukes (atom bombs, hydrogen bombs, MIRVs) are one of its draws.
+- The other maps need equivalents in their own style: Eldmoor dragons or an arcane cataclysm; Skyshards orbital strikes.
+- **Open questions:**
+  - Super weapons overlap the Primordials' powers and the Cataclysm phase. They need their own role, for example a nation's own late-game strike with a long build time, a counter (RoFront's SAM launchers) and the immunity rules.
+  - They can't snowball a 25-minute match, so they probably fit the Long and grand strategy modes best.
+  - Roblox allows stylised weapons; keep them cartoon pixel art for the 13+ audience.
+
+**A sandbox at WorldBox level or better, with player-made worlds and "mods".**
+- Today's sandbox is the match world without rules: take over nations, change the speed, use the powers.
+- WorldBox level means:
+  - painting terrain and biomes;
+  - placing and growing civilisations of every people;
+  - wildlife and creatures;
+  - many more powers and disasters;
+  - traits, culture and history;
+  - time controls;
+  - saved worlds.
+- **Player-made content, all of it data rather than code** (Roblox players can't upload scripts):
+  - custom worlds and scenarios (painted maps, start positions, rules);
+  - custom peoples (name, colours, numbers within limits);
+  - sharing through codes and a world browser with likes.
+- **Must have:**
+  - Roblox's text filter on every name and description players write;
+  - report and remove tools for shared worlds, since drawn pixel art can be misused;
+  - storage limits per player.
+- The sandbox shares the map, peoples and powers with the PvP game. That's the advantage over World Sim (docs/RIVALS.md): every sandbox world is one tap from a real match.
+- It's also where the Sandbox Pass (docs/MONETIZATION.md 13.2) would earn its price.
+
 ## 10. Analytics additions
 
 All in LAUNCH.md's format; `Sim/Telemetry.luau` holds them as data, `TelemetryService` sends them. Today's plan uses 17 of 100 custom event names and 6 of 10 funnels (with `PrivateServer` and `Party` planned).
