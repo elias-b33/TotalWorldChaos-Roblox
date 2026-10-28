@@ -10,7 +10,8 @@
 -- options: lobby = true (it runs the Lobby; the rest boot with SkipLobby), tutorial = true (a tutorial server),
 -- map = "earth" (the map it needs; MAP still overrides it) and attributes (extra Workspace attributes). Shared helpers
 -- live in tools/harness/H.luau. Adding a scenario is adding a file: nothing else lists them.
--- Screenshots go to tools/harness/out/<scenario>/NN_name.png (rendered by render_scene.py).
+-- Screenshots go to tools/harness/out/<scenario>/NN_name.png (rendered by render_scene.py). NO_SHOTS=1 skips the
+-- PNG renders (every check still runs): much faster for verification runs that nobody looks at.
 -- A scenario fails on any script error, any warn(), any table Roblox would mangle over the network,
 -- or a failed expectation.
 

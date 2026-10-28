@@ -28,7 +28,7 @@ The full spec is `docs/DESIGN.md`; the three maps, textures and map data pipelin
 | Run Sim tests | `lune run tests/run` |
 | Install missing tools | `bash scripts/cloud-setup.sh` |
 | Regenerate maps and textures | `python3 tools/mapgen/generate.py` (or `--only earth`, `--only tiles`, …) |
-| Play the game headlessly | `lune run tools/harness/play all` after `rojo build` (or `play <scenario>`; screenshots in `tools/harness/out/`; `MAP=earth` for another map) |
+| Play the game headlessly | `lune run tools/harness/play all` after `rojo build` (or `play <scenario>`; screenshots in `tools/harness/out/`; `MAP=earth` for another map; `NO_SHOTS=1` skips the PNGs for faster check runs) |
 | Play a whole match with bots | `lune run tools/harness/soak` after `rojo build` (25 minutes in about 20 s; errors, GUI budget, armies per minute) |
 | Repaint the docs' map pictures | `python3 tools/harness/paint_maps.py` |
 

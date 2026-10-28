@@ -30,7 +30,12 @@ end
 function H.shot(client, name: string)
 	shotCount += 1
 	local base = string.format("%s/%02d_%s", shotDir, shotCount, name)
-	Scene.save(client, base .. ".json")
+	Scene.save(client, base .. ".json") -- also what flushes the GUI's property signals, so it always runs
+	if process.env.NO_SHOTS then
+		-- verification runs: every check still runs, only the (slow) PNG render is skipped
+		fs.removeFile(base .. ".json")
+		return
+	end
 	local r = process.exec("python3", { "tools/harness/render_scene.py", base .. ".json", base .. ".png" })
 	if not r.ok then
 		error("render failed: " .. r.stderr)
