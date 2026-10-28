@@ -20,70 +20,70 @@
    "name": "Rhine",
    "capital": 14,
    "colorIndex": 1,
-   "race": "Orcs"
+   "race": "Kingdom"
   },
   {
    "slot": 2,
    "name": "Volga",
    "capital": 29,
    "colorIndex": 2,
-   "race": "Elves"
+   "race": "Nomads"
   },
   {
    "slot": 3,
    "name": "Tigris",
    "capital": 37,
    "colorIndex": 3,
-   "race": "Dwarves"
+   "race": "Clans"
   },
   {
    "slot": 4,
    "name": "Ganges",
    "capital": 60,
    "colorIndex": 4,
-   "race": "Humans"
+   "race": "Republic"
   },
   {
    "slot": 5,
    "name": "Yangtze",
    "capital": 68,
    "colorIndex": 5,
-   "race": "Dwarves"
+   "race": "Clans"
   },
   {
    "slot": 6,
    "name": "Mekong",
    "capital": 80,
    "colorIndex": 6,
-   "race": "Elves"
+   "race": "Republic"
   },
   {
    "slot": 7,
    "name": "Niger",
    "capital": 102,
    "colorIndex": 7,
-   "race": "Humans"
+   "race": "Kingdom"
   },
   {
    "slot": 8,
    "name": "Zambezi",
    "capital": 113,
    "colorIndex": 8,
-   "race": "Humans"
+   "race": "Empire"
   },
   {
    "slot": 9,
    "name": "Mississippi",
    "capital": 129,
    "colorIndex": 9,
-   "race": "Orcs"
+   "race": "Nomads"
   },
   {
    "slot": 10,
    "name": "Amazon",
    "capital": 141,
    "colorIndex": 10,
-   "race": "Elves"
+   "race": "Empire"
   }
  ],
  "provinces": [

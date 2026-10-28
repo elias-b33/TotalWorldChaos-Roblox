@@ -55,7 +55,7 @@ local function build(
 	building: Types.Building
 ): (boolean, string?)
 	local nation = state.nations[nationId]
-	local cost = Economy.buildingCost(building, nation.race) -- Dwarves pay less for a fort
+	local cost = Economy.buildingCost(building, nation.race) -- a Hills race pays less for a fort
 	if cost == nil then
 		return false, "BadBuilding"
 	end
@@ -74,7 +74,8 @@ local function build(
 	return true, nil
 end
 
--- Regiments of one troop type: the shared troops for everyone, an elite only for its own race (WrongRace).
+-- Regiments of one troop type: the shared roles for everyone, an elite only for the races whose elite it is
+-- (WrongRace).
 local function recruit(
 	state: MatchState,
 	nationId: number,

@@ -5,8 +5,8 @@
 -- One siege per province: whoever started it keeps it while one of its armies (or an ally's) stands there; a rival
 -- besieger at peace with it waits instead of blocking. An interrupted siege (a battle, a defender, the besieger
 -- leaving) keeps its progress for Config.Siege.GraceTicks, then resets. Retreating armies are ignored.
--- Army size doesn't matter, but troops do: while an army with Ironguard in it besieges (the holder's or an ally's),
--- the siege moves Config.Troops.Ironguard.siegeSpeed times as fast.
+-- Army size doesn't matter, but troops do: while an army with a siege troop in it (Ironguard, Legionaries) besieges
+-- (the holder's or an ally's), the siege moves that troop's Config.Troops siegeSpeed times as fast.
 
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
@@ -89,7 +89,7 @@ function Siege.step(state: MatchState)
 				then current
 				else { by = leader, progress = 0, required = Siege.required(province), lastTick = state.tick }
 			province.siege = siege
-			-- Ironguard besiege faster: the fastest army besieging with the leader sets the pace
+			-- siege troops besiege faster: the fastest army besieging with the leader sets the pace
 			local speed = 1
 			for _, a in besieging do
 				if Diplomacy.friendly(state, leader, a.owner) then

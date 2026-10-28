@@ -10,9 +10,11 @@ export type Building = "None" | "Farm" | "Barracks" | "Fort"
 export type Phase = "Lobby" | "Pick" | "Peace" | "War" | "Cataclysm" | "Results"
 export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "Blessing" | "Shield"
 
--- Races and troops (docs/DESIGN.md "Races", "Troops"; numbers in Config.Races and Config.Troops).
-export type Race = "Humans" | "Elves" | "Orcs" | "Dwarves"
-export type Troop = "Infantry" | "Archers" | "Cavalry" | "Knights" | "Rangers" | "Berserkers" | "Ironguard"
+-- Races and troops (docs/DESIGN.md "Races", "Troops"): data-driven, so both are ids. A Race is a key of
+-- Config.Races (each map has its own cast: Config.Casts), a Troop a key of Config.Troops (Sim.Races, Sim.Troops
+-- check them).
+export type Race = string
+export type Troop = string
 -- An army's composition: men per troop type (only types it has). It always adds up to Army.men (Army.setTroops).
 export type Composition = { [Troop]: number }
 

@@ -17,6 +17,7 @@ local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
 local Pathing = require("./Pathing")
+local Races = require("./Races")
 local Rng = require("./Rng")
 local Troops = require("./Troops")
 local Types = require("../Types")
@@ -452,7 +453,8 @@ end
 local function richEnough(ctx: Ctx, troop: Types.Troop, regiments: number): number
 	local t = Troops.stats(troop)
 	local n = math.min(regiments, affordable(ctx, troop))
-	while n >= 1 and ctx.nation.gold - n * t.gold < Config.Bots.UpkeepReserveMonths * (ctx.upkeep + n * t.upkeep) do
+	local each = t.upkeep * Races.upkeepMultiplier(ctx.nation.race) -- an Upkeep race pays less
+	while n >= 1 and ctx.nation.gold - n * t.gold < Config.Bots.UpkeepReserveMonths * (ctx.upkeep + n * each) do
 		n -= 1
 	end
 	return n

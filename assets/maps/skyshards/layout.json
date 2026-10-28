@@ -20,70 +20,70 @@
    "name": "Aurora",
    "capital": 2,
    "colorIndex": 1,
-   "race": "Humans"
+   "race": "Marines"
   },
   {
    "slot": 2,
    "name": "Zephyr",
    "capital": 11,
    "colorIndex": 2,
-   "race": "Orcs"
+   "race": "Insectoids"
   },
   {
    "slot": 3,
    "name": "Nimbus",
    "capital": 20,
    "colorIndex": 3,
-   "race": "Elves"
+   "race": "Crystals"
   },
   {
    "slot": 4,
    "name": "Tempest",
    "capital": 29,
    "colorIndex": 4,
-   "race": "Dwarves"
+   "race": "Robots"
   },
   {
    "slot": 5,
    "name": "Halo",
    "capital": 38,
    "colorIndex": 5,
-   "race": "Humans"
+   "race": "Energy"
   },
   {
    "slot": 6,
    "name": "Solace",
    "capital": 47,
    "colorIndex": 6,
-   "race": "Elves"
+   "race": "Marines"
   },
   {
    "slot": 7,
    "name": "Ember",
    "capital": 56,
    "colorIndex": 7,
-   "race": "Dwarves"
+   "race": "Insectoids"
   },
   {
    "slot": 8,
    "name": "Rime",
    "capital": 65,
    "colorIndex": 8,
-   "race": "Humans"
+   "race": "Crystals"
   },
   {
    "slot": 9,
    "name": "Verdance",
    "capital": 74,
    "colorIndex": 9,
-   "race": "Elves"
+   "race": "Robots"
   },
   {
    "slot": 10,
    "name": "Umbra",
    "capital": 83,
    "colorIndex": 10,
-   "race": "Orcs"
+   "race": "Energy"
   }
  ],
  "provinces": [

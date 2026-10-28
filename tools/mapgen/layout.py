@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 START_SIZE = 8  # provinces each nation owns at the start (~40% of land stays neutral)
-RACES = ("Humans", "Elves", "Orcs", "Dwarves")  # every nation has one (docs/DESIGN.md "Races"); every map mixes all four
+NATIONS_PER_RACE = 2  # every map has its own cast of five races (docs/DESIGN.md "Races"), two nations each
 MIN_SHARED_BORDER = 3  # pixels of shared border before two provinces count as neighbours
 
 
@@ -47,6 +47,7 @@ class Layout:
     owner: list[int | None] = field(default_factory=list)  # nation slot index or None
     nations: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    cast: tuple[str, ...] = ()  # the map's five races (Config.Casts in src/shared/Config.luau lists the same ones)
 
     def terrain(self, i: int) -> str:
         return self.terrain_of[self.seeds[i].biome]
@@ -336,7 +337,7 @@ def assign_start_territories(
 
     allowed(slot, province) -> bool can restrict claims (Skyshards keeps each nation on its own shard).
     order lists the nations by slot; by default slots follow the capitals' seed order.
-    races gives each nation (by name) its race, one of RACES (validate() checks every nation has one).
+    races gives each nation (by name) its race, one of the map's cast (validate() checks every nation has one).
     """
     n = len(lay.seeds)
     caps = [(i, s.nation) for i, s in enumerate(lay.seeds) if s.nation]
@@ -453,12 +454,15 @@ def validate(lay: Layout) -> list[str]:
         problems.append(f"duplicate names: {sorted(dupes)}")
     if len(lay.seeds) > 150:
         problems.append(f"{len(lay.seeds)} provinces is over the 150 budget")
+    if not lay.cast:
+        problems.append("the map has no cast of races")
     for n in lay.nations:
-        if n.get("race") not in RACES:
-            problems.append(f"nation '{n['name']}' has no race (one of {', '.join(RACES)})")
-    missing = [r for r in RACES if r not in {n.get("race") for n in lay.nations}]
-    if missing:
-        problems.append(f"races missing from the map: {', '.join(missing)}")
+        if n.get("race") not in lay.cast:
+            problems.append(f"nation '{n['name']}' has no race of the map's cast ({', '.join(lay.cast)})")
+    for r in lay.cast:
+        count = sum(1 for n in lay.nations if n.get("race") == r)
+        if count != NATIONS_PER_RACE:
+            problems.append(f"race {r} has {count} nations (should be {NATIONS_PER_RACE})")
     return problems
 
 

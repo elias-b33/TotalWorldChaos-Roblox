@@ -88,16 +88,68 @@ end
 
 -- Recruiting ----------------------------------------------------------------------------------------------
 
-T.test("every nation has a race, and each map mixes all four", function()
+T.test("every map has its own cast of five races, two nations each, set in the map data", function()
+	local everyRace: { [string]: boolean } = {}
 	for _, mapId in Maps.ids do
+		local cast = Races.forMap(mapId)
+		T.equal(#cast, 5, mapId .. " has five races")
 		local state = Match.new(Maps.get(mapId))
 		local seen: { [string]: number } = {}
 		for _, nation in state.nations do
 			T.expect(Races.isRace(nation.race), nation.name .. " has no race")
+			T.expect(table.find(cast, nation.race) ~= nil, nation.name .. "'s " .. nation.race .. " isn't of " .. mapId)
 			seen[nation.race] = (seen[nation.race] or 0) + 1
 		end
-		for _, race in Races.LIST do
-			T.expect((seen[race] or 0) >= 2, mapId .. " has " .. (seen[race] or 0) .. " " .. race)
+		for _, race in cast do
+			T.equal(seen[race] or 0, 2, mapId .. ": nations of the " .. race)
+			T.equal(Races.mapOf(race), mapId)
+			T.expect(not everyRace[race], race .. " lives on one map only")
+			everyRace[race] = true
+		end
+	end
+	for _, race in Races.LIST do
+		T.expect(everyRace[race], race .. " is in a map's cast")
+	end
+	T.equal(#Races.LIST, 15, "fifteen races in all")
+end)
+
+T.test("Earth is human civilisations, Eldmoor the fantasy peoples, Skyshards the sci-fi peoples", function()
+	local earth, eldmoor, sky = Races.forMap("earth"), Races.forMap("eldmoor"), Races.forMap("skyshards")
+	for _, race in { "Kingdom", "Empire", "Nomads", "Republic", "Clans" } do
+		T.expect(table.find(earth, race) ~= nil, "Earth has the " .. race)
+	end
+	for _, race in { "Humans", "Elves", "Orcs", "Dwarves", "Lizardfolk" } do
+		T.expect(table.find(eldmoor, race) ~= nil, "Eldmoor has the " .. race)
+	end
+	for _, race in { "Marines", "Robots", "Insectoids", "Crystals", "Energy" } do
+		T.expect(table.find(sky, race) ~= nil, "Skyshards has the " .. race)
+	end
+	T.equal(Races.name("Crystals"), "Crystal folk", "a race's name for the UI")
+	T.equal(Races.name(nil), "")
+end)
+
+T.test("each race has one passive of the known kinds and one elite, and every kind is used", function()
+	local kinds: { [string]: number } = {}
+	for _, race in Races.LIST do
+		local def = assert(Races.def(race), race)
+		T.expect(table.find(Races.PASSIVES, def.passive) ~= nil, race .. "'s passive " .. def.passive)
+		kinds[def.passive] = (kinds[def.passive] or 0) + 1
+		local elite = Troops.elite(race)
+		T.expect(elite ~= nil and Troops.isTroop(elite), race .. " has an elite troop")
+		T.expect(not Troops.isShared(elite :: Types.Troop), race .. "'s elite isn't a shared role")
+		T.expect(Races.bonusText(race) ~= "", race .. " describes its passive")
+	end
+	for _, kind in Races.PASSIVES do
+		T.expect((kinds[kind] or 0) >= 1, "some race has the " .. kind .. " passive")
+	end
+	-- every elite belongs to a race (Knights to two: Earth's Kingdom and Eldmoor's Humans)
+	for _, troop in Troops.LIST do
+		if not Troops.isShared(troop) then
+			local owners = 0
+			for _, race in Races.LIST do
+				owners += if Troops.elite(race) == troop then 1 else 0
+			end
+			T.expect(owners >= 1, troop .. " is some race's elite")
 		end
 	end
 end)
@@ -108,7 +160,7 @@ T.test("a nation recruits infantry, archers, cavalry and its own elite, never an
 	for _, race in Races.LIST do
 		nation.race = race
 		local elite = Troops.elite(race)
-		T.expect(elite ~= nil and Troops.stats(elite :: Types.Troop).race == race, race .. " has an elite")
+		T.expect(elite ~= nil, race .. " has an elite")
 		T.equal(#Troops.available(race), 4)
 		for _, troop in Troops.LIST do
 			nation.gold, nation.manpower = 10000, 100000
@@ -251,6 +303,124 @@ T.test("Elves cross forest at plains speed", function()
 	T.equal(Movement.moveTicks(state, riders, FOREST), Config.Army.FastMoveTicks.Plains, "elven cavalry")
 end)
 
+T.test("passives go by kind: every Forest race and every Hills race gets the same rules", function()
+	local state = fresh()
+	local army = Army.spawn(state, AURORA, id("Aurora Meadows"), 2000)
+	state.nations[AURORA].race = "Crystals" -- Skyshards' Forest race glides through crystal groves
+	T.equal(Movement.moveTicks(state, army, FOREST), Config.Army.MoveTicks.Plains)
+	local battle = fresh()
+	war(battle, FOREST)
+	battle.nations[ZEPHYR].race, battle.nations[AURORA].race = "Crystals", "Marines"
+	local def = modifiers(battle, FOREST)
+	T.near(def, 1 + Config.Battle.TerrainDefenceBonus + Config.Races.Crystals.forestBonus, 1e-9, "Crystals in forest")
+	local hills = fresh()
+	war(hills, HILLS)
+	hills.nations[ZEPHYR].race, hills.nations[AURORA].race = "Clans", "Marines" -- Earth's Hills race
+	local hdef = modifiers(hills, HILLS)
+	T.near(hdef, 1 + Config.Battle.TerrainDefenceBonus + Config.Races.Clans.hillsDefenceBonus, 1e-9, "Clans in hills")
+	T.equal(
+		Economy.buildingCost("Fort", "Clans"),
+		Config.Buildings.Fort.cost * Config.Races.Clans.fortCostMultiplier,
+		"Clans build cheap forts"
+	)
+	T.equal(Economy.buildingCost("Fort", "Kingdom"), Config.Buildings.Fort.cost)
+end)
+
+T.test("an Upkeep race pays less upkeep for every troop type, and bots count it", function()
+	local state = fresh()
+	Army.spawn(state, AURORA, state.nations[AURORA].capital, 3000)
+	Army.spawn(state, AURORA, id("Aurora Fields"), 1000, "Drones")
+	state.nations[AURORA].race = "Marines"
+	local full = Economy.monthlyIncome(state, AURORA).upkeep
+	state.nations[AURORA].race = "Robots"
+	local cheap = Economy.monthlyIncome(state, AURORA).upkeep
+	T.near(cheap, full * Config.Races.Robots.upkeepMultiplier, 1e-9)
+	T.expect(cheap < full, "machines need no pay")
+	T.near(Races.upkeepMultiplier("Republic"), Config.Races.Republic.upkeepMultiplier, 1e-9)
+	T.equal(Races.upkeepMultiplier("Humans"), 1, "other races pay in full")
+end)
+
+T.test("a Swift race marches faster: every step takes fewer ticks, at least one", function()
+	local state = fresh()
+	local army = Army.spawn(state, AURORA, id("Aurora Meadows"), 2000)
+	local riders = Army.spawn(state, AURORA, id("Aurora Fields"), 1000, "StormWisps")
+	state.nations[AURORA].race = "Marines"
+	local plain, hill = Movement.moveTicks(state, army, id("Aurora Landing")), Movement.moveTicks(state, army, HILLS)
+	state.nations[AURORA].race = "Energy"
+	local m = Config.Races.Energy.moveMultiplier
+	T.equal(Movement.moveTicks(state, army, id("Aurora Landing")), math.floor(plain * m + 0.5))
+	T.equal(Movement.moveTicks(state, army, HILLS), math.floor(hill * m + 0.5))
+	T.expect(Movement.moveTicks(state, army, HILLS) < hill, "faster in hills too")
+	local fast = Movement.moveTicks(state, riders, id("Aurora Landing"))
+	T.equal(fast, math.max(1, math.floor(Config.Army.FastMoveTicks.Plains * m + 0.5)), "storm wisps are fast too")
+	T.expect(fast >= 1, "never instant")
+	T.equal(Races.moveTicks("Nomads", 1), 1, "at least one tick")
+	-- a whole march: the order arrives sooner
+	assert(Movement.order(state, AURORA, army.id, id("Aurora Landing")))
+	run(state, math.floor(plain * m + 0.5))
+	T.equal(army.location, id("Aurora Landing"), "the Energy beings arrive early")
+end)
+
+T.test("an Attack race fights harder when attacking, anywhere, never defending", function()
+	local state = fresh()
+	war(state, PLAINS)
+	state.nations[ZEPHYR].race, state.nations[AURORA].race = "Lizardfolk", "Empire"
+	local def, att = modifiers(state, PLAINS)
+	T.near(att, 1 + Config.Races.Empire.attackBonus, 1e-9, "the Empire attacking on plains")
+	T.near(def, 1, 1e-9, "the Lizardfolk defending get nothing")
+	local hills = fresh()
+	war(hills, HILLS)
+	hills.nations[ZEPHYR].race, hills.nations[AURORA].race = "Marines", "Lizardfolk"
+	local _, att2 = modifiers(hills, HILLS)
+	T.near(att2, 1 + Config.Races.Lizardfolk.attackBonus, 1e-9, "and in hills")
+end)
+
+T.test("each passive's one line for the UI follows Config", function()
+	local function pct(x: number): string
+		return math.floor(x * 100 + 0.5) .. "%"
+	end
+	T.equal(Races.bonusText("Kingdom"), "+" .. pct(Config.Races.Kingdom.goldBonus) .. " gold")
+	T.equal(Races.bonusText("Orcs"), "+" .. pct(Config.Races.Orcs.manpowerBonus) .. " manpower")
+	T.equal(
+		Races.bonusText("Dwarves"),
+		string.format(
+			"+%s defending hills, forts -%s",
+			pct(Config.Races.Dwarves.hillsDefenceBonus),
+			pct(1 - Config.Races.Dwarves.fortCostMultiplier)
+		)
+	)
+	T.equal(
+		Races.bonusText("Robots"),
+		"Armies cost " .. pct(1 - Config.Races.Robots.upkeepMultiplier) .. " less upkeep"
+	)
+	T.equal(Races.bonusText("Nomads"), "Armies march " .. pct(1 - Config.Races.Nomads.moveMultiplier) .. " faster")
+	T.equal(Races.bonusText("Lizardfolk"), "+" .. pct(Config.Races.Lizardfolk.attackBonus) .. " attacking")
+	T.equal(Races.bonusText(nil), "")
+end)
+
+T.test("a map names its shared troops (Skyshards: troopers, gunners, hover bikes), the stats are the same", function()
+	T.equal(Troops.name("skyshards", "Infantry"), "Troopers")
+	T.equal(Troops.name("skyshards", "Archers"), "Gunners")
+	T.equal(Troops.name("skyshards", "Cavalry"), "Hover bikes")
+	T.equal(Troops.name("earth", "Infantry"), "Infantry")
+	T.equal(Troops.name("eldmoor", "Cavalry"), "Cavalry")
+	T.equal(Troops.name("earth", "HorseArchers"), "Horse archers", "an elite's own name")
+	T.equal(Troops.name(nil, "Mechs"), "Mechs")
+	-- the shared roles are the same troops everywhere: one entry each in Config.Troops
+	T.equal(Troops.SHARED[1], "Infantry")
+	T.equal(Troops.SHARED[2], "Archers")
+	T.equal(Troops.SHARED[3], "Cavalry")
+	for _, troop in Troops.SHARED do
+		T.expect(Troops.isShared(troop) and Troops.canRecruit("Robots", troop), troop .. " is for everyone")
+	end
+	T.expect(not Troops.canRecruit("Robots", "Dragons"), "an unknown troop is never recruited")
+	T.expect(not Troops.isTroop("Dragons"))
+	-- the list keeps a fixed order: the shared roles, then every elite, sorted
+	for i = 4, #Troops.LIST - 1 do
+		T.expect(Troops.LIST[i] < Troops.LIST[i + 1], "elites sorted")
+	end
+end)
+
 -- Battles -----------------------------------------------------------------------------------------------
 
 T.test("a side's strength is its men × attack (attackers) or × defence (defenders)", function()
@@ -374,6 +544,10 @@ T.test("an army with Ironguard besieges faster (Ironguard siegeSpeed)", function
 		math.ceil(required / speed),
 		"any Ironguard sets the pace"
 	)
+	-- the Empire's Legionaries are siege troops too
+	local legion = Config.Troops.Legionaries.siegeSpeed :: number
+	T.equal(siegeTicks({ Infantry = 2000, Legionaries = 1000 }), math.ceil(required / legion), "Legionaries")
+	T.equal(Troops.siegeSpeed({ Pikemen = 3000 }), 1, "Pikemen besiege at the normal pace")
 end)
 
 -- Powers, garrisons, network, quests --------------------------------------------------------------------

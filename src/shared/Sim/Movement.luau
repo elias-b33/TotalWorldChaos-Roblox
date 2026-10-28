@@ -1,7 +1,7 @@
 --!strict
 -- Army orders and movement (tick order step 2): one province per 5 s on plains, 8 s on forest and hills, and
--- 3 s / 6 s for fast troops (cavalry, knights). An army marches at its slowest troop's speed, and Elves cross
--- forest at plains speed (Sim.Troops, Sim.Races). After moving, a nation's armies that stand still in the same
+-- 3 s / 6 s for fast troops (cavalry, knights...). An army marches at its slowest troop's speed; a Forest race
+-- crosses forest at plains speed and a Swift race marches faster (Sim.Troops, Sim.Races). After moving, a nation's armies that stand still in the same
 -- province merge into one (the lowest id stays, the compositions add up): an army is a stack of regiments shown as
 -- one token. Retreating armies walk on and take no orders.
 
@@ -56,11 +56,12 @@ function Movement.order(state: MatchState, nationId: number, armyId: number, to:
 	return true, nil
 end
 
--- Ticks this army takes to step into a province: its slowest troop's speed on that terrain (as plains for Elves
--- in a forest).
+-- Ticks this army takes to step into a province: its slowest troop's speed on that terrain (as plains for a Forest
+-- race in a forest), fewer for a Swift race.
 function Movement.moveTicks(state: MatchState, army: Types.Army, provinceId: number): number
-	local terrain = Races.moveTerrain(Races.of(state, army.owner), state.provinces[provinceId].terrain)
-	return Troops.moveTicks(army.troops, terrain)
+	local race = Races.of(state, army.owner)
+	local terrain = Races.moveTerrain(race, state.provinces[provinceId].terrain)
+	return Races.moveTicks(race, Troops.moveTicks(army.troops, terrain))
 end
 
 -- Ticks this army still needs to reach the next province (0 if it is not moving).

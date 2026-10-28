@@ -1,7 +1,7 @@
 --!strict
--- Income, upkeep and costs (docs/DESIGN.md "Economy"). Paid once per month. Races change two numbers: Humans earn
--- more gold (gross), Orcs more manpower (Sim.Races, Config.Races); every troop type has its own price and upkeep
--- (Sim.Troops).
+-- Income, upkeep and costs (docs/DESIGN.md "Economy"). Paid once per month. Race passives change a few numbers
+-- (Sim.Races, Config.Races): Gold races earn more gold (gross), Manpower races more manpower, Upkeep races pay less
+-- upkeep, Hills races less for a fort; every troop type has its own price and upkeep (Sim.Troops).
 
 local CatchUp = require("./CatchUp")
 local Config = require("../Config")
@@ -25,7 +25,7 @@ function Economy.developCost(level: number): number
 	return Config.Economy.DevelopCostPerLevel * level
 end
 
--- nil for "None" (nothing to build). `race` (optional): the builder's race (Dwarves pay half for a fort).
+-- nil for "None" (nothing to build). `race` (optional): the builder's race (a Hills race pays less for a fort).
 function Economy.buildingCost(building: Types.Building, race: Types.Race?): number?
 	local cost: number? = nil
 	if building == "Farm" then
@@ -66,7 +66,7 @@ function Economy.regiments(state: MatchState, nationId: number): number
 	return men / Config.Army.MenPerRegiment
 end
 
--- Gold per month a nation pays for its armies: every troop type at its own upkeep.
+-- Gold per month a nation pays for its armies: every troop type at its own upkeep, less for an Upkeep race.
 function Economy.upkeep(state: MatchState, nationId: number): number
 	local gold = 0
 	for _, army in state.armies do
@@ -74,7 +74,7 @@ function Economy.upkeep(state: MatchState, nationId: number): number
 			gold += Troops.upkeep(army.troops)
 		end
 	end
-	return gold
+	return gold * Races.upkeepMultiplier(Races.of(state, nationId))
 end
 
 function Economy.monthlyIncome(state: MatchState, nationId: number): Income
@@ -87,13 +87,13 @@ function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 		end
 	end
 	local race = Races.of(state, nationId)
-	manpower *= Primordial.manpowerMultiplier(state, nationId) * Races.manpowerMultiplier(race) -- Plague, Orcs
+	manpower *= Primordial.manpowerMultiplier(state, nationId) * Races.manpowerMultiplier(race) -- Plague, Manpower
 	local nation = state.nations[nationId]
 	local capital = nation and state.provinces[nation.capital]
 	if capital and capital.owner == nationId then
 		gold += Config.Economy.CapitalGold
 	end
-	gold *= CatchUp.goldMultiplier(state, nationId) * Races.goldMultiplier(race) -- overextension, Humans
+	gold *= CatchUp.goldMultiplier(state, nationId) * Races.goldMultiplier(race) -- overextension, Gold
 	return {
 		gold = gold,
 		manpower = manpower,

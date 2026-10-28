@@ -298,12 +298,16 @@ WRAP_STRAITS = [("Chukotka", "Alaska")]  # Bering Strait, across the map edge
 # Neutral garrisons above the 1,000-man default. Volga and Zambezi had quiet backyards no other nation reaches early
 # (western Siberia; the Horn, Abyssinia and Madagascar) and won about twice their share: these wilds hold out longer.
 GARRISONS = {"Ob": 2000, "Yenisei": 2000, "Madagascar": 2000, "Horn": 2000, "Abyssinia": 2000}
-# Races (docs/DESIGN.md "Races"; docs/MAPS.md): Elves in the great forests (taiga, jungles), Dwarves in the hills of
-# Mesopotamia and China, Humans and Orcs on the plains. Orcs go to Western Europe and North America, so no race reads
-# as a jab at a real people. Each race gets strong and weak start positions alike (docs/BALANCE.md section 18).
+# Races (docs/DESIGN.md "Races"; docs/MAPS.md): Earth is the realistic map, so its cast is five archetypes of human
+# civilisation a history strategy game uses, never a real people or present-day nation. They go to nations by the
+# land and by balance only: the Clans (hills) to the two hilliest starts, the Nomads (swift) to the two with the
+# widest steppe and grassland, the Republic (sea lanes) to the starts with the most straits, the Kingdom (gold,
+# knights on open plains) to two plains starts, the Empire to the other two; and each race gets one strong and one
+# weak start position (docs/BALANCE.md sections 17 and 19).
+CAST = ("Kingdom", "Empire", "Nomads", "Republic", "Clans")
 RACES = {
-    "Rhine": "Orcs", "Volga": "Elves", "Tigris": "Dwarves", "Ganges": "Humans", "Yangtze": "Dwarves",
-    "Mekong": "Elves", "Niger": "Humans", "Zambezi": "Humans", "Mississippi": "Orcs", "Amazon": "Elves",
+    "Rhine": "Kingdom", "Volga": "Nomads", "Tigris": "Clans", "Ganges": "Republic", "Yangtze": "Clans",
+    "Mekong": "Republic", "Niger": "Kingdom", "Zambezi": "Empire", "Mississippi": "Nomads", "Amazon": "Empire",
 }
 
 TERRAIN = {
@@ -324,7 +328,7 @@ def build() -> Layout:
     assert set(GARRISONS) <= {s.name for s in seeds}, "GARRISONS names a province that doesn't exist"
     notes: list[str] = []
     labels, seeds = build_regions(land, seeds, notes)
-    lay = Layout("earth", "Earth", "earth", W, H, labels, land, seeds, TERRAIN, notes=notes)
+    lay = Layout("earth", "Earth", "earth", W, H, labels, land, seeds, TERRAIN, notes=notes, cast=CAST)
     finalize(lay)
     curated_straits(lay, STRAITS, WRAP_STRAITS)
     auto_connect(lay)

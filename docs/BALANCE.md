@@ -11,7 +11,7 @@ Every number below comes from `Config.luau` as of this document or from one of t
 | `lune run tools/balance/conquest` | Time and cost to take a neutral province, through `Sim/Tick` (section 7) |
 | `lune run tools/balance/catchup` | Overextension by size, where the thresholds sit, break-even ratios; writes `data/catchup.csv` (section 9) |
 | `lune run tools/balance/expansion` | Whole matches with a greedy planner: Peace income, best-case domination, free-for-all; writes `data/expansion_*.csv` (sections 10–12). About 3 minutes (`MAP=earth` for one map). `SET="Siege.TicksPerDevelopment=20"` runs a what-if (section 14) |
-| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 17: use 200 seeds per map, about 12 min each), wins per race, regiments recruited per troop type and the troop mix (section 18). Takes `SET="…"` too, and `RACES=shuffle` deals the map's races out to the nations at random every match |
+| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 17: use 200 seeds per map, about 12 min each), wins per race, regiments recruited per troop type and the troop mix (sections 18 and 19). Takes `SET="…"` too, and `RACES=shuffle` deals the map's races out to the nations at random every match |
 | `lune run tools/balance/troops` | Troop matchups through `Sim/Battle`: how many attackers of one troop type beat a defender of another, and what each troop gives per gold of upkeep (section 18) |
 | `python3 tools/balance/charts.py` | The four charts in `docs/images/balance_*.png`, from the CSVs (Pillow; matplotlib isn't installed) |
 
@@ -568,3 +568,43 @@ Matches flow as before: as many wars, about as many alliance victories (the rest
 - **The Orcs' passive is weak by construction:** manpower never runs out for bots after the first minutes. If players turn out to be short of manpower (they recruit in bursts and lose armies), it matters more for them; if not, a different passive for the Orcs is a design question.
 - **Cavalry is the Humans' troop in practice** (see above). Players may still buy it for speed.
 - Player behaviour differs from bots. Once real matches run, compare wins by race from the `match_win` event (its start nation gives the race through the map data, `docs/LAUNCH.md`) and redo this with the same levers, `Config.Races` and `Config.Troops`.
+
+## 19. A cast of peoples for every map
+
+Every map now has its own five peoples, two nations each (`docs/DESIGN.md` "Races", `docs/MAPS.md`): human civilisations on Earth (Kingdom, Empire, Nomads, Republic, Clans), the four classic races and the Lizardfolk on Eldmoor, sci-fi peoples on Skyshards (Marines, Robots, Insectoids, Crystal folk, Energy beings). Each takes one passive of seven kinds and one elite; the three shared troops keep their numbers (Skyshards calls them troopers, gunners and hover bikes). Section 18's Humans, Elves, Orcs and Dwarves keep their numbers on Eldmoor.
+
+**How it was measured.** `lune run tools/harness/tournament 200 <map>` on each map with the map's races (what players get), seeds 1–200. A race's share is its wins over its fair share (section 18); with two nations per race it moves by about ±0.2 between batches of 200 seeds.
+
+**First pass** (`Config.Races` and `Config.Troops` as they are; map races, 200 seeds per map)
+
+| Map | Race: wins (share) |
+| --- | --- |
+| Earth | Kingdom 45 (0.80×) · Empire 77 (1.37×) · Nomads 64 (1.13×) · Republic 62 (1.10×) · Clans 34 (0.60×) |
+| Eldmoor | Humans 69 (1.25×) · Elves 78 (1.42×) · Orcs 48 (0.87×) · Dwarves 45 (0.82×) · Lizardfolk 35 (0.64×) |
+| Skyshards | Marines 35 (0.74×) · Robots 50 (1.06×) · Insectoids 37 (0.79×) · Crystal folk 52 (1.11×) · Energy beings 61 (1.30×) |
+
+**A what-if on the next 200 seeds** (201–400; `SET=`, not applied): Kingdom +15% gold, Empire +5% attack, Pikemen attack 1.5, Elves +5% in forests, Lizardfolk +15% attack and Raptor riders' upkeep 2, Marines +15% gold, Hive warriors' defence 1, Energy beings 15% faster.
+
+| Map | Race: wins (share) |
+| --- | --- |
+| Earth | Kingdom 72 (1.32×) · Empire 60 (1.10×) · Nomads 62 (1.14×) · Republic 51 (0.94×) · Clans 27 (0.50×) |
+| Eldmoor | Humans 81 (1.43×) · Elves 60 (1.06×) · Orcs 47 (0.83×) · Dwarves 58 (1.02×) · Lizardfolk 37 (0.65×) |
+| Skyshards | Marines 0.93× · Robots 1.14× · Insectoids 0.75× · Crystal folk 1.27× · Energy beings 0.91× |
+
+**Start positions, both batches together** (400 seeds): Earth from Yangtze 0.40× and Tigris 0.70× to Volga 1.61× and Zambezi 1.55×; Eldmoor from Ironholds 0.52× and Saltmarsh 0.54× to Frostmarch 1.67×. The Clans hold Earth's two weakest starts (Tigris, Yangtze) and the Lizardfolk two of Eldmoor's three weakest (Saltmarsh, Sunscorch), and neither moved when their passive or elite got stronger: their low share is mostly where they start. Skyshards' ten shards are the same, so its numbers are the races alone: the Insectoids (Manpower, like the Orcs: section 18's "manpower never runs out for bots") are the weakest there.
+
+**Troops bots recruit** (regiments per match, first pass): every troop is recruited on its map.
+
+| Map | Shared roles | Elites |
+| --- | --- | --- |
+| Earth | Infantry 533 (62%), Archers 197 (23%), Cavalry 9 (1%) | Legionaries 38, Crossbowmen 32, Horse archers 21, Pikemen 16, Knights 8 |
+| Eldmoor | Infantry 571 (62%), Archers 240 (26%), Cavalry 15 (2%) | Rangers 32, Ironguard 19, Berserkers 19, Raptor riders 15, Knights 14 |
+| Skyshards | Troopers 647 (59%), Gunners 286 (26%), Hover bikes 16 (1%) | Drones 37, Hive warriors 36, Storm wisps 34, Golems 27, Mechs 11 |
+
+**Match feel** (first pass): matches end at 25:00 in 80–92% of games as before (alliance victories 41 / 37 / 17 of 200), 9.7–10.9 wars per match, 37–54 provinces taken from nations per match, 144k–181k men in all armies at 25:00.
+
+**Still to do**
+
+- Spread the start positions over the peoples (one strong and one weak start each) before tuning their numbers: the Clans and the Lizardfolk first.
+- The Manpower passive (Orcs, Insectoids) does little for bots (section 18); their elites carry them.
+- The Elves' two wildwoods are strong starts (1.42× with +10% in forests, 1.06× with +5%).

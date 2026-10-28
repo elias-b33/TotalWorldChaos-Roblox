@@ -30,7 +30,7 @@ These are checked by the generator (`tools/mapgen/layout.py`), so a map that bre
 - **≤ 150 provinces** (the performance budget).
 - **Straits** are extra neighbour links across water or void, exactly as in the design doc. Each map draws them in its own style: dashed sea lanes on Earth, ink sea lanes on Eldmoor, rope bridges on Skyshards.
 - **Neutral garrisons** default to one regiment (1,000 men, `Config.NeutralGarrison`). A map can give a province a bigger garrison: the two map centres (the Crownlands and the Heartstone) and a few provinces set for start-position balance (see each map).
-- **Races** (docs/DESIGN.md "Races"): every nation has one of WorldBox's four races, set per nation in the generator (`RACES` in each `tools/mapgen/maps/*.py`, written into `layout.json` and `MapData` as the nation's `race`). Every map mixes all four, at least two nations of each, fitted to the land where it makes sense: Elves on the forest starts, Dwarves in the hills, Humans and Orcs elsewhere. The validator flags a nation without a race and a map missing one. The race also picks what the nation's capital looks like in the pixel art ("Capitals and armies by race").
+- **Races** (docs/DESIGN.md "Races"): every map has its own cast of five peoples, two nations each: realistic civilisations on Earth, fantasy peoples on Eldmoor, sci-fi peoples on Skyshards. The generator sets them per nation (`CAST` and `RACES` in each `tools/mapgen/maps/*.py`, written into `layout.json` and `MapData` as the nation's `race`; `Config.Casts` lists the same five per map), fitted to the land where it makes sense (Forest races on the forest starts, Hills races in the hills) and spread so every race gets strong and weak start positions. The validator flags a nation whose race isn't of the map's cast and a race without exactly two nations. The race also picks what the nation's capital and armies look like ("Capitals and armies by race").
 - **Start-position balance** is measured, not assumed: `lune run tools/harness/tournament 200 <map>` plays 200 bot matches and prints each slot's wins against its fair share. The goal (`docs/BALANCE.md` section 17) is that no slot wins more than about twice its share and none (almost) never wins. Fixes go into the generator (garrisons, passes, sea lanes, where a capital sits), never into special rules.
 
 ## Earth
@@ -41,18 +41,18 @@ The real world on a Miller projection, centred on 11°E so the Americas sit on t
 
 | Colour | Nation | Capital | Start region | Race |
 | --- | --- | --- | --- | --- |
-| 1 crimson | Rhine | Rhineland | Western Europe | Orcs |
-| 2 blue | Volga | Muscovy | Russia | Elves |
-| 3 gold | Tigris | Mesopotamia | Middle East | Dwarves |
-| 4 violet | Ganges | Ganges Plain | India | Humans |
-| 5 orange | Yangtze | Yangtze Valley | China | Dwarves |
-| 6 teal | Mekong | Mekong | Southeast Asia | Elves |
-| 7 magenta | Niger | Niger Bend | West Africa | Humans |
-| 8 lime | Zambezi | Zambezi | Southern Africa | Humans |
-| 9 bronze | Mississippi | Mississippi | North America | Orcs |
-| 10 charcoal | Amazon | Amazonia | South America | Elves |
+| 1 crimson | Rhine | Rhineland | Western Europe | Kingdom |
+| 2 blue | Volga | Muscovy | Russia | Nomads |
+| 3 gold | Tigris | Mesopotamia | Middle East | Clans |
+| 4 violet | Ganges | Ganges Plain | India | Republic |
+| 5 orange | Yangtze | Yangtze Valley | China | Clans |
+| 6 teal | Mekong | Mekong | Southeast Asia | Republic |
+| 7 magenta | Niger | Niger Bend | West Africa | Kingdom |
+| 8 lime | Zambezi | Zambezi | Southern Africa | Empire |
+| 9 bronze | Mississippi | Mississippi | North America | Nomads |
+| 10 charcoal | Amazon | Amazonia | South America | Empire |
 
-**Races:** Elves in the great forests (Volga's taiga, the Mekong and Amazon jungles), Dwarves in the hills of Mesopotamia and China, Humans on the plains of India and Africa, Orcs on the plains of Western Europe and North America. Orcs were kept off any region where "orcs" could read as a jab at a real people. Start positions are spread over the races: the first draft gave the Humans Yangtze and Niger, two of the weakest starts, and the Dwarves Zambezi, one of the strongest; now Zambezi is Human and the hilly Yangtze Dwarven (`docs/BALANCE.md` section 18).
+**Races: the realistic cast.** Earth has no fantasy creatures: its five races are archetypes of human civilisation a history strategy game uses (a feudal Kingdom with knights, an Empire of legions, steppe Nomads with horse archers, a sea Republic with crossbowmen, mountain Clans with pikemen). None is a real people or a present-day nation, and they go to nations by the land and by balance, never by who lives there: the Clans to the two hilliest starts (Tigris, Yangtze: four and three hill provinces), the Nomads to the two with the widest steppe and grassland and the biggest empty wilds next door (Volga, Mississippi), the Republic to the starts with the most sea lanes (Mekong, ten straits; Ganges), the Kingdom to two plains starts (Rhine, Niger), the Empire to the other two (Zambezi, Amazon). Each race holds one of the strongest and one of the weakest start positions (`docs/BALANCE.md` sections 17 and 19).
 
 **How it plays**
 
@@ -77,17 +77,17 @@ A fantasy continent built for chokepoint fights. Ten kingdoms ring the **Crownla
 | Colour | Nation | Region | Terrain | Race |
 | --- | --- | --- | --- | --- |
 | 1 crimson | Mistborn | Isle of Mists (east island) | Wildwood, meadows | Elves |
-| 2 blue | Saltmarsh | Southwest coast | Meadows, woods | Humans |
+| 2 blue | Saltmarsh | Southwest coast | Meadows, woods | Lizardfolk |
 | 3 gold | Ironholds | Northeast | Highlands, frost | Dwarves |
 | 4 violet | Frostmarch | Frozen north | Frostfields | Humans |
 | 5 orange | Greenvale | Western breadbasket | Meadows | Orcs |
 | 6 teal | Elderwood | Great eastern forest | Wildwood | Elves |
 | 7 magenta | Wyrmcoast | Northwest | Highlands, meadows | Dwarves |
-| 8 lime | Sunscorch | Southern desert | Dunes | Orcs |
+| 8 lime | Sunscorch | Southern desert | Dunes | Lizardfolk |
 | 9 bronze | Ashen Dominion | Southeast volcano | Ashlands, dunes | Orcs |
 | 10 charcoal | Corsairs | Corsair Isles (southwest archipelago) | Meadows, highlands | Humans |
 
-**Races:** Elves in the two wildwoods (the Isle of Mists, Elderwood), Dwarves in the highlands (Ironholds, Wyrmcoast), Orcs in the desert, the ash wastes round Mount Cinder and the western breadbasket, Humans on the southwest coast, the frostfields and the Corsair Isles. Start positions are spread over the races (`docs/BALANCE.md` section 18): the first draft gave the Orcs Frostmarch and Wyrmcoast, the two strongest kingdoms, and the Dwarves and Humans the weakest (Ironholds, Greenvale).
+**Races: the fantasy cast.** WorldBox's four classic races and the Lizardfolk: Elves in the two wildwoods (the Isle of Mists, Elderwood), Dwarves in the highlands (Ironholds, Wyrmcoast), Orcs in the ash wastes round Mount Cinder and the western breadbasket, Humans on the frostfields and the Corsair Isles, and the Lizardfolk (raiders with raptor riders) in the salt marshes of the southwest coast and the southern dunes. Start positions are spread over the races (`docs/BALANCE.md` sections 18 and 19): the first draft gave the Orcs Frostmarch and Wyrmcoast, the two strongest kingdoms, and the Dwarves and Humans the weakest (Ironholds, Greenvale).
 
 **How it plays**
 
@@ -127,7 +127,7 @@ Province names are generated from per-region word lists (Hoarreach, Silvershade,
 ```
 
 - **Home shards:** 8 provinces around an impassable storm spire. The capital (Landing) is on the far side from the Heartstone, and the Gate faces it.
-- **Races:** every shard has the same land, so the races alternate round the ring and no two neighbouring shards share one: Aurora Humans, Zephyr Orcs, Nimbus Elves, Tempest Dwarves, Halo Humans, Solace Elves, Ember Dwarves, Rime Humans, Verdance Elves, Umbra Orcs (3 Humans, 3 Elves, 2 Orcs, 2 Dwarves). Races are the one thing that differs between shards.
+- **Races: the sci-fi cast.** Five peoples of space: human Marines (with mechs), Robots (drones), an Insectoid hive (hive warriors), Crystal folk (golems) and Energy beings (storm wisps); the shared troops are troopers, gunners and hover bikes here. Every shard has the same land, so each race holds two opposite shards and no two neighbouring shards share one: Aurora and Solace Marines, Zephyr and Ember Insectoids, Nimbus and Rime Crystal folk, Tempest and Verdance Robots, Halo and Umbra Energy beings. Races are the one thing that differs between shards.
 - **Drift isles:** 10 two-province islets between neighbouring shards. These are the first contested land.
 - **The Heartstone:** 10 Approaches (development 3, 2,000-man garrisons) and 10 Sanctums (development 4, 3,000-man garrisons) around the Heartstone Spire. That's almost two-thirds of the map's neutral development in one place.
 
@@ -169,16 +169,27 @@ Skyshards uses no new rules: shards are islands and bridges are straits, both al
 
 ### Capitals and armies by race
 
-Each race builds its own capital (docs/DESIGN.md "Races"), so you see at a glance whose kingdom it is. The owner's colour is on its flag, roofs and banners, and a capital keeps its founders' look when someone else takes it: only the flag changes.
+Each race builds its own capital (docs/DESIGN.md "Races"), so you see at a glance whose kingdom it is. The owner's colour is on its flag, roofs and banners, and a capital keeps its founders' look when someone else takes it: only the flag changes. Skyshards' peoples build in its sci-fi materials (steel, crystal, cyan and red light).
 
-| Race | Earth and Eldmoor | Skyshards (sci-fi materials) |
-| --- | --- | --- |
-| Humans | a stone castle: two towers and a keep with roofs in the owner's colour | a glowing dome on a steel base |
-| Elves | a tree hall: a great pale-barked tree, its crown lit from the north-west, little halls with the owner's roofs up in the leaves, lanterns, a glowing door between the roots | a crystal tree with cyan leaves and a steel trunk |
-| Orcs | a spiked war camp: a hide tent on crossed poles with a band in the owner's colour, bone spikes, a fire in its door, a palisade of sharpened stakes | a plated war camp with steel spikes and a red glow |
-| Dwarves | a stone hall carved into a snowy mountain: pillars, a gable and banners in the owner's colour, a gate glowing with a forge | a steel mountain with a glowing peak and a red-lit gate |
+| Map | Race | Capital (close-up) | Army token |
+| --- | --- | --- | --- |
+| Earth | Kingdom | a castle: round towers under tall cones and a keep with a pointed roof in the owner's colour, a gate | a man-at-arms in a great helm with a heater shield and a raised sword |
+| Earth | Empire | a marble palace: steps, a colonnade, a pediment roofed in the owner's colour with a gold wreath | a legionary with a red-crested helmet, a tall curved shield and a short sword |
+| Earth | Nomads | a great felt tent with a band in the owner's colour and a painted door, a horse-tail standard | a horse archer in a fur-trimmed cap with a recurve bow |
+| Earth | Republic | a harbour: a lantern tower, a merchants' hall roofed in the owner's colour, a boat with a sail, the water | a crossbowman in a broad kettle hat |
+| Earth | Clans | a tower house with the owner's banner on a crag, a palisade of stakes | a bearded pikeman in a steel cap |
+| Eldmoor | Humans | a stone castle: two towers and a keep with roofs in the owner's colour | a footman with a kite shield and a spear |
+| Eldmoor | Elves | a tree hall: a great pale-barked tree, its crown lit from the north-west, little halls with the owner's roofs up in the leaves, lanterns, a glowing door between the roots | an elf archer with a drawn bow |
+| Eldmoor | Orcs | a spiked war camp: a hide tent on crossed poles with a band in the owner's colour, bone spikes, a fire in its door, a palisade of sharpened stakes | a green orc warrior with horns, tusks and a cleaver |
+| Eldmoor | Dwarves | a stone hall carved into a snowy mountain: pillars, a gable and banners in the owner's colour, a gate glowing with a forge | a red-bearded dwarf with an axe |
+| Eldmoor | Lizardfolk | a stepped pyramid of mossy stone with a stair, a shrine with a glowing door and a crest in the owner's colour, reeds | a lizard warrior with an orange crest and a spear |
+| Skyshards | Marines | a glowing dome on a steel base | a marine in power armour with a cyan visor and a rifle |
+| Skyshards | Robots | a factory with cyan windows and a red-lit bay, a radar dish, a mast with red lights | a robot with an antenna light and a red eye strip |
+| Skyshards | Insectoids | a ridged hive spire of purple chitin with glowing amber cells and spikes | an insect warrior with antennae, compound eyes and four arms |
+| Skyshards | Crystal folk | a cluster of glowing cyan and violet shards on a steel platform | a crystal being with a faceted glowing head |
+| Skyshards | Energy beings | a floating orb of light over a lattice pylon, a ring and arcs | an energy being: a crackling orb with a tail |
 
-On the whole map each capital is a 5 × 6 pixel sprite in the same colours (a white castle, a green crown on a pale trunk, a brown tent with white spikes, a grey peak with a lit gate); in the close-up it is a 21 × 22 sub-pixel building, and the capital's name stands below it. Armies are little soldiers of their nation's race (a footman, an elf archer, an orc warrior, a dwarf with an axe) unless it has a token skin equipped, and each army's badge shows the icon of the troop type it is mostly made of (docs/DESIGN.md "Map rendering"). `lune run tools/harness/play kingdoms` (with `MAP=earth` or `MAP=eldmoor` for the classic looks) photographs each race's capital and army at the three zooms.
+On the whole map each capital is a 5 × 6 pixel sprite in the same colours; in the close-up it is a 21 × 22 sub-pixel building, and the capital's name stands below it. Armies are little soldiers of their nation's race unless it has a token skin equipped, and each army's badge shows the icon of the troop type it is mostly made of, as the map draws it (docs/DESIGN.md "Map rendering"). `lune run tools/harness/race_sheet` paints every race's icons, soldier and capital at the sizes the game shows them into `tools/harness/out/gui/races.png`; `lune run tools/harness/play kingdoms` (Skyshards, or `MAP=earth` / `MAP=eldmoor`) photographs each race's capital and army at the three zooms in a real match.
 
 ### Map themes
 
@@ -278,4 +289,4 @@ Done when: 3 test clients vote and the chosen map loads
 - **Scale:** 1 px = 0.5 stud, and texture tiles every 128 studs.
 - **Earth straits:** the Bering Strait wraps around the map edge. The Dakar–Natal lane was removed for start-position balance (Amazon attacked Niger through it in almost every match); the Americas reach the Old World through Greenland–Iceland and Bering.
 - **`biome`** is a cosmetic field in map data only. `MatchState` is unchanged.
-- **Races per nation** (the tables above): set in the generator, fitted to the land and spread so each race gets strong and weak start positions; Orcs only where the name can't read as a jab at a real people.
+- **Races per nation** (the tables above): a cast of five per map, set in the generator, fitted to the land and spread so each race gets strong and weak start positions. Earth's are archetypes of civilisation, never a real people or present-day nation, given by terrain and balance only.

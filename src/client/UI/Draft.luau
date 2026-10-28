@@ -151,7 +151,7 @@ local function render()
 			if taken and nation.userId ~= me then
 				button.Text = nation.name .. "\n" .. nameOf(nation.userId)
 			else
-				button.Text = nation.name .. "\n" .. nation.race
+				button.Text = nation.name .. "\n" .. RaceInfo.name(nation.race)
 			end
 			stars[nation.id].Visible = nation.userId == me -- your nation wears a star
 			-- taken nations fade into the panel (a grey nation colour must still read as free)
@@ -179,7 +179,7 @@ local function render()
 	raceCard.Visible = shown ~= nil
 	if shown then
 		Icons.set(raceCard:FindFirstChild("Icon") :: GuiObject, RaceInfo.icon(shown.race))
-		raceCard.Text = string.format("%s: %s · %s", shown.name, shown.race, RaceInfo.bonus(shown.race))
+		raceCard.Text = string.format("%s: %s · %s", shown.name, RaceInfo.name(shown.race), RaceInfo.bonus(shown.race))
 	end
 end
 

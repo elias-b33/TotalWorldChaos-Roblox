@@ -32,14 +32,15 @@ function MapBadges.mainTroop(troops: { [string]: number }, order: { string }, co
 	return best
 end
 
--- The icon on an army's strength badge: Rebels, a garrison, a battle or a retreat first, else the icon of the troop
--- type it is mostly made of (MapBadges.mainTroop; IconArt names them in lower case), or a sword without one.
+-- The icon on an army's strength badge: Rebels, a garrison, a battle or a retreat first, else `troopIcon`, the icon
+-- of the troop type it is mostly made of (MapBadges.mainTroop, as the map draws it: Sim.Troops.icon), or a sword
+-- without one.
 function MapBadges.armyIcon(
 	rebel: boolean,
 	neutral: boolean,
 	inBattle: boolean,
 	retreating: boolean,
-	mainTroop: string?
+	troopIcon: string?
 ): string
 	if rebel then
 		return "rebels"
@@ -49,8 +50,8 @@ function MapBadges.armyIcon(
 		return "battle"
 	elseif retreating then
 		return "retreat"
-	elseif mainTroop then
-		return string.lower(mainTroop)
+	elseif troopIcon then
+		return troopIcon
 	end
 	return "sword"
 end
