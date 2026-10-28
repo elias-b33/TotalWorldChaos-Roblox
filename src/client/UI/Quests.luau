@@ -329,8 +329,10 @@ end
 
 function QuestsUI.init()
 	gui = Widgets.screen("Quests", 31) -- above the shop and the lobby screens
+	-- the Lobby's 📜 button, next to its 🛒 (the lobby screens cover the top bar), in a screen of its own under the
+	-- shop (30) and the private-server sheet (31), so a full-screen panel covers it instead of the other way round
+	local buttonGui = Widgets.screen("QuestsButton", 29)
 
-	-- the Lobby's 📜 button, next to its 🛒 (the lobby screens cover the top bar)
 	openButton = Instance.new("TextButton")
 	openButton.Name = "QuestsButton"
 	openButton.AnchorPoint = Vector2.new(0, 1)
@@ -341,7 +343,7 @@ function QuestsUI.init()
 	openButton.TextSize = 24
 	openButton.TextColor3 = Color3.new(1, 1, 1)
 	openButton.Text = "📜"
-	openButton.Parent = gui
+	openButton.Parent = buttonGui
 	Widgets.corner(openButton, BUTTON_SIZE // 2)
 	openButton.Activated:Connect(function()
 		setOpen(true)
@@ -410,6 +412,7 @@ function QuestsUI.init()
 	weeklyColumn = column(body, "Weekly", UDim.new(1 - LEFT_SHARE, -COLUMN_GAP // 2), 2)
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	buttonGui.Parent = gui.Parent
 
 	QuestState.onChange(function()
 		refreshButton()
