@@ -90,6 +90,17 @@ function Economy.upkeep(state: MatchState, nationId: number): number
 	return troops * Races.upkeepMultiplier(Races.of(state, nationId)) + ships
 end
 
+-- An event card's timed income boost (Sim.EventCards): the best one this nation has running, 0 = none.
+function Economy.boost(state: MatchState, nationId: number): number
+	local best = 0
+	for _, b in state.boosts or {} do
+		if b.nation == nationId and b.untilTick > state.tick then
+			best = math.max(best, b.bonus)
+		end
+	end
+	return best
+end
+
 function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 	local gold, manpower = 0, 0
 	for _, province in state.provinces do
@@ -110,6 +121,7 @@ function Economy.monthlyIncome(state: MatchState, nationId: number): Income
 		gold += Config.Economy.CapitalGold
 	end
 	gold *= CatchUp.goldMultiplier(state, nationId) * Races.goldMultiplier(race) -- overextension, Gold
+	gold *= 1 + Economy.boost(state, nationId) -- an event card's income boost
 	return {
 		gold = gold,
 		manpower = manpower,

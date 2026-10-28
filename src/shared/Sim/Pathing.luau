@@ -125,8 +125,10 @@ function Pathing.nearest(state: MatchState, nationId: number, from: number, want
 end
 
 -- The route to the nearest province `owner` holds, other than `from`, over land its armies may enter (fewest
--- steps; ties go to the lower province id). nil if there is none. Used for retreats.
-function Pathing.retreatPath(state: MatchState, owner: number, from: number): { number }?
+-- steps; ties go to the lower province id). nil if there is none. Used for retreats, and to walk home from a land
+-- whose military access just ended: `through` (that land's owner) counts as land the army may cross. Straits closed
+-- by enemy fleets stay closed either way.
+function Pathing.retreatPath(state: MatchState, owner: number, from: number, through: number?): { number }?
 	local blocked = Diplomacy.blockedZones(state, owner)
 	local cameFrom: { [number]: number } = { [from] = from }
 	local queue = { from }
@@ -137,7 +139,9 @@ function Pathing.retreatPath(state: MatchState, owner: number, from: number): { 
 		local next = table.clone(Pathing.open(state, blocked, cur))
 		table.sort(next)
 		for _, n in next do
-			if cameFrom[n] == nil and Diplomacy.canEnter(state, owner, n) then
+			local p = state.provinces[n]
+			local crossable = through ~= nil and p.owner == through and p.terrain ~= "Mountain"
+			if cameFrom[n] == nil and (crossable or Diplomacy.canEnter(state, owner, n)) then
 				cameFrom[n] = cur
 				if state.provinces[n].owner == owner then
 					local path = { n }
