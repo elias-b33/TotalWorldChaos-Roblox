@@ -74,24 +74,28 @@ function Pathing.find(state: MatchState, nationId: number, from: number, to: num
 	end, from, to)
 end
 
--- The route to the nearest province `want` accepts, over land this nation's armies may enter (fewest steps; ties go
--- to the lower province id): {} if `from` itself is wanted, nil if none is reachable. Embarking uses it to find a
--- coast of the fleet's zone.
-function Pathing.nearest(state: MatchState, nationId: number, from: number, want: (number) -> boolean): { number }?
+-- Generic BFS to the nearest province `want` accepts (fewest steps; ties go to the lower province id): {} if `from`
+-- itself is wanted, nil if none is reachable. The client previews embarking with it, with its own neighbour and access
+-- functions.
+function Pathing.searchNearest(
+	neighborsOf: (number) -> { number },
+	canEnter: (number) -> boolean,
+	from: number,
+	want: (number) -> boolean
+): { number }?
 	if want(from) then
 		return {}
 	end
-	local blocked = Diplomacy.blockedZones(state, nationId)
 	local cameFrom: { [number]: number } = { [from] = from }
 	local queue = { from }
 	local head = 1
 	while head <= #queue do
 		local cur = queue[head]
 		head += 1
-		local nexts = table.clone(Pathing.open(state, blocked, cur))
+		local nexts = table.clone(neighborsOf(cur))
 		table.sort(nexts)
 		for _, n in nexts do
-			if cameFrom[n] == nil and Diplomacy.canEnter(state, nationId, n) then
+			if cameFrom[n] == nil and canEnter(n) then
 				cameFrom[n] = cur
 				if want(n) then
 					local path = { n }
@@ -107,6 +111,17 @@ function Pathing.nearest(state: MatchState, nationId: number, from: number, want
 		end
 	end
 	return nil
+end
+
+-- The route to the nearest province `want` accepts, over land this nation's armies may enter (Pathing.searchNearest).
+-- Embarking uses it to find a coast of the fleet's zone.
+function Pathing.nearest(state: MatchState, nationId: number, from: number, want: (number) -> boolean): { number }?
+	local blocked = Diplomacy.blockedZones(state, nationId)
+	return Pathing.searchNearest(function(id)
+		return Pathing.open(state, blocked, id)
+	end, function(id)
+		return Diplomacy.canEnter(state, nationId, id)
+	end, from, want)
 end
 
 -- The route to the nearest province `owner` holds, other than `from`, over land its armies may enter (fewest

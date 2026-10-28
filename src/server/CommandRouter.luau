@@ -159,6 +159,49 @@ function CommandRouter.init(getNation: (Player) -> number?)
 			end)
 		end)
 
+	-- Navies (docs/DESIGN.md "Navies"): ships launched from a coastal province, a fleet sailing to a sea zone or to a
+	-- coast to land the men aboard, an army boarding a fleet. Whole numbers only; Sim.Navy checks the rest (the ships
+	-- per order, ownership, coasts, blockades, room aboard).
+	Remotes.event("RequestBuildShips").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, province: unknown, ships: unknown)
+			accept(player, requestId, function()
+				if not isId(province) or not isId(ships) then
+					return nil
+				end
+				return { kind = "BuildShips", province = province :: number, ships = ships :: number }
+			end)
+		end)
+
+	Remotes.event("RequestSail").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, fleet: unknown, zone: unknown)
+			accept(player, requestId, function()
+				if not isId(fleet) or not isId(zone) then
+					return nil
+				end
+				return { kind = "Sail", fleet = fleet :: number, zone = zone :: number }
+			end)
+		end)
+
+	Remotes.event("RequestLand").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, fleet: unknown, province: unknown)
+			accept(player, requestId, function()
+				if not isId(fleet) or not isId(province) then
+					return nil
+				end
+				return { kind = "Land", fleet = fleet :: number, province = province :: number }
+			end)
+		end)
+
+	Remotes.event("RequestEmbark").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, army: unknown, fleet: unknown)
+			accept(player, requestId, function()
+				if not isId(army) or not isId(fleet) then
+					return nil
+				end
+				return { kind = "Embark", army = army :: number, fleet = fleet :: number }
+			end)
+		end)
+
 	-- Lobby intents: the same request ids and rate limit, their own queue (Sim.Lobby checks the rules).
 	local function acceptLobby(player: Player, requestId: unknown, intent: Types.LobbyIntent?)
 		if not isId(requestId) then

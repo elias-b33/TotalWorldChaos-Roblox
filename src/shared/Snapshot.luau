@@ -3,6 +3,8 @@
 -- Records are flat arrays of plain values because RemoteEvents mangle sparse or mixed tables.
 -- Neutral owner and "no player" are sent as 0 instead of nil for the same reason. Pure Luau (tested with Lune).
 
+local Config = require("./Config")
+local Navy = require("./Sim/Navy")
 local Troops = require("./Sim/Troops")
 local Types = require("./Types")
 
@@ -19,6 +21,7 @@ export type ProvinceRecord = {
 	battle: boolean,
 	shieldUntil: number, -- tick; 0 = never shielded
 	blessedUntil: number, -- tick a Blessing ends; 0 = none
+	blockade: number, -- the nation whose fleet blockades it (Sim.Navy.blockades); 0 = none
 }
 
 export type NationRecord = {
@@ -52,6 +55,24 @@ export type ArmyRecord = {
 	retreating: boolean, -- beaten and walking home: takes no orders
 }
 
+-- A fleet (docs/DESIGN.md "Navies"). Moving fleets change every tick (`progress`), so clients glide their tokens
+-- from zone centre to zone centre without a channel of their own.
+export type FleetRecord = {
+	id: number,
+	owner: number,
+	zone: number,
+	ships: number, -- its hull in whole ships, rounded up (Sim.Navy.ships)
+	hull: number,
+	men: number, -- the men aboard
+	troops: string, -- the men aboard by troop type, like ArmyRecord.troops
+	next: number, -- next zone on its route, 0 = standing still
+	dest: number, -- where it is heading (Sim.Navy.destination): its own zone while standing still
+	progress: number, -- percent of the way to `next`
+	landAt: number, -- the province it is sailing to land its men on, 0 = none
+	inBattle: boolean,
+	retreating: boolean, -- beaten and sailing off: takes no orders
+}
+
 -- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes.
 export type DiplomacyData = {
 	wars: { { id: number, attackers: { number }, defenders: { number } } },
@@ -74,6 +95,7 @@ export type SnapshotData = {
 	provinces: { ProvinceRecord },
 	nations: { NationRecord },
 	armies: { ArmyRecord },
+	fleets: { FleetRecord }, -- the fleets the viewer sees (Sim.Navy.visible)
 	diplomacy: DiplomacyData,
 	primordials: { PrimordialRecord },
 	result: Types.MatchResult?,
@@ -88,6 +110,8 @@ export type DeltaData = {
 	nations: { NationRecord },
 	armies: { ArmyRecord },
 	removedArmies: { number },
+	fleets: { FleetRecord },
+	removedFleets: { number }, -- sunk, merged into another fleet (a FleetMerged event) or out of sight
 	diplomacy: DiplomacyData?, -- only when it changed
 	primordials: { PrimordialRecord }?, -- only when it changed
 	result: Types.MatchResult?, -- only when it changed
@@ -106,8 +130,40 @@ local function sortedKeys(t: { [number]: any }): { number }
 	return keys
 end
 
+-- The fleets `viewer` sees (Sim.Navy.visible, the one fog-of-war hook; 0 = no nation, a spectator's view).
+function Snapshot.fleets(state: MatchState, viewer: number): { FleetRecord }
+	local out = {}
+	local fleets = state.fleets or {}
+	for _, id in sortedKeys(fleets) do
+		local f = fleets[id]
+		if Navy.visible(state, viewer, f) then
+			local nextZone = f.path[1]
+			table.insert(out, {
+				id = f.id,
+				owner = f.owner,
+				zone = f.zone,
+				ships = Navy.ships(f),
+				hull = f.hull,
+				men = f.men,
+				troops = Troops.encode(f.troops),
+				next = nextZone or 0,
+				dest = Navy.destination(f),
+				progress = if nextZone
+					then math.clamp(math.floor(100 * f.moveProgress / Config.Navy.MoveTicks + 0.5), 0, 100)
+					else 0,
+				landAt = f.landAt or 0,
+				inBattle = f.inBattle,
+				retreating = f.retreating == true,
+			})
+		end
+	end
+	return out
+end
+
 -- cosmetics (optional): every nation's equipped cosmetics (Sim.Shop.nationCosmetics); none = an empty list.
-function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?): SnapshotData
+-- viewer (optional): whose eyes the fleets are seen with (Snapshot.fleets); everyone sees every fleet for now, so
+-- the Replicator sends one view to all.
+function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?, viewer: number?): SnapshotData
 	local provinces = {}
 	for _, id in sortedKeys(state.provinces) do
 		local p = state.provinces[id]
@@ -123,6 +179,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 			battle = state.battles[p.id] ~= nil,
 			shieldUntil = p.shieldUntil or 0,
 			blessedUntil = p.buffs.Blessing or 0,
+			blockade = p.blockade or 0,
 		})
 	end
 	local nations = {}
@@ -170,6 +227,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?)
 		provinces = provinces,
 		nations = nations,
 		armies = armies,
+		fleets = Snapshot.fleets(state, viewer or 0),
 		diplomacy = Snapshot.diplomacy(state),
 		primordials = Snapshot.primordials(state),
 		result = state.result,
@@ -277,18 +335,26 @@ local function changed<T>(before: { T }, after: { T }): { T }
 	return out
 end
 
--- Records that differ between two snapshots, plus this tick's events. Returns nil when nothing changed but the tick.
-function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Types.MatchEvent }?): DeltaData?
-	local removed = {}
+-- The ids of records in `before` that `after` no longer has.
+local function gone<T>(before: { T }, after: { T }): { number }
 	local alive: { [number]: boolean } = {}
-	for _, a in after.armies do
-		alive[a.id] = true
+	for _, r in after do
+		alive[(r :: any).id] = true
 	end
-	for _, a in before.armies do
-		if not alive[a.id] then
-			table.insert(removed, a.id)
+	local out = {}
+	for _, r in before do
+		local id = (r :: any).id
+		if not alive[id] then
+			table.insert(out, id)
 		end
 	end
+	return out
+end
+
+-- Records that differ between two snapshots, plus this tick's events. Returns nil when nothing changed but the tick.
+function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Types.MatchEvent }?): DeltaData?
+	local removed = gone(before.armies, after.armies)
+	local removedFleets = gone(before.fleets, after.fleets)
 	local delta: DeltaData = {
 		tick = after.tick,
 		phase = after.phase,
@@ -296,6 +362,8 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		nations = changed(before.nations, after.nations),
 		armies = changed(before.armies, after.armies),
 		removedArmies = removed,
+		fleets = changed(before.fleets, after.fleets),
+		removedFleets = removedFleets,
 		diplomacy = if encode(before.diplomacy) ~= encode(after.diplomacy) then after.diplomacy else nil,
 		primordials = if encode(before.primordials) ~= encode(after.primordials) then after.primordials else nil,
 		result = if encode(before.result) ~= encode(after.result) then after.result else nil,
@@ -307,6 +375,8 @@ function Snapshot.diff(before: SnapshotData, after: SnapshotData, events: { Type
 		and #delta.nations == 0
 		and #delta.armies == 0
 		and #removed == 0
+		and #delta.fleets == 0
+		and #removedFleets == 0
 		and before.phase == after.phase
 		and delta.diplomacy == nil
 		and delta.primordials == nil
@@ -336,6 +406,24 @@ local function merge<T>(list: { T }, updates: { T }): { T }
 	return list
 end
 
+-- The records whose ids are not in `ids` (a new list; the same one when `ids` is empty).
+local function without<T>(list: { T }, ids: { number }): { T }
+	if #ids == 0 then
+		return list
+	end
+	local drop: { [number]: boolean } = {}
+	for _, id in ids do
+		drop[id] = true
+	end
+	local kept = {}
+	for _, r in list do
+		if not drop[(r :: any).id] then
+			table.insert(kept, r)
+		end
+	end
+	return kept
+end
+
 -- Client side: bring a snapshot up to date with a delta (changes it in place and returns it).
 function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	snapshot.tick = delta.tick
@@ -343,6 +431,7 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	merge(snapshot.provinces, delta.provinces)
 	merge(snapshot.nations, delta.nations)
 	merge(snapshot.armies, delta.armies)
+	merge(snapshot.fleets, delta.fleets)
 	if delta.diplomacy then
 		snapshot.diplomacy = delta.diplomacy
 	end
@@ -355,19 +444,8 @@ function Snapshot.apply(snapshot: SnapshotData, delta: DeltaData): SnapshotData
 	if delta.cosmetics then
 		snapshot.cosmetics = delta.cosmetics
 	end
-	if #delta.removedArmies > 0 then
-		local gone: { [number]: boolean } = {}
-		for _, id in delta.removedArmies do
-			gone[id] = true
-		end
-		local kept = {}
-		for _, a in snapshot.armies do
-			if not gone[a.id] then
-				table.insert(kept, a)
-			end
-		end
-		snapshot.armies = kept
-	end
+	snapshot.armies = without(snapshot.armies, delta.removedArmies)
+	snapshot.fleets = without(snapshot.fleets, delta.removedFleets)
 	return snapshot
 end
 

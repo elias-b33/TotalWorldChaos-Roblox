@@ -3,7 +3,8 @@
 -- runs under Lune: the pixel icon for an army's state or its main troop type, the short form of its size, a
 -- province's status pills (its battle or siege, then Primordial-power effects with their seconds left), where armies
 -- resting in one province stand and how their strength badges stack above them, and the development pips painted as
--- a small segmented bar. src/client/MapRenderer.luau puts all of it on screen.
+-- a small segmented bar; a fleet's badge (its state or the ship, its ships and the men aboard) and the blockade
+-- marker on a coast (docs/DESIGN.md "Navies"). src/client/MapRenderer.luau puts all of it on screen.
 
 local IconArt = require("./IconArt")
 
@@ -64,6 +65,24 @@ function MapBadges.shortMen(men: number): string
 	return tostring(men)
 end
 
+-- The icon on a fleet's strength badge: a burst in a sea battle, the white flag while it retreats, else the ship.
+function MapBadges.fleetIcon(inBattle: boolean, retreating: boolean): string
+	if inBattle then
+		return "battle"
+	elseif retreating then
+		return "retreat"
+	end
+	return "ship"
+end
+
+-- A fleet's badge text: its ships, then the men aboard when it carries any ("3", "3 · 2k").
+function MapBadges.fleetText(ships: number, men: number): string
+	if men > 0 then
+		return ships .. " · " .. MapBadges.shortMen(men)
+	end
+	return tostring(ships)
+end
+
 -- A power's shield is the glowing power shield; the plain shield marks neutral garrisons.
 local EFFECT_ICONS: { [string]: string } = { shield = "powerShield" }
 
@@ -80,14 +99,24 @@ function MapBadges.effects(text: string): { Pill }
 	return out
 end
 
--- A province's status pills, left to right: the battle, or the siege's progress in percent, then the power effects.
--- `brief` keeps only the icons (zoomed out, on provinces that aren't yours).
-function MapBadges.status(battle: boolean, siegePercent: number?, effects: string?, brief: boolean): { Pill }
+-- A province's status pills, left to right: the battle, or the siege's progress in percent, an anchor while an
+-- enemy fleet blockades it, then the power effects. `brief` keeps only the icons (zoomed out, on provinces that
+-- aren't yours).
+function MapBadges.status(
+	battle: boolean,
+	siegePercent: number?,
+	effects: string?,
+	brief: boolean,
+	blockaded: boolean?
+): { Pill }
 	local out: { Pill } = {}
 	if battle then
 		table.insert(out, { icon = "battle", text = "" })
 	elseif siegePercent then
 		table.insert(out, { icon = "hourglass", text = siegePercent .. "%" })
+	end
+	if blockaded then
+		table.insert(out, { icon = "anchor", text = "" })
 	end
 	for _, pill in MapBadges.effects(effects or "") do
 		table.insert(out, pill)

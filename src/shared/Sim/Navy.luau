@@ -176,9 +176,10 @@ function Navy.friendlyCoast(state: MatchState, nationId: number, zone: number): 
 	return false
 end
 
--- The route from one zone to the nearest zone `want` accepts (fewest zones; ties to the lower zone id): {} if `from`
--- is wanted, nil if none is.
-function Navy.route(state: MatchState, from: number, want: (number) -> boolean): { number }?
+-- The route from one zone to the nearest zone `want` accepts, over `neighborsOf` (fewest zones; ties to the zone
+-- found first, the neighbours in their listed order): {} if `from` is wanted, nil if none is. Pure, so the client
+-- previews the very route the server sails (Relations.seaRoute).
+function Navy.search(neighborsOf: (number) -> { number }, from: number, want: (number) -> boolean): { number }?
 	if want(from) then
 		return {}
 	end
@@ -188,7 +189,7 @@ function Navy.route(state: MatchState, from: number, want: (number) -> boolean):
 	while head <= #queue do
 		local cur = queue[head]
 		head += 1
-		for _, n in state.zones[cur].neighbors do
+		for _, n in neighborsOf(cur) do
 			if cameFrom[n] == nil then
 				cameFrom[n] = cur
 				if want(n) then
@@ -205,6 +206,14 @@ function Navy.route(state: MatchState, from: number, want: (number) -> boolean):
 		end
 	end
 	return nil
+end
+
+-- The route from one zone to the nearest zone `want` accepts (Navy.search over the map's zones; their neighbour
+-- lists are sorted, so ties go to the lower zone id).
+function Navy.route(state: MatchState, from: number, want: (number) -> boolean): { number }?
+	return Navy.search(function(z)
+		return state.zones[z].neighbors
+	end, from, want)
 end
 
 -- Orders (Sim.Commands) --------------------------------------------------------------------------------------------

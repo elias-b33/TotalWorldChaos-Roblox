@@ -1648,6 +1648,43 @@ IconArt.ICONS = {
 		"................",
 		"................",
 	},
+	-- navies (docs/DESIGN.md "Navies"): a sailing ship for fleets and the ships button, an anchor for blockades
+	ship = {
+		"......K.........",
+		"......KK........",
+		"......KWK.......",
+		".....KKWWK......",
+		"....KWKWWWK.....",
+		"...KWWKWWWWK....",
+		"..KWWWKWWWWwK...",
+		".KWWWwKWWWwwwK..",
+		".KKKKKKKKKKKKKK.",
+		"KttttttttttttttK",
+		".KttttttttttttK.",
+		"..KKKKKKKKKKKK..",
+		".cBBcBBBcBBBcBB.",
+		"..BbB.BbB..BbB..",
+		"................",
+		"................",
+	},
+	anchor = {
+		"......KKKK......",
+		".....KwwwwK.....",
+		".....KwKKwK.....",
+		".....KwwwwK.....",
+		"...KKKKwwKKKK...",
+		"...KwwwwwwwwK...",
+		"...KKKKwwKKKK...",
+		"......KwwK......",
+		"......KwwK......",
+		".K....KwwK....K.",
+		"KwK...KwwK...KwK",
+		"KwwK..KwwK..KwwK",
+		".KwwKKKwwKKKwwK.",
+		"..KwwwwwwwwwwK..",
+		"...KKwwwwwwKK...",
+		".....KKKKKK.....",
+	},
 } :: { [string]: { string } }
 
 -- Icons made by recolouring another one: { base, { [from code] = to code } }.
@@ -1758,6 +1795,9 @@ IconArt.FALLBACK = {
 	troopers = "🔫",
 	gunners = "💥",
 	hoverbikes = "🏍",
+	-- navies
+	ship = "⛵",
+	anchor = "⚓",
 } :: { [string]: string }
 
 -- Old emoji in text (toasts from the server, power names, relation marks) and the icon that replaces each.
@@ -1827,6 +1867,10 @@ IconArt.EMOJI = {
 	["📺"] = "video",
 	["🧱"] = "border",
 	["🖼"] = "frame",
+	-- navies (toasts and refusals: "⚓ Zephyr blockades Aurora Landing!")
+	["⛵"] = "ship",
+	["🚢"] = "ship",
+	["⚓"] = "anchor",
 } :: { [string]: string }
 
 local function rgba(c: number): number

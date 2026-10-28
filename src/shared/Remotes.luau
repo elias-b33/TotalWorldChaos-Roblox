@@ -13,6 +13,10 @@ local EVENTS = {
 	"RequestDevelop",
 	"RequestDiplomacy",
 	"RequestPower",
+	"RequestBuildShips", -- navies: provinceId, ships (1-5)
+	"RequestSail", -- navies: fleetId, zoneId
+	"RequestLand", -- navies: fleetId, provinceId (a coast: sail to a zone off it and land the men aboard)
+	"RequestEmbark", -- navies: armyId, fleetId (walk to the fleet's coast and board)
 	"RequestVote", -- lobby: mapId
 	"RequestPick", -- lobby: nationId
 	"RequestSetting", -- lobby, private server owner: key, value, extra (Sim.Settings.set)

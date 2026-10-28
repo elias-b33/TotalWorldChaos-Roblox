@@ -3,8 +3,13 @@
 -- (terrain, owners, the selected province, each race's capitals), straits, province names with their development
 -- pips, army tokens (a soldier of the nation's race, or its token skin) gliding from province to province with their
 -- strength badges (the icon of the troop type an army is mostly made of), each province's status pills (battle,
--- siege, Primordial powers), the coalition leader's crown and route lines. Everything sits on MapView's canvas,
--- placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
+-- siege, Primordial powers, blockades), the coalition leader's crown and route lines. Everything sits on MapView's
+-- canvas, placed in map pixels. The terrain is painted in the match's map theme (Cosmetics.matchTheme).
+--
+-- Navies (docs/DESIGN.md "Navies"): each fleet is the map's ship (Cosmetics.shipLabel) in its nation's colours at its
+-- sea zone's centre, gliding from zone to zone, with a strength badge (its ships and the men aboard); fleets resting
+-- in one zone sit side by side. Zoomed out, each zone's name stands under its centre in quiet italics wherever it
+-- covers no province name. Taps on the water find a zone in the sea grid (MapGrid.decodeSea).
 --
 -- The overlays share the UI kit's look (UI/Theme, UI/Icons): names in Builder Sans with an ink outline, pips as a
 -- pixel bar, badges and pills as dark plates with a pixel icon and Fredoka One numbers. What they say and where they
@@ -33,6 +38,7 @@ local MapView = require(script.Parent.MapView)
 local Palette = require(script.Parent.Palette)
 local PixelArt = require(script.Parent.PixelArt)
 local RaceInfo = require(script.Parent.RaceInfo)
+local Relations = require(script.Parent.Relations)
 local ShopState = require(script.Parent.ShopState)
 local Theme = require(script.Parent.UI.Theme)
 local Widgets = require(script.Parent.UI.Widgets)
@@ -58,6 +64,12 @@ local BADGE_ICON = 16 -- the pixel icon in a badge or pill
 local BADGE_PAD = 4 -- inside a pill, left of its icon and right of its text
 local BADGE_TEXT_GAP = 2 -- between a pill's icon and its text
 local GARRISON_PRIORITY = -1e6 -- idle garrisons' badges claim room after every province name (LabelLayout)
+local FLEET_WIDTH, FLEET_HEIGHT = 24, 18 -- a fleet's 16×12 ship, screen pixels (1.5 a sprite pixel, like soldiers)
+local FLEET_PICK = 22 -- a tap this close to a fleet's centre (screen pixels) picks it
+local FLEET_SLOT = 28 -- screen pixels between fleets resting side by side in one zone
+local ZONE_NAME_OFFSET = 6 -- screen pixels between a zone's centre and the top of its name (its fleets stand above)
+local ZONE_PRIORITY = -1e5 -- zone names claim room after every province name, bigger zones first (LabelLayout)
+local ZONE_LABEL_ID = 1e5 -- zone names' ids in the label layout (provinces use their own ids, garrisons negative ones)
 local STATUS_WIDTH = 240 -- a province's status row (its pills are centred in it)
 local CROWN_SIZE = Theme.size.icon -- the coalition leader's crown, on top of its flag pole
 local NOTICE_TOP = 60 -- the "map art is off" notice: screen pixels under the top bars, below the toasts' line
@@ -106,8 +118,28 @@ type Token = {
 	troop: string?,
 }
 
--- A province's status row: battle or siege, and Primordial-power effects (MapBadges.status).
+-- A province's status row: battle or siege, a blockade, and Primordial-power effects (MapBadges.status).
 type Status = { row: Frame, pills: { Pill }, lift: number }
+
+-- What placing a token beside others and stacking its badge needs (armies and fleets alike).
+type Badged = { frame: Frame, badge: Pill, pos: Vector2, slotX: number, row: number }
+
+-- A fleet's token: the map's ship in its nation's colours, its badge (state icon, ships and men aboard).
+type FleetToken = {
+	frame: Frame,
+	stroke: UIStroke,
+	badge: Pill,
+	pos: Vector2,
+	target: Vector2,
+	owner: number,
+	zone: number, -- the zone it is in (or leaving)
+	skinned: boolean, -- drawn with the ship sprite (no square outline unless selected)
+	resting: boolean, -- standing in its zone (not sailing between two)
+	slotX: number,
+	row: number,
+	text: string,
+	icon: string,
+}
 
 local grid: MapGrid.Grid? = nil
 local art: PixelArt.Art? = nil
@@ -136,7 +168,10 @@ local roomy: { [number]: boolean } = {} -- those of them whose badge had room
 -- each province's name (its pips under it) and the name's width on screen
 local labels: { [number]: { name: TextLabel, pips: GuiObject, width: number, development: number } } = {}
 local pipImages: { [number]: EditableImage | false } = {} -- the pip bar for each development level (false: no image)
-local provinceStates: { [number]: { battle: boolean, siege: number?, siegeBy: number, owner: number } } = {}
+local provinceStates: {
+	[number]: { battle: boolean, siege: number?, siegeBy: number, owner: number, blockade: number },
+} =
+	{}
 local effectTexts: { [number]: string } = {} -- Primordial-power badges from Powers (MapRenderer.setEffect)
 local statuses: { [number]: Status } = {}
 local crowns: { [number]: GuiObject } = {}
@@ -150,6 +185,14 @@ local victories: { { label: TextLabel, frames: { string } } } = {}
 local victoryClock = 0
 local selectedArmy: number? = nil
 local selectedProvince: number? = nil
+-- navies
+local seaGrid: MapGrid.Grid? = nil -- which sea zone each pixel of the current map is in, at the province grid's size
+local seaGrids: { [string]: MapGrid.Grid } = {} -- decoded sea grids by map id (full resolution)
+local wraps = false -- the map runs on across its left and right edges (Earth's Pacific)
+local zoneLabels: { [number]: { label: TextLabel, width: number, area: number } } = {}
+local fleetTokens: { [number]: FleetToken } = {}
+local fleetGroups: { [number]: { number } } = {} -- each zone's badge stack: fleets resting there, then leaving it
+local selectedFleet: number? = nil
 
 local function at(p: Vector2): UDim2
 	return UDim2.fromScale(p.X / size.X, p.Y / size.Y)
@@ -164,6 +207,16 @@ function MapRenderer.centerOf(provinceId: number): Vector2
 	end
 	local c = map.provinces[provinceId].center
 	return Vector2.new(c.x, c.y) / g.scale
+end
+
+-- A sea zone's centre in map pixels (where its name and fleets stand).
+function MapRenderer.zoneCenterOf(zoneId: number): Vector2
+	local def = Relations.zone(zoneId)
+	local g = grid
+	if def == nil or g == nil then
+		return Vector2.zero
+	end
+	return Vector2.new(def.center.x, def.center.y) / g.scale
 end
 
 -- A province's rough radius in map pixels (from its area).
@@ -317,18 +370,51 @@ local function nationColor(nationId: number): Color3
 	return if nation then Palette.nation(nation.colorIndex) else Palette.garrison
 end
 
--- Dots from a to b (map pixels) on a layer: straits and routes.
-local function dots(parent: Frame, a: Vector2, b: Vector2, color: Color3, dotSize: number)
+-- Dots from a to b (map pixels) on a layer: straits and routes. `clip` leaves out the dots off the map's sides.
+local function dots(parent: Frame, a: Vector2, b: Vector2, color: Color3, dotSize: number, clip: boolean?)
 	local n = math.max(1, math.floor((b - a).Magnitude / DOT_SPACING))
 	for i = 0, n do
-		local dot = Instance.new("Frame")
-		dot.AnchorPoint = Vector2.new(0.5, 0.5)
-		dot.Position = at(a:Lerp(b, i / n))
-		dot.Size = UDim2.fromOffset(dotSize, dotSize)
-		dot.BackgroundColor3 = color
-		dot.BorderSizePixel = 0
-		dot.Parent = parent
+		local p = a:Lerp(b, i / n)
+		if not clip or (p.X >= 0 and p.X <= size.X) then
+			local dot = Instance.new("Frame")
+			dot.AnchorPoint = Vector2.new(0.5, 0.5)
+			dot.Position = at(p)
+			dot.Size = UDim2.fromOffset(dotSize, dotSize)
+			dot.BackgroundColor3 = color
+			dot.BorderSizePixel = 0
+			dot.Parent = parent
+		end
 	end
+end
+
+-- On a map that runs on across its sides, two points more than half the map apart are joined the short way round,
+-- over the edge.
+local function acrossEdge(a: Vector2, b: Vector2): number
+	if wraps and math.abs(b.X - a.X) > size.X / 2 then
+		return if b.X > a.X then -size.X else size.X
+	end
+	return 0
+end
+
+-- Dots between two zone centres, over the map's edge when that is the short way.
+local function seaDots(parent: Frame, a: Vector2, b: Vector2, color: Color3, dotSize: number)
+	local shift = acrossEdge(a, b)
+	if shift == 0 then
+		dots(parent, a, b, color, dotSize)
+	else
+		dots(parent, a, b + Vector2.new(shift, 0), color, dotSize, true)
+		dots(parent, a - Vector2.new(shift, 0), b, color, dotSize, true)
+	end
+end
+
+-- The point `t` of the way from one zone centre to the next (over the map's edge when that is the short way).
+local function seaLerp(a: Vector2, b: Vector2, t: number): Vector2
+	local shift = acrossEdge(a, b)
+	if shift == 0 then
+		return a:Lerp(b, t)
+	end
+	local p = a:Lerp(b + Vector2.new(shift, 0), t)
+	return Vector2.new(p.X % size.X, p.Y)
 end
 
 -- Neutral garrisons and development pips show from the region zoom inwards (it depends on the screen size).
@@ -339,6 +425,11 @@ end
 -- Where armies resting in a province stand (map pixels): a little above its centre, clear of its name.
 local function anchorOf(provinceId: number): Vector2
 	return MapRenderer.centerOf(provinceId) - Vector2.new(0, TOKEN_LIFT)
+end
+
+-- Where fleets resting in a zone stand (map pixels): a little above its centre, clear of its name.
+local function fleetAnchorOf(zoneId: number): Vector2
+	return MapRenderer.zoneCenterOf(zoneId) - Vector2.new(0, TOKEN_LIFT)
 end
 
 -- A neutral garrison alone in its province and not fighting: its badge shows only where it has room.
@@ -403,6 +494,20 @@ local function layoutNames(z: number, detail: boolean, force: boolean?): boolean
 			})
 		end
 	end
+	-- zoomed out, the sea zones' names, wherever they cover no province name
+	if not detail then
+		for id, zone in zoneLabels do
+			local c = MapRenderer.zoneCenterOf(id) * z
+			table.insert(boxes, {
+				id = ZONE_LABEL_ID + id,
+				x = c.X - zone.width / 2,
+				y = c.Y + ZONE_NAME_OFFSET,
+				w = zone.width,
+				h = NAME_HEIGHT,
+				priority = ZONE_PRIORITY + zone.area,
+			})
+		end
+	end
 	idleLaidOut = {}
 	if detail then
 		for id, token in tokens do
@@ -427,6 +532,9 @@ local function layoutNames(z: number, detail: boolean, force: boolean?): boolean
 		label.name.Visible = shown[id] == true
 		label.pips.Visible = detail
 	end
+	for id, zone in zoneLabels do
+		zone.label.Visible = shown[ZONE_LABEL_ID + id] == true
+	end
 	roomy = {}
 	for id in idleLaidOut do
 		roomy[id] = shown[-id] == true
@@ -447,8 +555,8 @@ local function badgeShown(id: number, token: Token): boolean
 	return detailShown or token.rebel or (me ~= 0 and token.owner == me)
 end
 
--- A badge's place: `row` rows above its token, centred over the armies resting beside it.
-local function placeBadge(token: Token, row: number)
+-- A badge's place: `row` rows above its token, centred over the armies (or fleets) resting beside it.
+local function placeBadge(token: Badged, row: number)
 	local label = token.badge.label
 	local visible = row >= 0
 	if label.Visible ~= visible then
@@ -499,6 +607,31 @@ local function stackBadges()
 	end
 end
 
+-- A fleet's strength badge shows like an army's: from the region zoom inwards, and zoomed out on your own fleets, the
+-- selected one and fleets in a sea battle.
+local function fleetBadgeShown(id: number, token: FleetToken): boolean
+	local me = ClientState.myNation()
+	return id == selectedFleet or detailShown or (me ~= 0 and token.owner == me) or token.icon == "battle"
+end
+
+-- Stack the badges of the fleets in each zone in a column above them (the first shown lowest).
+local function stackFleets()
+	for _, ids in fleetGroups do
+		local shown = 0
+		for _, id in ids do
+			local token = fleetTokens[id]
+			if token then
+				if fleetBadgeShown(id, token) then
+					placeBadge(token, shown)
+					shown += 1
+				else
+					placeBadge(token, -1)
+				end
+			end
+		end
+	end
+end
+
 -- Is this province's status yours to follow closely (your land, or your siege)?
 local function involvesMe(provinceId: number): boolean
 	local me = ClientState.myNation()
@@ -511,6 +644,8 @@ local function statusEdge(icon: string): Color3
 		return Theme.color.danger
 	elseif icon == "hourglass" then
 		return Theme.color.gold
+	elseif icon == "anchor" then
+		return Theme.color.azure -- a blockade
 	end
 	return Theme.color.special -- Primordial powers
 end
@@ -518,6 +653,17 @@ end
 -- A province's status row: its battle or siege, then Primordial-power effects, each a pill. Zoomed out, only the
 -- icons show unless it is your province or your siege. Made on demand and destroyed once empty, so the provinces
 -- that once had a battle or a siege don't keep hidden objects for the rest of the match.
+-- A blockade's anchor shows from the region zoom inwards, and zoomed out on your own coast or where you blockade, so a
+-- war at sea doesn't sprinkle anchors over every coast of the whole map.
+local function blockadeShown(provinceId: number): boolean
+	local state = provinceStates[provinceId]
+	if state == nil or state.blockade == 0 then
+		return false
+	end
+	local me = ClientState.myNation()
+	return detailShown or involvesMe(provinceId) or (me ~= 0 and state.blockade == me)
+end
+
 local function renderStatus(provinceId: number)
 	local state = provinceStates[provinceId]
 	local brief = not detailShown and not involvesMe(provinceId)
@@ -525,7 +671,8 @@ local function renderStatus(provinceId: number)
 		state ~= nil and state.battle,
 		if state then state.siege else nil,
 		effectTexts[provinceId],
-		brief
+		brief,
+		blockadeShown(provinceId)
 	)
 	local status = statuses[provinceId]
 	if #pills == 0 then
@@ -591,8 +738,14 @@ local function onZoom(z: number)
 			end
 		end
 		stackBadges()
+		stackFleets()
 		for provinceId in statuses do
 			renderStatus(provinceId)
+		end
+		for provinceId, state in provinceStates do
+			if state.blockade ~= 0 and statuses[provinceId] == nil then
+				renderStatus(provinceId) -- other nations' blockades show from the region zoom
+			end
 		end
 	end
 	local label = imageLabel
@@ -991,6 +1144,10 @@ local function build(map: Types.MapDef)
 	detailShown = false
 	selectedArmy = nil
 	selectedProvince = nil
+	zoneLabels = {}
+	fleetTokens = {}
+	fleetGroups = {}
+	selectedFleet = nil
 
 	-- full resolution if the device allows it, else half
 	local full = grids[map.id] or MapGrid.decode(map)
@@ -1003,6 +1160,14 @@ local function build(map: Types.MapDef)
 	end
 	grid = g
 	detailAllowed = g == full -- no close-up on a device that needs the half-size map
+	-- the sea grid at the same size, so a tap on the water finds its zone
+	local sea = seaGrids[map.id] or MapGrid.decodeSea(map)
+	seaGrids[map.id] = sea
+	seaGrid = if g == full then sea else MapGrid.downsample(sea, full.width // g.width)
+	wraps = false
+	for _, st in map.straits do
+		wraps = wraps or st.wrap
+	end
 	size = Vector2.new(g.width, g.height)
 	local canvas = MapView.create(size, Palette.background[map.theme] or Palette.background.earth)
 
@@ -1047,6 +1212,23 @@ local function build(map: Types.MapDef)
 	end
 	layer("Route", canvas)
 
+	-- each sea zone's name under its centre (its fleets stand above): quiet italics in a pale sea blue
+	local zoneLayer = layer("Zones", canvas)
+	for _, def in map.seaZones do
+		local width = LabelLayout.textWidth(def.name, TEXT_SIZE)
+		local label = textLabel(zoneLayer, def.name)
+		label.Name = "Z" .. def.id
+		label.FontFace = Font.new(Theme.font.body.Family, Enum.FontWeight.SemiBold, Enum.FontStyle.Italic)
+		label.TextColor3 = Palette.zoneName
+		label.TextTransparency = 0.15
+		label.TextStrokeTransparency = 0.45
+		label.AnchorPoint = Vector2.new(0.5, 0)
+		label.Position = at(Vector2.new(def.center.x, def.center.y) / g.scale) + UDim2.fromOffset(0, ZONE_NAME_OFFSET)
+		label.Size = UDim2.fromOffset(width, NAME_HEIGHT)
+		label.Visible = false -- layoutNames shows the ones with room
+		zoneLabels[def.id] = { label = label, width = width, area = def.area / (g.scale * g.scale) }
+	end
+
 	-- each province's name, its development pips hanging under it (two GUI objects a province)
 	local labelLayer = layer("Labels", canvas)
 	for _, def in map.provinces do
@@ -1069,6 +1251,7 @@ local function build(map: Types.MapDef)
 	end
 	layer("Flags", canvas)
 	layer("Tokens", canvas)
+	layer("Fleets", canvas)
 	layer("Markers", canvas)
 	layer("Crowns", canvas)
 	layer("Emotes", canvas)
@@ -1174,6 +1357,7 @@ local function refreshProvince(record: Snapshot.ProvinceRecord)
 	local siege = if record.siegeRequired > 0
 		then math.floor(100 * record.siegeProgress / record.siegeRequired)
 		else nil
+	local blockade = record.blockade or 0 -- (0 from a server older than navies)
 	local old = provinceStates[record.id]
 	if
 		old
@@ -1181,12 +1365,18 @@ local function refreshProvince(record: Snapshot.ProvinceRecord)
 		and old.siege == siege
 		and old.siegeBy == record.siegeBy
 		and old.owner == record.owner
+		and old.blockade == blockade
 	then
 		return
 	end
-	provinceStates[record.id] =
-		{ battle = record.battle, siege = siege, siegeBy = record.siegeBy, owner = record.owner }
-	if record.battle or siege or statuses[record.id] then
+	provinceStates[record.id] = {
+		battle = record.battle,
+		siege = siege,
+		siegeBy = record.siegeBy,
+		owner = record.owner,
+		blockade = blockade,
+	}
+	if record.battle or siege or blockade ~= 0 or statuses[record.id] then
 		renderStatus(record.id)
 	end
 end
@@ -1257,8 +1447,8 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	return token
 end
 
--- Beside the other armies resting in its province (screen pixels from the province's anchor).
-local function setSlot(token: Token, x: number)
+-- Beside the other armies resting in its province, or fleets in its zone (screen pixels from the anchor).
+local function setSlot(token: Badged, x: number)
 	if token.slotX ~= x then
 		token.slotX = x
 		token.row = -2 -- its badge has to move back over the group
@@ -1349,20 +1539,144 @@ local function refreshArmies()
 	stackBadges()
 end
 
--- What is under a screen point: an army token (they sit on top) or a province.
-function MapRenderer.pick(screenPos: Vector2): ("Army" | "Province" | nil, number?)
+local function makeFleet(fleet: Snapshot.FleetRecord, target: Vector2): FleetToken
+	local frame = Instance.new("Frame")
+	frame.Name = "Fleet" .. fleet.id
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = at(target)
+	frame.Size = UDim2.fromOffset(TOKEN_SIZE, TOKEN_SIZE)
+	frame.BackgroundColor3 = nationColor(fleet.owner)
+	frame.BorderSizePixel = 0
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Theme.color.ink
+	stroke.Thickness = Theme.stroke
+	stroke.Parent = frame
+	-- the map's ship in the nation's colours (a plain square where the device can't paint it)
+	local nation = ClientState.nation(fleet.owner)
+	local map = ClientState.map()
+	local sprite = if nation and map
+		then Cosmetics.shipLabel(frame, map.ship, nation.colorIndex, UDim2.fromScale(1, 1))
+		else nil
+	local skinned = sprite ~= nil
+	if skinned then
+		frame.Size = UDim2.fromOffset(FLEET_WIDTH, FLEET_HEIGHT)
+		frame.BackgroundTransparency = 1
+		stroke.Enabled = false
+	end
+	local token: FleetToken = {
+		frame = frame,
+		stroke = stroke,
+		badge = newPill(frame, "Strength", "ship", nationColor(fleet.owner)),
+		pos = target,
+		target = target,
+		owner = fleet.owner,
+		zone = fleet.zone,
+		skinned = skinned,
+		resting = true,
+		slotX = 0,
+		row = -1,
+		text = "",
+		icon = "",
+	}
+	token.badge.label.AnchorPoint = Vector2.new(0.5, 1)
+	token.badge.label.Visible = false -- stackFleets places and shows it
+	frame.Parent = layers.Fleets
+	return token
+end
+
+-- Fleet tokens from the snapshot: at their zone's anchor, or between two zone centres while sailing (the record's
+-- progress, a new one every tick); fleets resting in one zone side by side, their badges stacked above them.
+local function refreshFleets()
+	local snapshot = ClientState.snapshot()
+	if snapshot == nil or layers.Fleets == nil then
+		return
+	end
+	local alive: { [number]: boolean } = {}
+	local resting: { [number]: { number } } = {}
+	local leaving: { number } = {}
+	for _, fleet in snapshot.fleets do
+		alive[fleet.id] = true
+		local sailing = fleet.next ~= 0
+		local target = if sailing
+			then seaLerp(fleetAnchorOf(fleet.zone), fleetAnchorOf(fleet.next), fleet.progress / 100)
+			else fleetAnchorOf(fleet.zone)
+		local token = fleetTokens[fleet.id]
+		if token == nil then
+			token = makeFleet(fleet, target)
+			fleetTokens[fleet.id] = token
+		end
+		local t = token :: FleetToken
+		if math.abs(target.X - t.pos.X) > size.X / 2 then
+			t.pos = target -- over the map's edge: jump rather than glide across the whole map
+		end
+		t.target = target
+		t.zone = fleet.zone
+		t.resting = not sailing
+		if sailing then
+			table.insert(leaving, fleet.id)
+		else
+			local list = resting[fleet.zone] or {}
+			table.insert(list, fleet.id)
+			resting[fleet.zone] = list
+		end
+		local icon = MapBadges.fleetIcon(fleet.inBattle, fleet.retreating)
+		local text = MapBadges.fleetText(fleet.ships, fleet.men)
+		if t.icon ~= icon or t.text ~= text then
+			t.icon, t.text = icon, text
+			setPill(t.badge, icon, text)
+		end
+	end
+	for id, token in fleetTokens do
+		if not alive[id] then
+			token.frame:Destroy()
+			fleetTokens[id] = nil
+		end
+	end
+	-- fleets resting in one zone side by side (always in the same order), then each zone's badge stack: those resting
+	-- there, then those sailing out of it (their badges ride with them a row up)
+	local stacks: { [number]: { number } } = {}
+	for zone, ids in resting do
+		table.sort(ids)
+		for slot, id in ids do
+			setSlot(fleetTokens[id], MapBadges.slotOffset(slot, #ids, FLEET_SLOT))
+		end
+		stacks[zone] = table.clone(ids)
+	end
+	table.sort(leaving)
+	for _, id in leaving do
+		local token = fleetTokens[id]
+		setSlot(token, 0)
+		local list = stacks[token.zone] or {}
+		table.insert(list, id)
+		stacks[token.zone] = list
+	end
+	fleetGroups = stacks
+	stackFleets()
+end
+
+export type Pick = "Army" | "Fleet" | "Province" | "Zone"
+
+-- What is under a screen point: an army or fleet token (they sit on top), a province, or a sea zone.
+function MapRenderer.pick(screenPos: Vector2): (Pick?, number?)
 	local best: number? = nil
-	local bestDistance = TOKEN_PICK
+	local bestKind: Pick? = nil
+	local bestDistance = math.huge
 	for id, token in tokens do
 		if token.frame.Visible then
 			local d = (MapView.toScreen(token.pos) + Vector2.new(token.slotX, 0) - screenPos).Magnitude
-			if d < bestDistance then
-				best, bestDistance = id, d
+			if d < TOKEN_PICK and d < bestDistance then
+				best, bestKind, bestDistance = id, "Army", d
 			end
 		end
 	end
+	for id, token in fleetTokens do
+		local d = (MapView.toScreen(token.pos) + Vector2.new(token.slotX, 0) - screenPos).Magnitude
+		if d < FLEET_PICK and d < bestDistance then
+			best, bestKind, bestDistance = id, "Fleet", d
+		end
+	end
 	if best then
-		return "Army", best
+		return bestKind, best
 	end
 	local g = grid
 	if g then
@@ -1371,8 +1685,59 @@ function MapRenderer.pick(screenPos: Vector2): ("Army" | "Province" | nil, numbe
 		if id ~= 0 then
 			return "Province", id
 		end
+		local sea = seaGrid
+		local zone = if sea then MapGrid.at(sea, p.X, p.Y) else 0
+		if zone ~= 0 then
+			return "Zone", zone
+		end
 	end
 	return nil, nil
+end
+
+-- A fleet's route through zone centres (white for the selected fleet's way, a gold preview before confirming), and
+-- the last step ashore when it sails to land on a coast.
+function MapRenderer.showSeaRoute(from: number?, path: { number }?, preview: boolean?, landAt: number?)
+	local routeLayer = layers.Route
+	if routeLayer == nil then
+		return
+	end
+	routeLayer:ClearAllChildren()
+	if from == nil or path == nil then
+		return
+	end
+	local color = if preview then Theme.color.gold else Theme.color.text
+	local prev = MapRenderer.zoneCenterOf(from)
+	for _, zone in path do
+		local nextPoint = MapRenderer.zoneCenterOf(zone)
+		seaDots(routeLayer, prev, nextPoint, color, 5)
+		prev = nextPoint
+	end
+	if landAt then
+		dots(routeLayer, prev, MapRenderer.centerOf(landAt), color, 5)
+	end
+end
+
+-- The selected fleet: a gold outline round its ship and its badge, and the badge shows at any zoom.
+function MapRenderer.selectFleet(fleetId: number?)
+	local previous = selectedFleet
+	local old = if previous then fleetTokens[previous] else nil
+	if old then
+		old.stroke.Color = Theme.color.ink
+		old.stroke.Thickness = Theme.stroke
+		old.stroke.Enabled = not old.skinned
+		old.badge.stroke.Color = nationColor(old.owner)
+		old.badge.stroke.Thickness = 1
+	end
+	selectedFleet = fleetId
+	local token = if fleetId then fleetTokens[fleetId] else nil
+	if token then
+		token.stroke.Color = Theme.color.gold
+		token.stroke.Thickness = 3
+		token.stroke.Enabled = true
+		token.badge.stroke.Color = Theme.color.gold
+		token.badge.stroke.Thickness = Theme.stroke
+	end
+	stackFleets()
 end
 
 -- Route dots through province centres (the selected army's way in white, or a gold preview before confirming).
@@ -1448,6 +1813,7 @@ function MapRenderer.init()
 				end
 			end
 			refreshArmies()
+			refreshFleets()
 			refreshCrowns()
 			refreshFlags()
 			refreshVictory()
@@ -1464,6 +1830,13 @@ function MapRenderer.init()
 		end
 		if #delta.armies > 0 or #delta.removedArmies > 0 then
 			refreshArmies()
+		end
+		if #delta.fleets > 0 or #delta.removedFleets > 0 then
+			local selected = selectedFleet
+			refreshFleets()
+			if selected and fleetTokens[selected] then
+				MapRenderer.selectFleet(selected) -- (a token made again keeps its gold outline)
+			end
 		end
 		if delta.result then
 			refreshVictory()
@@ -1504,6 +1877,12 @@ function MapRenderer.init()
 		-- tokens glide towards their targets
 		local a = 1 - math.exp(-TOKEN_SMOOTHING * dt)
 		for _, token in tokens do
+			if (token.pos - token.target).Magnitude > 0.05 then
+				token.pos = token.pos:Lerp(token.target, a)
+				token.frame.Position = at(token.pos) + UDim2.fromOffset(token.slotX, 0)
+			end
+		end
+		for _, token in fleetTokens do
 			if (token.pos - token.target).Magnitude > 0.05 then
 				token.pos = token.pos:Lerp(token.target, a)
 				token.frame.Position = at(token.pos) + UDim2.fromOffset(token.slotX, 0)

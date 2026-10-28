@@ -107,6 +107,26 @@ T.test("status pills: battle or siege first, then powers; brief keeps only icons
 	T.equal(brief[1].text, "")
 	T.equal(brief[2].text, "")
 	T.equal(#MapBadges.status(false, nil, nil, false), 0, "nothing going on: no pills")
+	-- a blockade: an anchor after the siege, before the powers
+	local blockaded = MapBadges.status(false, 45, "🛡️20", false, true)
+	T.equal(#blockaded, 3)
+	T.equal(blockaded[2].icon, "anchor")
+	T.equal(blockaded[2].text, "", "the blockade is an icon alone")
+	T.equal(MapBadges.status(false, nil, nil, true, true)[1].icon, "anchor")
+	T.expect(IconArt.rows("anchor") ~= nil, "the anchor is a painted icon")
+end)
+
+T.test("a fleet's badge: its state or the ship, its ships and the men aboard", function()
+	T.equal(MapBadges.fleetIcon(false, false), "ship")
+	T.equal(MapBadges.fleetIcon(true, false), "battle")
+	T.equal(MapBadges.fleetIcon(false, true), "retreat")
+	T.equal(MapBadges.fleetIcon(true, true), "battle", "a fight shows first")
+	T.equal(MapBadges.fleetText(3, 0), "3", "empty: just the ships")
+	T.equal(MapBadges.fleetText(3, 2000), "3 · 2k")
+	T.equal(MapBadges.fleetText(1, 750), "1 · 750")
+	for _, icon in { "ship", "battle", "retreat" } do
+		T.expect(IconArt.rows(icon) ~= nil, icon .. " is a painted icon")
+	end
 end)
 
 T.test("resting armies stand side by side, centred on their province", function()

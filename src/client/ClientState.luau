@@ -104,6 +104,18 @@ function ClientState.army(armyId: number): Snapshot.ArmyRecord?
 	return nil
 end
 
+-- A fleet you can see (Snapshot.fleets), or nil.
+function ClientState.fleet(fleetId: number): Snapshot.FleetRecord?
+	if snapshot then
+		for _, f in snapshot.fleets do
+			if f.id == fleetId then
+				return f
+			end
+		end
+	end
+	return nil
+end
+
 function ClientState.map(): Types.MapDef?
 	return map
 end
