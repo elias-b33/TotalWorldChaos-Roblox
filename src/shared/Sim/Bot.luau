@@ -1,9 +1,10 @@
 --!strict
 -- Bot AI (docs/DESIGN.md "Bot AI"). Each plan walks the priority list and returns the first command that applies:
 --   1. Defend  2. Recruit  3. Expand  4. Attack  5. Build  6. Diplomacy  (7. Primordial power: see below)
--- Troops: infantry is the base; a threatened province raises archers (while they are under Config.Bots.ArcherShare
--- of my men); at war, a bot that can pay for them and keep its upkeep reserve recruits its race's elite or cavalry
--- instead (see pickTroop), while the two are under Config.Bots.AttackShare of my men.
+-- Troops, by role in the race's roster: the line troop is the base; a threatened province raises the ranged troop
+-- (while it is under Config.Bots.ArcherShare of my men); at war, a bot that can pay for them and keep its upkeep
+-- reserve recruits its special (under Config.Bots.SpecialShare), else its elite or its fast troop (see pickTroop),
+-- while those two are under Config.Bots.AttackShare of my men.
 -- Bots send the same commands players do, through CommandRouter, and every command is dry-run against
 -- Sim/Commands first, so a bot almost never sends one the server refuses. No cheating: bots read the same state
 -- any player could see and pay full price for everything.
@@ -263,7 +264,13 @@ local function strengths(
 		}
 	local myMod = Battle.modifier(ctx.state, provinceId, sides, iDefend, myRoll)
 	local theirMod = Battle.modifier(ctx.state, provinceId, sides, not iDefend, theirRoll)
-	local my, their = Battle.strength(mine, iDefend) * myMod, Battle.strength(theirs, not iDefend) * theirMod
+	local terrain = ctx.state.provinces[provinceId].terrain
+	local neutral = true -- garrisons and Rebels: my specials' anti-garrison trick counts
+	for _, a in theirs do
+		neutral = neutral and a.owner == 0
+	end
+	local my = Battle.strength(mine, iDefend, terrain, neutral and #theirs > 0) * myMod
+	local their = Battle.strength(theirs, not iDefend, terrain, false) * theirMod
 	local myMen, theirMen = menOf(mine), menOf(theirs)
 	local myRate = if myMen > 0 then my / myMen else myMod
 	local theirRate = if theirMen > 0 then their / theirMen else theirMod
@@ -465,21 +472,38 @@ local function underShare(ctx: Ctx, men: number, share: number): boolean
 	return men <= share * ctx.men
 end
 
--- What to recruit (up to `regiments` regiments) for the next fight: at war, my race's elite or cavalry (the elite
--- first when it costs no more upkeep than cavalry, else whichever I have fewer men of), if I am rich enough for it
--- and they are under Config.Bots.AttackShare of my men; else infantry, the base.
+-- What to recruit (up to `regiments` regiments) for the next fight, from my race's roster: at war, my special while
+-- it is under Config.Bots.SpecialShare of my men, else my elite or my fast troop (the elite first when it costs no
+-- more upkeep than the fast troop, else whichever I have fewer men of) while those two are under
+-- Config.Bots.AttackShare, if I am rich enough for it; else my line troop, the base.
 local function pickTroop(ctx: Ctx, regiments: number): (Types.Troop, number)
-	local elite = Troops.elite(ctx.nation.race)
-	local attackMen = (ctx.troopMen.Cavalry or 0) + (if elite then ctx.troopMen[elite] or 0 else 0)
-	if #ctx.enemies > 0 and underShare(ctx, attackMen, Config.Bots.AttackShare) then
-		local options: { Types.Troop } = { "Cavalry" }
-		if elite then
-			-- the elite first when it is no dearer to keep than cavalry, else whichever I have fewer men of
-			local cheaper = Troops.stats(elite).upkeep <= Troops.stats("Cavalry").upkeep
-			if cheaper or (ctx.troopMen[elite] or 0) <= (ctx.troopMen.Cavalry or 0) then
-				table.insert(options, 1, elite)
-			else
+	local race = ctx.nation.race
+	local line = Troops.ofRole(race, "line") or Troops.BASE
+	if #ctx.enemies > 0 then
+		local options: { Types.Troop } = {}
+		local special = Troops.ofRole(race, "special")
+		if special and underShare(ctx, ctx.troopMen[special] or 0, Config.Bots.SpecialShare) then
+			table.insert(options, special)
+		end
+		local fast, elite = Troops.ofRole(race, "fast"), Troops.ofRole(race, "elite")
+		local fastMen = if fast then ctx.troopMen[fast] or 0 else 0
+		local eliteMen = if elite then ctx.troopMen[elite] or 0 else 0
+		if underShare(ctx, fastMen + eliteMen, Config.Bots.AttackShare) then
+			if
+				elite
+				and (fast == nil or Troops.stats(elite).upkeep <= Troops.stats(fast).upkeep or eliteMen <= fastMen)
+			then
 				table.insert(options, elite)
+				if fast then
+					table.insert(options, fast)
+				end
+			else
+				if fast then
+					table.insert(options, fast)
+				end
+				if elite then
+					table.insert(options, elite)
+				end
 			end
 		end
 		for _, troop in options do
@@ -489,7 +513,7 @@ local function pickTroop(ctx: Ctx, regiments: number): (Types.Troop, number)
 			end
 		end
 	end
-	return "Infantry", math.min(regiments, affordable(ctx, "Infantry"))
+	return line, math.min(regiments, affordable(ctx, line))
 end
 
 -- The commands, if the server would accept all of them in this order (dry run on one copy of the state).
@@ -663,12 +687,16 @@ local function defend(ctx: Ctx): { Command }?
 					end
 				end
 			end
-			-- not enough men nearby: raise them where the threat is, archers (the best defenders) if I can pay and
-			-- they are still under Config.Bots.ArcherShare of my men
+			-- not enough men nearby: raise them where the threat is, my ranged troop (the best defenders) if I can
+			-- pay and it is still under Config.Bots.ArcherShare of my men, else my line troop
 			local missing = ratio * their - my
-			local options: { Types.Troop } = if underShare(ctx, ctx.troopMen.Archers or 0, Config.Bots.ArcherShare)
-				then { "Archers", "Infantry" }
-				else { "Infantry" }
+			local race = ctx.nation.race
+			local line = Troops.ofRole(race, "line") or Troops.BASE
+			local ranged = Troops.ofRole(race, "ranged")
+			local options: { Types.Troop } = if ranged
+					and underShare(ctx, ctx.troopMen[ranged] or 0, Config.Bots.ArcherShare)
+				then { ranged, line }
+				else { line }
 			for _, troop in options do
 				local perRegiment = Config.Army.MenPerRegiment * Troops.stats(troop).defence * myMod
 				local regiments = math.min(math.ceil(missing / perRegiment), affordable(ctx, troop))

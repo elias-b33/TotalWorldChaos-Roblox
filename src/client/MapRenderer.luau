@@ -1201,6 +1201,24 @@ local function edgeOf(token: Token): Color3
 	return nationColor(token.owner)
 end
 
+-- A nation's army whose main troop changed (it recruited or lost men): its soldier follows (an equipped token skin
+-- stays as it is).
+local function resoldier(token: Token)
+	local sprite = token.frame:FindFirstChild("TokenSkin")
+	local troop = token.troop
+	local nation = ClientState.nation(token.owner)
+	if sprite == nil or troop == nil or nation == nil then
+		return
+	end
+	local soldier = sprite:GetAttribute("Soldier")
+	if soldier == nil or soldier == troop then
+		return
+	end
+	if Cosmetics.armyLabel(token.frame, token.owner, troop, nation.colorIndex, UDim2.fromScale(1, 1)) then
+		sprite:Destroy()
+	end
+end
+
 local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	local rebel = army.rebel
 	local neutral = army.owner == 0 and not rebel
@@ -1217,10 +1235,11 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	stroke.Thickness = Theme.stroke
 	stroke.Parent = frame
 	-- a nation's sprite instead of the plain square: its token skin (cosmetic), or with the default token a soldier of
-	-- its race (garrisons and Rebels keep their squares)
+	-- the troop it is mostly made of (garrisons and Rebels keep their squares)
 	local nation = if neutral then nil else ClientState.nation(army.owner)
+	local troop = RaceInfo.mainTroop(army.troops) or RaceInfo.lineTroop(if nation then nation.race else nil)
 	local sprite = if nation
-		then Cosmetics.armyLabel(frame, army.owner, nation.race, nation.colorIndex, UDim2.fromScale(1, 1))
+		then Cosmetics.armyLabel(frame, army.owner, troop, nation.colorIndex, UDim2.fromScale(1, 1))
 		else nil
 	local skinned = sprite ~= nil
 	if skinned then
@@ -1298,7 +1317,8 @@ local function refreshArmies()
 		end
 		if t.troops ~= army.troops then
 			t.troops = army.troops
-			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon
+			t.troop = RaceInfo.mainTroop(army.troops) -- its badge shows this troop's icon, its token its soldier
+			resoldier(t)
 		end
 		local troopIcon = if t.troop then RaceInfo.troopIcon(t.troop) else nil -- as this map draws it
 		local icon = MapBadges.armyIcon(t.rebel, t.neutral, army.inBattle, army.retreating, troopIcon)

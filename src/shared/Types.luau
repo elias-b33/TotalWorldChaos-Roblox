@@ -12,9 +12,10 @@ export type PrimordialPower = "Meteor" | "Plague" | "Rebels" | "Earthquake" | "B
 
 -- Races and troops (docs/DESIGN.md "Races", "Troops"): data-driven, so both are ids. A Race is a key of
 -- Config.Races (each map has its own cast: Config.Casts), a Troop a key of Config.Troops (Sim.Races, Sim.Troops
--- check them).
+-- check them). Every troop has a role, and every race recruits one troop of each role (its roster).
 export type Race = string
 export type Troop = string
+export type TroopRole = "line" | "ranged" | "fast" | "elite" | "special"
 -- An army's composition: men per troop type (only types it has). It always adds up to Army.men (Army.setTroops).
 export type Composition = { [Troop]: number }
 

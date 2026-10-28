@@ -24,6 +24,7 @@ local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
+local RaceInfo = require(Client.RaceInfo)
 local Icons = require(script.Parent.Icons)
 local Powers = require(script.Parent.Powers)
 local Widgets = require(script.Parent.Widgets)
@@ -148,6 +149,14 @@ local function findButton(needle: string): TextButton?
 	return nil
 end
 
+-- The recruit button of the player's line troop (Infantry for the tutorial's Earth nation): its Name on the province
+-- sheet, its icon and its caption.
+local function lineButton(): (string, string, string)
+	local me = ClientState.nation(ClientState.myNation())
+	local troop = RaceInfo.lineTroop(if me then me.race else nil)
+	return "Recruit_" .. troop, RaceInfo.troopIcon(troop), RaceInfo.troopName(troop)
+end
+
 local function myArmies(): { any }
 	local out = {}
 	local snap = ClientState.snapshot()
@@ -190,8 +199,9 @@ local function marchPlan(v: Types.TutorialView): (string, string, string?, numbe
 	if idle then
 		return POINT, "Tap your army", nil, idle.location
 	end
-	if findButton("Regiment") then
-		return "sword", "Tap Infantry", "Regiment", nil
+	local recruit, icon, label = lineButton()
+	if findButton(recruit) then
+		return icon, "Tap " .. label, recruit, nil
 	end
 	local me = ClientState.nation(ClientState.myNation())
 	return POINT, "Tap your land", nil, if me then me.capital else nil
@@ -203,8 +213,9 @@ local function plan(v: Types.TutorialView): (string, string, string?, number?)
 	if step == "Take" or step == "Siege" then
 		return marchPlan(v)
 	elseif step == "Recruit" then
-		if findButton("Regiment") then
-			return "sword", "Tap Infantry", "Regiment", nil
+		local recruit, icon, label = lineButton()
+		if findButton(recruit) then
+			return icon, "Tap " .. label, recruit, nil
 		end
 		return POINT, "Tap your land", nil, v.province
 	elseif step == "Ally" then
