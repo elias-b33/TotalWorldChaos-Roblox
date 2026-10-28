@@ -1023,7 +1023,8 @@ function Widgets.setTab(b: TextButton, selected: boolean)
 		skin.faceTop = if selected then 0 else 2
 		skin.faceBottom = if selected then 0 else 2
 		Widgets.restyle(b, if selected then "gold" else "well", if selected then "button" else "well")
-		fitFace(b, skin)
+		-- a gem's caption sits on its face, above the base; a well has no base, so its caption centres in it
+		setInsets(b, if selected then FACE_TOP else 0, if selected then FACE_BOTTOM else 0)
 	end
 end
 

@@ -469,13 +469,13 @@ function Tutorial.init(selectedArmy: () -> number?)
 	-- the arrow over a glowing button
 	buttonArrow = arrow(cardGui, "ButtonArrow")
 	-- the card (and the way out that replaces it) at the top left, under the top bar
-	local function place()
+	local function placeCard()
 		local top = UDim2.fromOffset(Theme.space.m, HudLayout.contentTop())
 		Widgets.fit(card, nil, top)
 		Widgets.fit(leaveButton, nil, top)
 	end
-	place()
-	HudLayout.onChange(place)
+	placeCard()
+	HudLayout.onChange(placeCard)
 	Widgets.fitScreen(cardGui) -- tablets: the screen's roots grow with the UI's scale
 	cardGui.Parent = playerGui
 
