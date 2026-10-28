@@ -507,17 +507,16 @@ local setOpen: (boolean) -> ()
 -- The panel's contents, built when it opens: header (season, tier and XP bar, days left, pager, close), the page of
 -- tiers and the footer.
 local function build(): Refs
+	-- the season's name on a title plate on the window's top edge, the close gem on its corner
+	local _, title = Widgets.header(panel, "", "ticket", function()
+		setOpen(false)
+	end)
 	local header = Instance.new("Frame")
-	header.Name = "Header"
+	header.Name = "Info"
 	header.BackgroundTransparency = 1
 	header.Size = UDim2.new(1, 0, 0, BAR)
 	header.LayoutOrder = 1
 	header.Parent = panel
-	local close = Widgets.iconButton(header, "close", "✕", BAR, nil, function()
-		setOpen(false)
-	end)
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.fromScale(1, 0)
 	local pager, pageLabel = Widgets.pager(header, function()
 		page = math.max(1, page - 1)
 		render()
@@ -526,8 +525,8 @@ local function build(): Refs
 		render()
 	end, "Prev", "Next")
 	pager.AnchorPoint = Vector2.new(1, 0)
-	pager.Position = UDim2.new(1, -(BAR + Theme.space.m), 0, 0)
-	local right = BAR + pager.Size.X.Offset + 2 * Theme.space.m
+	pager.Position = UDim2.fromScale(1, 0)
+	local right = pager.Size.X.Offset + Theme.space.m
 	-- your tier: "Tier 6 · 300/1,200 XP", the bar, the days left
 	local tierBox = Instance.new("Frame")
 	tierBox.Name = "TierBox"
@@ -550,15 +549,11 @@ local function build(): Refs
 	days.Position = UDim2.fromOffset(0, 29)
 	days.TextWrapped = false
 	Widgets.leadIcon(days, "calendar", 14, Theme.space.xs)
-	local title = Widgets.title(header, "", Theme.text.heading, BAR) -- a season's name can be long
-	title.Name = "Title"
-	title.Size = UDim2.new(1, -(right + TIER_BOX + Theme.space.m), 1, 0)
-	Widgets.leadIcon(title, "ticket", Theme.icon.small)
 
 	local track = Instance.new("Frame")
 	track.Name = "Track"
 	track.BackgroundTransparency = 1
-	track.Size = UDim2.new(1, 0, 1, -(2 * BAR + 2 * Theme.space.s))
+	track.Size = UDim2.new(1, 0, 1, -(2 * BAR + 3 * Theme.space.s)) -- three gaps: the header's too
 	track.LayoutOrder = 2
 	track.Parent = panel
 
@@ -657,6 +652,8 @@ function SeasonUI.init(showToast: (string) -> ())
 	panel = Widgets.window(gui, "SeasonPanel")
 	Widgets.list(panel, false, Theme.space.s)
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
+	Widgets.fitScreen(buttonGui)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	buttonGui.Parent = gui.Parent
 

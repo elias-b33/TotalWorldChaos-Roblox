@@ -28,11 +28,11 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local BANNER_HEIGHT = 48 -- covers the HUD's top bar (44 px) while drafting
-local PANEL_WIDTH = 272
+local CELL = Vector2.new(120, 44)
+local PANEL_WIDTH = 2 * CELL.X + 6 + 2 * Widgets.PANEL_PAD -- two columns of nations inside the frame
 local CONFIRM_WIDTH = 280 -- the Pick button at most
 local RACE_CARD_WIDTH = 480 -- the race card at most (one line on an 844 px phone)
 local DRAFT_CORNER_BUTTONS = 2 -- corner buttons that stay during the draft: the shop's cart and the quests' scroll
-local CELL = Vector2.new(120, 44)
 local TAKEN_FADE = 0.75 -- background transparency of a nation someone already picked
 
 local Draft = {}
@@ -297,6 +297,7 @@ function Draft.init()
 	Widgets.stroke(raceCard)
 	raceCard.Visible = false
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	LobbyState.onChange(render)
 	ClientState.onReset(function()

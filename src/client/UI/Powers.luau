@@ -17,6 +17,7 @@ local ClientState = require(Client.ClientState)
 local Intents = require(Client.Intents)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
+local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
@@ -390,7 +391,7 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	Widgets.stroke(chargesLabel, Theme.color.gold)
 
 	-- the picker: 2 columns × 3 rows above the button
-	picker = Widgets.panel(gui, 2 * PICK_WIDTH + 8 + 2 * Theme.space.l + 2) -- two columns
+	picker = Widgets.panel(gui, 2 * PICK_WIDTH + 8 + 2 * Widgets.PANEL_PAD) -- two columns
 	picker.Name = "Picker"
 	picker.AnchorPoint = Vector2.new(1, 1)
 	picker.Position = UDim2.new(1, -12, 1, -BUTTON_SIZE - 30)
@@ -402,22 +403,22 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	grid.Parent = picker
 
 	-- the targeting bar: which power, what to tap, Confirm / Cancel
-	bar = Widgets.sheet(gui, 440)
+	bar = Widgets.sheet(gui, 444)
 	bar.Name = "TargetBar"
 	bar.Visible = false
 	Widgets.list(bar, false, Theme.space.s)
+	-- the power on a title plate on the bar's top edge, its cost in charges under it
+	local _, plate = Widgets.header(bar, "", "sparkles")
+	barTitle = plate
+	barTitleIcon = barTitle:FindFirstChild("Icon") :: GuiObject
 	local titleRow = Instance.new("Frame")
-	titleRow.Name = "Title"
+	titleRow.Name = "Cost"
 	titleRow.BackgroundTransparency = 1
-	titleRow.Size = UDim2.new(1, 0, 0, 30)
+	titleRow.Size = UDim2.new(1, 0, 0, 28)
 	titleRow.LayoutOrder = 1
 	titleRow.Parent = bar
 	Widgets.list(titleRow, true, Theme.space.m)
-	barTitle = Widgets.title(titleRow, "", Theme.text.title, 30)
-	barTitle.Size = UDim2.fromOffset(0, 30)
-	barTitle.AutomaticSize = Enum.AutomaticSize.X
-	barTitleIcon = Widgets.leadIcon(barTitle, "sparkles", Theme.icon.small)
-	barCost = Widgets.chip(titleRow, "charge", "", nil, 26)
+	barCost = Widgets.chip(titleRow, "charge", "", nil, 28)
 	barCost.LayoutOrder = 2
 	barHint = Widgets.label(bar, "", Theme.text.body, 22)
 	barHint.LayoutOrder = 2
@@ -432,7 +433,6 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 
 	banner = Widgets.label(gui, "You rose as a Primordial", Theme.text.body, 34)
 	banner.Name = "PrimordialBanner"
-	banner.Position = UDim2.fromOffset(12, 54) -- top left, clear of toasts, offers and the picker
 	banner.Size = UDim2.fromOffset(270, 34)
 	banner.BackgroundColor3 = Widgets.SPECIAL
 	banner.BackgroundTransparency = 0.05
@@ -444,6 +444,13 @@ function Powers.init(showToast: (string) -> (), openHandler: () -> ())
 	Widgets.padding(banner, Theme.space.m, 0)
 	Widgets.leadIcon(banner, "sparkles", Theme.size.icon)
 
+	-- the banner at the top left under the top bar, clear of toasts, offers and the picker
+	local function place()
+		Widgets.fit(banner, nil, UDim2.fromOffset(12, HudLayout.contentTop()))
+	end
+	place()
+	HudLayout.onChange(place)
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	ClientState.onReset(function()

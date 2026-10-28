@@ -385,29 +385,22 @@ local setOpen: (boolean) -> ()
 
 -- The panel's contents, built when it opens: header (title, Glory, rerolls, the ad button, close), two columns.
 local function build(): Refs
+	-- the title plate on the window's top edge, the close gem on its corner
+	Widgets.header(panel, "Quests", "scroll", function()
+		setOpen(false)
+	end)
 	local header = Instance.new("Frame")
-	header.Name = "Header"
+	header.Name = "Info"
 	header.BackgroundTransparency = 1
 	header.Size = UDim2.new(1, 0, 0, BAR)
 	header.LayoutOrder = 1
 	header.Parent = panel
-	local close = Widgets.iconButton(header, "close", "✕", BAR, nil, function()
-		setOpen(false)
-	end)
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.fromScale(1, 0)
 	local info = Instance.new("Frame")
-	info.Name = "Info"
+	info.Name = "Values"
 	info.BackgroundTransparency = 1
-	info.Size = UDim2.new(1, -(BAR + AD_WIDTH + 2 * Theme.space.m), 1, 0)
+	info.Size = UDim2.new(1, -(AD_WIDTH + Theme.space.m), 1, 0)
 	info.Parent = header
 	Widgets.list(info, true, Theme.space.m)
-	local title = Widgets.title(info, "Quests", Theme.text.title, BAR)
-	title.Size = UDim2.fromOffset(0, BAR)
-	title.AutomaticSize = Enum.AutomaticSize.X
-	title.TextTruncate = Enum.TextTruncate.None
-	title.LayoutOrder = 1
-	Widgets.leadIcon(title, "scroll", Theme.icon.small)
 	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
 	glory.Name = "Glory"
 	glory.LayoutOrder = 2
@@ -421,7 +414,7 @@ local function build(): Refs
 	local body = Instance.new("Frame")
 	body.Name = "Body"
 	body.BackgroundTransparency = 1
-	body.Size = UDim2.new(1, 0, 1, -(BAR + Theme.space.xs))
+	body.Size = UDim2.new(1, 0, 1, -(BAR + 2 * Theme.space.xs)) -- two gaps: the header's too
 	body.LayoutOrder = 2
 	body.Parent = panel
 	Widgets.list(body, true, COLUMN_GAP).VerticalAlignment = Enum.VerticalAlignment.Top
@@ -486,8 +479,9 @@ function QuestsUI.init()
 	panel = Widgets.window(gui, "QuestsPanel")
 	Widgets.list(panel, false, Theme.space.xs)
 
-	-- over the panel's header, left of its close cross (the panel is 8 px from the screen's edges, padded 12 / 8)
-	adButton = Widgets.iconTextButton(gui, "video", "", AD_WIDTH, Widgets.BUTTON, function()
+	-- at the right of the window's first row (the window is 8 px from the screen's sides and 16 from its top,
+	-- padded 16 at the sides and 22 under its title plate)
+	adButton = Widgets.iconTextButton(gui, "video", "", AD_WIDTH, Widgets.BUTTON_OFF, function()
 		Ads.watch()
 		updateAd()
 	end, "AdButton")
@@ -495,9 +489,12 @@ function QuestsUI.init()
 	adButton.TextWrapped = false
 	adButton.ZIndex = 2
 	adButton.AnchorPoint = Vector2.new(1, 0)
-	adButton.Position = UDim2.new(1, -(Theme.space.m + Theme.space.l + BAR + Theme.space.m), 0, 2 * Theme.space.m)
+	adButton.Position =
+		UDim2.new(1, -(Theme.space.m + Theme.frame.pad.side), 0, 2 * Theme.space.m + Theme.frame.pad.top)
 	adButton.Visible = false
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
+	Widgets.fitScreen(buttonGui)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	buttonGui.Parent = gui.Parent
 

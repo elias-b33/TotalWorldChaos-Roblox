@@ -387,29 +387,17 @@ local setOpen: (boolean) -> ()
 
 -- The panel's contents, built when it opens: header (title, tabs, close), the controls row and the body.
 local function build(): Refs
-	local header = Instance.new("Frame")
-	header.Name = "Header"
-	header.BackgroundTransparency = 1
-	header.Size = UDim2.new(1, 0, 0, BAR)
-	header.LayoutOrder = 1
-	header.Parent = panel
-	local close = Widgets.iconButton(header, "close", "✕", BAR, nil, function()
+	-- the title plate on the window's top edge, the close gem on its corner, the tabs under them
+	Widgets.header(panel, "Trophies", "trophy", function()
 		setOpen(false)
 	end)
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.fromScale(1, 0)
 	local row = Instance.new("Frame")
 	row.Name = "Tabs"
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, -(BAR + Theme.space.m), 1, 0)
-	row.Parent = header
+	row.Size = UDim2.new(1, 0, 0, BAR)
+	row.LayoutOrder = 1
+	row.Parent = panel
 	Widgets.list(row, true, Theme.space.s)
-	local title = Widgets.title(row, "Trophies", Theme.text.title, BAR)
-	title.Size = UDim2.fromOffset(0, BAR)
-	title.AutomaticSize = Enum.AutomaticSize.X
-	title.TextTruncate = Enum.TextTruncate.None
-	title.LayoutOrder = 0
-	Widgets.leadIcon(title, "trophy", Theme.icon.small)
 	local tabs: { [Tab]: TextButton } = {}
 	for i, name in TABS do
 		local b = Widgets.tab(row, name, 0, false, function()
@@ -436,7 +424,7 @@ local function build(): Refs
 	local body = Instance.new("Frame")
 	body.Name = "Body"
 	body.BackgroundTransparency = 1
-	body.Size = UDim2.new(1, 0, 1, -(2 * BAR + 2 * Theme.space.s))
+	body.Size = UDim2.new(1, 0, 1, -(2 * BAR + 3 * Theme.space.s)) -- three gaps: the header's too
 	body.LayoutOrder = 3
 	body.Parent = panel
 	return { tabs = tabs, controls = controls, body = body }
@@ -491,6 +479,8 @@ function Trophies.init()
 	panel = Widgets.window(gui, "TrophiesPanel")
 	Widgets.list(panel, false, Theme.space.s)
 
+	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
+	Widgets.fitScreen(buttonGui)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	buttonGui.Parent = gui.Parent
 
