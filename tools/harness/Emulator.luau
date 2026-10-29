@@ -1578,6 +1578,22 @@ function Emulator.pinch(client: Machine, scale: number)
 	sig:Fire({}, scale, 0, roblox.Enum.UserInputState.End, false)
 end
 
+-- Hold a finger still on the screen for `seconds` (a long press), then lift it: InputBegan, the game runs, InputEnded,
+-- with one touch InputObject from start to end as on a device. No TouchTap: the game decides what a hold means.
+function Emulator.longPress(client: Machine, x: number, y: number, seconds: number)
+	local uis = client.dm:GetService("UserInputService")
+	local input = {
+		UserInputType = roblox.Enum.UserInputType.Touch,
+		UserInputState = roblox.Enum.UserInputState.Begin,
+		Position = roblox.Vector3.new(x, y, 0),
+		Delta = roblox.Vector3.zero,
+	}
+	eventOf(uis, "InputBegan"):Fire(input, false)
+	Emulator.run(seconds)
+	input.UserInputState = roblox.Enum.UserInputState.End
+	eventOf(uis, "InputEnded"):Fire(input, false)
+end
+
 local function visibleInTree(inst): boolean
 	local node = inst
 	while node do

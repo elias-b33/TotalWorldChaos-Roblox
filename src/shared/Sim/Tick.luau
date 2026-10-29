@@ -10,6 +10,7 @@ local EventCards = require("./EventCards")
 local Match = require("./Match")
 local Movement = require("./Movement")
 local Navy = require("./Navy")
+local Pings = require("./Pings")
 local Primordial = require("./Primordial")
 local Rng = require("./Rng")
 local Siege = require("./Siege")
@@ -40,6 +41,7 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 		Economy.payMonth(state)
 	end
 	Primordial.step(state, rng) -- 6: eliminations, charges, effect timers, Cataclysm disasters
+	Pings.expire(state) -- (and old map pings, and a fallen sender's)
 	-- 7: bots (Phase 3)
 	Diplomacy.expire(state) -- 8: offers, insults' answer windows...
 	EventCards.step(state, rng) -- ...and event cards (the default choice), then new cards

@@ -37,6 +37,7 @@ export type SoundName =
 	| "War"
 	| "Cataclysm"
 	| "Results"
+	| "Ping"
 
 -- id: the file; volume 0..1; speed: playback speed (pitch); gap: seconds before the same sound may start again (a
 -- burst of battles plays once).
@@ -57,6 +58,7 @@ local SOUNDS: { [string]: { id: string, volume: number, speed: number, gap: numb
 	War = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.7, speed = 0.55, gap = 1 },
 	Cataclysm = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.7, speed = 0.6, gap = 1 },
 	Results = { id = "rbxasset://sounds/action_get_up.mp3", volume = 0.6, speed = 1.2, gap = 1 },
+	Ping = { id = "rbxasset://sounds/volume_slider.ogg", volume = 0.7, speed = 1.9, gap = 0.5 }, -- an ally's map ping
 }
 
 -- module state lives as long as the client session, across matches

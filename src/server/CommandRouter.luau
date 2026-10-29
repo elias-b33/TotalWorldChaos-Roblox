@@ -11,6 +11,7 @@ ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
 local Commands = require(Shared.Sim.Commands)
 local Config = require(Shared.Config)
+local Pings = require(Shared.Sim.Pings)
 local Primordial = require(Shared.Sim.Primordial)
 local RateLimit = require(Shared.RateLimit)
 local Remotes = require(Shared.Remotes)
@@ -224,6 +225,18 @@ function CommandRouter.init(getNation: (Player) -> number?)
 					return nil
 				end
 				return { kind = "Embark", army = army :: number, fleet = fleet :: number }
+			end)
+		end)
+
+	-- Map pings (docs/NEXT_FEATURES.md 4): one of the four kinds on a province id, nothing else (a ping carries no
+	-- text from the player). Sim.Pings checks the rest: allies, the cooldown, the per-minute cap, the target.
+	Remotes.event("RequestPing").OnServerEvent
+		:Connect(function(player: Player, requestId: unknown, kind: unknown, province: unknown)
+			accept(player, requestId, function()
+				if not Pings.isKind(kind) or not isId(province) then
+					return nil
+				end
+				return { kind = "Ping", ping = kind :: Types.PingKind, province = province :: number }
 			end)
 		end)
 

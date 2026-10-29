@@ -160,6 +160,10 @@ export type MatchEvent = {
 	outnumbered: boolean?,
 }
 
+-- A map ping (Sim.Pings, docs/NEXT_FEATURES.md 4): an icon a nation put on a province for its alliance, live while
+-- the tick is at most untilTick. Never in the snapshot or the delta: PingService sends it to the sender's alliance.
+export type PingKind = "Attack" | "Defend" | "Help" | "Look"
+export type Ping = { id: number, by: NationId, kind: PingKind, province: ProvinceId, untilTick: number }
 -- Insults (docs/DESIGN.md "Diplomacy"): the insulted nation (holder) fights its insulter (against) better for a while.
 -- against = 0: high spirits, from laughing an insult off (a smaller bonus in every battle).
 export type Grudge = { holder: NationId, against: NationId, untilTick: number }
@@ -278,6 +282,11 @@ export type MatchState = {
 	seaBattles: { [ZoneId]: SeaBattle },
 	offers: { Offer },
 	events: { MatchEvent },
+	-- Map pings (Sim.Pings): the live ones (oldest first), the ticks of each nation's pings in the last minute (the
+	-- cooldown and the per-minute cap) and the next ping id. Never sent in the snapshot or the delta.
+	pings: { Ping },
+	pingSent: { [NationId]: { number } },
+	nextPingId: number,
 	result: MatchResult?, -- set when someone has won; the phase is then Results
 	theme: string?, -- the map theme everyone sees (a Theme catalogue item id, from the theme vote); nil = classic.
 	-- Cosmetic only: no rule reads it.
@@ -431,6 +440,8 @@ export type Command =
 	| { kind: "Sail", fleet: FleetId, zone: ZoneId }
 	| { kind: "Land", fleet: FleetId, province: ProvinceId }
 	| { kind: "Embark", army: ArmyId, fleet: FleetId }
+	-- a map ping for the sender's alliance (Sim.Pings): an icon, never text
+	| { kind: "Ping", ping: PingKind, province: ProvinceId }
 	-- the EU4 pack's event cards: choice 1 or 2 on the nation's open card (Sim.EventCards)
 	| { kind: "EventChoice", card: number, choice: number }
 

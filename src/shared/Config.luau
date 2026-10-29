@@ -1333,6 +1333,18 @@ Config.Net = {
 	MaxShopIntentsPerSecond = 2, -- shop requests (buy, equip, emote, theme setting) on top of that, per player
 }
 
+-- Map pings (docs/NEXT_FEATURES.md 4, DESIGN.md "UI and controls"): Sim.Pings, Services/PingService, UI/Pings ----------
+
+Config.Pings = {
+	Kinds = { "Attack", "Defend", "Help", "Look" }, -- the four pings (icons war, powerShield, fire, eye), wheel order
+	LifeTicks = 8, -- seconds a ping stays on the allies' maps
+	CooldownTicks = 3, -- seconds between one nation's pings
+	MaxActive = 2, -- a sender's third live ping replaces its oldest
+	MaxPerMinute = 12, -- hard cap per nation in any MinuteTicks
+	MinuteTicks = 60,
+	LongPressSeconds = 0.45, -- hold a province this long (without panning) to open the ping wheel (client)
+}
+
 -- Bots -------------------------------------------------------------------------------------------
 
 Config.Bots = {
