@@ -93,6 +93,8 @@ local FLAG_WIDTH, FLAG_HEIGHT = 24, 18 -- a capital's 16×12 flag, screen pixels
 local FLAG_RIGHT, FLAG_BOTTOM = -10, 8 -- the flag's pole stands left of the capital's centre: its bottom right corner
 local POLE = 3 -- the pole's width plus the gap before the flag
 local EMOTE_SIZE = 26 -- capital emote icon, screen pixels
+local MARKER_SIZE = EMOTE_SIZE + 10 -- an insult's marker (a round badge with an anger mark), screen pixels
+local MARKER_LIFT = 58 -- screen pixels from the insulted capital up to the marker's foot (where emotes show)
 local VICTORY_SIZE = 32 -- victory animation over a winner's capital
 local VICTORY_FRAME_SECONDS = 0.4
 local _, PIP_BAR_W, PIP_BAR_H = MapBadges.pips(0, Config.Economy.MaxDevelopment) -- the pip bar's size in pixels
@@ -189,6 +191,7 @@ local stackShown: { [number]: number } = {} -- strength badges shown in each pro
 local stackHalf: { [number]: number } = {} -- half the biggest token in each province's stack
 local detailShown = false -- garrisons, pips and every army's size show (the region zoom inwards)
 local flags: { [number]: { frame: Frame, key: string } } = {}
+local insultMarkers: { [number]: Frame } = {} -- insulted nation -> the marker over its capital
 local victories: { { label: TextLabel, frames: { string } } } = {}
 local victoryClock = 0
 local selectedArmy: number? = nil
@@ -1077,6 +1080,60 @@ local function showEmote(e: Types.MatchEvent)
 	end)
 end
 
+-- An insult's marker (MatchEvent "Insult" / "InsultBack": b = the insulted nation): an anger mark in a round badge
+-- over the insulted nation's capital, or its first province once the capital is lost, for
+-- Config.Diplomacy.MarkerSeconds. Everyone sees it. No text: an insult carries no message (docs/DESIGN.md
+-- "Diplomacy"). A newer insult of the same nation replaces it.
+local function showInsultMarker(e: Types.MatchEvent)
+	local markerLayer = layers.Emotes
+	local snapshot = ClientState.snapshot()
+	local nation = ClientState.nation(e.b)
+	if markerLayer == nil or snapshot == nil or nation == nil then
+		return
+	end
+	local where = nation.capital
+	local capital = ClientState.province(nation.capital)
+	if capital == nil or capital.owner ~= nation.id then
+		for _, record in snapshot.provinces do
+			if record.owner == nation.id then
+				where = record.id
+				break
+			end
+		end
+	end
+	local old = insultMarkers[e.b]
+	if old then
+		old:Destroy()
+	end
+	local badge = Instance.new("Frame")
+	badge.Name = "Insulted" .. e.b
+	badge.AnchorPoint = Vector2.new(0.5, 1)
+	badge.Position = at(MapRenderer.centerOf(where)) + UDim2.fromOffset(0, -MARKER_LIFT)
+	badge.Size = UDim2.fromOffset(MARKER_SIZE, MARKER_SIZE)
+	badge.BackgroundColor3 = Theme.color.navyDeep
+	badge.BackgroundTransparency = 0.15
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = badge
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Theme.color.ink
+	stroke.Thickness = Theme.stroke
+	stroke.Parent = badge
+	local icon = Icons.label(badge, "grudge", EMOTE_SIZE)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	badge.Parent = markerLayer
+	insultMarkers[e.b] = badge
+	local myGeneration = generation
+	task.delay(Config.Diplomacy.MarkerSeconds, function()
+		if generation == myGeneration and insultMarkers[e.b] == badge then
+			insultMarkers[e.b] = nil
+			badge:Destroy()
+		end
+	end)
+end
+
 -- The winners' victory animations over their capitals while Results shows (frames of the item's art, cycled).
 local function refreshVictory()
 	local snapshot = ClientState.snapshot()
@@ -1163,6 +1220,7 @@ local function build(map: Types.MapDef)
 	groups = {}
 	stackShown, stackHalf = {}, {}
 	flags = {}
+	insultMarkers = {}
 	victories = {}
 	layers = {}
 	widths = {}
@@ -1946,6 +2004,8 @@ function MapRenderer.init()
 		for _, e in delta.events do
 			if e.kind == "Emote" then
 				showEmote(e)
+			elseif e.kind == "Insult" or e.kind == "InsultBack" then
+				showInsultMarker(e)
 			end
 		end
 	end)

@@ -156,18 +156,24 @@ local function run()
 	H.shot(alice, "shield")
 	H.expect(Effects.stats().particles <= 240, "particles stay inside the pool")
 
-	-- mute: nothing plays until unmuted, and it is remembered
-	Emulator.press(alice, "Mute")
-	Emulator.run(0.2)
-	H.expect(H.iconShown(alice, "soundOff"), "the button shows muted")
+	-- Sounds off (the speaker's popover): nothing plays until it is on again
+	local Speaker = H.client(alice, "UI.Speaker")
+	local function flipSounds()
+		if not Speaker.isOpen() then
+			Emulator.press(alice, "Mute")
+		end
+		Emulator.press(alice, "SoundsToggle")
+		Emulator.run(0.2)
+	end
+	flipSounds()
+	H.expect(H.iconShown(alice, "soundOff"), "the Sounds toggle shows off")
 	local before = #Emulator.sounds
 	cast("Blessing", capital)
 	waitFor("Blessing", 3, capital)
 	Emulator.run(1)
-	H.expect(#Emulator.sounds == before, "muted: no sounds")
-	Emulator.press(alice, "Mute")
-	Emulator.run(0.2)
-	H.expect(H.iconShown(alice, "soundOn"), "unmuted again")
+	H.expect(#Emulator.sounds == before, "Sounds off: no sounds")
+	flipSounds()
+	H.expect(not H.iconShown(alice, "soundOff"), "on again")
 
 	-- the Cataclysm banner, then the shield runs out and its dome goes
 	state.tick = 20 * 60 - 2

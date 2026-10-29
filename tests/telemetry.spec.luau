@@ -177,6 +177,39 @@ T.test("primordial_power_used says who used it", function()
 	T.equal(Telemetry.powerUsed(state, 102, "Meteor").fields[3], "primordial")
 end)
 
+T.test("diplomacy_action logs the EU4 pack's insults and answers, gifts and military access", function()
+	local state = seated()
+	local function logged(action: Types.DiplomacyAction, target: number): string?
+		local e = Telemetry.diplomacy(state, 101, { kind = "Diplomacy", action = action, target = target, gold = 0 })
+		return if e then e.name .. ":" .. table.concat(e.fields, ",") else nil
+	end
+	T.equal(logged("Insult", 2), "diplomacy_action:insult,skyshards,human", "aimed at a player")
+	T.equal(logged("InsultBack", 3), "diplomacy_action:insult_back,skyshards,bot", "aimed at a bot")
+	T.equal(logged("LaughOff", 2), "diplomacy_action:laugh_off,skyshards,human")
+	T.equal(logged("Gift", 3), "diplomacy_action:gift,skyshards,bot")
+	T.equal(logged("Access", 3), "diplomacy_action:access_asked,skyshards,bot")
+	T.equal(logged("AcceptAccess", 2), "diplomacy_action:access_granted,skyshards,human")
+	T.equal(logged("War", 2), nil, "war, alliances and peace aren't the pack's")
+	T.equal(Telemetry.diplomacy(state, 101, { kind = "Develop", province = 1 }), nil)
+end)
+
+T.test("event_card says which event, the map, and whether the player picked or time ran out", function()
+	local state = seated()
+	local function logged(outcome: Types.EventOutcome?): string?
+		local e = Telemetry.eventCard(state, 101, outcome)
+		return if e then e.name .. ":" .. table.concat(e.fields, ",") else nil
+	end
+	T.equal(
+		logged({ card = 3, event = "Harvest", province = 0, choice = 2, auto = false }),
+		"event_card:Harvest,skyshards,picked_2"
+	)
+	T.equal(
+		logged({ card = 4, event = "CargoPod", province = 5, choice = 1, auto = true }),
+		"event_card:CargoPod,skyshards,timeout_1"
+	)
+	T.equal(logged(nil), nil)
+end)
+
 T.test("map_vote: one per voter with the round and the theme", function()
 	local lobby = Lobby.new(Maps.ids, nil)
 	T.expect((Lobby.vote(lobby, 202, "eldmoor")), "vote")
@@ -233,6 +266,17 @@ T.test("first_pick: the seconds the chooser took, the map, picked or timeout", f
 	T.equal(timeout.value, Config.Phases.FirstPickTicks)
 	T.equal(table.concat(timeout.fields, ","), "earth,timeout")
 	T.equal(Telemetry.firstPick(Lobby.new(Maps.ids, nil), "earth"), nil, "a vote logs map_vote instead")
+end)
+
+T.test("music_setting: both speaker toggles and what the server was doing", function()
+	local e = Telemetry.musicSetting(false, true, "match", 101)
+	T.equal(e.kind, "Custom")
+	T.equal(e.name, "music_setting")
+	T.equal(e.value, 1)
+	T.equal(e.userId, 101)
+	T.equal(table.concat(e.fields, ","), "off,on,match")
+	T.equal(table.concat(Telemetry.musicSetting(true, false, "lobby", 101).fields, ","), "on,off,lobby")
+	T.expect(Telemetry.sandboxAllows(e) == false, "a sandbox server doesn't send it")
 end)
 
 -- Economy and progression --------------------------------------------------------------------------------------------

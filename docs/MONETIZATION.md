@@ -136,9 +136,11 @@ DESIGN.md's price stays. A group of friends can split it, and a paid price (not 
 | Bots | 0–9, Easy / Normal / Hard | Fill to 10, Normal |
 | Primordial powers | On / off | On |
 | Cataclysm disasters | On / off | On |
+| Insults (the EU4 pack's insults, gifts and military access, `docs/DESIGN.md` "Diplomacy") | On / off | On (`Config.Features.Diplomacy`) |
+| Events (the EU4 pack's event cards with choices, `docs/DESIGN.md` "Events"; off isn't a custom rule) | On / off | On (`Config.Features.Events`) |
 | Lock teams | Owner pre-sets alliances | Off |
 
-**Rewards in private servers:** with default rules and 4+ real players, everything counts (XP, Glory, quests). With custom rules or fewer than 4 real players: 50% XP and Glory, quests still progress except "win" quests, and no leaderboard points. That stops one player farming nine Easy bots. The map and the theme only change how a match looks, so they never count as custom rules; "real players" are those who held a nation during the match. Allowed values live in `Config.Private`, the rules in `Sim/Settings.luau`; the owner sets them in the Lobby (⚙ Settings, during the map vote) and Studio simulates a private server with the Workspace attribute `PrivateServerOwner` (`docs/STUDIO.md`).
+**Rewards in private servers:** with default rules and 4+ real players, everything counts (XP, Glory, quests). With custom rules or fewer than 4 real players: 50% XP and Glory, quests still progress except "win" quests, and no leaderboard points. That stops one player farming nine Easy bots. The map and the theme only change how a match looks, so they never count as custom rules, and neither does turning insults off (it makes nothing easier, and an owner may do it for younger players); "real players" are those who held a nation during the match. Allowed values live in `Config.Private`, the rules in `Sim/Settings.luau`; the owner sets them in the Lobby (⚙ Settings, during the map vote) and Studio simulates a private server with the Workspace attribute `PrivateServerOwner` (`docs/STUDIO.md`).
 
 ### 3.5 Starter pack and bundles
 

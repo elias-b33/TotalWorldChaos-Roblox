@@ -493,6 +493,36 @@ function FrameArt.paint(frame: string, palette: Palette): (buffer, number, numbe
 	return out, w, h
 end
 
+-- The sunburst behind the Results ribbon (docs/UI_DIRECTION.md 7.13): `n` × `n` px of `rays` rays in `colour`
+-- from the centre, in alternate angular sectors, starting from a ring (the middle, where the rays would crowd into
+-- a jumble, is hidden by the ribbon anyway) and fading out in four steps towards the edge: pixel art, not a blur.
+-- RGBA bytes, ready for EditableImage:WritePixelsBuffer.
+FrameArt.SUNBURST_STEPS = 4
+FrameArt.SUNBURST_HOLE = 0.22 -- of the radius: no rays inside it
+local SUNBURST_BANDS = { 0.55, 0.72, 0.86, 1 } -- full, then 3/4, 1/2 and 1/4 alpha out to the edge
+function FrameArt.sunburst(n: number, rays: number, colour: number): (buffer, number, number)
+	local out = buffer.create(n * n * 4) -- zero = transparent
+	local r, g, b = bit32.rshift(colour, 16), bit32.band(bit32.rshift(colour, 8), 255), bit32.band(colour, 255)
+	local centre = (n - 1) / 2
+	local steps = FrameArt.SUNBURST_STEPS
+	for y = 0, n - 1 do
+		for x = 0, n - 1 do
+			local dx, dy = x - centre, y - centre
+			local d = math.sqrt(dx * dx + dy * dy) / (n / 2)
+			local sector = math.floor((math.atan2(dy, dx) + math.pi) / (2 * math.pi) * rays * 2) % (rays * 2)
+			if d >= FrameArt.SUNBURST_HOLE and d < 1 and sector % 2 == 0 then
+				local band = 1
+				while d >= SUNBURST_BANDS[band] do
+					band += 1
+				end
+				local a = math.floor((steps + 1 - band) / steps * 255 + 0.5)
+				buffer.writeu32(out, (y * n + x) * 4, a * 16777216 + b * 65536 + g * 256 + r)
+			end
+		end
+	end
+	return out, n, n
+end
+
 -- The size of a frame's art in art pixels.
 function FrameArt.size(frame: string): (number, number)
 	local def = FrameArt.FRAMES[frame]

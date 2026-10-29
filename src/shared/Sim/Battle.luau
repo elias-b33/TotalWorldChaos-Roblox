@@ -4,7 +4,8 @@
 -- own strength × modifiers. A side's strength is the sum of its men × each troop's attack (attackers) or defence
 -- (defenders), with the specials' terrain and anti-garrison tricks and each troop's counter against the other side's
 -- mix (Troops.strength); losses split over an army's troop types in proportion to their men (Army.shrinkTo). Race
--- bonuses (Sim.Races), the catch-up rules and flanking (Battle.directions) add to the modifier.
+-- bonuses (Sim.Races), the catch-up rules, flanking (Battle.directions) and an insult's grudge or high spirits
+-- (Sim.Diplomacy) add to the modifier.
 -- Every round also costs both sides morale (Battle.moraleDrop). A side whose morale breaks loses at once; else after
 -- the last round the side with fewer men loses (Battle.loser). The loser walks to its nearest owned province
 -- (Pathing.retreatPath) at its own speed, can't take orders, and doesn't fight, block or besiege on the way
@@ -262,6 +263,7 @@ function Battle.modifier(state: MatchState, provinceId: number, sides: Sides, de
 	local theirs = owners(if defending then sides.attackers else sides.defenders)
 	m += Races.battleBonus(state, province, mine, defending) -- Forest in forest, Hills defending hills, Attack
 	m += Battle.flankBonus(Battle.directions(side))
+	m += Diplomacy.grudgeBonus(state, mine, theirs) -- an insulted nation against its insulter, or high spirits
 	return math.max(0.1, m + Battle.bonus(state, mine, theirs, defending))
 end
 

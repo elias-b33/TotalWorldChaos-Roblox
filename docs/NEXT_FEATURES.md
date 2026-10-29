@@ -1,6 +1,6 @@
 # Next features: plans for the builders
 
-Plans for thirteen ideas the owner picked, written so another agent can build each one from its task card. Nothing here is built yet, and nothing here changes a rule until it is added to `docs/DESIGN.md` (the appendix has the text). The top five get full plans; the other eight are shorter but still buildable.
+Plans for thirteen ideas the owner picked, written so another agent can build each one from its task card. Music (section 6, stages 1–2) is built and its rules are in `docs/DESIGN.md` "Sound and effects"; nothing else here is built yet, and nothing here changes a rule until it is added to `docs/DESIGN.md` (the appendix has the text). The top five get full plans; the other eight are shorter but still buildable.
 
 - Platform facts were checked against Roblox's Creator Hub, Developer Forum and newsroom in October 2026. Sources are at the end; anything we couldn't confirm is marked **unverified**.
 - Numbers marked "measured" come from bot matches through the real Sim (the method is in each section). Every number is a starting value and goes in `src/shared/Config.luau`.

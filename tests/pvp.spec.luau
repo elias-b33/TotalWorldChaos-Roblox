@@ -304,6 +304,30 @@ T.test("armies from two directions flank: +FlankBonus per extra direction, cappe
 	T.equal(Battle.directions(sides2.defenders), 2)
 end)
 
+T.test("a flank and a grudge add up as side modifiers, and Battle.outcome sees both", function()
+	local state = atWar()
+	local d = Army.spawn(state, ZEPHYR, FIELD, 3000)
+	local a1 = Army.spawn(state, AURORA, FIELD, 1500)
+	local a2 = Army.spawn(state, AURORA, FIELD, 1500)
+	a1.from, a2.from = WEST, EAST
+	local sides = assert(Battle.sides(state, FIELD, { d, a1, a2 }))
+	local flanked = Battle.modifier(state, FIELD, sides, false, 0)
+	T.near(flanked, 1 + Config.Battle.FlankBonus, 1e-9, "the flank alone")
+	assert(Diplomacy.insult(state, ZEPHYR, AURORA)) -- Aurora now holds a grudge against Zephyr
+	local both = Battle.modifier(state, FIELD, sides, false, 0)
+	T.near(both, flanked + Config.Diplomacy.GrudgeBonus, 1e-9, "the flank and the grudge")
+	-- the bots' predictor: an even fight the flank alone doesn't win, with the grudge on top it does
+	local rate = Config.Battle.KillRatePerRound
+	local defender = { men = 3000, rate = rate * (1 + Config.Battle.FlankBonus), morale = MAX }
+	local function attacker(mod: number): Battle.Fighter
+		return { men = 3000, rate = rate * mod, morale = MAX }
+	end
+	local wonFlank = Battle.outcome(attacker(flanked), defender, false)
+	local wonBoth = Battle.outcome(attacker(both), defender, false)
+	T.expect(not wonFlank, "flank against flank: the defender holds the tie")
+	T.expect(wonBoth, "the grudge tips it")
+end)
+
 T.test("two stacks marching in from two sides arrive together and a flank decides the battle", function()
 	local function fight(twoSides: boolean): Types.MatchEvent
 		local state, rng = atWar()

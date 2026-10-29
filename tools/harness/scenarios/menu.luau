@@ -53,6 +53,7 @@ local function run()
 	Emulator.run(2.5) -- the vote cards' thumbnails behind it get painted
 	local aliceMenu = H.client(alice, "UI.Menu")
 	H.expect(aliceMenu.isOpen(), "Alice arrives at the start menu")
+	H.expect(H.client(alice, "Music").state().track == "Lobby", "the start menu plays the Lobby theme")
 	for _, text in { "Play online", "Singleplayer", "How to play" } do
 		H.expect(H.within(alice, "Menu", text), "it offers " .. text)
 	end

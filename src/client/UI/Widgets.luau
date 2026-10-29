@@ -10,9 +10,11 @@
 -- children draw over their parent). Where EditableImage isn't allowed, skin does nothing and the root keeps the
 -- flat look (a fill, a corner, an ink outline and a bevel), so every widget works either way.
 
+local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 
 local FrameArt = require(script.Parent.Parent.FrameArt)
+local TextWidth = require(script.Parent.Parent.TextWidth)
 local Frames = require(script.Parent.Frames)
 local Icons = require(script.Parent.Icons)
 local Theme = require(script.Parent.Theme)
@@ -128,7 +130,9 @@ local function syncCaption(root: TextLabel | TextButton, caption: TextLabel)
 	if ink and ink:IsA("UIStroke") then
 		local display = root.FontFace.Family == Theme.font.display.Family
 		ink.Enabled = display and luminance(root.TextColor3) > 0.35
-		ink.Thickness = if root.TextSize >= 16 then 2 else 1.5
+		-- a hero caption (a ribbon's) keeps its own thicker outline
+		local hero = caption:GetAttribute("InkThickness")
+		ink.Thickness = if type(hero) == "number" then hero elseif root.TextSize >= 16 then 2 else 1.5
 	end
 end
 
@@ -742,6 +746,51 @@ function Widgets.icon(parent: Instance, name: string, size: number?): GuiObject
 	return Icons.label(parent, name, size or Theme.size.icon)
 end
 
+-- Whether the player asked for less motion (GuiService.ReducedMotionEnabled): no loops, shines or turning
+-- sunburst, pops become instant, numbers still update.
+function Widgets.reducedMotion(): boolean
+	local ok, reduced = pcall(function()
+		return GuiService.ReducedMotionEnabled
+	end)
+	return ok and reduced == true
+end
+
+-- The width of a text object's text in its font, estimated from the font's advances (TextWidth): the same on
+-- Roblox and in the harness, with no layout pass needed.
+function Widgets.textWidth(obj: TextLabel | TextButton): number
+	local face: TextWidth.Face = if obj.FontFace.Family == Theme.font.display.Family then "display" else "body"
+	local text = if obj.RichText then (string.gsub(obj.Text, "<[^>]*>", "")) else obj.Text
+	local widest = 0
+	for _, line in string.split(text, "\n") do
+		widest = math.max(widest, TextWidth.measure(line, obj.TextSize, face))
+	end
+	return math.ceil(widest)
+end
+
+-- Centre a text widget's lead icon and its text together (docs/UI_DIRECTION.md 7.2: icon and caption centre as
+-- one, `gap` apart): the left padding makes room for the icon, so the centred text sits right of the middle by
+-- half the icon and gap, and the icon is placed just left of the text. Follows the text as it changes.
+local function centreLead(obj: TextLabel | TextButton, icon: GuiObject, size: number, gap: number)
+	obj.TextXAlignment = Enum.TextXAlignment.Center
+	local pad = obj:FindFirstChildOfClass("UIPadding")
+	local function place()
+		local box = obj.Size.X.Offset
+		if pad then
+			box -= pad.PaddingLeft.Offset + pad.PaddingRight.Offset
+		end
+		local w = Widgets.textWidth(obj)
+		if obj.AutomaticSize == Enum.AutomaticSize.None and obj.Size.X.Scale == 0 then
+			w = math.min(w, box) -- a fixed-width widget wraps or cuts its text at the box
+		end
+		icon.AnchorPoint = Vector2.new(0, 0.5)
+		icon.Position = UDim2.new(0.5, -(w // 2) - size - gap, 0.5, 0)
+	end
+	place()
+	for _, prop in { "Text", "TextSize", "FontFace", "Size" } do
+		obj:GetPropertyChangedSignal(prop):Connect(place)
+	end
+end
+
 -- Put an icon at the left of a text label or button, inside its left padding (the text moves right to make room).
 -- Returns the icon; Icons.set changes it later.
 function Widgets.leadIcon(obj: GuiObject, name: string, size: number?, gap: number?): GuiObject
@@ -868,8 +917,8 @@ function Widgets.button(parent: Instance, text: string, width: number, color: Co
 	return newButton(parent, text, width, color or Widgets.BUTTON, nil, onPress)
 end
 
--- A button with a pixel icon (16 px) before its text. `name` (optional) is the button's Name, e.g. its old emoji
--- caption, so the tutorial and the harness still find it.
+-- A button with a pixel icon (16 px, or `iconSize`) before its text. `name` (optional) is the button's Name, e.g.
+-- its old emoji caption, so the tutorial and the harness still find it.
 function Widgets.iconTextButton(
 	parent: Instance,
 	icon: string,
@@ -877,12 +926,13 @@ function Widgets.iconTextButton(
 	width: number,
 	color: Color3?,
 	onPress: () -> (),
-	name: string?
+	name: string?,
+	iconSize: number?
 ): TextButton
 	local b = Widgets.button(parent, text, width, color, onPress)
 	b.TextXAlignment = Enum.TextXAlignment.Left
 	Widgets.padding(b, Theme.space.m + 2, 0)
-	Widgets.leadIcon(b, icon, Theme.size.icon)
+	Widgets.leadIcon(b, icon, iconSize or Theme.size.icon)
 	if name then
 		b.Name = name
 	end
@@ -1319,6 +1369,49 @@ function Widgets.setProgress(track: Frame, fraction: number)
 	end
 end
 
+-- A reward cell (Results, docs/UI_DIRECTION.md 7.13): a raised plate `width` × 56 with a 48 px icon at its left,
+-- the amount in Fredoka One 22 gold, outlined, and under it the unit in Builder Sans Bold 14, dim. Returns the cell
+-- (a TextLabel: its Text is the amount, so a count-up just sets it); the unit is the child "Unit".
+Widgets.REWARD_CELL_HEIGHT = 56
+function Widgets.rewardCell(parent: Instance, icon: string, amount: string, unit: string, width: number): TextLabel
+	local iconSize = Theme.size.iconLarge
+	local c = Instance.new("TextLabel")
+	c.Name = "RewardCell"
+	c.Size = UDim2.fromOffset(width, Widgets.REWARD_CELL_HEIGHT)
+	c.BackgroundColor3 = Theme.color.slate700
+	c.BorderSizePixel = 0
+	c.FontFace = Theme.font.display
+	c.TextSize = 22
+	c.TextColor3 = Theme.color.gold
+	c.TextXAlignment = Enum.TextXAlignment.Left
+	c.TextYAlignment = Enum.TextYAlignment.Bottom
+	c.TextWrapped = false
+	c.Text = amount
+	c.Parent = parent
+	Widgets.corner(c, Theme.radius.s)
+	Widgets.stroke(c)
+	-- the amount over the middle line, the unit under it
+	local pad = Widgets.padding(c, 0, 0)
+	pad.PaddingLeft = UDim.new(0, Theme.space.s + iconSize + Theme.space.m)
+	pad.PaddingRight = UDim.new(0, Theme.space.s)
+	pad.PaddingTop = UDim.new(0, Theme.space.s)
+	pad.PaddingBottom = UDim.new(0, 26)
+	local mark = Icons.label(c, icon, iconSize)
+	mark.Position = UDim2.fromOffset(-(iconSize + Theme.space.m), (Widgets.REWARD_CELL_HEIGHT - iconSize) // 2 - 6)
+	mark.ZIndex = 2
+	local u = Widgets.label(c, unit, Theme.text.small, 18)
+	u.Name = "Unit"
+	u.TextColor3 = Theme.color.textDim
+	u.TextWrapped = false
+	u.Position = UDim2.new(0, 0, 1, 2)
+	u.Size = UDim2.new(1, 0, 0, 18)
+	u.ZIndex = 2
+	if not Widgets.skin(c, "plate", "plateRaised") then
+		Widgets.textStroke(c)
+	end
+	return c
+end
+
 -- A brass title plate (docs/UI_DIRECTION.md 7.1): 28 px tall, as wide as its title, an optional 16 px icon, white
 -- Fredoka One outlined in ink, a hard shadow. Widgets.header puts one on a window's top edge.
 function Widgets.titlePlate(parent: Instance, text: string, icon: string?): TextLabel
@@ -1395,14 +1488,46 @@ function Widgets.header(parent: Instance, text: string, icon: string?, onClose: 
 	return row, title
 end
 
--- A toast: a line (two at most) under the top bar on a slate plate with a hard shadow, an icon at its left.
--- Widgets.setToast shows a text (a leading emoji becomes the icon). Starts hidden.
-function Widgets.toast(parent: Instance, top: number, width: number): TextLabel
+-- Toasts (docs/UI_DIRECTION.md 7.7): a slate plate 44 px tall under the top bar, a 32 px medallion in the event's
+-- colour at its left with the event's icon, the line in Builder Sans Bold (two lines at most), as wide as its text
+-- up to `maxWidth`. Widgets.setToast shows a text: a leading emoji becomes the medallion's icon and picks its
+-- colour. Starts hidden.
+local TOAST_TEXT_X = 46 -- the line starts right of the medallion
+local TOAST_RIGHT = 18 -- and keeps this much plate after it
+local toastWidths = setmetatable({} :: { [Instance]: number }, { __mode = "k" })
+
+-- The medallion colour of a toast by its icon: war red; peace, alliances and provinces you took green; battles won
+-- gold; losses slate; offers azure; Primordial powers royal; anything else slate.
+local TOAST_STYLES: { [string]: string } = {
+	war = "war",
+	peace = "peace",
+	handshake = "peace",
+	flag = "peace",
+	trophy = "gold",
+	gold = "gold",
+	skull = "slate",
+	retreat = "slate",
+	scroll = "azure",
+	sparkles = "royal",
+	meteor = "royal",
+	plague = "royal",
+	rebels = "royal",
+	earthquake = "royal",
+	blessing = "royal",
+	powerShield = "royal",
+	charge = "royal",
+}
+
+function Widgets.toastStyle(icon: string): string
+	return TOAST_STYLES[icon] or "slate"
+end
+
+function Widgets.toast(parent: Instance, top: number, maxWidth: number): TextLabel
 	local t = Instance.new("TextLabel")
 	t.Name = "Toast"
 	t.AnchorPoint = Vector2.new(0.5, 0)
 	t.Position = UDim2.new(0.5, 0, 0, top)
-	t.Size = UDim2.fromOffset(width, Widgets.BUTTON_HEIGHT)
+	t.Size = UDim2.fromOffset(maxWidth, Widgets.BUTTON_HEIGHT)
 	t.BackgroundColor3 = Theme.color.slate800
 	t.BackgroundTransparency = 0
 	t.BorderSizePixel = 0
@@ -1413,17 +1538,181 @@ function Widgets.toast(parent: Instance, top: number, width: number): TextLabel
 	t.TextWrapped = true -- a long one takes two lines
 	t.Visible = false
 	t.Parent = parent
+	toastWidths[t] = maxWidth
 	Widgets.corner(t, Theme.radius.s)
 	Widgets.stroke(t)
-	Widgets.padding(t, Theme.space.l, 0)
-	Widgets.leadIcon(t, "sparkles", Theme.size.icon)
+	local pad = Widgets.padding(t, 0, 0)
+	pad.PaddingLeft = UDim.new(0, TOAST_TEXT_X)
+	pad.PaddingRight = UDim.new(0, TOAST_RIGHT - Theme.space.s)
+	local medallion = Widgets.medallion(t, "small", "royal", "sparkles")
+	medallion.Position = UDim2.fromOffset(Theme.space.s - TOAST_TEXT_X, Theme.space.s)
 	Widgets.skin(t, "plate", "plate")
 	Widgets.shadow(t, "plate")
 	return t
 end
 
 function Widgets.setToast(t: TextLabel, text: string)
-	Widgets.setIconText(t, text, "sparkles")
+	local icon, rest = Icons.split(text)
+	local name = icon or "sparkles"
+	local medallion = t:FindFirstChild("Medallion")
+	if medallion and medallion:IsA("ImageLabel") then
+		Widgets.setMedallion(medallion, Widgets.toastStyle(name))
+		local mark = medallion:FindFirstChild("Icon")
+		if mark and mark:IsA("GuiObject") then
+			Icons.set(mark, name)
+		end
+	end
+	t.Text = rest
+	-- as wide as its line (min(max, text + 64)); a longer one wraps onto a second line at the widest
+	local maxWidth = toastWidths[t] or t.Size.X.Offset
+	local w = math.min(maxWidth, Widgets.textWidth(t) + TOAST_TEXT_X + TOAST_RIGHT)
+	Widgets.fit(t, UDim2.fromOffset(w - w % 2, Widgets.BUTTON_HEIGHT)) -- kept when its screen re-places it
+end
+
+-- Ribbons (docs/UI_DIRECTION.md 7.8): the War and Cataclysm banners and the Results headline. The ribbon frame in a
+-- colour, exactly 60 px tall (its art is 30, so the tails never stretch), its body padded 34 px each side (the tails
+-- are 26): as wide as its 32 px icon and hero text plus 108 px, at least `minWidth`, icon and text centred
+-- together. Hero text is Fredoka One 30 with a 3 px ink outline and, behind it, a 3 px ink drop (a second label).
+-- A "Shine" band sweeps across it with Widgets.shine. Returns the ribbon (set its Text); its icon is "Icon".
+Widgets.RIBBON_HEIGHT = 60
+local RIBBON_SIDE = 34
+local RIBBON_GAP = Theme.space.m
+local HERO_STROKE = 3
+
+local function mirrorText(from: TextLabel, to: TextLabel)
+	for _, prop in { "Text", "TextSize", "FontFace", "TextXAlignment", "TextTruncate" } do
+		(to :: any)[prop] = (from :: any)[prop]
+		from:GetPropertyChangedSignal(prop):Connect(function()
+			(to :: any)[prop] = (from :: any)[prop]
+		end)
+	end
+end
+
+function Widgets.ribbon(parent: Instance, text: string, icon: string, color: Color3, minWidth: number?): TextLabel
+	local r = Instance.new("TextLabel")
+	r.Name = "Ribbon"
+	r.Size = UDim2.fromOffset(minWidth or 0, Widgets.RIBBON_HEIGHT)
+	r.AutomaticSize = Enum.AutomaticSize.X
+	r.BackgroundColor3 = color
+	r.BorderSizePixel = 0
+	r.FontFace = Theme.font.display
+	r.TextSize = Theme.text.ribbon
+	r.TextColor3 = Theme.color.text
+	r.TextWrapped = false
+	r.Text = text
+	r.Parent = parent
+	Widgets.corner(r, Theme.radius.s)
+	Widgets.stroke(r)
+	local pad = Widgets.padding(r, RIBBON_SIDE, 0)
+	pad.PaddingLeft = UDim.new(0, RIBBON_SIDE + Theme.size.iconButton + RIBBON_GAP)
+	local mark = Icons.label(r, icon, Theme.size.iconButton)
+	mark.ZIndex = 3
+	local face = Widgets.skin(r, "ribbon", Widgets.styleOf(color))
+	if face then
+		-- the words centre on the body's face (art rows 2..20), above its shaded rows and the tails
+		pad.PaddingTop = UDim.new(0, 2)
+		pad.PaddingBottom = UDim.new(0, 16)
+		local caption = (skins[r] :: Skin).caption :: TextLabel
+		caption:SetAttribute("InkThickness", HERO_STROKE)
+		local ink = caption:FindFirstChild("Ink")
+		if ink and ink:IsA("UIStroke") then
+			ink.Thickness = HERO_STROKE
+		end
+		local drop = Instance.new("TextLabel")
+		drop.Name = "Drop"
+		drop.BackgroundTransparency = 1
+		drop.Position = UDim2.fromOffset(0, HERO_STROKE)
+		drop.Size = UDim2.fromScale(1, 1)
+		drop.TextColor3 = Theme.color.ink
+		drop.ZIndex = 1
+		mirrorText(r, drop)
+		Widgets.textStroke(drop, HERO_STROKE)
+		drop.Parent = r
+		-- the shine: a white band over the body's face, invisible until it sweeps
+		local shine = Instance.new("Frame")
+		shine.Name = "Shine"
+		shine.BackgroundColor3 = WHITE
+		shine.BorderSizePixel = 0
+		shine.Position = UDim2.fromOffset(20, 4)
+		shine.Size = UDim2.new(1, -40, 0, 38)
+		shine.ZIndex = 1
+		shine.Visible = false
+		local band = Instance.new("UIGradient")
+		band.Rotation = 20
+		band.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.4, 1),
+			NumberSequenceKeypoint.new(0.5, 0.55),
+			NumberSequenceKeypoint.new(0.6, 1),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		band.Offset = Vector2.new(-1, 0)
+		band.Parent = shine
+		shine.Parent = face
+	else
+		-- the flat look: a plate in the colour with a darker base, the words outlined
+		Widgets.bevel(r)
+		pad.PaddingBottom = UDim.new(0, math.floor(Widgets.RIBBON_HEIGHT * Theme.bevel))
+		Widgets.textStroke(r, HERO_STROKE)
+	end
+	centreLead(r, mark, Theme.size.iconButton, RIBBON_GAP)
+	return r
+end
+
+-- Sweep a ribbon's shine across it once (0.5 s), after `delay` seconds. Nothing under reduced motion or in the
+-- flat look.
+function Widgets.shine(obj: GuiObject, delay: number?)
+	local skin = skins[obj]
+	local shine = if skin then skin.face:FindFirstChild("Shine") else nil
+	local band = if shine then shine:FindFirstChildOfClass("UIGradient") else nil
+	if shine == nil or band == nil or Widgets.reducedMotion() then
+		return
+	end
+	local frame = shine :: Frame
+	band.Offset = Vector2.new(-1, 0)
+	frame.Visible = true
+	local sweep = TweenService:Create(
+		band,
+		TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, 0, false, delay or 0),
+		{ Offset = Vector2.new(1, 0) }
+	)
+	sweep.Completed:Connect(function()
+		frame.Visible = false
+	end)
+	sweep:Play()
+end
+
+-- Fade a widget and everything drawn in it (its frame, texts, outlines, icons) to `transparency` over `seconds`
+-- (0 = at once), e.g. a banner leaving. A flat widget's own fill fades too.
+function Widgets.fade(obj: GuiObject, transparency: number, seconds: number)
+	local info = TweenInfo.new(seconds, Enum.EasingStyle.Quad)
+	local function set(target: Instance, goals: { [string]: number })
+		if seconds <= 0 then
+			for prop, value in goals do
+				(target :: any)[prop] = value
+			end
+		else
+			TweenService:Create(target, info, goals):Play()
+		end
+	end
+	if not skins[obj] then
+		set(obj, { BackgroundTransparency = transparency })
+	end
+	for _, d in { obj :: Instance, table.unpack(obj:GetDescendants()) } do
+		if d.Name == "Shine" then
+			continue
+		elseif d:IsA("TextLabel") or d:IsA("TextButton") then
+			if not (d == obj and skins[obj]) then -- a skinned root's own text stays hidden
+				set(d, { TextTransparency = transparency })
+			end
+		elseif d:IsA("ImageLabel") then
+			set(d, { ImageTransparency = transparency })
+		elseif d:IsA("UIStroke") and d.Parent and d.Parent.Name ~= "Shine" then
+			if d.Enabled then
+				set(d, { Transparency = transparency })
+			end
+		end
+	end
 end
 
 -- Set the text of a label that has a lead icon (Widgets.leadIcon): a leading emoji in `text` becomes the icon
