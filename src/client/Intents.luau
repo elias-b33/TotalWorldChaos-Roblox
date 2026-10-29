@@ -95,6 +95,11 @@ local REASONS: { [string]: string } = {
 	UnknownZone = "🚫 Unknown sea",
 	NoTroops = "⛵ No troops aboard",
 	FleetFull = "⛵ The fleet is full",
+	-- map pings (Sim.Pings)
+	NoAllies = "🤝 Pings go to allies: make an ally first",
+	TooSoon = "⏱ Wait a moment to ping again",
+	TooMany = "⏱ Too many pings: wait a little",
+	Phase = "⏳ Not now",
 }
 
 local Intents = {}
@@ -164,6 +169,11 @@ end
 -- power: Meteor | Plague | Rebels | Earthquake | Blessing | Shield; target: army, nation or province id
 function Intents.power(power: string, target: number)
 	send("RequestPower", power, target)
+end
+
+-- A map ping for your alliance: kind is Attack | Defend | Help | Look (Config.Pings.Kinds).
+function Intents.ping(kind: string, provinceId: number)
+	send("RequestPing", kind, provinceId)
 end
 
 -- Lobby: vote for a map, pick a start nation in the draft.

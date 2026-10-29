@@ -523,6 +523,8 @@ function TelemetryService.init()
 		lastCommand[player.UserId] = state.tick
 		if ok and command.kind == "Power" then
 			TelemetryService.send(Telemetry.powerUsed(state, player.UserId, command.power), player)
+		elseif ok and command.kind == "Ping" then
+			TelemetryService.send(Telemetry.pingSent(state, player.UserId, command.ping, command.province), player)
 		end
 	end)
 	PlayerDataService.onLoaded(function(player: Player, data: Types.PlayerProfile)

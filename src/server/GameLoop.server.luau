@@ -30,6 +30,7 @@ local DevService = require(Server.Services.DevService)
 local LobbyService = require(Server.Services.LobbyService)
 local MatchService = require(Server.Services.MatchService)
 local MenuService = require(Server.Services.MenuService)
+local PingService = require(Server.Services.PingService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
@@ -195,6 +196,7 @@ local function sandboxTick(state: Types.MatchState)
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end
+	PingService.afterTick(state) -- new map pings to the sender's alliance only
 	Replicator.broadcast(state) -- 9. one delta to every client
 end
 
@@ -282,6 +284,7 @@ local function arriveAtMenu(player: Player)
 end
 
 Replicator.init()
+PingService.init()
 CommandRouter.init(MatchService.nationOf)
 PlayerDataService.init()
 ProgressionService.init(MatchService.current)
@@ -349,6 +352,7 @@ local function tick()
 	if newPhase then
 		ShopService.onPhase(newPhase) -- after the rewards: the starter-pack offer counts finished matches
 	end
+	PingService.afterTick(state) -- new map pings to the sender's alliance only (never in the delta)
 	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
 end
 

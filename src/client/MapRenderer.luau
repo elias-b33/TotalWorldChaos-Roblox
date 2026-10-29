@@ -706,7 +706,7 @@ local function renderStatus(provinceId: number)
 		return
 	end
 	if status == nil then
-		local parent = layers.Markers
+		local parent = layers.Status
 		if parent == nil then
 			return
 		end
@@ -1276,9 +1276,10 @@ local function build(map: Types.MapDef)
 	layer("Flags", canvas)
 	layer("Tokens", canvas)
 	layer("Fleets", canvas)
-	layer("Markers", canvas)
+	layer("Status", canvas)
 	layer("Crowns", canvas)
 	layer("Emotes", canvas)
+	layer("Markers", canvas) -- MapMarkers' pooled overlays (pings), over every badge and crown
 	layer("Effects", canvas).ZIndex = 2 -- Effects' particles, over everything else
 	onZoom(MapView.zoom())
 end

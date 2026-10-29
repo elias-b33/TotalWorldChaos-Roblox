@@ -1,17 +1,24 @@
 --!strict
 -- The 2D map on screen (docs/DESIGN.md "UI and controls"): a full-screen GUI with the pixel-art map on a canvas
 -- that pans and zooms. One finger or mouse drag pans, pinch zooms around the fingers, the wheel zooms around the
--- pointer, a tap (or click) is handed to the tap handler. Map positions are in map-art pixels (1 pixel = 1 stud);
--- things drawn on the map are children of the canvas, placed by scale so they follow every pan and zoom.
+-- pointer, a tap (or click) is handed to the tap handler. A press held still for Config.Pings.LongPressSeconds (or a
+-- right-click) is handed to the long-press handler instead (the ping wheel), and the tap its release would make is
+-- swallowed. Map positions are in map-art pixels (1 pixel = 1 stud); things drawn on the map are children of the
+-- canvas, placed by scale so they follow every pan and zoom.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+
+ReplicatedStorage:WaitForChild("Shared")
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local TAP_SLOP = 8 -- pixels a press may move and still count as a tap
 local MAX_ZOOM = 10 -- screen pixels per map pixel at the closest zoom
 local ZOOM_LEVELS = 3 -- whole map, region, close-up (mouse wheel steps between them)
 local SMOOTHING = 12 -- higher = snappier
+local SWALLOW_SECONDS = 0.3 -- after a long press ends, a tap event arriving this soon belongs to it
 
 local HudLayout = require(script.Parent.UI.HudLayout)
 
@@ -37,6 +44,11 @@ local shakeStrength = 0 -- screen pixels at the start of the current shake
 local shakeSeconds = 0
 local shakeLeft = 0
 local shakeOffset = Vector2.zero
+-- A finger or the left mouse button held down on the map: a long press if it stays within TAP_SLOP long enough.
+type Press = { input: InputObject, start: Vector2, at: number, fired: boolean }
+local press: Press? = nil
+local swallowUntil = 0 -- taps before this clock time are a long press's release
+local longPressHandler: TapHandler? = nil
 
 -- The whole screen the map GUI covers (ScreenInsets None), in its own coordinates. Camera.ViewportSize leaves out
 -- notches, so it is only the fallback until the GUI has been laid out.
@@ -251,6 +263,11 @@ local function stepShake(dt: number)
 	shakeOffset = Vector2.new(math.floor(amount * math.sin(t * 61) + 0.5), math.floor(amount * math.cos(t * 47) + 0.5))
 end
 
+-- Called with the map-screen position of every long press (a press held still, or a right-click).
+function MapView.onLongPress(fn: TapHandler)
+	longPressHandler = fn
+end
+
 -- Zoom to z keeping the map point under screenPos where it is (pinch midpoint, mouse pointer).
 local function zoomAround(screenPos: Vector2, z: number, immediate: boolean)
 	anchor = { screen = screenPos, map = MapView.toMap(screenPos) }
@@ -262,8 +279,79 @@ end
 
 function MapView.init(onTap: TapHandler)
 	local function tap(inputPos: Vector2)
+		if os.clock() < swallowUntil or (press and press.fired) then
+			return -- the release of a long press
+		end
 		onTap(fromInput(inputPos))
 	end
+	local function longPress(inputPos: Vector2)
+		local handler = longPressHandler
+		if handler then
+			handler(fromInput(inputPos))
+		end
+	end
+	local function positionOf(input: InputObject): Vector2
+		return Vector2.new(input.Position.X, input.Position.Y)
+	end
+
+	-- Long presses: one finger (or the left button) held still. A second finger (a pinch) or moving past TAP_SLOP
+	-- (a pan) cancels it; right-click is a long press at once.
+	local rightDown: Vector2? = nil
+	UserInputService.InputBegan:Connect(function(input, processed)
+		local kind = input.UserInputType
+		if kind == Enum.UserInputType.Touch then
+			local held = press
+			if processed or (held and held.input.UserInputState ~= Enum.UserInputState.End) then
+				press = nil -- a second finger: a pinch, not a press
+				return
+			end
+			press = { input = input, start = positionOf(input), at = os.clock(), fired = false }
+		elseif kind == Enum.UserInputType.MouseButton1 and not processed then
+			press = { input = input, start = positionOf(input), at = os.clock(), fired = false }
+		elseif kind == Enum.UserInputType.MouseButton2 and not processed then
+			rightDown = positionOf(input)
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		local held = press
+		if held == nil or held.fired then
+			return
+		end
+		local kind = input.UserInputType
+		local moved = (kind == Enum.UserInputType.Touch and input == held.input)
+			or (
+				kind == Enum.UserInputType.MouseMovement
+				and held.input.UserInputType == Enum.UserInputType.MouseButton1
+			)
+		if moved and (positionOf(input) - held.start).Magnitude > TAP_SLOP then
+			press = nil
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		local held = press
+		-- a touch keeps its InputObject from start to end; a mouse button's release is the same input type
+		local same = held ~= nil
+			and (
+				input == held.input
+				or (input.UserInputType == held.input.UserInputType and input.UserInputType ~= Enum.UserInputType.Touch)
+			)
+		if held and same then
+			if held.fired then
+				swallowUntil = os.clock() + SWALLOW_SECONDS
+			end
+			task.defer(function()
+				if press == held then
+					press = nil -- after the mouse's own release handler below has seen it
+				end
+			end)
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 and rightDown then
+			local from = rightDown :: Vector2
+			rightDown = nil
+			if (positionOf(input) - from).Magnitude <= TAP_SLOP then
+				longPress(from)
+			end
+		end
+	end)
 
 	-- Mouse: drag to pan, click to select, wheel to step zoom levels around the pointer.
 	local mouseDown: Vector2? = nil
@@ -360,6 +448,11 @@ function MapView.init(onTap: TapHandler)
 		end
 		stepShake(dt)
 		apply()
+		local held = press
+		if held and not held.fired and os.clock() - held.at >= Config.Pings.LongPressSeconds then
+			held.fired = true
+			longPress(held.start)
+		end
 	end)
 end
 
