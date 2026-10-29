@@ -746,12 +746,33 @@ Config.Casts = {
 }
 
 Config.Battle = {
-	Rounds = 3,
+	Rounds = 3, -- at most: a side whose morale breaks retreats sooner
 	KillRatePerRound = 0.15, -- each side kills this × its own strength × modifiers
 	TerrainDefenceBonus = 0.25, -- defender in forest or hills
 	UnderdogBonus = 0.5, -- a defending underdog holds like a fort (docs/BALANCE.md 5)
 	CoalitionBonus = 0.3,
 	RandomSpread = 0.1, -- ± per battle
+	-- Troop counters (docs/DESIGN.md "Troops"): each role beats the one it names. Each round a troop type's damage is
+	-- × (1 + CounterBonus × the share of enemy men it beats − CounterPenalty × the share of enemy men that beats it).
+	-- Elite and special troops are neutral.
+	Counters = { ranged = "line", line = "fast", fast = "ranged" },
+	CounterBonus = 0.25,
+	CounterPenalty = 0.25,
+	-- Morale (docs/DESIGN.md "Armies and combat"): whole points from 0 to MoraleMax. A round costs a side MoraleShock ×
+	-- the share of its men it lost that round + MoraleDrain; a side at MoraleBreak or under breaks and retreats at once.
+	-- Out of battle, every MoraleRecoverTicks ticks an army gets MoraleRecoverHome on its own land (garrisons and
+	-- Rebels: neutral land) and MoraleRecoverAbroad elsewhere.
+	MoraleMax = 100,
+	MoraleShock = 100,
+	MoraleDrain = 5,
+	MoraleBreak = 0,
+	MoraleRecoverTicks = 5,
+	MoraleRecoverHome = 10,
+	MoraleRecoverAbroad = 5,
+	-- Flanking: a side whose armies came into the battle from 2+ directions gets FlankBonus per extra direction, for at
+	-- most FlankMaxExtra extra directions
+	FlankBonus = 0.25,
+	FlankMaxExtra = 2,
 }
 
 Config.Siege = {
@@ -1347,6 +1368,15 @@ Config.Bots = {
 	SpecialShare = 0.1,
 	EliteShare = 0.2,
 	FastShare = 0.1,
+	-- tactics (docs/DESIGN.md "Bot AI"): the troop that beats the enemy armies near my land (Troops.bestCounter of
+	-- their role shares, scoring at least CounterMinScore) while it is under CounterShare of my men; attack into a counter
+	-- (their troops' counter edge over mine above CounterEdge) only with CounteredExtraRatio more on the attack ratio;
+	-- armies under MinAttackMorale rest instead of expanding, attacking or marching to help
+	CounterShare = 0.35,
+	CounterMinScore = 0.15,
+	CounterEdge = 0.05,
+	CounteredExtraRatio = 0.3,
+	MinAttackMorale = 70,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
 	-- insults (docs/DESIGN.md "Bot AI"): now and then a bot insults a rival, and an insulted bot answers back and leans

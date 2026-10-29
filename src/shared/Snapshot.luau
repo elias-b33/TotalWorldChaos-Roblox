@@ -51,6 +51,7 @@ export type ArmyRecord = {
 	next: number, -- next province on its route, 0 = standing still
 	dest: number, -- end of its route, 0 = standing still
 	inBattle: boolean,
+	morale: number, -- 0..Config.Battle.MoraleMax, whole points; it changes on battle rounds and every few ticks of rest
 	rebel: boolean, -- an owner-0 army raised by the Rebels power (else owner 0 is a neutral garrison)
 	retreating: boolean, -- beaten and walking home: takes no orders
 }
@@ -224,6 +225,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?,
 			next = a.path[1] or 0,
 			dest = a.path[#a.path] or 0,
 			inBattle = a.inBattle,
+			morale = a.morale,
 			rebel = a.rebel == true,
 			retreating = a.retreating == true,
 		})

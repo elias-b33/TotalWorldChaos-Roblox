@@ -64,6 +64,11 @@ export type Army = {
 	path: { ProvinceId }, -- remaining route
 	moveProgress: number, -- ticks spent toward next province
 	inBattle: boolean,
+	-- 0..Config.Battle.MoraleMax, whole points: a battle round costs some, a side at 0 breaks; it recovers out of battle
+	morale: number,
+	-- the province it stepped in from, while it marches or fights there (its direction for flanking, Battle.directions);
+	-- nil once it settles (stands still out of battle): it then counts the province it stands in
+	from: ProvinceId?,
 	rebel: boolean?, -- true for the neutral army a Rebels power raised (clients draw it apart from garrisons)
 	retreating: boolean?, -- beaten: walking home on its path; takes no orders, doesn't fight, block or besiege
 	boardFleet: FleetId?, -- walking to the coast to board this fleet (Sim.Navy: the Embark order)
@@ -104,12 +109,19 @@ export type Truce = { a: NationId, b: NationId, untilTick: number }
 -- chargeTicks: progress towards the next charge (its own clock, started when the Primordial rose)
 export type Primordial = { userId: number, charges: number, chargeTicks: number }
 
--- A fight in one province. It lasts Config.Battle.Rounds rounds, one per tick.
+-- What a side's flank bonus and its troop counters did to the other side so far in a battle: the enemy men they killed
+-- and the enemy morale those losses cost (Battle.step keeps it, to tell what decided the battle).
+export type BattleEdge = { flankMen: number, flankMorale: number, counterMen: number, counterMorale: number }
+
+-- A fight in one province. It lasts up to Config.Battle.Rounds rounds, one per tick (a side whose morale breaks
+-- retreats sooner).
 export type Battle = {
 	province: ProvinceId,
 	round: number, -- rounds fought so far
 	attackerRoll: number, -- the random ± modifier each side gets for this battle
 	defenderRoll: number,
+	attackerEdge: BattleEdge,
+	defenderEdge: BattleEdge,
 }
 
 -- An alliance, peace or military access proposal waiting for the other nation to accept.
@@ -124,7 +136,8 @@ export type Offer = {
 
 -- Something worth telling players about (a toast). Cleared after every tick's delta.
 -- kinds: WarDeclared(a attacks b), PeaceMade(a, b), AllianceFormed(a, b), Offer(a -> b, province = offer id),
--- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province), Victory(a),
+-- ProvinceTaken(a takes province from b), BattleEnded(a won against b at province; broke: b's morale broke, flank /
+-- counter: a flank / the troop counters decided it, outnumbered: a won with fewer men; Sim.Battle), Victory(a),
 -- Power(a = power index in Sim.Primordial.POWERS, b = nation hit or 0, at province, by = the caster's nation, for a
 -- Primordial the nation it last held, so clients show the caster's power-effect cosmetic; men = the men a Meteor
 -- killed, for achievements), Disaster (same fields, no caster), Eliminated(a). Navies (zone = the sea zone):
@@ -141,6 +154,10 @@ export type MatchEvent = {
 	by: number?,
 	men: number?,
 	zone: number?,
+	broke: boolean?,
+	flank: boolean?,
+	counter: boolean?,
+	outnumbered: boolean?,
 }
 
 -- A map ping (Sim.Pings, docs/NEXT_FEATURES.md 4): an icon a nation put on a province for its alliance, live while

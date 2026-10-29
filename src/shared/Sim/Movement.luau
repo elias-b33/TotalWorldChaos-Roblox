@@ -4,7 +4,9 @@
 -- crosses forest at plains speed and a Swift race marches faster (Sim.Troops, Sim.Races). After moving, a nation's armies that stand still in the same
 -- province merge into one (the lowest id stays, the compositions add up): an army is a stack of regiments shown as
 -- one token. Retreating armies walk on and take no orders, even through land that closed to them on the way (a peace,
--- or military access that ended: Movement.endAccess sends the guests home under the white flag).
+-- or military access that ended: Movement.endAccess sends the guests home under the white flag). An army remembers
+-- the province it stepped in from (Army.from, its direction for flanking) until it settles: stands still out of
+-- battle.
 
 local Army = require("./Army")
 local Diplomacy = require("./Diplomacy")
@@ -75,8 +77,8 @@ function Movement.ticksToNext(state: MatchState, army: Types.Army): number
 	return Movement.moveTicks(state, army, nextId) - army.moveProgress
 end
 
--- A nation's armies standing still together (no route, not fighting, not retreating, not about to board a fleet)
--- become one army: the lowest id keeps the men of the others (their compositions add up), which are removed. Each
+-- A nation's armies standing still together (no route, not fighting, not retreating, not about to board a fleet,
+-- settled: not on the tick they arrive, so two stacks arriving from two sides fight as two and flank) become one army: the lowest id keeps the men of the others (their compositions add up), which are removed. Each
 -- merge is remembered (state.mergedInto, so orders for the removed id reach the stack) and sent as a "Merged" event
 -- (a = the army that stays, b = the one removed), so clients don't take the removed token for an army destroyed.
 function Movement.mergeStacks(state: MatchState)
@@ -89,13 +91,14 @@ function Movement.mergeStacks(state: MatchState)
 			and not army.inBattle
 			and not army.retreating
 			and not army.boardFleet
+			and army.from == nil -- settled: stacks that just arrived from two sides fight as two (flanking)
 		then
 			local key = army.owner .. ":" .. army.location
 			local first = keeper[key]
 			if first == nil then
 				keeper[key] = army
 			else
-				Army.add(first, army.troops)
+				Army.add(first, army.troops, army.morale) -- the morale: the average by men
 				state.armies[id] = nil
 				state.mergedInto[id] = first.id
 				Events.push(state, "Merged", first.id, id, army.location)
@@ -134,6 +137,9 @@ function Movement.step(state: MatchState)
 	for _, id in sortedIds(state.armies) do
 		local army = state.armies[id]
 		local nextId = army.path[1]
+		if nextId == nil and not army.inBattle then
+			army.from = nil -- settled: in its next battle it counts the province it stands in (Battle.directions)
+		end
 		if nextId and not army.inBattle and army.owner ~= 0 then
 			local zones = blocked[army.owner]
 			if zones == nil then
@@ -152,6 +158,7 @@ function Movement.step(state: MatchState)
 			else
 				army.moveProgress += 1
 				if army.moveProgress >= Movement.moveTicks(state, army, nextId) then
+					army.from = army.location -- the direction it comes into a battle there from (flanking)
 					army.location = nextId
 					table.remove(army.path, 1)
 					army.moveProgress = 0

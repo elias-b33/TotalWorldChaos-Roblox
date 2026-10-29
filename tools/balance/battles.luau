@@ -159,6 +159,7 @@ local function arena(case: Case, attackerMen: number, defenderMen: number): Type
 				path = {},
 				moveProgress = 0,
 				inBattle = false,
+				morale = Config.Battle.MoraleMax,
 			},
 			[2] = {
 				id = 2,
@@ -169,6 +170,7 @@ local function arena(case: Case, attackerMen: number, defenderMen: number): Type
 				path = {},
 				moveProgress = 0,
 				inBattle = false,
+				morale = Config.Battle.MoraleMax,
 			},
 		},
 		wars = { [1] = { id = 1, attackers = { 1 }, defenders = { 2 }, startedAt = 0 } },

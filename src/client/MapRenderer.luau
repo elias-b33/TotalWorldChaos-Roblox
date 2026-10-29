@@ -59,6 +59,9 @@ local TOKEN_PICK = 20 -- a tap this close to a token's centre (screen pixels) pi
 local TOKEN_LIFT = 4 -- map pixels: armies resting in a province stand this far above its centre (its name is below)
 local TOKEN_SLOT = 18 -- screen pixels between armies resting side by side in one province
 local TOKEN_SMOOTHING = 6 -- higher = tokens catch up with their target faster
+local MORALE_BAR_HEIGHT = 4 -- the morale bar under a token (an ink track with the fill inside), screen pixels
+local MORALE_COLORS: { [string]: Color3 } =
+	{ good = Theme.color.emerald, low = Theme.color.gold, broken = Theme.color.crimson }
 local BADGE_HEIGHT = 20 -- strength badges and status pills, screen pixels
 local BADGE_GAP = 2 -- between a token and its badge, and between stacked badges
 local BADGE_ICON = 16 -- the pixel icon in a badge or pill
@@ -120,6 +123,8 @@ type Token = {
 	icon: string,
 	troops: string, -- its composition as last seen (ArmyRecord.troops), and the troop type it is mostly made of
 	troop: string?,
+	morale: number, -- the morale its bar shows (-1: no bar), and the bar once it has one
+	moraleBar: Frame?,
 }
 
 -- A province's status row: battle or siege, a blockade, and Primordial-power effects (MapBadges.status).
@@ -1541,6 +1546,8 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		icon = "",
 		troops = "",
 		troop = nil,
+		morale = -1,
+		moraleBar = nil,
 	}
 	token.badge.stroke.Color = edgeOf(token)
 	token.badge.label.AnchorPoint = Vector2.new(0.5, 1)
@@ -1548,6 +1555,43 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	frame.Visible = not neutral or detailShown
 	frame.Parent = layers.Tokens
 	return token
+end
+
+-- An army's morale bar under its token (docs/DESIGN.md "Armies and combat"): while it fights, and while it is below
+-- full (MapBadges.showMorale); its fill in the tone's colour. `morale` -1 hides it. Two objects, made on first use.
+local function setMorale(token: Token, morale: number)
+	local bar = token.moraleBar
+	if morale < 0 then
+		if bar then
+			bar.Visible = false
+		end
+		return
+	end
+	if bar == nil then
+		local track = Instance.new("Frame")
+		track.Name = "Morale"
+		track.AnchorPoint = Vector2.new(0.5, 0)
+		track.Position = UDim2.new(0.5, 0, 1, 2)
+		track.Size = UDim2.fromOffset(TOKEN_SKIN_SIZE, MORALE_BAR_HEIGHT)
+		track.BackgroundColor3 = Theme.color.ink
+		track.BorderSizePixel = 0
+		local fill = Instance.new("Frame")
+		fill.Name = "Fill"
+		fill.Position = UDim2.fromOffset(1, 1)
+		fill.BorderSizePixel = 0
+		fill.Parent = track
+		track.Parent = token.frame
+		token.moraleBar = track
+		bar = track
+	end
+	local track = bar :: Frame
+	local fraction, tone = MapBadges.morale(morale, Config.Battle.MoraleMax)
+	local fill = track:FindFirstChild("Fill") :: Frame
+	fill.Size = UDim2.new(fraction, -2 * fraction, 1, -2)
+	fill.BackgroundColor3 = MORALE_COLORS[tone]
+	fill.Visible = fraction > 0
+	track:SetAttribute("Morale", morale)
+	track.Visible = true
 end
 
 -- Beside the other armies resting in its province, or fleets in its zone (screen pixels from the anchor).
@@ -1600,6 +1644,13 @@ local function refreshArmies()
 		if t.icon ~= icon or t.text ~= text then
 			t.icon, t.text = icon, text
 			setPill(t.badge, icon, text)
+		end
+		local morale = if MapBadges.showMorale(army.morale, Config.Battle.MoraleMax, army.inBattle)
+			then army.morale
+			else -1
+		if t.morale ~= morale then
+			t.morale = morale
+			setMorale(t, morale)
 		end
 	end
 	for id, token in tokens do

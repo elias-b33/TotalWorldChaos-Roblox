@@ -313,9 +313,10 @@ T.test("a defender stops a siege; once it is beaten, the siege resumes where it 
 	local siege = assert(state.provinces[rock].siege)
 	local before = siege.progress
 	local relief = Army.spawn(state, ZEPHYR, rock, 1000)
-	run(state, rng, Config.Battle.Rounds - 1)
+	run(state, rng, 1)
 	T.equal(siege.progress, before, "no progress during the battle")
-	run(state, rng, 1) -- the battle ends this tick and the relief army walks away
+	-- the relief, a third of the besiegers' size, breaks in round 2 (morale) and walks away
+	run(state, rng, 1)
 	local r = state.armies[relief.id]
 	T.expect(r == nil or r.retreating == true, "relief beaten")
 	T.equal(state.provinces[rock].siege, siege, "progress kept through the battle")

@@ -2472,6 +2472,7 @@ IconArt.VARIANTS = {
 	powerShield = { "shield", { Y = "W", B = "c", b = "B", c = "W" } },
 	fireBlue = { "fire", { R = "b", F = "B", Y = "c", y = "W" } },
 	teams = { "manpower", { B = "G", b = "n" } },
+	morale = { "flag", { R = "Y", r = "O" } }, -- a gold banner: an army's morale (docs/DESIGN.md "Armies and combat")
 } :: { [string]: { any } }
 
 -- What a device without EditableImage shows instead (a plain emoji or symbol).
@@ -2530,6 +2531,7 @@ IconArt.FALLBACK = {
 	powerShield = "🛡",
 	fireBlue = "💙",
 	teams = "👥",
+	morale = "💪",
 	-- the meta screens
 	ticket = "🎟",
 	gift = "🎁",
@@ -2700,6 +2702,8 @@ IconArt.EMOJI = {
 	["🚶"] = "access",
 	-- blockades and the EU4 pack's event cards ("⚓ Zephyr blockades Aurora Landing!", "⚓ A ship joins your fleet")
 	["⚓"] = "anchor",
+	-- battles: a side's morale
+	["💪"] = "morale",
 } :: { [string]: string }
 
 local function rgba(c: number): number

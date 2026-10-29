@@ -23,6 +23,7 @@ local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
 local LobbyState = require(Client.LobbyState)
+local MapBadges = require(Client.MapBadges)
 local ProfileState = require(Client.ProfileState)
 local Relations = require(Client.Relations)
 local Sounds = require(Client.Sounds)
@@ -345,10 +346,9 @@ local function eventText(e: Types.MatchEvent): string?
 			return "🏳 " .. nationName(e.a) .. " took " .. provinceName(e.province) .. "!"
 		end
 	elseif e.kind == "BattleEnded" then
-		if e.a == me then
-			return "🎉 Battle won at " .. provinceName(e.province)
-		elseif e.b == me then
-			return "💀 Battle lost at " .. provinceName(e.province)
+		-- what decided it, when it was a flank or a side breaking (docs/DESIGN.md "Armies and combat")
+		if e.a == me or e.b == me then
+			return MapBadges.battleText(e.a == me, provinceName(e.province), e.flank == true, e.broke == true)
 		end
 	elseif e.kind == "Offer" and e.b == me then
 		return "📜 " .. nationName(e.a) .. " sent you an offer"

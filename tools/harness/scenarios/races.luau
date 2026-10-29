@@ -3,7 +3,8 @@
 -- bonus, and picking Ironholds makes Alice the Dwarves; the nations drawer shows the races; the province sheet
 -- recruits each of the Dwarves' five troops into one army whose sheet shows the composition and the Sappers' trick;
 -- the server refuses another race's troop; Sappers besiege faster than Axemen; and the Dwarves' ranged troop, the
--- Firelocks, wins a battle defending that it loses attacking.
+-- Firelocks, holds against line troops (strong defence, and ranged beats line) but loses attacking fast troops (weak
+-- attack, and fast beats ranged: docs/DESIGN.md "Troops", counters).
 
 local Config = require("../../../src/shared/Config")
 local Emulator = require("../Emulator")
@@ -195,8 +196,8 @@ local function run()
 	H.expect(state.provinces[slowId].owner == me, "the Axemen's province falls later")
 
 	-- a battle where troop types matter: 3,000 Firelocks (the Dwarves' ranged troop) holding Alice's plains province
-	-- beat 3,000 attacking Footmen; the same Firelocks attacking the enemy's plains province lose to 3,000 defending
-	-- Footmen
+	-- beat 3,000 attacking Footmen (strong defence, and ranged beats line); the same Firelocks attacking the enemy's
+	-- plains province lose to 3,000 defending Lancers (weak attack, and fast beats ranged)
 	state.tick = 179
 	Emulator.run(2)
 	local enemy, home, away
@@ -233,17 +234,17 @@ local function run()
 		end
 	end
 	H.expect(enemy ~= nil, "a plains province of Alice's next to a neighbour's plains")
-	state.nations[enemy].race = "Humans" -- its line troop, Footmen (no forest or hills bonus could decide it, on plains)
+	state.nations[enemy].race = "Humans" -- Footmen and Lancers (no forest or hills bonus could decide it, on plains)
 	state.wars[999] = { id = 999, attackers = { me }, defenders = { enemy }, startedAt = state.tick }
 	H.expect(Diplomacy.atWar(state, me, enemy), "Alice is at war with " .. state.nations[enemy].name)
-	local function fight(where: number, archerSide: number, infantrySide: number)
+	local function fight(where: number, archerSide: number, infantrySide: number, troop: string?)
 		for id, a in state.armies do
 			if a.location == where then
 				state.armies[id] = nil
 			end
 		end
 		local archers = Army.spawn(state, archerSide, where, 3000, "Firelocks")
-		local infantry = Army.spawn(state, infantrySide, where, 3000) -- the Humans' Footmen
+		local infantry = Army.spawn(state, infantrySide, where, 3000, troop) -- the Humans' Footmen, or `troop`
 		return archers, infantry
 	end
 	local won0 = nation.battlesWon
@@ -261,16 +262,16 @@ local function run()
 		"their badge shows the firelock once the battle is over"
 	)
 	local enemyWon0 = state.nations[enemy].battlesWon
-	local attackers = fight(away, me, enemy)
+	local attackers = fight(away, me, enemy, "Lancers")
 	Emulator.run(4.5)
 	-- (the enemy is a bot at war: it may win other battles meanwhile, so count at least this one)
 	H.expect(state.nations[enemy].battlesWon > enemyWon0, "attacking, the same Firelocks lost")
 	H.expect(state.armies[attackers.id] == nil or attackers.retreating == true, "and fell back")
-	local held = false -- (the infantry may have merged with the raiders that fell back there)
+	local held = false -- (the Lancers may have merged with the raiders that fell back there)
 	for _, a in state.armies do
 		held = held or (a.owner == enemy and a.location == away and not a.retreating)
 	end
-	H.expect(held and state.provinces[away].owner == enemy, "the defending Footmen hold their province")
+	H.expect(held and state.provinces[away].owner == enemy, "the defending Lancers hold their province")
 	H.client(alice, "MapView").centreOn(H.provinceMap(alice, away), true)
 	Emulator.run(1.5)
 	H.shot(alice, "archers_attack")
