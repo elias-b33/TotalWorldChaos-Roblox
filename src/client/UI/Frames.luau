@@ -102,6 +102,25 @@ function Frames.apply(label: ImageLabel | ImageButton, frame: string, style: Sty
 	return true
 end
 
+-- A new sunburst image for the Results screen (docs/UI_DIRECTION.md 7.13): 64 × 64 px of 16 gold rays, shown at
+-- 7×. Not shared or cached: the caller destroys it when Results closes. Nil when frames are unavailable.
+Frames.SUNBURST = 64
+function Frames.sunburst(): EditableImage?
+	if unavailable then
+		return nil
+	end
+	local pixels, w, h = FrameArt.sunburst(Frames.SUNBURST, 16, FrameArt.COLORS.brass100)
+	local ok, result = pcall(function()
+		return AssetService:CreateEditableImage({ Size = Vector2.new(w, h) })
+	end)
+	if not ok or result == nil then
+		return nil -- the sunburst is decoration: frames themselves may still work, so don't mark them unavailable
+	end
+	local editable = result :: EditableImage
+	editable:WritePixelsBuffer(Vector2.zero, Vector2.new(w, h), pixels)
+	return editable
+end
+
 -- The size of a frame's art on screen (art pixels × 2), e.g. a medallion's.
 function Frames.size(frame: string): Vector2
 	local w, h = FrameArt.size(frame)
