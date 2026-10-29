@@ -782,8 +782,8 @@ Config.Siege = {
 }
 
 -- Navies (docs/DESIGN.md "Navies"): one ship type per map (Galleon, Dragonship, Starship; MapDef.ship), the same
--- numbers on every map. A sea battle is a land battle's rule with a fleet's hull as its men. First numbers, to be
--- tuned with bot tournaments once bots sail (navies stage 3).
+-- numbers on every map. A sea battle is a land battle's rule with a fleet's hull as its men. Tuned with bot
+-- tournaments once bots sailed: docs/BALANCE.md section 23.
 Config.Navy = {
 	ShipGold = 25, -- one ship (no manpower)
 	ShipUpkeep = 1, -- gold per ship per month (a damaged fleet pays for what is left of it)
@@ -792,7 +792,7 @@ Config.Navy = {
 	MaxShipsPerCommand = 5, -- ships in one BuildShips order
 	MoveTicks = 8, -- to sail into the next sea zone
 	MinHull = 500, -- a fleet left with less than half a ship sinks after a battle, with everyone aboard
-	BlockadeGoldLoss = 0.5, -- a blockaded province loses this share of its gold income
+	BlockadeGoldLoss = 0.25, -- a blockaded province loses this share of its gold income (0.5 before section 23)
 	BlockadeSiegeSpeed = 1.25, -- the blockader's side besieges a blockaded province this much faster
 }
 
@@ -1349,10 +1349,33 @@ Config.Pings = {
 
 Config.Bots = {
 	-- noPlayerWarTicks: no war declared on a player before this tick; targetsLeadingPlayer: wars go to the player
-	-- holding the most provinces first
-	Easy = { planTicks = 6, attackRatio = 1.6, noPlayerWarTicks = 8 * 60, targetsLeadingPlayer = false },
-	Normal = { planTicks = 3, attackRatio = 1.3, noPlayerWarTicks = 0, targetsLeadingPlayer = false },
-	Hard = { planTicks = 2, attackRatio = 1.1, noPlayerWarTicks = 0, targetsLeadingPlayer = true },
+	-- holding the most provinces first. At sea (docs/DESIGN.md "Bot AI"): navyGoldShare: its ships' upkeep stays
+	-- under this share of its gold income; fleetShips: ships for one landing (one front). attackRatio also decides
+	-- which fleets a bot dares to fight.
+	Easy = {
+		planTicks = 6,
+		attackRatio = 1.6,
+		noPlayerWarTicks = 8 * 60,
+		targetsLeadingPlayer = false,
+		navyGoldShare = 0.1,
+		fleetShips = 3,
+	},
+	Normal = {
+		planTicks = 3,
+		attackRatio = 1.3,
+		noPlayerWarTicks = 0,
+		targetsLeadingPlayer = false,
+		navyGoldShare = 0.15,
+		fleetShips = 5,
+	},
+	Hard = {
+		planTicks = 2,
+		attackRatio = 1.1,
+		noPlayerWarTicks = 0,
+		targetsLeadingPlayer = true,
+		navyGoldShare = 0.2,
+		fleetShips = 5,
+	},
 	Difficulty = "Normal", -- what every bot plays on (a private server's owner can pick another: Config.Private)
 	DefendRatio = 0.8,
 	MenPerProvince = 800,
@@ -1379,6 +1402,10 @@ Config.Bots = {
 	MinAttackMorale = 70,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
+	MaxLandingChecks = 12, -- coasts weighed for one landing, nearest by sea first (keeps planning cheap)
+	MaxLandingZones = 2, -- a landing sails at most this many zones on from the port it leaves (no far colonies)
+	SeaPrepareTicks = 60, -- spare fleets keep gathering at the port of a landing being prepared this long after the
+	-- bot last worked on it (ships still to buy or to sail there)
 	-- insults (docs/DESIGN.md "Bot AI"): now and then a bot insults a rival, and an insulted bot answers back and leans
 	-- towards war with its insulter
 	InsultChance = 0.002, -- per plan (Normal bots plan every 3 s: about one insult per bot in a 25-minute match)

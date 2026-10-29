@@ -11,7 +11,7 @@ Every number below comes from `Config.luau` as of this document or from one of t
 | `lune run tools/balance/conquest` | Time and cost to take a neutral province, through `Sim/Tick` (section 7) |
 | `lune run tools/balance/catchup` | Overextension by size, where the thresholds sit, break-even ratios; writes `data/catchup.csv` (section 9) |
 | `lune run tools/balance/expansion` | Whole matches with a greedy planner: Peace income, best-case domination, free-for-all; writes `data/expansion_*.csv` (sections 10–12). About 3 minutes (`MAP=earth` for one map). `SET="Siege.TicksPerDevelopment=20"` runs a what-if (section 14) |
-| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 17: use 200 seeds per map, about 12 min each), wins per race, regiments recruited per troop type and the troop mix (sections 18 and 19). Takes `SET="…"` too, and `RACES=shuffle` deals the map's races out to the nations at random every match |
+| `lune run tools/harness/tournament` | Bot-only matches (Normal bots, 20 seeds × 3 maps, about 65 s): match length, wars, conquests, leader changes, Primordial powers used, army totals at 15:00 and 25:00 (section 15), wins per start slot against the fair share (section 17: use 200 seeds per map, about 12 min each), wins per race, regiments recruited per troop type and the troop mix (sections 18 and 19), battles, insults and event cards (sections 20–22), ships, landings and blockades (section 23). Takes `SET="…"` too, and `RACES=shuffle` deals the map's races out to the nations at random every match |
 | `lune run tools/balance/troops` | Troop matchups through `Sim/Battle`: how many attackers of one troop type beat a defender of another, and what each troop gives per gold of upkeep (section 18) |
 | `python3 tools/balance/charts.py` | The four charts in `docs/images/balance_*.png`, from the CSVs (Pillow; matplotlib isn't installed) |
 
@@ -785,3 +785,100 @@ Mixed difficulties, Hard / Normal wins (210 matches): main 47% / 53%, merged 41%
 - Skyshards' races traded places under the counters: Crystal folk (+1.8 provinces) and Marines (+1.7) up, Energy beings (−1.4) and Robots (−1.1) down; the spread is the same as main's (1.46). Robots and Insectoids win 0.63× and Crystal folk 1.49×: check the roles of their rosters (`Config.Races`) before touching numbers.
 - Eldmoor's start slots spread more (best ÷ worst land 2.26 on main, 2.8 with the stage): Greenvale and Ironholds end with 7.8 provinces, Elderwood with 22.0. Section 17's start-position work covers it.
 - Hard no longer beats Normal bot against bot (41% against 59%; on main 47%). Section 16's 56% came before the races and the EU4 pack; Hard's job is to be hardest on players, so the next difficulty pass should measure `Hard/Player` first.
+
+## 23. Navies: bots at sea
+
+Navies stage 3 taught bots to use fleets (`docs/DESIGN.md` "Bot AI": the Sea step and the fleet orders), so the bot tournament can measure navies. `lune run tools/harness/tournament` also prints, per match: ships built, landings (and how many put their men ashore at home because the target was lost on the way), provinces taken by landed armies (after the landing, anywhere, neutral land included), sea battles, wars declared across the sea (no land border between the two), blockaded province-ticks and the gold they cost; and each slot's ships and landings. Bots at sea follow the land rules of section 22: a tired army (under `MinAttackMorale`) doesn't board for a landing, and a landing is judged like a land attack (`aboveRatio`, counters and morale included).
+
+**How it was measured.** `lune run tools/harness/tournament 100 <map>` with `FIRST_SEED` = 1 and 101 (seeds 1–200 per map, the maps' races, Normal bots), on the stage merged with Smarter PvP and main (section 22). Two runs on the same seeds:
+
+- **No navies:** `SET="Bots.Normal.navyGoldShare=0"`: bots never build a ship and everything else is as committed. It reproduces section 22's merged numbers exactly (provinces taken 36.1 / 54.8 / 32.9, men at 25:00 162k / 136k / 146k), so the navy code changes nothing until bots sail.
+- **With navies:** `Config` as committed.
+
+"The stage before the merge" is the same tournament on the stage alone (five troops per race, no counters, morale or EU4 pack), seeds 1–200. While the stage was being built, `Navy.BlockadeGoldLoss` went from 0.5 to 0.25: at 0.5, blockades cost 1.7–2× as much gold and the strongest start slots gained the most (Earth's Volga 62 of 200 wins, Skyshards' Halo 48). As in section 17, one slot's share moves by about ±0.2× between batches of 200 seeds; compare spreads and totals, not single slots.
+
+**What bots do at sea** (with navies, per match, all ten nations together; the stage before the merge in brackets)
+
+| Map | Ships built | Landings | Landings at home | Provinces taken by landed armies | Sea battles | Wars across the sea | Blockaded province-ticks | Gold lost to blockades |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Earth | 53.0 (53.1) | 23.0 (25.1) | 0.9 (0.8) | 16.1 (19.6) | 16.9 (19.1) | 2.2 (2.7) | 18,898 (18,224) | 1,178 (1,090) |
+| Eldmoor | 21.5 (25.0) | 6.8 (10.7) | 0.4 (0.6) | 4.7 (6.7) | 5.0 (6.7) | 0.9 (1.1) | 9,968 (9,442) | 641 (609) |
+| Skyshards | 32.4 (35.0) | 20.6 (27.1) | 0.8 (0.6) | 7.2 (7.8) | 10.0 (9.9) | 0.1 (0.2) | 26,370 (20,469) | 2,114 (1,690) |
+
+- Bots build ships only for land their armies can't walk to, so Earth, the ocean map, uses them most: about 5 ships and 2.3 landings per nation per match. The keenest sailors are the nations whose way out is the sea: Amazon (8.0 ships and 6.0 landings a match), Mississippi (7.2, 3.3), Niger (5.1, 2.9), and on Eldmoor the Corsairs' island (3.5, 2.0). Landlocked Ironholds and Ashen Dominion build 1.1–1.4 ships a match.
+- Ships stay where they were; landings fell after the merge (Earth −8%, Skyshards −24%, Eldmoor −36%). The cause is the land rules, not the coasts: armies are smaller (section 22) and tired ones rest instead of boarding, and a landing into a counter wants 0.3 more on the attack ratio. Letting a landing sail one zone further (`SET="Bots.MaxLandingZones=3"`, seeds 1–100) gave Eldmoor 7.8 landings instead of 7.2 and Skyshards 20.4 instead of 20.2, so `MaxLandingZones` stays 2. Earth, the map navies are for, keeps its Americas at sea (Amazon and Mississippi land as often as before).
+- Bots' spare fleets stand off enemy coasts between landings, so blockades are constant: at any moment about 13 provinces are blockaded on Earth, 7 on Eldmoor and 18 on Skyshards (province-ticks ÷ 1,500 ticks).
+- Wars across the sea: 0.8, 0.2 and 0.1 a match on Earth, Eldmoor and Skyshards even with no navies (allies and coalitions joining wars), so navies add about 1.4 a match on Earth.
+- Bots' orders are almost always accepted: the server refused 16–20 of 424k–475k bot commands per map (200 matches; with no navies 5–16).
+
+**What navies do to the match** (no navies → with navies)
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Provinces taken from nations per match | 36.1 → 59.2 | 54.8 → 62.4 | 33.0 → 43.5 |
+| Men in all armies at 25:00 (median) | 162k → 130k | 136k → 131k | 146k → 118k |
+| Gold banked per nation at 25:00 (median) | 261 → 154 | 244 → 158 | 176 → 159 |
+| Alliance victories of 200 (the rest score wins at 25:00, no dominations) | 19 → 26 | 40 → 61 | 10 → 24 |
+| Most wins by one start slot, of 200 | 39 → 54 | 44 → 54 | 38 → 43 |
+| Start slots' land spread (best ÷ worst) | 2.04 → 2.25 | 2.82 → 2.72 | 1.57 → 1.84 |
+| Battles ended by a morale break (between nations) | 61% → 58% | 56% → 54% | 62% → 59% |
+
+Navies open up the map: far more land changes hands (Earth +64%), bots spend their savings on ships and the fights they bring, and more matches end in an alliance victory. Fairness by the land each race ends with (with navies; no navies in brackets, section 22): Earth Kingdom 12.1 · Empire 14.2 · Nomads 17.2 · Republic 15.2 · Clans 10.8 (best ÷ worst 1.59; 1.51); Eldmoor Humans 13.9 · Elves 18.9 · Orcs 11.8 · Dwarves 12.1 · Lizardfolk 11.1 (1.70; 1.79); Skyshards Marines 12.8 · Robots 9.2 · Insectoids 8.8 · Crystal folk 14.9 · Energy beings 14.2 (1.69; 1.46).
+
+**Start positions**
+
+**Earth** (200 seeds each; fair share 23.8 / 25.2 wins)
+
+| Slot | Nation (capital) | No navies: wins (share) | With navies | With navies: avg final provinces, ships, landings | The stage before the merge |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Rhine (Rhineland) | 33 (1.39×) | **27 (1.07×)** | 13.4, 5.0, 1.9 | 31 (0.98×) |
+| 2 | Volga (Muscovy) | 36 (1.51×) | **54 (2.14×)** | 18.2, 4.4, 1.0 | 56 (1.77×) |
+| 3 | Tigris (Mesopotamia) | 17 (0.71×) | **20 (0.79×)** | 8.1, 4.0, 1.0 | 16 (0.51×) |
+| 4 | Ganges (Ganges Plain) | 25 (1.05×) | **35 (1.39×)** | 15.7, 4.9, 1.2 | 41 (1.30×) |
+| 5 | Yangtze (Yangtze Valley) | 8 (0.34×) | **10 (0.40×)** | 13.4, 4.0, 1.6 | 26 (0.82×) |
+| 6 | Mekong (Mekong) | 24 (1.01×) | **16 (0.63×)** | 14.8, 5.2, 2.0 | 23 (0.73×) |
+| 7 | Niger (Niger Bend) | 18 (0.76×) | **26 (1.03×)** | 10.8, 5.1, 2.9 | 39 (1.23×) |
+| 8 | Zambezi (Zambezi) | 39 (1.64×) | **28 (1.11×)** | 11.3, 5.2, 2.0 | 31 (0.98×) |
+| 9 | Mississippi (Mississippi) | 28 (1.18×) | **11 (0.44×)** | 16.1, 7.2, 3.3 | 28 (0.89×) |
+| 10 | Amazon (Amazonia) | 10 (0.42×) | **25 (0.99×)** | 16.9, 8.0, 6.0 | 25 (0.79×) |
+
+**Eldmoor** (200 seeds each; fair share 28.1 / 32.3 wins)
+
+| Slot | Nation (capital) | No navies: wins (share) | With navies | With navies: avg final provinces, ships, landings | The stage before the merge |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Mistborn (Oakstead) | 36 (1.28×) | **37 (1.15×)** | 15.7, 2.5, 0.8 | 47 (1.30×) |
+| 2 | Saltmarsh (Thornthicket) | 20 (0.71×) | **34 (1.05×)** | 13.1, 3.0, 0.8 | 35 (0.97×) |
+| 3 | Ironholds (Stoneridge) | 13 (0.46×) | **13 (0.40×)** | 8.2, 1.4, 0.3 | 14 (0.39×) |
+| 4 | Frostmarch (Hoarreach) | 44 (1.57×) | **54 (1.67×)** | 14.9, 2.0, 0.5 | 43 (1.19×) |
+| 5 | Greenvale (Stoneheath) | 12 (0.43×) | **25 (0.77×)** | 11.4, 2.2, 0.5 | 17 (0.47×) |
+| 6 | Elderwood (Silverglade) | 41 (1.46×) | **45 (1.39×)** | 22.2, 1.6, 0.3 | 64 (1.77×) |
+| 7 | Wyrmcoast (Clovershire) | 27 (0.96×) | **28 (0.87×)** | 15.9, 2.2, 0.8 | 37 (1.02×) |
+| 8 | Sunscorch (Dunehaven) | 29 (1.03×) | **34 (1.05×)** | 9.2, 1.9, 0.5 | 38 (1.05×) |
+| 9 | Ashen Dominion (Scorchoasis) | 37 (1.32×) | **33 (1.02×)** | 12.2, 1.1, 0.3 | 35 (0.97×) |
+| 10 | Corsairs (Moonroot) | 22 (0.78×) | **20 (0.62×)** | 13.0, 3.5, 2.0 | 32 (0.88×) |
+
+**Skyshards** (200 seeds each; fair share 22.2 / 24.9 wins)
+
+| Slot | Nation (capital) | No navies: wins (share) | With navies | With navies: avg final provinces, ships, landings | The stage before the merge |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Aurora | 18 (0.81×) | **25 (1.00×)** | 12.6, 3.7, 2.5 | 27 (0.87×) |
+| 2 | Zephyr | 17 (0.77×) | **15 (0.60×)** | 9.3, 2.6, 1.4 | 17 (0.55×) |
+| 3 | Nimbus | 28 (1.26×) | **26 (1.04×)** | 14.7, 3.8, 2.7 | 28 (0.90×) |
+| 4 | Tempest | 14 (0.63×) | **23 (0.92×)** | 9.3, 2.8, 1.6 | 21 (0.68×) |
+| 5 | Halo | 28 (1.26×) | **40 (1.61×)** | 13.9, 3.3, 2.4 | 55 (1.77×) |
+| 6 | Solace | 30 (1.35×) | **25 (1.00×)** | 12.9, 4.0, 2.5 | 33 (1.06×) |
+| 7 | Ember | 11 (0.50×) | **12 (0.48×)** | 8.3, 2.7, 1.1 | 26 (0.84×) |
+| 8 | Rime | 38 (1.71×) | **25 (1.00×)** | 15.2, 3.9, 2.5 | 37 (1.19×) |
+| 9 | Verdance | 14 (0.63×) | **15 (0.60×)** | 8.9, 2.5, 1.4 | 28 (0.90×) |
+| 10 | Umbra | 24 (1.08×) | **43 (1.73×)** | 14.6, 3.1, 2.5 | 38 (1.23×) |
+
+**Gate 3 holds:** no start slot wins more than 54 of 200 matches (27%), against a fair share of 25–32. Earth's Volga (Muscovy) is the outlier with navies, as it was on the stage alone (54 and 56 wins; 36 with no navies). Skyshards' Halo and Umbra rise (1.6–1.7×), Mississippi falls (0.44×) though it lands 3.3 times a match.
+
+**Mixed difficulties** (`tournament 20 all Hard/Normal` plus `FIRST_SEED=21 … 50 all Hard/Normal`, 210 matches each): Hard wins 35% with navies, 41% with no navies (section 22's merged number, reproduced), and 39% when Hard keeps its ships' upkeep under Normal's 15% of income (`SET="Bots.Hard.navyGoldShare=0.15"`). The gap is about one standard error of the difference (±5 points), so navies may cost Hard a few more points: Hard's lower attack ratio (1.1) also sends riskier landings. Not changed here; the bot strategy stage owns Hard against Normal.
+
+**Config.** Nothing changed after the merge: `Navy.BlockadeGoldLoss` 0.25, `Bots.<difficulty>.navyGoldShare` 0.1 / 0.15 / 0.2 and `fleetShips` 3 / 5 / 5, `Bots.MaxLandingZones` 2, `MaxLandingChecks` 12, `SeaPrepareTicks` 60.
+
+**Watch:**
+- Earth's Volga with navies (2.1× its fair share): section 17's start-position work, with navies on.
+- Skyshards' blockades cost the most gold (2,114 a match) and grew most after the merge (+29% province-ticks): spare fleets wait off enemy coasts while the armies rest. If Skyshards' economy feels slow, look at the gather order (fleet order 4) before `BlockadeGoldLoss`.
+- Landed men come ashore as a new army with full morale (`Sim/Navy.luau`), so boarding and landing at once refreshes a tired army. Bots don't use it (a tired army never boards), but a player could.
