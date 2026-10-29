@@ -730,11 +730,10 @@ local function defend(ctx: Ctx): { Command }?
 	end
 	for _, t in list do
 		local guards = guardsOf(ctx, t.target)
-		local my, their, myRate, theirRate, myMod = strengths(ctx, t.target, guards, t.armies, true, 0, 0)
-		-- enough strength, and not so worn out that they would break (Battle.outcome with both sides' morale)
-		local holds = my >= ratio * their
-			and (#guards == 0 or wouldWin(fighter(guards, myRate), fighter(t.armies, theirRate), true))
-		if holds then
+		-- by strength with the counters, not morale: a tired guard recruiting until it wouldn't break drained the gold
+		-- bots keep for elites (docs/BALANCE.md section 20)
+		local my, their, _, _, myMod = strengths(ctx, t.target, guards, t.armies, true, 0, 0)
+		if my >= ratio * their then
 			for _, g in guards do
 				ctx.reserved[g.id] = t.location
 			end
@@ -751,9 +750,9 @@ local function defend(ctx: Ctx): { Command }?
 					end
 				end
 			end
-			-- not enough men nearby: raise them where the threat is (fresh regiments lift a tired guard's morale):
-			-- my ranged troop (the best defenders) if I can pay and it is still under Config.Bots.RangedShare of my
-			-- men, and my line troop, the one that defends better against this enemy's mix first (its counters)
+			-- not enough men nearby: raise them where the threat is: my ranged troop (the best defenders) if I can pay
+			-- and it is still under Config.Bots.RangedShare of my men, and my line troop, the one that defends better
+			-- against this enemy's mix first (its counters)
 			local race = ctx.nation.race
 			local line = Troops.ofRole(race, "line") or Troops.BASE
 			local ranged = Troops.ofRole(race, "ranged")
@@ -769,9 +768,9 @@ local function defend(ctx: Ctx): { Command }?
 			if #options == 2 and holding(options[2]) > holding(options[1]) then
 				options[1], options[2] = options[2], options[1]
 			end
+			local missing = ratio * their - my
 			for _, troop in options do
 				local perRegiment = Config.Army.MenPerRegiment * holding(troop) * myMod
-				local missing = math.max(ratio * their - my, perRegiment) -- at least one regiment
 				local regiments = math.min(math.ceil(missing / perRegiment), affordable(ctx, troop))
 				if regiments >= 1 then
 					local result =

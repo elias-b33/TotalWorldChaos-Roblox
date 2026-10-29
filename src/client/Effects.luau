@@ -88,6 +88,7 @@ local layer: Frame? = nil
 local size = Vector2.new(1024, 512)
 local generation = 0 -- bumps with every new map: effects still running for an old one stop
 local free: { Particle } = {}
+local pooled: { Particle } = {} -- every particle on the current canvas, so a new map can stop their tweens
 local created = 0
 local active = 0
 local domes: { [number]: Dome } = {}
@@ -157,6 +158,7 @@ local function acquire(color: Color3): Particle?
 		frame.ZIndex = 2
 		frame.Parent = parent
 		p = { frame = frame, serial = 0, tweens = {} }
+		table.insert(pooled, p :: Particle)
 	end
 	local particle = p :: Particle
 	particle.serial += 1
@@ -861,7 +863,12 @@ end
 -- Draw on the current map's canvas. A new map means a new canvas: every pooled frame went with the old one.
 local function bind()
 	generation += 1
-	free, created, active, domes = {}, 0, 0, {}
+	for _, p in pooled do -- their frames went with the old canvas: stop tweening them
+		for _, t in p.tweens do
+			t:Cancel()
+		end
+	end
+	free, pooled, created, active, domes = {}, {}, 0, 0, {}
 	layer = MapRenderer.layer("Effects")
 	size = MapRenderer.mapSize()
 end

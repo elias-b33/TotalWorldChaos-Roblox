@@ -763,7 +763,7 @@ Config.Battle = {
 	-- Out of battle, every MoraleRecoverTicks ticks an army gets MoraleRecoverHome on its own land (garrisons and
 	-- Rebels: neutral land) and MoraleRecoverAbroad elsewhere.
 	MoraleMax = 100,
-	MoraleShock = 150,
+	MoraleShock = 100,
 	MoraleDrain = 5,
 	MoraleBreak = 0,
 	MoraleRecoverTicks = 5,
@@ -771,7 +771,7 @@ Config.Battle = {
 	MoraleRecoverAbroad = 5,
 	-- Flanking: a side whose armies came into the battle from 2+ directions gets FlankBonus per extra direction, for at
 	-- most FlankMaxExtra extra directions
-	FlankBonus = 0.15,
+	FlankBonus = 0.25,
 	FlankMaxExtra = 2,
 }
 

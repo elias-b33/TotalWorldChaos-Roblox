@@ -42,8 +42,11 @@ local CHIP_GAP = Theme.space.s
 local PIP_SCALE = 2 -- the pip bar at the map's scale, in a well 10 px wider each side
 local LONG_CAPTION = 12 -- characters that fit a tile's caption at the kit's size; longer ones (troop names like
 -- "Crocodile guard") are set a size or two smaller
-local COUNTER_BADGE = 22 -- the counter badge on a recruit tile (the troop it beats), level with the tile's icon
-local COUNTER_Y = 20
+local COUNTER_BADGE = 20 -- the counter badge on a recruit tile (the troop it beats): it sits on the tile's base at
+-- the bottom right, clear of the costs even on a 667 px phone's 102 px tiles; offsets from the tile's padded content
+-- box (Widgets.slotTile: 6 px each side, 12 px of base below), 4 px in from the right edge and 2 px up from the bottom
+local COUNTER_X = 2
+local COUNTER_Y = 10
 
 local TERRAIN_ICONS: { [string]: string } = { Plains = "farm", Forest = "tree", Hills = "hills", Mountain = "mountain" }
 local BUILDING_ICONS: { [string]: string } = { Farm = "farm", Barracks = "sword", Fort = "castle" }
@@ -137,7 +140,7 @@ local function hintKey(provinceId: number): string
 	return table.concat(parts, ",")
 end
 
--- A recruit tile's counter badge: the icon of the troop of my roster it beats, on the tile's right. Green when it is
+-- A recruit tile's counter badge: the icon of the troop of my roster it beats, on the tile's base at the bottom right. Green when it is
 -- the pick against the enemy armies near this province, red when they beat it (the rule bots use:
 -- Troops.counterHint). Attributes Beats (the troop) and Hint ("good", "bad" or "") for the harness.
 local function counterBadge(tile: GuiObject, troop: string, race: string, mix: { [string]: number }?)
@@ -156,8 +159,8 @@ local function counterBadge(tile: GuiObject, troop: string, race: string, mix: {
 	b.Name = "Counter"
 	b.AutomaticSize = Enum.AutomaticSize.None
 	b.Size = UDim2.fromOffset(COUNTER_BADGE, COUNTER_BADGE)
-	b.AnchorPoint = Vector2.new(1, 0)
-	b.Position = UDim2.new(1, 0, 0, COUNTER_Y)
+	b.AnchorPoint = Vector2.new(1, 1)
+	b.Position = UDim2.new(1, COUNTER_X, 1, COUNTER_Y)
 	b:SetAttribute("Beats", beaten)
 	b:SetAttribute("Hint", hint or "")
 	local icon = Icons.label(b, RaceInfo.troopIcon(beaten), Theme.size.icon)
