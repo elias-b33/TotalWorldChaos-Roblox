@@ -2,7 +2,8 @@
 -- A private server's settings in the Lobby (docs/MONETIZATION.md 3.4): during the map vote the owner gets a
 -- Settings button (a gear) and a sheet with every setting; everyone sees a one-line summary under the vote cards.
 -- Every tap sends RequestSetting; the server checks it (Sim.Lobby.setting, Sim.Settings.set) and the next Lobby
--- view (once a second) shows the result. The sheet fits a phone in landscape without scrolling: two columns.
+-- view (once a second) shows the result. The sheet fits a 667×375 phone in landscape without scrolling: two tabs,
+-- Rules (two columns of five settings) and Teams (a cell per player), with the reward line and Done beside them.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,16 +17,19 @@ local Settings = require(Shared.Sim.Settings)
 local Types = require(Shared.Types)
 
 local Client = script.Parent.Parent
+local TextWidth = require(Client.TextWidth)
 local Intents = require(Client.Intents)
 local LobbyState = require(Client.LobbyState)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local LABEL_WIDTH = 104
+local LABEL_WIDTH = 88 -- "Bot level" and "Disasters" with their icons
 local OPTION_WIDTH = 76
-local FEATURE_LABEL = 80 -- the EU4 pack's features share a row: a short label and narrow On/Off tabs each
-local FEATURE_OPTION = 46
-local HEADER_HEIGHT = 36
+local OPTION_PAD = 14 -- a tab's caption keeps this much room (the map row's tabs fit their names)
+local LEFT_SHARE = 0.58 -- the Rules page's left column (the map row is the widest)
+local VALUE_WIDTH = 60 -- the bot count between its arrows
+local HEADER_HEIGHT = Widgets.BUTTON_HEIGHT -- the tabs, the reward line and Done
+local TAB_WIDTH = 104
 local TEAM_CELL = Vector2.new(120, 36)
 local TEXT_SIZE = 14
 local SETTINGS_WIDTH = 140
@@ -43,6 +47,9 @@ local summaryLabel: TextLabel
 local rewardLabel: TextLabel
 local botsLabel: TextLabel
 local teamGrid: Frame
+local pages: { [string]: Frame } = {} -- "Rules" and "Teams"
+local pageTabs: { [string]: TextButton } = {}
+local page = "Rules"
 local options: { Option } = {}
 local teamButtons: { [number]: TextButton } = {} -- userId -> button
 local teamsFor = "" -- the player list the team buttons were built for
@@ -111,24 +118,35 @@ local function option(parent: Frame, key: string, value: string | number | boole
 	table.insert(options, { button = b, key = key, value = value })
 end
 
--- The EU4 pack's on/off features (Settings.FEATURES) side by side in one row, each a short label and an On/Off pair,
--- so the teams below keep the room they need on a phone. features: { icon, label, setting key }.
-local function featureRow(parent: Instance, order: number, features: { { string } })
-	local f = Instance.new("Frame")
-	f.BackgroundTransparency = 1
-	f.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
-	f.LayoutOrder = order
-	f.Parent = parent
-	Widgets.list(f, true, Theme.space.xs)
-	for _, feature in features do
-		local l = Widgets.label(f, feature[2], TEXT_SIZE, Widgets.BUTTON_HEIGHT)
-		l.Size = UDim2.fromOffset(FEATURE_LABEL, Widgets.BUTTON_HEIGHT)
-		l.TextWrapped = false
-		l.LayoutOrder = #f:GetChildren()
-		Widgets.leadIcon(l, feature[1], Theme.size.icon)
-		option(f, feature[3], true, "On", FEATURE_OPTION)
-		option(f, feature[3], false, "Off", FEATURE_OPTION)
+-- An on/off setting's row (powers, disasters, and the EU4 pack's insults and event cards).
+local function onOff(parent: Instance, order: number, icon: string, text: string, key: string)
+	local r = row(parent, order, icon, text)
+	option(r, key, true, "On")
+	option(r, key, false, "Off")
+end
+
+-- The map row's tabs: all as wide as the longest name needs (at least OPTION_WIDTH) where the column has room, else
+-- each as wide as its own name, sharing out what is left ("Skyshards" needs more than a 667 px phone's even share).
+local function mapWidths(texts: { string }, room: number): { number }
+	local widths, total, widest = {}, 0, OPTION_WIDTH
+	for i, text in texts do
+		local w = math.ceil(TextWidth.measure(text, TEXT_SIZE)) + OPTION_PAD
+		widths[i] = w + w % 2
+		total += widths[i]
+		widest = math.max(widest, widths[i])
 	end
+	local gaps = (#texts - 1) * Theme.space.xs
+	if #texts * widest + gaps <= room then
+		for i in widths do
+			widths[i] = widest
+		end
+		return widths
+	end
+	local extra = math.max(0, (room - total - gaps) // #texts)
+	for i, w in widths do
+		widths[i] = w + extra - extra % 2
+	end
+	return widths
 end
 
 -- The next team for a player: the one after theirs that still has room (0 = no team).
@@ -184,32 +202,55 @@ local function column(parent: Instance, x: number, width: number): Frame
 	return f
 end
 
+-- Show a page of the sheet: "Rules" or "Teams".
+local function showPage(name: string)
+	page = name
+	for key, frame in pages do
+		frame.Visible = key == name
+	end
+	for key, tab in pageTabs do
+		Widgets.setTab(tab, key == name)
+	end
+end
+
 -- The settings sheet, built the first time the owner opens it (most servers are public and never need its
 -- 150 or so GUI objects).
 local function buildPanel()
-	-- an iron sheet over the vote screen, its title on a plate on its top edge
+	-- an iron sheet over the vote screen, its title on a plate on its top edge: a full-screen window's size (a phone's
+	-- at most, grown by the device scale on a tablet)
 	local p = Widgets.panel(sheetGui, 0)
 	panel = p
 	p.Name = "SettingsPanel"
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
-	p.Position = UDim2.new(0.5, 0, 0.5, Theme.space.xs)
-	p.Size = UDim2.new(1, -2 * Theme.space.m, 1, -3 * Theme.space.m)
 	p.AutomaticSize = Enum.AutomaticSize.None
 	p.Visible = false
-	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(900, 600)
-	limit.Parent = p
+	Widgets.dimBehind(p)
+	local size = Widgets.windowSize(sheetGui)
+	Widgets.fit(p, UDim2.fromOffset(size.X, size.Y), UDim2.new(0.5, 0, 0.5, Theme.space.xs))
 	Widgets.header(p, "Private server settings", "gear")
-	Widgets.fit(p)
 
+	-- the two tabs, the reward line, Done
 	local header = Instance.new("Frame")
 	header.Name = "Header"
 	header.BackgroundTransparency = 1
 	header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 	header.Parent = p
+	for i, tab in { { "Rules", "gear" }, { "Teams", "teams" } } do
+		local name = tab[1]
+		local b = Widgets.tab(header, name, TAB_WIDTH, false, function()
+			showPage(name)
+		end)
+		b.Name = "SettingsTab_" .. name
+		b.Position = UDim2.fromOffset((i - 1) * (TAB_WIDTH + Theme.space.s), 0)
+		Widgets.padding(b, Theme.space.m, 0) -- like the trophies' tabs: the icon inside the tab's edge
+		Widgets.leadIcon(b, tab[2], Theme.size.icon, Theme.space.xs)
+		pageTabs[name] = b
+	end
+	local tabsWidth = 2 * TAB_WIDTH + Theme.space.s + Theme.space.m
 	rewardLabel = Widgets.hint(header, "", TEXT_SIZE, HEADER_HEIGHT)
 	rewardLabel.Name = "Rewards"
-	rewardLabel.Size = UDim2.new(1, -116, 1, 0)
+	rewardLabel.Position = UDim2.fromOffset(tabsWidth, 0)
+	rewardLabel.Size = UDim2.new(1, -(tabsWidth + 104 + Theme.space.m), 1, 0)
 	local done = Widgets.iconTextButton(header, "check", "Done", 104, Widgets.GOOD, function()
 		open = false
 		PrivateSettings.render()
@@ -218,81 +259,95 @@ local function buildPanel()
 	done.AnchorPoint = Vector2.new(1, 0.5)
 	done.Position = UDim2.fromScale(1, 0.5)
 
-	local body = Instance.new("Frame")
-	body.Name = "Body"
-	body.BackgroundTransparency = 1
-	body.Position = UDim2.fromOffset(0, HEADER_HEIGHT + 6)
-	body.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + 6))
-	body.Parent = p
-	local left = column(body, 0, 0.52)
-	local right = column(body, 0.53, 0.47)
+	local function newPage(name: string): Frame
+		local f = Instance.new("Frame")
+		f.Name = name
+		f.BackgroundTransparency = 1
+		f.Position = UDim2.fromOffset(0, HEADER_HEIGHT + Theme.space.m)
+		f.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + Theme.space.m))
+		f.Parent = p
+		pages[name] = f
+		return f
+	end
 
-	local map = row(left, 1, "map", "Map")
-	option(map, "map", "", "Vote")
+	-- Rules: five settings a column (the map row is the widest, so the left column is wider)
+	local rules = newPage("Rules")
+	local left = column(rules, 0, LEFT_SHARE)
+	local right = column(rules, LEFT_SHARE + 0.01, 0.99 - LEFT_SHARE)
+	local sheetWidth = size.X - 2 * Widgets.PANEL_PAD
+	local mapTexts = { "Vote" }
 	for _, id in Maps.ids do
-		option(map, "map", id, Maps.get(id).title)
+		table.insert(mapTexts, Maps.get(id).title)
 	end
-	local theme = row(left, 2, "palette", "Theme")
-	for _, t in Config.Private.Themes do
-		option(theme, "theme", t, t)
+	local widths = mapWidths(mapTexts, sheetWidth * LEFT_SHARE - LABEL_WIDTH - Theme.space.xs)
+	local map = row(left, 1, "map", "Map")
+	option(map, "map", "", "Vote", widths[1])
+	for i, id in Maps.ids do
+		option(map, "map", id, Maps.get(id).title, widths[i + 1])
 	end
-	local length = row(left, 3, "clock", "Length")
+	local length = row(left, 2, "clock", "Length")
 	for _, m in Config.Private.Minutes do
 		option(length, "minutes", m, m .. " min")
 	end
-	local peace = row(left, 4, "peace", "Peace")
+	local peace = row(left, 3, "peace", "Peace")
 	for _, m in Config.Private.PeaceMinutes do
 		option(peace, "peaceMinutes", m, if m == 0 then "None" else m .. " min")
 	end
-	local bots = row(left, 5, "bot", "Bots")
+	local theme = row(left, 4, "palette", "Theme")
+	for _, t in Config.Private.Themes do
+		option(theme, "theme", t, t)
+	end
+	local level = row(left, 5, "gear", "Bot level")
+	for _, d in Config.Private.Difficulties do
+		option(level, "difficulty", d, d)
+	end
+
+	local bots = row(right, 1, "bot", "Bots")
 	local function stepBots(delta: number)
 		local view = LobbyState.view()
 		if view then
 			Intents.setting("bots", math.clamp(view.settings.bots + delta, 0, Config.Private.MaxBots))
 		end
 	end
-	local less = Widgets.button(bots, "−", Widgets.BUTTON_HEIGHT, Widgets.BUTTON, function()
+	local less = Widgets.button(bots, "−", Widgets.BUTTON_HEIGHT, Widgets.BUTTON_OFF, function()
 		stepBots(-1)
 	end)
 	less.Name = "BotsLess"
 	less.LayoutOrder = 1
 	botsLabel = Widgets.label(bots, "", 16, Widgets.BUTTON_HEIGHT)
 	botsLabel.FontFace = Theme.font.display
-	botsLabel.Size = UDim2.fromOffset(OPTION_WIDTH, Widgets.BUTTON_HEIGHT)
+	botsLabel.Size = UDim2.fromOffset(VALUE_WIDTH, Widgets.BUTTON_HEIGHT)
 	botsLabel.TextXAlignment = Enum.TextXAlignment.Center
 	botsLabel.LayoutOrder = 2
-	local more = Widgets.button(bots, "+", Widgets.BUTTON_HEIGHT, Widgets.BUTTON, function()
+	local more = Widgets.button(bots, "+", Widgets.BUTTON_HEIGHT, Widgets.BUTTON_OFF, function()
 		stepBots(1)
 	end)
 	more.Name = "BotsMore"
 	more.LayoutOrder = 3
-	local level = row(left, 6, "gear", "Bot level")
-	for _, d in Config.Private.Difficulties do
-		option(level, "difficulty", d, d)
-	end
-
-	local powers = row(right, 1, "sparkles", "Powers")
-	option(powers, "powers", true, "On")
-	option(powers, "powers", false, "Off")
-	local disasters = row(right, 2, "meteor", "Disasters")
-	option(disasters, "disasters", true, "On")
-	option(disasters, "disasters", false, "Off")
+	onOff(right, 2, "sparkles", "Powers", "powers")
+	onOff(right, 3, "meteor", "Disasters", "disasters")
 	-- the EU4 pack: insults (with gifts and military access), and event cards with choices
-	featureRow(right, 3, { { "grudge", "Insults", "diplomacy" }, { "scroll", "Events", "events" } })
-	local teamsTitle = Widgets.label(right, "Teams: tap a player (same team = allies)", TEXT_SIZE, 22)
-	teamsTitle.LayoutOrder = 4
+	onOff(right, 4, "grudge", "Insults", "diplomacy")
+	onOff(right, 5, "scroll", "Events", "events")
+
+	-- Teams: a cell per player, tap to move them to the next team
+	local teams = newPage("Teams")
+	Widgets.list(teams, false, Theme.space.s)
+	local teamsTitle = Widgets.label(teams, "Tap a player to change their team (same team = allies)", TEXT_SIZE, 22)
+	teamsTitle.LayoutOrder = 1
 	Widgets.leadIcon(teamsTitle, "teams", Theme.size.icon)
 	teamGrid = Instance.new("Frame")
 	teamGrid.Name = "Teams"
 	teamGrid.BackgroundTransparency = 1
-	teamGrid.Size = UDim2.new(1, 0, 0, 4 * TEAM_CELL.Y + 3 * 4)
-	teamGrid.LayoutOrder = 5
-	teamGrid.Parent = right
+	teamGrid.Size = UDim2.new(1, 0, 1, -(22 + Theme.space.s))
+	teamGrid.LayoutOrder = 2
+	teamGrid.Parent = teams
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(TEAM_CELL.X, TEAM_CELL.Y)
 	grid.CellPadding = UDim2.fromOffset(4, 4)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = teamGrid
+	showPage(page)
 end
 
 function PrivateSettings.render()
@@ -351,24 +406,30 @@ end
 function PrivateSettings.init()
 	gui = Widgets.screen("PrivateSettings", 25) -- the summary and the button: above the vote screen, below the shop
 	sheetGui = Widgets.screen("PrivateSettingsSheet", 31) -- the sheet covers the shop's button too
+	-- the whole screen, Roblox's top-bar row included: the sheet has the full height in Studio as in the harness, and
+	-- its title plate starts right of Roblox's buttons (Widgets.header)
+	Widgets.coverScreen(sheetGui)
 
-	-- the summary: a dark strip with a lock icon and one line, between the Lobby's round buttons and Settings
+	-- the summary: a plate with a lock icon and one line, between the Lobby's corner gems and Settings
 	local left = Widgets.cornerRowEnd(LOBBY_BUTTONS) + Theme.space.m
 	summaryLabel = Widgets.label(gui, "", TEXT_SIZE, Widgets.BUTTON_HEIGHT)
 	summaryLabel.Name = "Summary"
 	summaryLabel.AnchorPoint = Vector2.new(0, 1)
 	summaryLabel.Position = UDim2.new(0, left, 1, -Theme.space.l)
 	summaryLabel.Size = UDim2.new(1, -(left + SETTINGS_WIDTH + Theme.space.l + Theme.space.m), 0, Widgets.BUTTON_HEIGHT)
-	summaryLabel.BackgroundColor3 = Theme.color.navyDeep
-	summaryLabel.BackgroundTransparency = 0.1
-	summaryLabel.TextColor3 = Theme.color.goldPale
+	summaryLabel.BackgroundColor3 = Theme.color.slate800
+	summaryLabel.TextColor3 = Theme.color.brass200
+	summaryLabel.TextWrapped = false
+	summaryLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	summaryLabel.Visible = false
-	Widgets.corner(summaryLabel, Theme.radius.m)
+	Widgets.corner(summaryLabel, Theme.radius.s)
 	Widgets.stroke(summaryLabel)
 	Widgets.padding(summaryLabel, Theme.space.m, 0)
 	Widgets.leadIcon(summaryLabel, "lock", Theme.size.icon)
+	Widgets.skin(summaryLabel, "plate", "plate")
+	Widgets.shadow(summaryLabel, "plate")
 
-	openButton = Widgets.iconTextButton(gui, "gear", "Settings", SETTINGS_WIDTH, Widgets.BUTTON, function()
+	openButton = Widgets.iconTextButton(gui, "gear", "Settings", SETTINGS_WIDTH, Widgets.BUTTON_OFF, function()
 		open = true
 		PrivateSettings.render()
 	end)
@@ -376,6 +437,7 @@ function PrivateSettings.init()
 	openButton.AnchorPoint = Vector2.new(1, 1)
 	openButton.Position = UDim2.new(1, -12, 1, -12)
 	openButton.Visible = false
+	Widgets.shadow(openButton, "button")
 
 	Widgets.fitScreen(gui) -- tablets: the screen's roots grow with the UI's scale
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")

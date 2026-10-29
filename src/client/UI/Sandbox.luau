@@ -30,7 +30,7 @@ local MARGIN = Theme.space.m -- from the screen's left edge and the top bar
 local GAP = Theme.space.xs
 local TAB = 46 -- a time tab
 local INNER = 4 * TAB + 3 * GAP -- the panel's content width
-local PANEL_WIDTH = INNER + 2 * Theme.space.l
+local PANEL_WIDTH = INNER + 2 * Widgets.PANEL_PAD -- the iron frame's padding round the content
 local CELL = 150 -- a nation in the Play as list: the longest name ("Ashen Dominion") fits beside its race icon
 local COLUMNS = 3
 local MAP_BUTTON = 120 -- a new world's map
@@ -122,7 +122,7 @@ local function openPlayAs()
 		return
 	end
 	local f =
-		openPopup("PlayAs", "Play as", "crown", COLUMNS * CELL + (COLUMNS - 1) * Theme.space.s + 2 * Theme.space.l)
+		openPopup("PlayAs", "Play as", "crown", COLUMNS * CELL + (COLUMNS - 1) * Theme.space.s + 2 * Widgets.PANEL_PAD)
 	local grid = row(f, 1, COLUMNS)
 	local me = ClientState.myNation()
 	local watch = Widgets.iconTextButton(
@@ -146,7 +146,7 @@ local function openPlayAs()
 				RaceInfo.icon(n.race),
 				n.name,
 				CELL,
-				if id == me then Widgets.GOLD else Widgets.BUTTON,
+				if id == me then Widgets.GOLD else Widgets.BUTTON_OFF,
 				function()
 					Intents.sandbox("Play", id)
 					closePopup()
@@ -156,6 +156,10 @@ local function openPlayAs()
 			b.LayoutOrder = id
 			b.TextSize = Theme.text.small + 1
 			b.TextTruncate = Enum.TextTruncate.AtEnd
+			local pad = b:FindFirstChildOfClass("UIPadding")
+			if pad then -- the name keeps clear of the colour swatch at the right
+				pad.PaddingRight = UDim.new(0, pad.PaddingRight.Offset + SWATCH + Theme.space.xs)
+			end
 			local swatch = Instance.new("Frame")
 			swatch.Name = "Swatch"
 			swatch.AnchorPoint = Vector2.new(1, 0.5)
@@ -177,7 +181,7 @@ local function openWorld()
 		return
 	end
 	local width = #Maps.ids * MAP_BUTTON + (#Maps.ids - 1) * Theme.space.s
-	local f = openPopup("World", "World", "globe", width + 2 * Theme.space.l)
+	local f = openPopup("World", "World", "globe", width + 2 * Widgets.PANEL_PAD)
 	local half = (width - Theme.space.s) // 2
 	local first = row(f, 1)
 	local on = controls.disasters
@@ -203,7 +207,7 @@ local function openWorld()
 	Widgets.leadIcon(hint, "map", Theme.size.icon)
 	local maps = row(f, 3)
 	for i, id in Maps.ids do
-		local b = Widgets.iconTextButton(maps, "map", Maps.get(id).title, MAP_BUTTON, Widgets.BUTTON, function()
+		local b = Widgets.iconTextButton(maps, "map", Maps.get(id).title, MAP_BUTTON, Widgets.BUTTON_OFF, function()
 			Intents.sandbox("NewWorld", id)
 			closePopup()
 		end, "NewWorld_" .. id)

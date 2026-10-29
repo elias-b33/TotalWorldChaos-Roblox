@@ -435,6 +435,57 @@ function Widgets.screen(name: string, order: number?): ScreenGui
 	return gui
 end
 
+-- Make a screen cover the whole screen, Roblox's top-bar row included, but clear of a notch (docs/UI_DIRECTION.md
+-- "As built (step 7)"): the full-screen windows, the vote, the draft, the start menu and Results. A ScreenGui left
+-- at Roblox's default insets starts under that row, about 58 px lower on a phone, while the harness models no inset:
+-- a screen laid out for the full height would overflow in Studio. Covering the row gives the same area in both, and
+-- whatever falls in the row keeps clear of Roblox's own buttons (Widgets.topbarMargins; Widgets.header does it for
+-- a window's title plate and close gem).
+function Widgets.coverScreen(gui: ScreenGui)
+	gui.IgnoreGuiInset = true
+	gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	gui:SetAttribute("CoversTopBar", true) -- what Widgets.header checks (the harness can't read unset properties)
+end
+
+-- The free part of Roblox's top-bar row (GuiService.TopbarInset), in screen px from a screen's top-left: where
+-- Roblox's buttons end at the left, where anything of its own at the right starts, and the row's bottom. A device
+-- with no row gives (0, the screen's width, 0).
+local function topbarRow(gui: Instance): (number, number, number)
+	local screen = Widgets.screenSize(gui)
+	local ok, inset = pcall(function()
+		return GuiService.TopbarInset
+	end)
+	if not ok or typeof(inset) ~= "Rect" or inset.Height <= 0 then
+		return 0, screen.X, 0
+	end
+	local origin = Vector2.zero -- a screen that keeps clear of a notch starts right of it
+	local okOrigin, at = pcall(function()
+		return (gui :: any).AbsolutePosition
+	end)
+	if okOrigin and typeof(at) == "Vector2" then
+		origin = at
+	end
+	return inset.Min.X - origin.X, inset.Max.X - origin.X, inset.Max.Y - origin.Y
+end
+
+-- Margins from the left and right edges of a screen that covers Roblox's top-bar row (Widgets.coverScreen), for
+-- something placed in that row: at least `left` and `right`, and a gap clear of Roblox's buttons. In phone px (what
+-- Widgets.fit positions are written in), even. On a phone Roblox's buttons take the row's first 104 px or so.
+function Widgets.topbarMargins(gui: ScreenGui, left: number, right: number): (number, number)
+	local rowLeft, rowRight = topbarRow(gui)
+	local width = Widgets.screenSize(gui).X
+	local l = math.max(left, (rowLeft / currentScale) + Theme.space.m)
+	local r = math.max(right, (width - rowRight) / currentScale + Theme.space.m)
+	return math.ceil(l / 2) * 2, math.ceil(r / 2) * 2
+end
+
+-- The bottom of Roblox's top-bar row in a screen that covers it, phone px (0 where there is no row): something
+-- that can't keep clear of Roblox's buttons beside them goes under it.
+function Widgets.topbarBottom(gui: ScreenGui): number
+	local _, _, bottom = topbarRow(gui)
+	return math.max(0, bottom) / currentScale
+end
+
 -- The 2 px ink outline round a panel, button or chip (the flat look). Several strokes may share an object (the
 -- tutorial's glow sits outside it, at a higher ZIndex).
 function Widgets.stroke(parent: GuiObject, color: Color3?, thickness: number?): UIStroke
@@ -568,7 +619,7 @@ function Widgets.material(obj: GuiObject, material: string | Color3)
 	obj.BackgroundColor3 = m.fill
 	d.band.Color = m.band or m.fill
 	d.band.Thickness = m.bandThickness
-	local painted = obj:IsA("ImageLabel") and Frames.apply(obj :: any, m.frame, m.style)
+	local painted = (obj:IsA("ImageLabel") or obj:IsA("ImageButton")) and Frames.apply(obj :: any, m.frame, m.style)
 	obj.BackgroundTransparency = if painted then 1 else 0
 	d.outline.Enabled = not painted and m.outline
 	d.band.Enabled = not painted and m.band ~= nil
@@ -649,7 +700,10 @@ end
 -- The screen a widget is on, in GUI px (not divided by the device scale): its ScreenGui's size once laid out,
 -- else the camera's viewport.
 function Widgets.screenSize(obj: Instance?): Vector2
-	local gui = if obj then obj:FindFirstAncestorWhichIsA("LayerCollector") else nil
+	local gui = if obj and obj:IsA("LayerCollector")
+		then obj
+		elseif obj then obj:FindFirstAncestorWhichIsA("LayerCollector")
+		else nil
 	if gui and gui:IsA("ScreenGui") then
 		local ok, size = pcall(function()
 			return gui.AbsoluteSize
@@ -917,8 +971,11 @@ function Widgets.button(parent: Instance, text: string, width: number, color: Co
 	return newButton(parent, text, width, color or Widgets.BUTTON, nil, onPress)
 end
 
--- A button with a pixel icon (16 px, or `iconSize`) before its text. `name` (optional) is the button's Name, e.g.
--- its old emoji caption, so the tutorial and the harness still find it.
+-- A button with a pixel icon (16 px, or `iconSize`) before its text, the two centred together 6 px apart
+-- (docs/UI_DIRECTION.md 7.2). `name` (optional) is the button's Name, e.g. its old emoji caption, so the tutorial
+-- and the harness still find it.
+local ICON_GAP = Theme.space.s
+local BUTTON_SIDE = Theme.space.m + 2 -- a button's text keeps this far from its edges
 function Widgets.iconTextButton(
 	parent: Instance,
 	icon: string,
@@ -929,10 +986,13 @@ function Widgets.iconTextButton(
 	name: string?,
 	iconSize: number?
 ): TextButton
+	local size = iconSize or Theme.size.icon
 	local b = Widgets.button(parent, text, width, color, onPress)
-	b.TextXAlignment = Enum.TextXAlignment.Left
-	Widgets.padding(b, Theme.space.m + 2, 0)
-	Widgets.leadIcon(b, icon, iconSize or Theme.size.icon)
+	local pad = Widgets.padding(b, BUTTON_SIDE, 0)
+	pad.PaddingLeft = UDim.new(0, BUTTON_SIDE + size + ICON_GAP)
+	local mark = Icons.label(b, icon, size)
+	mark.ZIndex = 2
+	centreLead(b, mark, size, ICON_GAP)
 	if name then
 		b.Name = name
 	end
@@ -1076,6 +1136,73 @@ end
 function Widgets.tileWidth(width: number, columns: number, gap: number): number
 	local w = math.floor((width - (columns - 1) * gap) / columns)
 	return w - w % 2
+end
+
+-- A raised slate plate you tap (a nation in the draft): no enamel base, so its whole height holds content; it
+-- squashes a little while held. `size` in px; its text is Fredoka One 15, centred.
+function Widgets.plateButton(parent: Instance, text: string, size: Vector2, onPress: () -> ()): TextButton
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.fromOffset(size.X, size.Y)
+	b.BackgroundColor3 = Theme.color.slate700
+	b.AutoButtonColor = false
+	b.BorderSizePixel = 0
+	b.FontFace = Theme.font.display
+	b.TextSize = Theme.text.small + 1
+	b.TextColor3 = Theme.color.text
+	b.TextWrapped = true
+	b.Text = text
+	b.Parent = parent
+	Widgets.corner(b, Theme.radius.s)
+	Widgets.stroke(b)
+	Widgets.padding(b, Theme.space.s, 0)
+	if not Widgets.skin(b, "plate", "plateRaised") then
+		Widgets.textStroke(b)
+	end
+	pressable(b, nil)
+	b.Activated:Connect(onPress)
+	return b
+end
+
+-- Mark a card or tile as chosen (your vote, the nation you tapped): a gold line 2 px inside its edge, or none. On a
+-- skinned widget the line goes on its face (a stroke on the root would draw under the face, which covers the box).
+function Widgets.setChosen(widget: GuiObject, chosen: boolean)
+	local skin = skins[widget]
+	local obj: GuiObject = if skin then skin.face else widget
+	local existing = obj:FindFirstChild("Chosen")
+	if not chosen then
+		if existing then
+			existing:Destroy()
+		end
+		return
+	end
+	if existing then
+		return
+	end
+	local s = Instance.new("UIStroke")
+	s.Name = "Chosen"
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.BorderStrokePosition = Enum.BorderStrokePosition.Inner
+	s.LineJoinMode = Enum.LineJoinMode.Miter
+	s.Color = Theme.color.gold
+	s.Thickness = Theme.stroke
+	s.ZIndex = 3
+	s.Parent = obj
+end
+
+-- Dim a widget that can't be had now (a nation someone already picked): its frame and icons fade, its caption
+-- goes grey. A flat widget's fill fades instead.
+function Widgets.setDimmed(obj: GuiObject, dimmed: boolean)
+	local skin = skins[obj]
+	if skin then
+		skin.face.ImageTransparency = if dimmed then 0.55 else 0
+	else
+		obj.BackgroundTransparency = if dimmed then 0.6 else 0
+	end
+	for _, child in obj:GetChildren() do
+		if child.Name == "Icon" and child:IsA("GuiObject") then
+			Icons.dim(child, dimmed)
+		end
+	end
 end
 
 -- A square button showing just an icon (32 px on a 44 px gem). `name` is the button's Name (what the harness and
@@ -1451,9 +1578,44 @@ function Widgets.closeButton(parent: Instance, onClose: () -> ()): TextButton
 	return b
 end
 
+local TITLE_RISE = 14 -- a title plate's top sits this far above its window's top edge
+local CLOSE_OVERHANG = 8 -- the close gem sticks out this far past the window's right edge
+
+-- How far a window must keep its title plate from its left edge, and how much further left its close gem must sit,
+-- to stay clear of Roblox's buttons (phone px). Only a root object of a screen that covers Roblox's top-bar row
+-- (Widgets.coverScreen) whose plate would fall in that row needs it; anything else gets (0, 0). Worked out from the
+-- window's Size, Position and AnchorPoint and the screen's size, as the harness has no layout engine to ask.
+local function topbarClearance(window: GuiObject): (number, number)
+	local gui = window.Parent
+	if not (gui and gui:GetAttribute("CoversTopBar")) or window.AutomaticSize ~= Enum.AutomaticSize.None then
+		return 0, 0
+	end
+	local screen = Widgets.screenSize(gui)
+	local scale = window:FindFirstChild("DeviceScale")
+	local k = if scale and scale:IsA("UIScale") then scale.Scale else 1
+	local size, position = window.Size, window.Position
+	local w = (size.X.Scale * screen.X + size.X.Offset) * k
+	local h = (size.Y.Scale * screen.Y + size.Y.Offset) * k
+	local limit = window:FindFirstChildOfClass("UISizeConstraint") -- the private settings sheet's (in phone px)
+	if limit then
+		w, h = math.min(w, limit.MaxSize.X * k), math.min(h, limit.MaxSize.Y * k)
+	end
+	local left = position.X.Scale * screen.X + position.X.Offset - window.AnchorPoint.X * w
+	local top = position.Y.Scale * screen.Y + position.Y.Offset - window.AnchorPoint.Y * h
+	local rowLeft, rowRight, rowBottom = topbarRow(gui)
+	if top - TITLE_RISE * k >= rowBottom then
+		return 0, 0 -- the plate hangs under the row
+	end
+	local keepLeft = math.max(0, (rowLeft - left) / k + Theme.space.m)
+	local keepRight = math.max(0, (left + w - rowRight) / k + CLOSE_OVERHANG)
+	return keepLeft, keepRight
+end
+
 -- A window's header (docs/UI_DIRECTION.md 7.1): the title plate centred on its top edge, 16 px from its left, and
 -- the close gem overhanging its top-right corner when `onClose` is given. The header row itself takes no room:
 -- put it first in the window (it is LayoutOrder -1). Returns the row and the title plate (set its Text later).
+-- A full-screen window's top edge lies in Roblox's top-bar row: its plate starts right of Roblox's buttons instead
+-- (and its close gem keeps left of anything Roblox has at the right), re-placed when the row changes.
 function Widgets.header(parent: Instance, text: string, icon: string?, onClose: (() -> ())?): (Frame, TextLabel)
 	local row = Instance.new("Frame")
 	row.Name = "Header"
@@ -1476,14 +1638,24 @@ function Widgets.header(parent: Instance, text: string, icon: string?, onClose: 
 	padding.PaddingTop = UDim.new(0, Theme.frame.pad.top - gap)
 	local function place()
 		local top = padding.PaddingTop.Offset
-		title.Position = UDim2.fromOffset(Theme.frame.pad.side - padding.PaddingLeft.Offset, -top - 14)
+		local keepLeft, keepRight = topbarClearance(host)
+		local x = math.max(Theme.frame.pad.side, math.ceil(keepLeft / 2) * 2) -- even, on the pixel grid
+		title.Position = UDim2.fromOffset(x - padding.PaddingLeft.Offset, -top - TITLE_RISE)
 		if close then
-			close.Position = UDim2.new(1, padding.PaddingRight.Offset - 36, 0, -top - 16)
+			local shift = math.ceil(keepRight / 2) * 2
+			close.Position = UDim2.new(1, padding.PaddingRight.Offset - 36 - shift, 0, -top - 16)
 		end
 	end
 	place()
 	for _, prop in { "PaddingTop", "PaddingLeft", "PaddingRight" } do
 		padding:GetPropertyChangedSignal(prop):Connect(place)
+	end
+	if host.Parent and host.Parent:GetAttribute("CoversTopBar") then
+		-- Roblox's row can change while the window is open (its menu widens): the header is rebuilt on every opening
+		local moved = GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(place)
+		row.Destroying:Connect(function()
+			moved:Disconnect()
+		end)
 	end
 	return row, title
 end
@@ -1739,31 +1911,58 @@ end
 
 -- The meta screens (shop, season pass, quests, trophies) --------------------------------------------------------
 
--- A full-screen window (the shop, the season pass...): a brass frame 8 px from the screen's edges (16 at the top,
--- for its title plate), a hard shadow, and the screen dimmed behind it. Hidden until opened; the dim follows it.
--- Screens build its contents when it opens and drop them when it closes (Widgets.clear), to save GUI objects.
-function Widgets.window(parent: Instance, name: string): Frame
+Widgets.WINDOW_MAX = Vector2.new(828, 366) -- a full-screen window at most: its size on an 844×390 phone
+
+-- A full-screen window's size on this screen, in phone px: the screen less its margins, at most WINDOW_MAX. On a
+-- tablet the window keeps a phone's size and grows by the device scale, so its contents never stretch. Even.
+function Widgets.windowSize(gui: Instance): Vector2
+	local screen = Widgets.screenSize(gui) / currentScale
+	local w = math.min(screen.X - 2 * Theme.space.m, Widgets.WINDOW_MAX.X)
+	local h = math.min(screen.Y - 3 * Theme.space.m, Widgets.WINDOW_MAX.Y)
+	return Vector2.new(w - w % 2, h - h % 2)
+end
+
+-- The screen dimmed behind a window (Widgets.window, the private server sheet): a full-screen frame under it that
+-- also catches the taps around it, so nothing below (the map, the Lobby's buttons) reacts while it is open. On a
+-- tablet a window keeps a phone's size, so most of the screen is around it. It shows and hides with the window.
+function Widgets.dimBehind(window: GuiObject): Frame
 	local dim = Instance.new("Frame")
-	dim.Name = name .. "Dim"
+	dim.Name = window.Name .. "Dim"
 	dim.Active = true -- taps on the dim never reach the map
 	dim.Size = UDim2.fromScale(1, 1)
 	dim.BackgroundColor3 = Theme.color.slate950
 	dim.BackgroundTransparency = 0.4
 	dim.BorderSizePixel = 0
-	dim.ZIndex = 0
-	dim.Visible = false
-	dim.Parent = parent
+	dim.ZIndex = 0 -- under the window, which is a sibling at ZIndex 1
+	dim.Visible = window.Visible
+	dim.Parent = window.Parent
+	window:GetPropertyChangedSignal("Visible"):Connect(function()
+		dim.Visible = window.Visible
+	end)
+	return dim
+end
+
+-- A full-screen window (the shop, the season pass...): a brass frame 8 px from the screen's edges (16 at the top,
+-- for its title plate; at most Widgets.windowSize), a hard shadow, and the screen dimmed behind it
+-- (Widgets.dimBehind). Hidden until opened. Screens build its contents when it opens and drop them when it closes
+-- (Widgets.clear), to save GUI objects.
+-- `parent` is the window's ScreenGui: it covers the whole screen (Widgets.coverScreen), so the window has the same
+-- room in Studio as in the harness, and its title plate keeps clear of Roblox's buttons (Widgets.header).
+function Widgets.window(parent: ScreenGui, name: string): Frame
+	Widgets.coverScreen(parent)
 	local f = Widgets.panel(parent, 0, "brass")
 	f.Name = name
 	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Position = UDim2.new(0.5, 0, 0.5, Theme.space.xs)
-	f.Size = UDim2.new(1, -2 * Theme.space.m, 1, -3 * Theme.space.m)
 	f.AutomaticSize = Enum.AutomaticSize.None
 	f.Visible = false
-	Widgets.fit(f)
-	f:GetPropertyChangedSignal("Visible"):Connect(function()
-		dim.Visible = f.Visible
-	end)
+	Widgets.dimBehind(f)
+	local function place()
+		local size = Widgets.windowSize(parent)
+		Widgets.fit(f, UDim2.fromOffset(size.X, size.Y), UDim2.new(0.5, 0, 0.5, Theme.space.xs))
+	end
+	place()
+	parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+	Widgets.onScale(place)
 	return f
 end
 

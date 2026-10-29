@@ -1267,7 +1267,8 @@ local function build(map: Types.MapDef)
 		local notice = Widgets.toast(canvas.Parent or canvas, MapView.topBand() + NOTICE_TOP, NOTICE_WIDTH)
 		notice.Name = "MapArtOff"
 		artOffNotice = notice
-		Widgets.setIconText(notice, "🗺 Map art is off: turn on Allow Mesh / Image APIs", "map")
+		-- its map icon in the medallion (a toast's icon sits inside its Medallion), as wide as its line
+		Widgets.setToast(notice, "🗺 Map art is off: turn on Allow Mesh / Image APIs")
 		notice.Visible = true
 		if not warned then
 			warned = true

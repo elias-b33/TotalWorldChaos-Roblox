@@ -6,8 +6,10 @@
 -- are only in this season" label shown before buying, and Claim all.
 -- Opens from the ticket button in the Lobby, the Results screen and the shop's Offers tab. No single tier skips are
 -- sold. No pressure (section 10): the days left are a fact, not a countdown, and nothing pops up on its own.
--- Built from the UI kit (docs/DESIGN.md "UI style"); the panel's contents are built when it opens and dropped when
--- it closes.
+-- Built from the UI kit (docs/UI_DIRECTION.md 7.14): reward cells on raised plates, with a rim in the rarity's
+-- colour for items; a claimable cell glows gold round its emerald Claim; locked ones show a lock in a well; empty
+-- slots are wells; the tier numbers are small chips, gold up to your tier. The pass buttons are royal, Claim all
+-- the gold primary. The panel's contents are built when it opens and dropped when it closes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,15 +34,18 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local ROBUX = utf8.char(0xE002) -- Roblox's Robux icon in every Roblox font
-local TIERS_PER_PAGE = 8
+local TIERS_PER_PAGE = 8 -- at most; a short screen shows fewer, wider cells (fitTrack)
+local MIN_NAME_WIDTH = 100 -- a one-line name ("Primordial Rift") needs this much of a cell
 local BAR = Widgets.BUTTON_HEIGHT -- the header and the footer
-local TIER_HEADER = 18
+local TIER_HEADER = 22 -- the tier chips
+local TIER_CHIP = 40
 local LABEL_WIDTH = 52 -- "Free" and "Pass" left of the tracks
 local GAP = Theme.space.xs
 local HALF = (TIER_HEADER + 2 * GAP) // 2 -- each track row is half of what is left under the tier numbers, less this
 local TIER_BOX = 172
-local PREVIEW_HEIGHT = 30
-local NAME_HEIGHT = 34 -- two 14 px lines
+local PREVIEW_HEIGHT = 24 -- a reward's picture
+local CELL_TOP = 6 -- a cell's content starts under its plate's lit rim
+local NAME_HEIGHT = 32 -- two 14 px lines, between the picture and the state tag
 local PILL = 30 -- a cell's Claim button or state tag (the whole claimable cell is the touch target)
 local PASS_WIDTH = 128
 local BUNDLE_WIDTH = 188
@@ -69,6 +74,8 @@ local badge: TextLabel
 local panel: Frame
 local ui: Refs? = nil
 local page = 1
+local perPage = TIERS_PER_PAGE -- tiers on a page now (fitTrack)
+local twoLines = true -- a cell has room for a name on two lines (fitTrack)
 local toast: (string) -> () = function(_text: string) end
 
 local function formatNumber(n: number): string
@@ -92,8 +99,24 @@ local function centred(parent: Instance, text: string, size: number, height: num
 	return l
 end
 
+-- How the track fits this screen: eight tiers a page when a cell is tall enough for a picture, a name on two lines
+-- and its state tag (an 844×390 phone); on a shorter screen (667×375) names keep to one line, so fewer, wider cells
+-- (each name at least MIN_NAME_WIDTH) rather than names cut short.
+local function fitTrack()
+	local window = Widgets.windowSize(gui)
+	local content = window.Y - Theme.frame.pad.top - Theme.frame.pad.bottom
+	local cell = (content - (2 * BAR + 3 * Theme.space.s)) / 2 - HALF
+	twoLines = cell >= CELL_TOP + PREVIEW_HEIGHT + NAME_HEIGHT + PILL + GAP
+	if twoLines then
+		perPage = TIERS_PER_PAGE
+	else
+		local columns = window.X - 2 * Widgets.PANEL_PAD - LABEL_WIDTH - GAP
+		perPage = math.clamp((columns + GAP) // (MIN_NAME_WIDTH + 3 * GAP), 4, TIERS_PER_PAGE)
+	end
+end
+
 local function pages(): number
-	return math.ceil((Config.Season.Tiers + 1) / TIERS_PER_PAGE) -- the last column is the bonus reward
+	return math.ceil((Config.Season.Tiers + 1) / perPage) -- the last column is the bonus reward
 end
 
 -- A reward's short name for its cell.
@@ -120,17 +143,17 @@ local function preview(parent: Instance, r: Types.SeasonReward)
 	local color = myColor()
 	local thing: GuiObject
 	if item and item.slot == "Flag" then
-		thing = Cosmetics.flagLabel(holder, item.id, color, UDim2.fromOffset(40, 30))
+		thing = Cosmetics.flagLabel(holder, item.id, color, UDim2.fromOffset(32, 24))
 	elseif item and item.slot == "Token" then
-		thing = Cosmetics.tokenLabel(holder, item.id, color, UDim2.fromOffset(30, 30))
+		thing = Cosmetics.tokenLabel(holder, item.id, color, UDim2.fromOffset(24, 24))
 	elseif item and item.slot == "Border" then
-		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, UDim2.fromOffset(45, 30))
+		thing = Cosmetics.swatchLabel(holder, item.art, "default", color, UDim2.fromOffset(36, 24))
 	elseif item and item.slot == "Shades" then
-		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, UDim2.fromOffset(45, 30))
+		thing = Cosmetics.swatchLabel(holder, "solid", item.art, color, UDim2.fromOffset(36, 24))
 	elseif item and item.slot == "PowerFx" then
-		thing = Cosmetics.effectLabel(holder, item.id, UDim2.fromOffset(40, 30))
+		thing = Cosmetics.effectLabel(holder, item.id, UDim2.fromOffset(32, 24))
 	elseif item and item.slot == "Theme" then
-		thing = Cosmetics.themeLabel(holder, item.id, UDim2.fromOffset(60, 30))
+		thing = Cosmetics.themeLabel(holder, item.id, UDim2.fromOffset(48, 24))
 	elseif item and item.slot == "Frame" then
 		local l = centred(holder, "Name", Theme.text.small, 22)
 		l.FontFace = Theme.font.display
@@ -146,7 +169,7 @@ local function preview(parent: Instance, r: Types.SeasonReward)
 		Widgets.corner(l, Theme.radius.m)
 		thing = l
 	elseif item then -- emotes and victory animations are emoji over a capital: their first frame
-		thing = centred(holder, string.split(item.art, " ")[1], 24, PREVIEW_HEIGHT)
+		thing = centred(holder, string.split(item.art, " ")[1], 22, PREVIEW_HEIGHT) -- an emoji draws a little over its size
 	else
 		thing = Widgets.icon(holder, if r.glory then "medal" elseif r.title then "crown" else "star", 24)
 	end
@@ -182,16 +205,15 @@ local function rewardCell(
 	local rewards = if def then Season.rewards(def, tier, which) else {}
 	local name = string.format("Reward_%s%d", if which == "Free" then "F" else "P", tier)
 	local size = UDim2.new(1, 0, 0.5, -HALF)
-	if #rewards == 0 then -- nothing on this track at this tier: an empty slot
-		local slot = Instance.new("Frame")
+	if #rewards == 0 then -- nothing on this track at this tier: an empty slot, a well
+		local slot = Instance.new("ImageLabel")
 		slot.Name = name
-		slot.BackgroundColor3 = Theme.color.navyDeep
-		slot.BackgroundTransparency = 0.4
 		slot.BorderSizePixel = 0
 		slot.Position = position
 		slot.Size = size
 		slot.Parent = column
-		Widgets.corner(slot, Theme.radius.m)
+		Widgets.material(slot, "well")
+		slot.ImageTransparency = 0.4
 		return
 	end
 	local key = Season.key(tier, which)
@@ -201,12 +223,22 @@ local function rewardCell(
 	local function claim()
 		Intents.claimSeason(tier, which)
 	end
+	local first = rewards[1]
+	local item = if first.item then Catalogue.item(first.item) else nil
+	local rarity = if item then Theme.rarity[item.rarity] else nil
+	-- a raised plate, with a rim in the rarity's colour for an item; a claimable cell is itself the button and glows
 	local cell: GuiObject
 	if not claimed and not locked and not needsPass then
-		cell = Widgets.button(column, "", 0, Theme.color.navyRaised, claim)
+		local b = Widgets.button(column, "", 0, Theme.color.slate700, claim)
+		Widgets.restyle(b, rarity or "plateRaised", "plate")
+		Widgets.glow(b, Theme.color.gold)
+		cell = b
 	else
 		local card = Widgets.card(column)
 		card.AutomaticSize = Enum.AutomaticSize.None
+		if rarity then
+			Widgets.Frames.apply(card :: any, "plate", rarity)
+		end
 		cell = card
 	end
 	cell.Name = name
@@ -214,15 +246,10 @@ local function rewardCell(
 	cell.Size = size
 	local pad = cell:FindFirstChildOfClass("UIPadding") or Widgets.padding(cell, GAP)
 	pad.PaddingLeft, pad.PaddingRight = UDim.new(0, GAP), UDim.new(0, GAP)
-	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, GAP), UDim.new(0, GAP)
-	local first = rewards[1]
-	local item = if first.item then Catalogue.item(first.item) else nil
-	local stroke = cell:FindFirstChild("Outline")
+	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, CELL_TOP), UDim.new(0, GAP)
+	local stroke = cell:FindFirstChild("Outline") -- the flat look's edge says the same
 	if stroke and stroke:IsA("UIStroke") then
-		stroke.Color = if item
-			then Theme.rarity[item.rarity] or Theme.color.ink
-			elseif first.glory then Theme.color.gold
-			else Theme.color.special
+		stroke.Color = if rarity then rarity elseif first.glory then Theme.color.gold else Theme.color.special
 	end
 	preview(cell, first)
 	local label = Widgets.label(
@@ -232,7 +259,10 @@ local function rewardCell(
 		NAME_HEIGHT
 	)
 	label.Name = "Name"
-	label.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT + 1)
+	-- between the picture and the state tag: two lines where the cell has room, else one (cut with …)
+	label.Position = UDim2.fromOffset(0, PREVIEW_HEIGHT)
+	label.Size = UDim2.new(1, 0, 1, -(PREVIEW_HEIGHT + PILL))
+	label.TextWrapped = twoLines
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextTruncate = Enum.TextTruncate.AtEnd
 	if claimed then
@@ -332,37 +362,41 @@ local function renderTrack(track: Frame, view: Types.SeasonView)
 	columns.Size = UDim2.new(1, -(LABEL_WIDTH + GAP), 1, 0)
 	columns.Parent = track
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.new(1 / TIERS_PER_PAGE, -GAP, 1, 0)
+	grid.CellSize = UDim2.new(1 / perPage, -GAP, 1, 0)
 	grid.CellPadding = UDim2.fromOffset(GAP, 0)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = columns
-	local firstTier = (page - 1) * TIERS_PER_PAGE + 1
-	for tier = firstTier, math.min(view.maxTier, firstTier + TIERS_PER_PAGE - 1) do
+	local firstTier = (page - 1) * perPage + 1
+	for tier = firstTier, math.min(view.maxTier, firstTier + perPage - 1) do
 		local column = Instance.new("Frame")
 		column.Name = "Tier" .. tier
 		column.BackgroundTransparency = 1
 		column.LayoutOrder = tier
 		column.Parent = columns
+		-- the tier's number in a small chip: gold enamel up to your tier, a well after it
 		local reached = tier <= view.tier
 		local head = centred(
 			column,
 			tostring(tier),
 			Theme.text.small,
 			TIER_HEADER,
-			if reached then Theme.color.gold else Theme.color.textDim
+			if reached then Theme.color.textDark else Theme.color.slate300
 		)
 		head.Name = "Head"
 		head.FontFace = Theme.font.display
-		if tier == view.tier then -- your tier: a gold pill
-			head.BackgroundColor3 = Theme.color.gold
-			head.BackgroundTransparency = 0
-			head.TextColor3 = Theme.color.textDark
-			Widgets.corner(head, Theme.radius.s)
+		head.AnchorPoint = Vector2.new(0.5, 0)
+		head.Position = UDim2.fromScale(0.5, 0)
+		head.Size = UDim2.fromOffset(TIER_CHIP, TIER_HEADER)
+		head.BackgroundColor3 = if reached then Theme.color.gold else Theme.color.slate900
+		head.BackgroundTransparency = 0
+		Widgets.corner(head, Theme.radius.s)
+		if not Widgets.skin(head, if reached then "badge" else "well", if reached then "gold" else "well") then
+			Widgets.stroke(head)
 		end
 		rewardCell(column, view, tier, "Free", UDim2.fromOffset(0, TIER_HEADER + GAP))
 		rewardCell(column, view, tier, "Premium", UDim2.new(0, 0, 0.5, HALF))
 	end
-	if firstTier + TIERS_PER_PAGE - 1 > view.maxTier then
+	if firstTier + perPage - 1 > view.maxTier then
 		bonusColumn(columns, view, view.maxTier + 1)
 	end
 end
@@ -445,7 +479,7 @@ local function renderFooter(footer: Frame, view: Types.SeasonView)
 		footer,
 		if view.ready > 0 then string.format("Claim all (%d)", view.ready) else "Claim all",
 		CLAIM_WIDTH,
-		Widgets.GOOD,
+		Widgets.GOLD,
 		Intents.claimAllSeason
 	)
 	claimAll.Name = "ClaimAll"
@@ -482,6 +516,7 @@ local function render()
 		Widgets.leadIcon(l, if view then "calendar" else "hourglass", Theme.size.icon)
 		return
 	end
+	fitTrack()
 	page = math.clamp(page, 1, pages())
 	r.title.Text = view.name
 	r.tier.Text =
@@ -597,7 +632,8 @@ setOpen = function(open: boolean)
 				end
 			end
 		end
-		page = (tier - 1) // TIERS_PER_PAGE + 1
+		fitTrack()
+		page = (tier - 1) // perPage + 1
 		Intents.seasonViewed() -- analytics: SeasonPass pass_viewed
 	end
 	panel.Visible = open
