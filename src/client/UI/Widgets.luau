@@ -1922,28 +1922,40 @@ function Widgets.windowSize(gui: Instance): Vector2
 	return Vector2.new(w - w % 2, h - h % 2)
 end
 
--- A full-screen window (the shop, the season pass...): a brass frame 8 px from the screen's edges (16 at the top,
--- for its title plate; at most Widgets.windowSize), a hard shadow, and the screen dimmed behind it. Hidden until opened; the dim follows it.
--- Screens build its contents when it opens and drop them when it closes (Widgets.clear), to save GUI objects.
--- `parent` is the window's ScreenGui: it covers the whole screen (Widgets.coverScreen), so the window has the same
--- room in Studio as in the harness, and its title plate keeps clear of Roblox's buttons (Widgets.header).
-function Widgets.window(parent: ScreenGui, name: string): Frame
-	Widgets.coverScreen(parent)
+-- The screen dimmed behind a window (Widgets.window, the private server sheet): a full-screen frame under it that
+-- also catches the taps around it, so nothing below (the map, the Lobby's buttons) reacts while it is open. On a
+-- tablet a window keeps a phone's size, so most of the screen is around it. It shows and hides with the window.
+function Widgets.dimBehind(window: GuiObject): Frame
 	local dim = Instance.new("Frame")
-	dim.Name = name .. "Dim"
+	dim.Name = window.Name .. "Dim"
 	dim.Active = true -- taps on the dim never reach the map
 	dim.Size = UDim2.fromScale(1, 1)
 	dim.BackgroundColor3 = Theme.color.slate950
 	dim.BackgroundTransparency = 0.4
 	dim.BorderSizePixel = 0
-	dim.ZIndex = 0
-	dim.Visible = false
-	dim.Parent = parent
+	dim.ZIndex = 0 -- under the window, which is a sibling at ZIndex 1
+	dim.Visible = window.Visible
+	dim.Parent = window.Parent
+	window:GetPropertyChangedSignal("Visible"):Connect(function()
+		dim.Visible = window.Visible
+	end)
+	return dim
+end
+
+-- A full-screen window (the shop, the season pass...): a brass frame 8 px from the screen's edges (16 at the top,
+-- for its title plate; at most Widgets.windowSize), a hard shadow, and the screen dimmed behind it
+-- (Widgets.dimBehind). Hidden until opened. Screens build its contents when it opens and drop them when it closes
+-- (Widgets.clear), to save GUI objects.
+-- `parent` is the window's ScreenGui: it covers the whole screen (Widgets.coverScreen), so the window has the same
+-- room in Studio as in the harness, and its title plate keeps clear of Roblox's buttons (Widgets.header).
+function Widgets.window(parent: ScreenGui, name: string): Frame
+	Widgets.coverScreen(parent)
 	local f = Widgets.panel(parent, 0, "brass")
 	f.Name = name
 	f.AnchorPoint = Vector2.new(0.5, 0.5)
 	f.AutomaticSize = Enum.AutomaticSize.None
 	f.Visible = false
+	Widgets.dimBehind(f)
 	local function place()
 		local size = Widgets.windowSize(parent)
 		Widgets.fit(f, UDim2.fromOffset(size.X, size.Y), UDim2.new(0.5, 0, 0.5, Theme.space.xs))
@@ -1951,9 +1963,6 @@ function Widgets.window(parent: ScreenGui, name: string): Frame
 	place()
 	parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
 	Widgets.onScale(place)
-	f:GetPropertyChangedSignal("Visible"):Connect(function()
-		dim.Visible = f.Visible
-	end)
 	return f
 end
 

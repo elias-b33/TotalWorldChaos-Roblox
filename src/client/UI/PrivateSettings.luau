@@ -224,6 +224,7 @@ local function buildPanel()
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
 	p.AutomaticSize = Enum.AutomaticSize.None
 	p.Visible = false
+	Widgets.dimBehind(p)
 	local size = Widgets.windowSize(sheetGui)
 	Widgets.fit(p, UDim2.fromOffset(size.X, size.Y), UDim2.new(0.5, 0, 0.5, Theme.space.xs))
 	Widgets.header(p, "Private server settings", "gear")
