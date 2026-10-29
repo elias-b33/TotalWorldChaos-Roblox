@@ -99,7 +99,17 @@ local function run()
 	Emulator.press(alice, "Cancel")
 	Emulator.run(0.5)
 
-	-- 3. A battle: the tired army, with more men, breaks against a fresh one
+	-- 3. A battle: the tired army, with more men, breaks against a fresh one. Its morale is set again here: it
+	-- recovers +10 every 5 s out of battle, and how many steps it got since the sheet depends on the tick
+	tired.morale = 30
+	-- the battles below play by the rules alone: no catch-up bonuses (who is an underdog depends on how far the bots
+	-- in the rest of the world got) and no random roll (the server's random stream depends on them too)
+	local ServerBattle, ServerConfig = H.shared("Sim.Battle"), H.shared("Config")
+	local bonus, spread = ServerBattle.bonus, ServerConfig.Battle.RandomSpread
+	ServerBattle.bonus = function()
+		return 0
+	end
+	ServerConfig.Battle.RandomSpread = 0
 	local fresh = Army.spawn(state, B, rock, 3000, Troops.ofRole(theirs, "line"))
 	H.client(alice, "MapView").centreOn(H.provinceMap(alice, rock), true)
 	Emulator.run(1.2)
@@ -115,8 +125,8 @@ local function run()
 	state.armies[fresh.id] = nil
 	state.provinces[leeward].owner = A
 	Emulator.run(8) -- the toasts pass
-	local west = Army.spawn(state, A, rock, 2100, line)
-	local east = Army.spawn(state, A, leeward, 2100, line)
+	local west = Army.spawn(state, A, rock, 1800, line) -- 3,600 men against 4,000: a flank from two sides wins it
+	local east = Army.spawn(state, A, leeward, 1800, line)
 	Emulator.run(1.5)
 	H.expect(Movement.order(state, A, west.id, reach) and Movement.order(state, A, east.id, reach), "both marching")
 	H.client(alice, "MapView").centreOn(H.provinceMap(alice, reach), true)
@@ -130,6 +140,7 @@ local function run()
 	H.expect(state.armies[guard.id] == nil or guard.retreating == true, "Bob's army lost")
 	H.expect(Emulator.findText(bob, "Flanked at Cinder Reach") ~= nil, "Bob: flanked")
 	H.shot(alice, "flank_toast")
+	ServerBattle.bonus, ServerConfig.Battle.RandomSpread = bonus, spread
 end
 
 return { run = run }
