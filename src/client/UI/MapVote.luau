@@ -6,6 +6,11 @@
 -- first player who chose Play online picks (tap a card, tap again); everyone else sees who is picking.
 -- Theme vote (docs/MONETIZATION.md 3.2): your thumbnails are painted in the map theme you have equipped, and the
 -- hint says you bring it; the map that wins is painted in the theme most of its voters bring.
+-- The kit (docs/UI_DIRECTION.md 7.14): each card a raised plate with its thumbnail in a recessed well, the name in
+-- outlined Fredoka One, the pitch dim, the votes in a chip; the card you tapped and the one you voted for are
+-- outlined in gold (with "Tap again" or a "Your vote" tag). The title is plain hero text, the timer a counter.
+-- The screen covers Roblox's top-bar row (Widgets.coverScreen), so the cards have the whole height on a phone; the
+-- title and its hint start right of Roblox's buttons in that row.
 
 local AssetService = game:GetService("AssetService")
 local Players = game:GetService("Players")
@@ -26,6 +31,7 @@ local LobbyState = require(Client.LobbyState)
 local Palette = require(Client.Palette)
 local PixelArt = require(Client.PixelArt)
 local ShopState = require(Client.ShopState)
+local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
@@ -33,11 +39,14 @@ local Theme = Widgets.Theme
 
 local THUMB_FACTOR = 4 -- thumbnails are the map grid at 1/4 resolution (Earth 256×128)
 local THUMB_HEIGHT = 120
+local THUMB_INSET = 4 -- the thumbnail sits this far inside its well
 local CARD_WIDTH_MAX = 260
 local CARD_HEIGHT = 224
 local CARD_GAP = 12
 local PAINT_SLICE = 0.008 -- seconds of painting per frame
-local SELECTED = Theme.color.gold
+local TIMER_WIDTH = 92
+local EDGE = 16 -- the title's and the timer's margins (more where Roblox's buttons sit in the top-bar row)
+local TITLE_ROOM = 144 -- the timer's room right of the title
 
 -- One short line each (docs/MAPS.md): it has to fit a phone card at 14 px.
 local PITCH: { [string]: string } = {
@@ -47,7 +56,7 @@ local PITCH: { [string]: string } = {
 }
 local ICON: { [string]: string } = { earth = "globe", eldmoor = "castle", skyshards = "sparkles" }
 
-type Card = { button: ImageButton, stroke: UIStroke, votes: TextLabel, status: TextLabel }
+type Card = { button: ImageButton, votes: TextLabel, status: TextLabel }
 
 local MapVote = {}
 
@@ -140,31 +149,35 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	local button = Instance.new("ImageButton")
 	button.Name = "Card_" .. mapId
 	button.AutoButtonColor = false
-	button.BackgroundColor3 = Theme.color.navy
+	button.BorderSizePixel = 0
 	button.Position = UDim2.new((index - 1) / count, CARD_GAP // 2, 0, 0)
 	button.Size = UDim2.new(1 / count, -CARD_GAP, 0, CARD_HEIGHT)
 	button.Parent = row
-	Widgets.corner(button, Theme.radius.l)
+	Widgets.material(button, "raised")
 	Widgets.padding(button, Theme.space.m)
 	Widgets.list(button, false, Theme.space.s)
-	Widgets.bevel(button, true)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(CARD_WIDTH_MAX, CARD_HEIGHT)
 	limit.Parent = button
-	-- the card's outline: ink, gold while chosen, green once it has your vote
-	local stroke = Widgets.stroke(button)
 
+	-- the thumbnail in a recessed well: the map's sea colour fills the well inside its rim
+	local well = Instance.new("ImageLabel")
+	well.Name = "ThumbWell"
+	well.Size = UDim2.new(1, 0, 0, THUMB_HEIGHT)
+	well.BorderSizePixel = 0
+	well.LayoutOrder = 1
+	well.Parent = button
+	Widgets.material(well, "well")
+	Widgets.padding(well, THUMB_INSET)
 	local holder = Instance.new("Frame")
 	holder.Name = "ThumbHolder"
-	holder.Size = UDim2.new(1, 0, 0, THUMB_HEIGHT)
+	holder.Size = UDim2.fromScale(1, 1)
 	holder.BorderSizePixel = 0
-	holder.LayoutOrder = 1
-	holder.Parent = button
-	Widgets.corner(holder, Theme.radius.m)
-	Widgets.stroke(holder)
+	holder.Parent = well
 	MapVote.thumbnail(holder, mapId)
 
-	local name = Widgets.title(button, map.title, Theme.text.heading, 24)
+	local name = Widgets.title(button, map.title, Theme.text.title, 24)
+	name.TextColor3 = Theme.color.text
 	name.LayoutOrder = 2
 	Widgets.leadIcon(name, ICON[mapId] or "map", Theme.size.icon)
 	local pitch = Widgets.hint(button, PITCH[mapId] or "", Theme.text.small, 20)
@@ -176,15 +189,12 @@ local function buildCard(mapId: string, index: number, count: number): Card
 	footer.Parent = button
 	local votes = Widgets.chip(footer, "ballot", "", 64, 26)
 	votes.Name = "Votes"
-	local status = Widgets.label(footer, "", Theme.text.small, 26)
+	-- "Your vote" (a tag), "Tap again" or "Locked" at the right
+	local status = Widgets.tag(footer, "check", "", 26)
 	status.Name = "Status"
 	status.AnchorPoint = Vector2.new(1, 0)
 	status.Position = UDim2.fromScale(1, 0)
-	status.Size = UDim2.fromScale(0, 1)
-	status.AutomaticSize = Enum.AutomaticSize.X
 	status.TextWrapped = false
-	status.TextXAlignment = Enum.TextXAlignment.Right
-	Widgets.leadIcon(status, "check", 18)
 
 	button.Activated:Connect(function()
 		local view = LobbyState.view()
@@ -202,7 +212,7 @@ local function buildCard(mapId: string, index: number, count: number): Card
 		end
 		MapVote.render()
 	end)
-	return { button = button, stroke = stroke, votes = votes, status = status }
+	return { button = button, votes = votes, status = status }
 end
 
 -- The name of the theme you bring to the vote, or nil for the classic look.
@@ -263,9 +273,8 @@ function MapVote.render()
 			card.status.Text = ""
 		end
 		card.status.Visible = card.status.Text ~= ""
-		local chosen = selected == id or mine == id
-		card.stroke.Thickness = if chosen then 3 else Theme.stroke
-		card.stroke.Color = if selected == id then SELECTED elseif mine == id then Widgets.GOOD else Theme.color.ink
+		card.status.TextColor3 = if mine == id then Theme.color.gold else Theme.color.text
+		Widgets.setChosen(card.button, selected == id or mine == id)
 	end
 	root.Visible = true
 end
@@ -277,29 +286,39 @@ local function updateTimer()
 	end
 end
 
+-- The title, its hint and the timer sit in Roblox's top-bar row: clear of Roblox's buttons.
+local function placeTop()
+	local left, right = Widgets.topbarMargins(gui, EDGE, EDGE)
+	title.Position = UDim2.fromOffset(left, 8)
+	title.Size = UDim2.new(1, -(left + right + TITLE_ROOM - EDGE), 0, 34)
+	hint.Position = UDim2.fromOffset(left, 44)
+	hint.Size = UDim2.new(1, -(left + right + TITLE_ROOM - EDGE), 0, 20)
+	timer.Position = UDim2.new(1, -right, 0, 12)
+end
+
 function MapVote.init()
 	gui = Widgets.screen("MapVote", 20)
+	Widgets.coverScreen(gui)
 	root = Instance.new("Frame")
 	root.Name = "Root"
 	root.Active = true -- nothing behind the vote can be tapped
 	root.Size = UDim2.fromScale(1, 1)
-	root.BackgroundColor3 = Theme.color.navyDeep
+	root.BackgroundColor3 = Theme.color.slate900
 	root.BorderSizePixel = 0
 	root.Visible = false
 	root.Parent = gui
+	Widgets.bevel(root, true) -- a gentle light from the top
 
-	title = Widgets.title(root, "", Theme.text.hero - 2, 34)
-	title.Position = UDim2.fromOffset(16, 8)
-	title.Size = UDim2.new(1, -160, 0, 34)
+	-- plain hero text (no plate), outlined in ink, the pixel icon before it
+	title = Widgets.title(root, "", Theme.text.hero, 34)
+	title.TextColor3 = Theme.color.text
 	titleIcon = Widgets.leadIcon(title, "ballot", Theme.icon.medium)
 	hint = Widgets.hint(root, "", Theme.text.small, 20)
-	hint.Position = UDim2.fromOffset(16, 44)
-	hint.Size = UDim2.new(1, -160, 0, 20)
-	timer = Widgets.chip(root, "hourglass", "", 96, 34)
+	timer = Widgets.counter(root, "hourglass", "", TIMER_WIDTH)
 	timer.Name = "Timer"
 	timer.AnchorPoint = Vector2.new(1, 0)
-	timer.Position = UDim2.new(1, -16, 0, 10)
-	timer.TextSize = Theme.text.title - 2
+	placeTop()
+	HudLayout.onChange(placeTop) -- Roblox's row changed, or the screen did
 
 	row = Instance.new("Frame")
 	row.Name = "Cards"

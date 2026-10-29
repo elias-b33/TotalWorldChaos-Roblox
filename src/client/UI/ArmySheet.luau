@@ -3,10 +3,10 @@
 -- see the route and arrival time, tap Go. Or tap one of your fleets instead of a destination: the army walks to the
 -- fleet's coast and boards it (docs/DESIGN.md "Navies"), confirmed with Board. Built from the UI kit
 -- (docs/UI_DIRECTION.md 7.10): the army's size and place on a title plate, its composition as chips (each troop's
--- icon and its men, docs/DESIGN.md "Troops": five fit a row; with its name while three or fewer types fit the row),
--- its morale as a bar (docs/DESIGN.md "Armies and combat": green when rested, gold when tired, red when broken), its
--- special's trick when it has one, the route line (an icon, the destination, the march time dimmer) and Go (or
--- Board) / Cancel.
+-- icon and its men, docs/DESIGN.md "Troops": five fit a row; with its name too while three or fewer types and every
+-- named chip fit the row), its morale as a bar (docs/DESIGN.md "Armies and combat": green when rested, gold when
+-- tired, red when broken), its special's trick when it has one, the route line (an icon, the destination, the march
+-- time dimmer) and Go (or Board) / Cancel.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +19,7 @@ local ClientState = require(Client.ClientState)
 local MapBadges = require(Client.MapBadges)
 local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
+local TextWidth = require(Client.TextWidth)
 local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
@@ -30,6 +31,8 @@ local NAMED_CHIPS = 3 -- up to this many troop types, a chip shows the troop's n
 local MORALE_BAR = 160 -- the morale bar's width
 local MORALE_COLORS: { [string]: Color3 } =
 	{ good = Theme.color.emerald, low = Theme.color.gold, broken = Theme.color.crimson }
+local CHIP_SIDES = 36 -- a chip's padding, icon and gap round its text (Widgets.chip)
+local CHIP_GAP = Theme.space.s
 
 local ArmySheet = {}
 
@@ -87,9 +90,20 @@ local function render()
 	Widgets.clear(chips)
 	local parts = RaceInfo.composition(army.troops)
 	local trickText = ""
+	-- names too, when there are few types and every named chip fits the row ("1.2k Crocodile guard" is wide)
+	local named = #parts <= NAMED_CHIPS
+	if named then
+		local row = sheet.Size.X.Offset - 2 * Widgets.PANEL_PAD
+		local total = -CHIP_GAP
+		for _, part in parts do
+			local text = shortMen(part.men) .. " " .. RaceInfo.troopName(part.troop)
+			total += CHIP_SIDES + TextWidth.measure(text, Theme.text.body) + CHIP_GAP
+		end
+		named = total <= row
+	end
 	for i, part in parts do
 		local text = shortMen(part.men)
-		if #parts <= NAMED_CHIPS then
+		if named then
 			text ..= " " .. RaceInfo.troopName(part.troop)
 		end
 		local chip = Widgets.chip(chips, RaceInfo.troopIcon(part.troop), text, nil, Theme.size.chip)

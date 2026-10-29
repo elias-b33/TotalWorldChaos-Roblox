@@ -28,7 +28,7 @@ local USES: { [string]: { string | number } } = {
 		0xd23c50,
 	},
 	buttonDown = { "gold", "slate", "tile:powers" },
-	plate = { "plate", "plateRaised" },
+	plate = { "plate", "plateRaised", "common", "rare", "epic", "legendary" },
 	window = { "window", "windowIron", "common", "rare", "epic", "legendary" },
 	well = { "well" },
 	titlePlate = { "titlePlate", "common", "rare", "epic", "legendary", "slate", "gold" },

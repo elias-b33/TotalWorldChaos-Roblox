@@ -7,8 +7,10 @@
 -- Rewarded video (the game's one ad placement): "Watch an ad · +1 free reroll" in the header, only during the
 -- Lobby's map vote, only once the free rerolls are used, and only while Roblox says an ad is available for this
 -- player (Client.Ads), so players it reports as ineligible (under 13) never see it.
--- Built from the UI kit (docs/DESIGN.md "UI style"); the panel's contents are built when it opens and dropped when
--- it closes.
+-- Built from the UI kit (docs/UI_DIRECTION.md 7.14): each quest a raised plate with its tier stripe, an emerald
+-- progress bar (gold once done) and its rewards as XP and Glory chips; Claim emerald, the reroll a slate button
+-- ("Free" with the reroll arrows); the play calendar seven wells, today's outlined in gold, done days ticked; your
+-- Glory in a counter. The panel's contents are built when it opens and dropped when it closes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,8 +37,11 @@ local SECTION_HEIGHT = 18
 local COLUMN_GAP = Theme.space.m
 local LEFT_SHARE = 0.54 -- of the panel's width: the daily column
 local TEXT_LEFT = 14 -- right of the tier stripe
-local REWARD_WIDTH = 70
+local REWARD_WIDTH = 74 -- the XP and Glory chips, one over the other
+local REWARD_CHIP = 20
+local BAR_HEIGHT = 14
 local COUNT_WIDTH = 44
+local GLORY_WIDTH = 96
 local ACTION_WIDTH = 80
 local REROLL_SHARE = 0.4 -- of the header left of the ad button: the reroll line (two lines on a small phone)
 local AD_WIDTH = 224
@@ -119,17 +124,16 @@ local function section(parent: Instance, icon: string, text: string, order: numb
 	return l
 end
 
--- A label sized to its text and anchored at its right edge (a reward line before the row's button).
-local function rightLine(parent: Instance, text: string, right: number, y: number, color: Color3): TextLabel
-	local l = Widgets.label(parent, text, Theme.text.small, 18)
-	l.FontFace = Theme.font.display
-	l.TextColor3 = color
-	l.TextWrapped = false
-	l.AnchorPoint = Vector2.new(1, 0)
-	l.Position = UDim2.new(1, -right, 0, y)
-	l.Size = UDim2.fromOffset(0, 18)
-	l.AutomaticSize = Enum.AutomaticSize.X
-	return l
+-- A reward chip (the XP star or the Glory medal and a number) sized to its text and anchored at its right edge,
+-- before the row's button.
+local function rewardChip(parent: Instance, icon: string, text: string, right: number, y: number, color: Color3)
+	local c = Widgets.chip(parent, icon, text, nil, REWARD_CHIP)
+	c.Name = "Reward"
+	c.TextSize = Theme.text.small
+	c.TextColor3 = color
+	c.AnchorPoint = Vector2.new(1, 0)
+	c.Position = UDim2.new(1, -right, 0, y)
+	return c
 end
 
 -- The reroll button: free ones first, then Glory (the reroll icon, the price and the Glory medal).
@@ -141,7 +145,7 @@ local function rerollButton(row: Frame, q: Types.QuestEntry, view: Types.QuestVi
 		row,
 		if free then "Free" else tostring(view.rerollGlory),
 		ACTION_WIDTH,
-		Widgets.BUTTON,
+		Widgets.BUTTON_OFF,
 		function()
 			Intents.rerollQuest(q.key)
 		end
@@ -221,10 +225,9 @@ local function questRow(parent: Instance, q: Types.QuestEntry, daily: boolean, o
 	elseif daily and q.daysLeft == 0 then -- yesterday's: today is its last day
 		Widgets.leadIcon(title, "hourglass", 16, Theme.space.xs)
 	end
-	local bar =
-		Widgets.progress(row, nil, 10, if done then Theme.color.gold else TIER_COLORS[q.tier] or Theme.color.textDim)
-	bar.Position = UDim2.fromOffset(TEXT_LEFT, 27)
-	bar.Size = UDim2.new(1, -(TEXT_LEFT + REWARD_WIDTH + right + COUNT_WIDTH), 0, 10)
+	local bar = Widgets.progress(row, nil, BAR_HEIGHT, if done then Theme.color.gold else Theme.color.emerald)
+	bar.Position = UDim2.fromOffset(TEXT_LEFT, 25)
+	bar.Size = UDim2.new(1, -(TEXT_LEFT + REWARD_WIDTH + right + COUNT_WIDTH), 0, BAR_HEIGHT)
 	Widgets.setProgress(bar, q.progress / q.target)
 	local count = Widgets.label(row, string.format("%d/%d", math.min(q.progress, q.target), q.target), nil, 18)
 	count.Name = "Count"
@@ -235,10 +238,10 @@ local function questRow(parent: Instance, q: Types.QuestEntry, daily: boolean, o
 	count.Position = UDim2.new(1, -(REWARD_WIDTH + right), 0, 23)
 	count.Size = UDim2.fromOffset(COUNT_WIDTH - Theme.space.xs, 18)
 
+	-- the rewards as chips, XP over Glory (dim once claimed)
 	local color = if q.claimed then Theme.color.textDim else Theme.color.gold
-	rightLine(row, string.format("+%s XP", formatNumber(q.xp)), right, 3, color)
-	local glory = rightLine(row, "+" .. q.glory, right, 23, color)
-	Widgets.leadIcon(glory, "medal", 16, 2)
+	rewardChip(row, "star", "+" .. formatNumber(q.xp), right, 2, color)
+	rewardChip(row, "medal", "+" .. q.glory, right, 2 + REWARD_CHIP, color)
 end
 
 -- The 7 calendar steps: done ones gold with a tick, the next one outlined. Each shows its day and its Glory.
@@ -259,25 +262,28 @@ local function calendar(parent: Instance, view: Types.QuestView, order: number)
 	local shown = if step == #view.calendar.glory and not view.calendar.playedToday then 0 else step
 	for i, glory in view.calendar.glory do
 		local done = i <= shown
+		-- a well per day: done days ticked with their Glory in gold, the day to play next outlined in gold
 		local cell = Instance.new("TextLabel")
 		cell.Name = "Step" .. i
 		cell.LayoutOrder = i
-		cell.BackgroundColor3 = if done then Theme.color.goldDeep else Theme.color.navyRaised
+		cell.BackgroundColor3 = Theme.color.slate900
 		cell.BorderSizePixel = 0
 		cell.FontFace = Theme.font.display
 		cell.TextSize = Theme.text.small
-		cell.TextColor3 = if done then Theme.color.goldPale else Theme.color.text
+		cell.TextColor3 = if done then Theme.color.gold else Theme.color.text
 		cell.Text = string.format("%s\n%d", if done then "" else tostring(i), glory)
 		cell.Parent = row
-		Widgets.corner(cell, Theme.radius.m)
+		Widgets.corner(cell, Theme.radius.s)
+		if not Widgets.skin(cell, "well", "well") then
+			Widgets.stroke(cell, Theme.color.slate850, 1)
+		end
 		if done then
 			local tick = Widgets.icon(cell, "check", 16)
 			tick.AnchorPoint = Vector2.new(0.5, 0)
 			tick.Position = UDim2.new(0.5, 0, 0, Theme.space.xs)
+			tick.ZIndex = 2
 		end
-		if i == shown + 1 and not view.calendar.playedToday then
-			Widgets.stroke(cell, Theme.color.gold)
-		end
+		Widgets.setChosen(cell, i == shown + 1 and not view.calendar.playedToday)
 	end
 end
 
@@ -401,7 +407,8 @@ local function build(): Refs
 	info.Size = UDim2.new(1, -(AD_WIDTH + Theme.space.m), 1, 0)
 	info.Parent = header
 	Widgets.list(info, true, Theme.space.m)
-	local glory = Widgets.chip(info, "medal", "", nil, Theme.size.chip)
+	Widgets.padding(info, 0, 0).PaddingLeft = UDim.new(0, 10) -- room for the counter's medal riding over its end
+	local glory = Widgets.counter(info, "medal", "", GLORY_WIDTH)
 	glory.Name = "Glory"
 	glory.LayoutOrder = 2
 	local rerolls = Widgets.label(info, "", Theme.text.small, BAR)

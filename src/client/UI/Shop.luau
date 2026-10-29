@@ -44,6 +44,7 @@ local ROBUX = utf8.char(0xE002) -- Roblox's Robux icon in every Roblox font
 local PER_PAGE = 5 -- item cards per page
 local OFFERS_PER_PAGE = 3 -- offer cards are wider: what's inside is a list
 local TODAY_COLUMNS = 6 -- 4 daily and 2 weekly slots
+local TODAY_MIN_PREVIEW = 32 -- six across would draw the pictures smaller: the Today tab pages its two sections
 local HISTORY_PER_PAGE = 6
 local BAR = Widgets.BUTTON_HEIGHT -- the header and the tab row
 local GAP = 9 -- between item cards: five 152 px cards fill an 844 px phone's 796 (docs/UI_DIRECTION.md 7.12)
@@ -784,28 +785,47 @@ local function sectionTitle(parent: Instance, name: string, icon: string, text: 
 	return l
 end
 
--- The Today tab: the 4 daily slots and the 2 weekly ones, each section with the time until it changes.
-local function renderToday(content: Frame, area: Vector2)
+-- The Today tab: the 4 daily slots and the 2 weekly ones, each section with the time until it changes. Six across
+-- on one page when their pictures stay at least TODAY_MIN_PREVIEW px tall (an 844 px phone); on a narrower screen
+-- the daily four and the weekly two get a page each, so the cards are wide enough for their prices side by side
+-- and the pictures keep their size. Returns the number of pages.
+local function renderToday(content: Frame, area: Vector2): number
 	local view = ShopState.view()
 	local rotation = if view then view.rotation else nil
 	if rotation == nil then
 		sectionTitle(content, "Loading", "hourglass", "Loading today's shop…")
-		return
+		return 1
 	end
-	local share = #rotation.daily / TODAY_COLUMNS
-	local daily = sectionTitle(content, "DailyTitle", "clock", "Daily · new items in " .. timeLeft(rotation.dailyLeft))
-	daily.Size = UDim2.new(share, -TODAY_GAP, 0, 20)
-	local weekly =
-		sectionTitle(content, "WeeklyTitle", "calendar", "Weekly · new in " .. timeLeft(rotation.weeklyLeft))
-	weekly.Position = UDim2.fromScale(share, 0)
-	weekly.Size = UDim2.new(1 - share, 0, 0, 20)
+	local cardHeight = area.Y - 24
+	local six = Vector2.new(Widgets.tileWidth(area.X, TODAY_COLUMNS, TODAY_GAP), cardHeight)
+	-- the picture six across would get, with both prices stacked under it
+	local stacked = 2 * Widgets.BUTTON_HEIGHT + PRICE_GAP
+	local well = geometry(six, stacked, false, true).wellHeight
+	local paged = well - 2 * WELL_INSET < TODAY_MIN_PREVIEW
+	local pages = if paged then 2 else 1
+	page = math.clamp(page, 1, pages)
+	local showDaily = not paged or page == 1
+	local showWeekly = not paged or page == 2
+	local columns = if paged then #rotation.daily else TODAY_COLUMNS
+	local size = Vector2.new(Widgets.tileWidth(area.X, columns, TODAY_GAP), cardHeight)
+	local share = if paged then 1 else #rotation.daily / TODAY_COLUMNS
+	if showDaily then
+		local daily =
+			sectionTitle(content, "DailyTitle", "clock", "Daily · new items in " .. timeLeft(rotation.dailyLeft))
+		daily.Size = UDim2.new(share, -TODAY_GAP, 0, 20)
+	end
+	if showWeekly then
+		local weekly =
+			sectionTitle(content, "WeeklyTitle", "calendar", "Weekly · new in " .. timeLeft(rotation.weeklyLeft))
+		weekly.Position = UDim2.fromScale(if paged then 0 else share, 0)
+		weekly.Size = UDim2.new(1 - (if paged then 0 else share), 0, 0, 20)
+	end
 	local cards = Instance.new("Frame")
 	cards.Name = "Rotation"
 	cards.BackgroundTransparency = 1
 	cards.Position = UDim2.fromOffset(0, 24)
 	cards.Size = UDim2.new(1, 0, 1, -24)
 	cards.Parent = content
-	local size = Vector2.new(Widgets.tileWidth(area.X, TODAY_COLUMNS, TODAY_GAP), area.Y - 24)
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(size.X, size.Y)
 	grid.CellPadding = UDim2.fromOffset(TODAY_GAP, 0)
@@ -813,24 +833,29 @@ local function renderToday(content: Frame, area: Vector2)
 	grid.Parent = cards
 	local pending: { Pending } = {}
 	local order = 0
-	for _, id in rotation.daily do
-		local item = Catalogue.item(id)
-		if item then
-			order += 1
-			table.insert(pending, itemCard(item, order, cards, size, true))
+	if showDaily then
+		for _, id in rotation.daily do
+			local item = Catalogue.item(id)
+			if item then
+				order += 1
+				table.insert(pending, itemCard(item, order, cards, size, true))
+			end
 		end
 	end
-	for _, id in rotation.weekly do
-		order += 1
-		local item = Catalogue.item(id)
-		local offer = Catalogue.offer(id)
-		if item then
-			table.insert(pending, itemCard(item, order, cards, size, true))
-		elseif offer then
-			bundleCard(offer, order, cards, size)
+	if showWeekly then
+		for _, id in rotation.weekly do
+			order += 1
+			local item = Catalogue.item(id)
+			local offer = Catalogue.offer(id)
+			if item then
+				table.insert(pending, itemCard(item, order, cards, size, true))
+			elseif offer then
+				bundleCard(offer, order, cards, size)
+			end
 		end
 	end
 	finishCards(pending, size, true)
+	return pages
 end
 
 -- The Themes tab's last card: what you see when a theme wins the vote (the opt-out, saved in your profile). A
@@ -1006,7 +1031,7 @@ render = function()
 		pages = renderHistory(content)
 		r.footer.Text = "Purchase history: your Robux purchases, newest first"
 	elseif tab == "Today" then
-		renderToday(content, contentSize())
+		pages = renderToday(content, contentSize())
 		r.footer.Text = string.format(
 			"The same shop for everyone, nothing random. Every item comes back within %d days.",
 			RETURN_DAYS
