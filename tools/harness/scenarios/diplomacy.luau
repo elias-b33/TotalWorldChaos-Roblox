@@ -56,7 +56,7 @@ local function run()
 
 	-- the province sheet of one of Bob's provinces: insult, gift and ask for access beside war and ally
 	H.tapProvince(alice, volga)
-	for _, name in { "Declare war", "Ally", "Insult", "Gift", "Ask access" } do
+	for _, name in { "Declare war", "Ally", "Insult", "Gift", "Access" } do
 		H.expect(H.hasButton(alice, name), "the sheet has " .. name)
 	end
 	H.shot(alice, "foreign_sheet")
@@ -117,7 +117,7 @@ local function run()
 	local army = Army.spawn(state, A, home, 3000)
 	H.expect(H.client(alice, "Relations").path(A, home, volga) == nil, "no route into Volga at peace")
 	H.tapProvince(alice, volga)
-	Emulator.press(alice, "Ask access")
+	Emulator.press(alice, "Access")
 	Emulator.run(1.5)
 	H.expect(H.waitText(bob, "asks to march through your land"), "Bob sees Alice's request")
 	H.shot(bob, "access_offer")
@@ -151,7 +151,7 @@ local function run()
 	Emulator.run(2)
 	local capitalName = state.provinces[state.nations[B].capital].name
 	H.expect(Emulator.findText(alice, capitalName) ~= nil, "the sheet of Volga's capital opens")
-	H.expect(H.hasButton(alice, "Gift") and not H.hasButton(alice, "Ask access"), "with its diplomacy buttons")
+	H.expect(H.hasButton(alice, "Gift") and not H.hasButton(alice, "Access"), "with its diplomacy buttons")
 	Emulator.press(alice, "✕")
 
 	-- the access runs out: the army walks home under the white flag

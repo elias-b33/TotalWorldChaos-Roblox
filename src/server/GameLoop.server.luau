@@ -232,6 +232,7 @@ local function runSandbox()
 			end
 			if ran == 0 and (speed == 0 or changed) then
 				Replicator.broadcast(state)
+				Replicator.sendCards(state, SandboxService.seat) -- a choice made while paused closes its card
 			end
 		end)
 		last = now

@@ -458,7 +458,7 @@ local function render()
 					Intents.diplomacy("Gift", target)
 				end, "Gift")
 				if not allied and not Relations.hasAccess(me.id, target) then
-					action(diplomacyRow, "access", "Ask access", {}, Widgets.BUTTON, true, function()
+					action(diplomacyRow, "access", "Access", {}, Widgets.BUTTON, true, function()
 						Intents.diplomacy("Access", target)
 					end, "Access")
 				end
