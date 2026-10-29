@@ -747,13 +747,14 @@ export type Command =
 | `RequestSandbox` | client → server | `Enter` map (from any server: off to a new sandbox world), `Leave`, `Speed` 0/1/2/4, `Play` nation (0 = watch), `Disasters` on, `NewWorld` map; all but `Enter` only on a sandbox server ("Sandbox") |
 | `RequestMenu` | client → server | `Online`: the start menu's Play online (join this server's matches) |
 | `Menu` | server → client | true = show your start menu, false = close it |
+| `RequestPreference` | client → server | a saved preference (`Sim/Preferences`): `music` or `sounds` and a boolean; the new `Profile` summary carries it back |
 
 ## UI and controls
 
 Phone first: the map fills the screen, the HUD stays on the edges, and every action is a tap on the map followed by a tap in a bottom sheet.
 
 - **Camera:** top-down; one finger pans, pinch zooms between 3 levels (whole map, region, province). Double-tap your capital to recentre.
-- **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank, and a mute button (see "Sound and effects").
+- **Top bar:** gold, manpower, Primordial-power charges, match timer, your rank, and a speaker button with the Music and Sounds toggles (see "Sound and effects").
 - **Left drawer:** nation list with colour, province count and relation icon (ally, at war, truce, military access). A tap on another nation's row closes the drawer and shows that nation's capital with its bottom sheet, so its diplomacy buttons are one tap from the list.
 - **Bottom sheet (tap a province):** owner, development, building, plus buttons for Develop, Build and Recruit (five buttons, one per troop of your race's roster in role order, each Named `Recruit_<troop>` and showing its price) and, on a coast, Ships, or Declare war and Ally (Peace with its tributes at war) on foreign provinces. With the `diplomacy` setting on, also Insult (one tap, no message; greyed with the seconds left while the pair's wait runs), Gift (its price, or the wait) and Access (to ask for military access; "Military access" doesn't fit a 102 px tile), in the same Diplomacy row.
 - **Insults on screen:** no message, ever (see Diplomacy). The target gets a neutral toast and an answer card in the top-right column (where offers show, under the toast line) with its timer, the grudge and two buttons, Insult back and Laugh it off (with its +5% and 1:00); everyone sees an anger mark in a round badge over the target's capital for 5 s; the one who acted gets a private flavour toast.
@@ -809,7 +810,7 @@ Cosmetic rarities (`Theme.rarity`, the outline and rarity line of shop cards and
 
 ### Sound and effects
 
-Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): they read the delta's events and records, never change the match. WorldBox pixel style: square particles in whole map pixels, colours from `Palette.fx`, moved with TweenService.
+Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`, `src/client/Music.luau`): they read the delta's events and records, never change the match. WorldBox pixel style: square particles in whole map pixels, colours from `Palette.fx`, moved with TweenService.
 
 | Moment | Effect | Sound |
 | --- | --- | --- |
@@ -828,7 +829,13 @@ Cosmetic and client-only (`src/client/Effects.luau`, `src/client/Sounds.luau`): 
 
 - **Phones:** at most 240 pooled particle frames, 8 other nations' effects (14 with powers and your own fights) at once, 6 shield domes. Effects off screen are skipped, and other nations' battles and captures are skipped where the province is under 16 screen pixels wide.
 - **Sounds:** stand-ins for now, all listed in `Sounds.luau`: the few files every Roblox client ships in `content/sounds` (the default character sounds: footsteps, jumps, landings, falling, swimming, an explosion, a splash, "oof"), played at different speeds. Before launch the owner swaps in Creator Store or uploaded sounds (`rbxassetid://…`). A missing file is harmless (Roblox logs it and stays silent). You hear your own battles and captures even off screen.
-- **Mute:** a speaker button at the right end of the top bar; it mutes every sound and is remembered for the session.
+- **Music:** music follows the match (Lobby, Peace, War while at war, Cataclysm, Results) with 2.5 s crossfades; the speaker button opens Music and Sounds toggles, saved in the profile.
+  - **Moods** (`src/client/MusicMood.luau`, pure, tested in `tests/music.spec.luau`): **Lobby** on the start menu, the map vote and the draft; **Peace** in Peace, in War while you aren't fighting, and in the whole sandbox; **War** in the War phase while your nation is at war or fought a battle of yours (on land or at sea) in the last 30 s, and for a Primordial for the rest of the War phase; **Cataclysm** from 20:00; at Results a **Victory** sting if your nation (or its alliance) won, else a **Results** sting, each played once, then the Lobby theme.
+  - **Crossfades:** a mood change fades the new track in over 2.5 s while the old one fades out and stops, so one track plays once a fade is over. Peace and War never swap back within 40 s (a quick peace doesn't flip the music twice); a new screen, the Cataclysm and Results switch at once.
+  - **Ducking:** the music dips (to 0.12 for 2.6 s) under the War and Cataclysm banners so their sounds land; later banners (events, empires) call the same `Music.duck()`.
+  - **Audio:** two `AudioPlayer`s (A and B) wired into one `AudioFader` named Music (volume 0.35), wired into an `AudioDeviceOutput`, in `SoundService`. The tracks are Creator Store ids in `Music.luau`'s `TRACKS`, picked by the owner (`docs/STUDIO.md` "Music"); an empty track is silence, never an error. The sounds keep their `Sound` objects. Numbers in `Config.Music`.
+- **The speaker:** a speaker button at the right end of the top bar opens a small plate under it with two 44 px toggles, **Music** (a note) and **Sounds** (the speaker): green with the icon when on, slate with a crossed-out icon when off. Two taps either way; the plate closes when the speaker is tapped again or 5 s after the last tap. Music off stops the music only; Sounds off silences every effect and button sound. The speaker shows muted (attribute `Muted`) when both are off.
+- **Saved:** each toggle is a `RequestPreference` intent (`music` or `sounds`, a boolean) through `CommandRouter` (shape and rate limit), then `Sim/Preferences.luau`, which keeps the allowed keys and values and writes `profile.settings.music` and `settings.sounds` (stored only when off). The `Profile` remote carries both, so a player who turned music off never hears it start when they join. Analytics: `music_setting` (`docs/LAUNCH.md`).
 
 ## Bot AI
 
@@ -966,6 +973,22 @@ The owner's "diplomacy like insulting" and more EU4 flavour, in stages. Later st
 - [x] Navies, stage 1: sea and space zones in the map data (generator, validator, `MapData`), the rules for ships and fleets, embarking and landing, sea battles, straits blocked by fleets, blockades and war across the sea (`Sim/Navy.luau`, tests in `tests/navy.spec.luau`)
 - [x] Navies, stage 2: the orders through `CommandRouter`, fleets in the snapshot, the ship art for each map, fleet tokens and sea zones on the map, the fleet sheet, toasts, a harness scenario (`tools/harness/scenarios/navy.luau`), a `docs/STUDIO.md` recipe
 - [ ] Navies, stage 3: bots at sea, bot tournaments and balance (Earth's Americas)
+
+### Phase 6: Next features (docs/NEXT_FEATURES.md)
+
+- [ ] Map pings for allies (Attack, Defend, Help, Look) and Roblox Quick Words; allied bots follow pings
+- [ ] Results replay of the match's borders and one award per player
+- [x] Music: Lobby, Peace, War, Cataclysm and Results tracks with crossfades; Music and Sounds toggles (stages 1 and 2: `Config.Music`, `MusicMood` with `tests/music.spec.luau`, `Music.luau`, the speaker popover, `RequestPreference` with `Sim/Preferences` and `tests/preferences.spec.luau`, `music_setting`; harness scenario `music`; the owner picks the tracks, `docs/STUDIO.md` "Music")
+- [ ] Map regions and empires
+- [ ] Play with friends: Roblox Party, invites, parties seated together, the tutorial deferred
+- [ ] Weekly twists
+- [ ] Battle animations
+- [ ] Advisor
+- [ ] Blitz mode
+- [ ] Daily challenge
+- [ ] Race mastery and the collection book
+- [ ] Accessibility: colour-safe map, text size, translations
+- [ ] Ranked mode (after launch)
 
 ## Open questions
 

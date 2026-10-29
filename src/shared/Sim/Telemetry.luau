@@ -45,6 +45,7 @@ Telemetry.CUSTOM_EVENTS = {
 	-- the EU4 pack (docs/DESIGN.md)
 	"diplomacy_action",
 	"event_card",
+	"music_setting",
 }
 
 -- The EU4 pack's diplomatic actions diplomacy_action logs, by Command action (field 1).
@@ -442,6 +443,17 @@ function Telemetry.eventCard(state: MatchState, userId: number, outcome: Types.E
 	end
 	local how = (if outcome.auto then "timeout_" else "picked_") .. outcome.choice
 	return Telemetry.custom("event_card", 1, { outcome.event, state.mapId, how }, userId)
+end
+
+-- The speaker ----------------------------------------------------------------------------------------------------
+
+-- A speaker toggle changed (RequestPreference "music" or "sounds"): both toggles after the change ("on" or "off")
+-- and what the server was doing (Telemetry.menuWhere).
+function Telemetry.musicSetting(music: boolean, sounds: boolean, where: string, userId: number): Event
+	local function onOff(on: boolean): string
+		return if on then "on" else "off"
+	end
+	return Telemetry.custom("music_setting", 1, { onOff(music), onOff(sounds), where }, userId)
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

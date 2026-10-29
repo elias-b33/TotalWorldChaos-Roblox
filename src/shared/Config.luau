@@ -1410,4 +1410,16 @@ Config.Ads = {
 	NotificationPromptDelaySeconds = 2, -- back in the Lobby after the first finished match, wait this long, then ask
 }
 
+-- Music (docs/DESIGN.md "Sound and effects", docs/NEXT_FEATURES.md 6): src/client/Music, src/client/MusicMood ---------
+
+Config.Music = {
+	Volume = 0.35, -- the music's level (its AudioFader): under the sounds, which play at 0.35-0.7
+	FadeSeconds = 2.5, -- a mood change crossfades the old track out and the new one in over this long
+	MinMoodSeconds = 40, -- Peace and War never switch back within this long (a quick peace doesn't flip it twice)
+	BattleWindowSeconds = 30, -- in the War phase, War plays while at war or this long after a battle of yours
+	DuckVolume = 0.12, -- the music's level under the War and Cataclysm banners, so their sounds land
+	DuckSeconds = 2.6, -- how long it stays down (a banner shows for about this long)
+	DuckFadeSeconds = 0.3, -- down and back up again over this long
+}
+
 return Config

@@ -562,6 +562,8 @@ export type ProfileSummary = {
 	glory: number,
 	rank: number, -- 1..#Config.Progression.Ranks
 	rankName: string,
+	music: boolean, -- the speaker's toggles (Sim.Preferences): the client starts with the saved ones
+	sounds: boolean,
 }
 
 -- Sent to a player at Results: the reward (with level-up and rank-up lines) and their profile before and after.

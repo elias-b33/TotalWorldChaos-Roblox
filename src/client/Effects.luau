@@ -30,6 +30,7 @@ local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
 local MapRenderer = require(Client.MapRenderer)
 local MapView = require(Client.MapView)
+local Music = require(Client.Music)
 local Palette = require(Client.Palette)
 local PowerFx = require(Client.PowerFx)
 local Sounds = require(Client.Sounds)
@@ -65,16 +66,18 @@ local FLAG = { "PFFF", "PFFF", "P...", "P...", "P..." }
 local FLAG_COLORS: { [string]: Color3 } = { P = fx.pole, F = fx.ink }
 local CRATER = { ".CCC.", "CDDDC", "CDDDC", ".CCC." }
 
--- Phase banners: a pixel icon and a few words on a plate in the kit's colours, and the flash colour.
-type Phase = { text: string, icon: string, plate: Color3, color: Color3, sound: Sounds.SoundName }
+-- Phase banners: a pixel icon and a few words on a plate in the kit's colours, and the flash colour. `duck`: the
+-- music dips under it so its sound lands (Results has its own sting instead).
+type Phase = { text: string, icon: string, plate: Color3, color: Color3, sound: Sounds.SoundName, duck: boolean? }
 local PHASES: { [string]: Phase } = {
-	War = { text = "WAR!", icon = "war", plate = Theme.color.danger, color = fx.fireRed, sound = "War" },
+	War = { text = "WAR!", icon = "war", plate = Theme.color.danger, color = fx.fireRed, sound = "War", duck = true },
 	Cataclysm = {
 		text = "CATACLYSM!",
 		icon = "meteor",
 		plate = Theme.color.special,
 		color = fx.fireOrange,
 		sound = "Cataclysm",
+		duck = true,
 	},
 	Results = { text = "MATCH OVER", icon = "flag", plate = Theme.color.gold, color = fx.gold, sound = "Results" },
 }
@@ -802,6 +805,9 @@ local function phaseChanged(name: string)
 	lastShown, lastProvince = name, 0
 	table.insert(history, { kind = name, province = 0, at = os.clock(), look = "" })
 	Sounds.play(def.sound)
+	if def.duck then
+		Music.duck()
+	end
 	flash.BackgroundColor3 = def.color
 	flash.BackgroundTransparency = 0.45
 	flash.Visible = true
