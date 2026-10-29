@@ -3,7 +3,8 @@
 -- 3 s / 6 s for fast troops (cavalry, knights...). An army marches at its slowest troop's speed; a Forest race
 -- crosses forest at plains speed and a Swift race marches faster (Sim.Troops, Sim.Races). After moving, a nation's armies that stand still in the same
 -- province merge into one (the lowest id stays, the compositions add up): an army is a stack of regiments shown as
--- one token. Retreating armies walk on and take no orders.
+-- one token. Retreating armies walk on and take no orders, even through land that closed to them on the way (a peace,
+-- or military access that ended: Movement.endAccess sends the guests home under the white flag).
 
 local Army = require("./Army")
 local Diplomacy = require("./Diplomacy")
@@ -103,6 +104,31 @@ function Movement.mergeStacks(state: MatchState)
 	end
 end
 
+-- Military access that ended (it ran out, a war started between the two, one of them is gone): the guest's armies
+-- standing in the owner's land walk home under the white flag, over that land if need be (Pathing.retreatPath). An
+-- army with no way home stays where it is. Tick order step 2, before the armies move.
+function Movement.endAccess(state: MatchState)
+	local ended = Diplomacy.endedAccess(state)
+	if #ended == 0 then
+		return
+	end
+	for _, id in sortedIds(state.armies) do
+		local army = state.armies[id]
+		for _, x in ended do
+			if army.owner == x.guest and not army.retreating and state.provinces[army.location].owner == x.owner then
+				local path = Pathing.retreatPath(state, army.owner, army.location, x.owner)
+				if path then
+					army.path = path
+					army.moveProgress = 0
+					army.retreating = true
+					army.boardFleet = nil -- walking home replaces boarding a fleet (Sim.Navy)
+				end
+				break
+			end
+		end
+	end
+end
+
 function Movement.step(state: MatchState)
 	local blocked: { [number]: { [number]: boolean } } = {} -- each owner's blocked sea zones, worked out once a tick
 	for _, id in sortedIds(state.armies) do
@@ -115,10 +141,12 @@ function Movement.step(state: MatchState)
 				blocked[army.owner] = zones
 			end
 			if
-				not Diplomacy.canEnter(state, army.owner, nextId)
+				(not army.retreating and not Diplomacy.canEnter(state, army.owner, nextId))
 				or not Diplomacy.crossable(state, zones, army.location, nextId)
 			then
-				-- the way closed (peace was made, an ally left, an enemy fleet blocks the strait): stop here
+				-- the way closed (peace was made, an ally left, military access ended, an enemy fleet blocks the
+				-- strait): stop here. A retreating army walks on through land that closed to it, but not over a
+				-- strait an enemy fleet holds.
 				army.path = {}
 				army.moveProgress = 0
 			else
@@ -131,7 +159,7 @@ function Movement.step(state: MatchState)
 			end
 		end
 		if army.retreating and #army.path == 0 then
-			army.retreating = nil -- home (or the way closed): a normal army again
+			army.retreating = nil -- home (or a strait closed): a normal army again
 		end
 	end
 	Movement.mergeStacks(state)

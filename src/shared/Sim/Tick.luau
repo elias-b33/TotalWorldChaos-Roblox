@@ -6,6 +6,7 @@ local Battle = require("./Battle")
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
+local EventCards = require("./EventCards")
 local Match = require("./Match")
 local Movement = require("./Movement")
 local Navy = require("./Navy")
@@ -28,7 +29,8 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	end
 	local before = state.phase
 	state.phase = Match.phaseAt(state.tick, state.setup)
-	Navy.step(state) -- 2: fleets sail, armies board, fleets land...
+	Movement.endAccess(state) -- 2: military access that ended sends the guests' armies home first...
+	Navy.step(state) -- ...fleets sail, armies board, fleets land...
 	Movement.step(state) -- ...then armies move and stacks merge
 	Battle.step(state, rng) -- 3: land battles, then sea battles
 	Navy.battleStep(state, rng)
@@ -40,7 +42,8 @@ function Tick.advance(state: MatchState, rng: Rng.Rng): Types.Phase?
 	Primordial.step(state, rng) -- 6: eliminations, charges, effect timers, Cataclysm disasters
 	Pings.expire(state) -- (and old map pings, and a fallen sender's)
 	-- 7: bots (Phase 3)
-	Diplomacy.expire(state) -- 8
+	Diplomacy.expire(state) -- 8: offers, insults' answer windows...
+	EventCards.step(state, rng) -- ...and event cards (the default choice), then new cards
 	if state.setup.sandbox then
 		-- a sandbox world never ends: no win check and no last tick (Sim.Sandbox)
 		return if state.phase ~= before then state.phase else nil

@@ -66,7 +66,10 @@ local function run()
 	local glory = 187 + achievementGlory
 	H.expect(report ~= nil and report.reward.xp == 460 and report.reward.glory == glory, "the reward: 460 XP, 187 Glory + achievements")
 	H.expect(report.reward.placement == 1 and report.after.level == 2, "1st place, and Alice reached level 2")
-	H.expect(Emulator.findText(alice, "+460 XP") ~= nil, "the Results screen shows the XP and Glory")
+	H.expect(
+		H.textOf(alice, "XP") == "+460" and H.textOf(alice, "Glory") == "+" .. glory,
+		"the Results screen's reward cells have counted up to the XP and Glory"
+	)
 	H.expect(Emulator.findText(alice, "First match today") ~= nil, "with the breakdown")
 	H.expect(Emulator.findText(alice, "Level 2!") ~= nil, "and the level-up")
 	H.expect(Emulator.findText(alice, "160 / 360 XP") ~= nil, "and the level bar")

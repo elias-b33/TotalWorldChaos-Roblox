@@ -1,6 +1,9 @@
 --!strict
--- Every sound the game plays, in one place, plus the mute toggle (the 🔊 button Hud puts at the right end of the
--- top bar, remembered for the session) and a tap sound for every button.
+-- Every sound the game plays, in one place, plus the speaker's two settings and a tap sound for every button.
+--
+-- The settings: Sounds (these effects) and Music (src/client/Music listens), flipped in the popover under the top
+-- bar's speaker (UI/Speaker) and saved in the profile (Sim.Preferences); the saved ones arrive with the first
+-- profile summary. The speaker button (Name Mute) shows muted, with its Muted attribute true, when both are off.
 --
 -- Stand-ins until the owner picks real sounds: every id is one of the few files every Roblox client ships in
 -- content/sounds (the default character sounds: footsteps, jumps, landings, falling, swimming, an explosion, a
@@ -11,7 +14,11 @@
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
 
+local ProfileState = require(script.Parent.ProfileState)
+
 local Sounds = {}
+
+export type Setting = "music" | "sounds"
 
 export type SoundName =
 	"Tap"
@@ -54,11 +61,14 @@ local SOUNDS: { [string]: { id: string, volume: number, speed: number, gap: numb
 	Ping = { id = "rbxasset://sounds/volume_slider.ogg", volume = 0.7, speed = 1.9, gap = 0.5 }, -- an ally's map ping
 }
 
-local muted = false -- module state lives as long as the client session, across matches
+-- module state lives as long as the client session, across matches
+local settings: { [string]: boolean } = { music = true, sounds = true }
+local loaded = false -- the saved settings arrived (the first profile summary)
+local settingListeners: { () -> () } = {}
 local instances: { [string]: Sound } = {}
 local lastPlayed: { [string]: number } = {}
 local muteButton: TextButton? = nil
-local showMuted: ((boolean) -> ())? = nil -- draws the mute button's icon (the top bar's pixel icons)
+local showMuted: ((boolean) -> ())? = nil -- draws the speaker button's icon (the top bar's pixel icons)
 local hooked: { [Instance]: boolean } = {}
 
 local function soundFor(name: string): Sound?
@@ -80,9 +90,9 @@ local function soundFor(name: string): Sound?
 	return sound
 end
 
--- Play a sound (unless muted, or the same one just started). Never errors.
+-- Play a sound (unless Sounds is off, or the same one just started). Never errors.
 function Sounds.play(name: SoundName)
-	if muted then
+	if not settings.sounds then
 		return
 	end
 	local def = SOUNDS[name]
@@ -99,19 +109,23 @@ function Sounds.play(name: SoundName)
 	end
 end
 
-function Sounds.muted(): boolean
-	return muted
+-- Have the saved settings arrived (the first profile summary)?
+function Sounds.loaded(): boolean
+	return loaded
 end
 
-function Sounds.setMuted(value: boolean)
-	muted = value
-	if value then
-		for _, sound in instances do
-			pcall(function()
-				sound:Stop()
-			end)
-		end
-	end
+-- Is a speaker setting on?
+function Sounds.enabled(setting: Setting): boolean
+	return settings[setting] ~= false
+end
+
+-- Both settings off: the speaker shows muted.
+function Sounds.muted(): boolean
+	return not settings.music and not settings.sounds
+end
+
+local function showSpeaker()
+	local muted = Sounds.muted()
 	local button = muteButton
 	if showMuted then
 		showMuted(muted)
@@ -120,19 +134,37 @@ function Sounds.setMuted(value: boolean)
 	end
 end
 
--- The mute toggle: Hud builds the button in the top bar, Sounds keeps its icon in step (through `show` when given,
--- else as the button's text).
+-- Turn a speaker setting on or off on this client (UI/Speaker also saves it, with RequestPreference). Sounds off
+-- stops the sounds playing now; Music listens for its own (Sounds.onSettings).
+function Sounds.set(setting: Setting, on: boolean)
+	if settings[setting] == on then
+		return
+	end
+	settings[setting] = on
+	if setting == "sounds" and not on then
+		for _, sound in instances do
+			pcall(function()
+				sound:Stop()
+			end)
+		end
+	end
+	showSpeaker()
+	for _, fn in settingListeners do
+		task.spawn(fn)
+	end
+end
+
+-- Call `fn` whenever a speaker setting changes.
+function Sounds.onSettings(fn: () -> ())
+	table.insert(settingListeners, fn)
+end
+
+-- The speaker button: Hud builds it in the top bar and UI/Speaker opens its popover from it; Sounds keeps its icon
+-- in step with the two settings (through `show` when given, else as the button's text).
 function Sounds.attachMuteButton(button: TextButton, show: ((boolean) -> ())?)
 	muteButton = button
 	showMuted = show
-	if show then
-		show(muted)
-	else
-		button.Text = if muted then "🔇" else "🔊"
-	end
-	button.Activated:Connect(function()
-		Sounds.setMuted(not muted)
-	end)
+	showSpeaker()
 end
 
 -- The id of a sound, for the harness and for anyone checking the list.
@@ -153,8 +185,17 @@ local function hookButton(inst: Instance)
 	end
 end
 
--- Call last, after the other UI is built: every button there and every button made later taps.
+-- Call last, after the other UI is built: every button there and every button made later taps. The saved settings
+-- apply once, from the first profile summary (later summaries only echo what this client set).
 function Sounds.init()
+	ProfileState.onChange(function()
+		local summary = ProfileState.summary()
+		if summary and not loaded then
+			loaded = true
+			Sounds.set("music", summary.music ~= false)
+			Sounds.set("sounds", summary.sounds ~= false)
+		end
+	end)
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	for _, d in playerGui:GetDescendants() do

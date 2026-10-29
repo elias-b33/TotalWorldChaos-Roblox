@@ -42,7 +42,7 @@ local REASONS: { [string]: string } = {
 	NoOffer = "⌛ That offer expired",
 	NotEnoughCharges = "⚡ Not enough charges",
 	Immune = "🛡 Hit by a power less than a minute ago",
-	Cooldown = "⏳ You hit that nation less than 2 minutes ago",
+	PowerCooldown = "⏳ You hit that nation less than 2 minutes ago",
 	NoBuilding = "🏚 No building there",
 	OwnTarget = "🚫 Not on yourself",
 	NoPowersYet = "⏳ Powers unlock when Peace ends",
@@ -100,6 +100,14 @@ local REASONS: { [string]: string } = {
 	TooSoon = "⏱ Wait a moment to ping again",
 	TooMany = "⏱ Too many pings: wait a little",
 	Phase = "⏳ Not now",
+	-- the EU4 pack
+	DiplomacyOff = "🔒 Insults, gifts and access are off on this server",
+	Cooldown = "⏳ Wait a little before doing that again",
+	NoAnswer = "💢 Too late to answer that one",
+	AlreadyAccess = "🚶 You can already march through their land",
+	EventsOff = "🔒 Events are off on this server",
+	NoEvent = "📜 That event is over",
+	BadChoice = "🚫 Not one of the choices",
 }
 
 local Intents = {}
@@ -161,9 +169,15 @@ function Intents.embark(armyId: number, fleetId: number)
 	send("RequestEmbark", armyId, fleetId)
 end
 
--- action: War | Ally | AcceptAlly | Peace | AcceptPeace
+-- action: War | Ally | AcceptAlly | Peace | AcceptPeace, and the EU4 pack's Insult | InsultBack | LaughOff | Gift |
+-- Access | AcceptAccess (an insult carries no message)
 function Intents.diplomacy(action: string, target: number, gold: number?)
 	send("RequestDiplomacy", action, target, gold or 0)
+end
+
+-- The EU4 pack's event cards: choice 1 or 2 on your nation's open card.
+function Intents.eventChoice(card: number, choice: number)
+	send("RequestEventChoice", card, choice)
 end
 
 -- power: Meteor | Plague | Rebels | Earthquake | Blessing | Shield; target: army, nation or province id
@@ -262,6 +276,11 @@ end
 
 function Intents.defaultTheme(on: boolean)
 	send("RequestDefaultTheme", on)
+end
+
+-- A saved preference (Sim.Preferences): "music" or "sounds" and whether it is on.
+function Intents.preference(key: string, value: boolean | number | string)
+	send("RequestPreference", key, value)
 end
 
 return Intents

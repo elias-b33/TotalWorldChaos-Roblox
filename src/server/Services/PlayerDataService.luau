@@ -1,7 +1,8 @@
 --!strict
 -- Player saves (docs/MONETIZATION.md "PlayerDataService with ProfileStore"): loads a player's profile with a
 -- ProfileStore session lock when they join, releases it when they leave, and applies changes such as match
--- rewards. Thin wrapper: the profile's shape and every rule are in Shared.Sim.Progression.
+-- rewards and saved preferences (RequestPreference, Sim.Preferences). Thin wrapper: the profile's shape and every rule
+-- are in Shared.Sim.Progression and Shared.Sim.Preferences.
 --
 -- Session lock: only one server at a time can hold a profile; a second server waits, then takes it over and the
 -- first one ends its session (and kicks the player there). Autosave every 5 minutes and a final save on leave and
@@ -19,10 +20,12 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Preferences = require(Shared.Sim.Preferences)
 local Progression = require(Shared.Sim.Progression)
 local Remotes = require(Shared.Remotes)
 local Types = require(Shared.Types)
 
+local CommandRouter = require(script.Parent.Parent.CommandRouter)
 local ProfileStore = require(script.Parent.Parent.Packages.ProfileStore)
 
 type Data = Types.PlayerProfile
@@ -45,6 +48,7 @@ local store = ProfileStore.New(PlayerDataService.STORE_NAME, Progression.newProf
 local profiles: { [Player]: Profile } = {}
 local leaveHooks: { (Player, Data) -> () } = {}
 local loadHooks: { (Player, Data) -> () } = {}
+local preferenceHooks: { (Player, string, Data) -> () } = {}
 local leaveHooksRan: { [Profile]: boolean } = {}
 local profileRemote: RemoteEvent
 
@@ -123,8 +127,33 @@ local function release(player: Player)
 	profile:EndSession() -- saves and releases the session lock
 end
 
+-- RequestPreference (CommandRouter checked the shape and the rate limit): Sim.Preferences checks the key and the
+-- value. A preference is a setting: it rides on the autosave and the final save. The player gets the new summary;
+-- the hooks run when the value changed.
+local function setPreference(player: Player, key: string, value: boolean | number | string): (boolean, string?)
+	local result = PlayerDataService.edit(player, function(data)
+		local before = if Preferences.KEYS[key] then Preferences.get(data, key) else nil
+		local ok, reason = Preferences.set(data, key, value)
+		return { ok = ok, reason = reason, changed = ok and before ~= value }
+	end)
+	if result == nil then
+		return false, "NotLoaded"
+	end
+	local profile = profiles[player]
+	if result.changed and profile then
+		for _, hook in preferenceHooks do
+			local ok, err = pcall(hook, player, key, profile.Data)
+			if not ok then
+				warn(string.format("[data] preference hook failed: %s", tostring(err)))
+			end
+		end
+	end
+	return result.ok, result.reason
+end
+
 function PlayerDataService.init()
 	profileRemote = Remotes.event("Profile")
+	CommandRouter.onPreference(setPreference)
 	Players.PlayerAdded:Connect(load)
 	Players.PlayerRemoving:Connect(release)
 	for _, player in Players:GetPlayers() do
@@ -181,6 +210,12 @@ end
 -- tutorial, checking the VIP pass, a Results reward that waited for the profile.
 function PlayerDataService.onLoaded(hook: (Player, Data) -> ())
 	table.insert(loadHooks, hook)
+end
+
+-- Run `hook` after a player changed a saved preference (RequestPreference): its key and the profile after it
+-- (TelemetryService logs music_setting).
+function PlayerDataService.onPreference(hook: (Player, string, Data) -> ())
+	table.insert(preferenceHooks, hook)
 end
 
 local function trimReceipts(data: Data)

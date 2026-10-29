@@ -131,7 +131,7 @@ local function run()
 	end
 	Emulator.run(2)
 	H.expect(state.result ~= nil and state.result.kind == "Domination", "Aurora won by domination")
-	H.expect(Emulator.findText(alice, "You win") ~= nil, "Alice sees the victory screen")
+	H.expect(Emulator.findText(alice, "YOU WIN!") ~= nil, "Alice sees the victory screen")
 	H.shot(alice, "results")
 	Emulator.run(32)
 	H.expect(state ~= H.state(), "a new match started after Results")

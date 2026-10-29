@@ -240,6 +240,7 @@ local EVENT_PROPS = {
 	{ "Instance", { "ChildAdded", "ChildRemoved", "Destroying", "AncestryChanged", "DescendantAdded" }, false },
 	{ "MarketplaceService", { "PromptGamePassPurchaseFinished", "PromptProductPurchaseFinished" }, false },
 	{ "TeleportService", { "TeleportInitFailed" }, false },
+	{ "AudioPlayer", { "Ended", "Looped" }, false },
 }
 for _, spec in EVENT_PROPS do
 	local class, names, queued = spec[1], spec[2], spec[3]
@@ -595,6 +596,53 @@ end)
 roblox.implementMethod("Sound", "Stop", function() end)
 roblox.implementMethod("Sound", "Pause", function() end)
 roblox.implementMethod("Sound", "Resume", function() end)
+
+-- The music (src/client/Music): AudioPlayer:Play is logged in Emulator.sounds too (music = true, the name is the
+-- player's "Track" attribute), and IsPlaying holds from Play to Stop, so a scenario can check that one track plays.
+-- Emulator.endAudio fires a player's Ended, as if its track had played to the end. Wire, AudioFader and
+-- AudioDeviceOutput need nothing: Lune's own instances keep their properties (Wire.SourceInstance, Volume...).
+local audioPlaying = {} -- AudioPlayer -> true from Play to Stop (strong keys, like `events`)
+
+roblox.implementMethod("AudioPlayer", "Play", function(player)
+	audioPlaying[player] = true
+	local ok, asset = pcall(function()
+		return player.Asset
+	end)
+	table.insert(Emulator.sounds, {
+		name = player:GetAttribute("Track") or player.Name,
+		id = if ok then asset else "",
+		time = now,
+		music = true,
+	})
+end)
+roblox.implementMethod("AudioPlayer", "Stop", function(player)
+	audioPlaying[player] = nil
+end)
+roblox.implementProperty("AudioPlayer", "IsPlaying", function(player)
+	return audioPlaying[player] == true
+end)
+
+-- The tracks a client's music players are playing now (their "Track" attributes).
+function Emulator.musicPlaying(client): { string }
+	local out = {}
+	for player in audioPlaying do
+		local node = player
+		while node.Parent ~= nil do
+			node = node.Parent
+		end
+		if node == client.dm then
+			table.insert(out, player:GetAttribute("Track") or player.Name)
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+-- A music player's track played to its end (a sting): it stops and fires Ended.
+function Emulator.endAudio(player)
+	audioPlaying[player] = nil
+	Emulator.eventOf(player, "Ended"):Fire()
+end
 
 ---------------------------------------------------------------------------------------------- data stores
 

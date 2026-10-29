@@ -112,10 +112,10 @@ export type Battle = {
 	defenderRoll: number,
 }
 
--- An alliance or peace proposal waiting for the other nation to accept.
+-- An alliance, peace or military access proposal waiting for the other nation to accept.
 export type Offer = {
 	id: number,
-	kind: "Ally" | "Peace",
+	kind: "Ally" | "Peace" | "Access",
 	from: NationId,
 	to: NationId,
 	tribute: number, -- gold the proposer pays when peace is accepted
@@ -130,7 +130,9 @@ export type Offer = {
 -- killed, for achievements), Disaster (same fields, no caster), Eliminated(a). Navies (zone = the sea zone):
 -- SeaBattle(a won against b), Blockade(a starts blockading b's coast, province = the first province blockaded),
 -- Embarked(a = the army that boarded whole and is gone, b = its fleet, province = where it stood), Landed(a = the
--- new army, b = the fleet, province), FleetMerged(a = the fleet that stays, b = the one removed).
+-- new army, b = the fleet, province), FleetMerged(a = the fleet that stays, b = the one removed). Diplomacy:
+-- Insult(a insults b), InsultBack(a answers b's insult in kind), LaughedOff(a laughs off b's insult), Gift(a sends b
+-- gold), AccessGranted(a lets b's armies through its land). Insults carry no text (docs/DESIGN.md "Diplomacy").
 export type MatchEvent = {
 	kind: string,
 	a: number,
@@ -145,6 +147,40 @@ export type MatchEvent = {
 -- the tick is at most untilTick. Never in the snapshot or the delta: PingService sends it to the sender's alliance.
 export type PingKind = "Attack" | "Defend" | "Help" | "Look"
 export type Ping = { id: number, by: NationId, kind: PingKind, province: ProvinceId, untilTick: number }
+-- Insults (docs/DESIGN.md "Diplomacy"): the insulted nation (holder) fights its insulter (against) better for a while.
+-- against = 0: high spirits, from laughing an insult off (a smaller bonus in every battle).
+export type Grudge = { holder: NationId, against: NationId, untilTick: number }
+-- `from` was insulted by `to` and may answer (insult back or laugh it off) until untilTick.
+export type Answer = { from: NationId, to: NationId, untilTick: number }
+-- A wait: `a` may do `kind` again from untilTick: "Insult" to `b`, "Gift" to anyone (b = 0).
+export type Cooldown = { kind: string, a: NationId, b: NationId, untilTick: number }
+-- Military access: the guest's armies may enter the owner's land until untilTick (a war between them ends it).
+export type Access = { owner: NationId, guest: NationId, untilTick: number }
+
+-- Event cards (the EU4 pack, stage 2; Sim.EventCards, docs/DESIGN.md "Events"). An open card waits for its nation's
+-- choice until untilTick, then its default choice happens. `event` is an id in Config.EventCards.Events; `province`
+-- is where its province effects land (development, regiments, ships), 0 when it has none.
+export type EventCard = { id: number, event: string, province: ProvinceId, untilTick: number }
+-- What a card came to: the choice made (1 or 2), and whether time ran out (auto: the default choice happened).
+export type EventOutcome = { card: number, event: string, province: ProvinceId, choice: number, auto: boolean }
+-- One nation's events: when its next card comes, the events it has had (each comes once until it has had every one
+-- it can get), its open card and the last one closed.
+export type Chronicle = { nextAt: number, seen: { string }, card: EventCard?, last: EventOutcome? }
+-- A timed income boost from an event: the nation's gold income × (1 + bonus) until untilTick (the best one counts).
+export type Boost = { nation: NationId, bonus: number, untilTick: number }
+-- What a player's client is told about its own nation's events, on its own remote, never in the delta everyone
+-- gets: the open card (card 0 = none) and the last card closed (lastCard 0 = none yet). Flat, for the network.
+export type EventCardView = {
+	card: number,
+	event: string,
+	province: number,
+	untilTick: number,
+	lastCard: number,
+	lastEvent: string,
+	lastProvince: number,
+	lastChoice: number,
+	lastAuto: boolean,
+}
 
 export type MatchResult = {
 	kind: "Domination" | "Alliance" | "Score",
@@ -167,6 +203,9 @@ export type MatchSettings = {
 	powers: boolean, -- Primordial powers (nations and Primordials)
 	disasters: boolean, -- the Cataclysm's disasters
 	teams: { { userId: number, team: number } }, -- locked teams: these players start allied; none = off
+	-- the EU4 pack's features (defaults in Config.Features)
+	diplomacy: boolean, -- insults and their answers, gifts, military access
+	events: boolean, -- event cards with choices
 }
 
 -- How a match was set up, read by Sim from MatchState (never from globals).
@@ -235,6 +274,15 @@ export type MatchState = {
 	theme: string?, -- the map theme everyone sees (a Theme catalogue item id, from the theme vote); nil = classic.
 	-- Cosmetic only: no rule reads it.
 	sandbox: SandboxState?, -- a sandbox world's controls (setup.sandbox); nil in a match
+	-- the EU4 pack's diplomacy (Sim.Diplomacy): insults' grudges and answer windows, waits, military access
+	grudges: { Grudge },
+	answers: { Answer },
+	cooldowns: { Cooldown },
+	access: { Access },
+	-- the EU4 pack's event cards (Sim.EventCards): private to each nation, never in the snapshot
+	chronicles: { [NationId]: Chronicle },
+	boosts: { Boost },
+	nextCardId: number,
 }
 
 -- The lobby before a match (Sim.Lobby): the map vote ("Lobby"), then the nation draft ("Pick"). It lives outside
@@ -345,7 +393,20 @@ export type MapDef = {
 
 -- Intents: what a player or bot asks for. CommandRouter checks the shape, Sim/Commands checks the rules.
 
-export type DiplomacyAction = "War" | "Ally" | "AcceptAlly" | "Peace" | "AcceptPeace"
+-- The EU4 pack: Insult (no message: docs/DESIGN.md "Diplomacy"), InsultBack and LaughOff answer an insult, Gift sends
+-- Config.Diplomacy.GiftGold, Access asks for military access, AcceptAccess grants it.
+export type DiplomacyAction =
+	"War"
+	| "Ally"
+	| "AcceptAlly"
+	| "Peace"
+	| "AcceptPeace"
+	| "Insult"
+	| "InsultBack"
+	| "LaughOff"
+	| "Gift"
+	| "Access"
+	| "AcceptAccess"
 
 export type Command =
 	{ kind: "Develop", province: ProvinceId }
@@ -364,6 +425,8 @@ export type Command =
 	| { kind: "Embark", army: ArmyId, fleet: FleetId }
 	-- a map ping for the sender's alliance (Sim.Pings): an icon, never text
 	| { kind: "Ping", ping: PingKind, province: ProvinceId }
+	-- the EU4 pack's event cards: choice 1 or 2 on the nation's open card (Sim.EventCards)
+	| { kind: "EventChoice", card: number, choice: number }
 
 -- Progression and saves (docs/MONETIZATION.md 4–5). Profiles are saved; MatchState never is.
 
@@ -510,6 +573,8 @@ export type ProfileSummary = {
 	glory: number,
 	rank: number, -- 1..#Config.Progression.Ranks
 	rankName: string,
+	music: boolean, -- the speaker's toggles (Sim.Preferences): the client starts with the saved ones
+	sounds: boolean,
 }
 
 -- Sent to a player at Results: the reward (with level-up and rank-up lines) and their profile before and after.

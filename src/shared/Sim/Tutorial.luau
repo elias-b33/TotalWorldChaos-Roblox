@@ -124,6 +124,7 @@ function Tutorial.setup(state: MatchState, slot: number): TutorialState
 			state.nations[c.id] = nil
 		end
 	end
+	state.setup.settings.events = false -- no event cards: the tutorial's prompts are enough to read
 	player.controller = "Player" -- held for the player until they arrive (Tutorial.seat)
 	player.userId = nil
 	Army.spawn(state, slot, player.capital, Config.Tutorial.StartRegiments * Config.Army.MenPerRegiment)

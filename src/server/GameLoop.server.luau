@@ -198,6 +198,7 @@ local function sandboxTick(state: Types.MatchState)
 	end
 	PingService.afterTick(state) -- new map pings to the sender's alliance only
 	Replicator.broadcast(state) -- 9. one delta to every client
+	Replicator.sendCards(state, SandboxService.seat) -- ...and the nation a player took over, its own event cards
 end
 
 -- The sandbox's loop: a beat every Config.Sandbox.BeatSeconds runs a tick whenever the world's speed has gathered a
@@ -233,6 +234,7 @@ local function runSandbox()
 			end
 			if ran == 0 and (speed == 0 or changed) then
 				Replicator.broadcast(state)
+				Replicator.sendCards(state, SandboxService.seat) -- a choice made while paused closes its card
 			end
 		end)
 		last = now
@@ -354,6 +356,7 @@ local function tick()
 	end
 	PingService.afterTick(state) -- new map pings to the sender's alliance only (never in the delta)
 	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
+	Replicator.sendCards(state, MatchService.nationOf) -- ...and each player their own event card, to them alone
 end
 
 -- A Lobby second: votes and picks, the clocks, then what changed to every client.

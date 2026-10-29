@@ -23,6 +23,8 @@ local Widgets = require(script.Parent.Widgets)
 local Theme = Widgets.Theme
 local LABEL_WIDTH = 104
 local OPTION_WIDTH = 76
+local FEATURE_LABEL = 80 -- the EU4 pack's features share a row: a short label and narrow On/Off tabs each
+local FEATURE_OPTION = 46
 local HEADER_HEIGHT = 36
 local TEAM_CELL = Vector2.new(120, 36)
 local TEXT_SIZE = 14
@@ -68,6 +70,12 @@ function PrivateSettings.summary(s: Types.MatchSettings): string
 	if not s.disasters then
 		table.insert(parts, "no disasters")
 	end
+	if not s.diplomacy then
+		table.insert(parts, "no insults, gifts or access")
+	end
+	if not s.events then
+		table.insert(parts, "no events")
+	end
 	if #s.teams > 0 then
 		table.insert(parts, "teams set")
 	end
@@ -93,14 +101,34 @@ local function row(parent: Instance, order: number, icon: string, text: string):
 	return f
 end
 
-local function option(parent: Frame, key: string, value: string | number | boolean, text: string)
-	local b = Widgets.tab(parent, text, OPTION_WIDTH, false, function()
+local function option(parent: Frame, key: string, value: string | number | boolean, text: string, width: number?)
+	local b = Widgets.tab(parent, text, width or OPTION_WIDTH, false, function()
 		Intents.setting(key, value)
 	end)
 	b.Name = "Setting_" .. key .. "_" .. tostring(value)
 	b.TextSize = TEXT_SIZE
 	b.LayoutOrder = #parent:GetChildren()
 	table.insert(options, { button = b, key = key, value = value })
+end
+
+-- The EU4 pack's on/off features (Settings.FEATURES) side by side in one row, each a short label and an On/Off pair,
+-- so the teams below keep the room they need on a phone. features: { icon, label, setting key }.
+local function featureRow(parent: Instance, order: number, features: { { string } })
+	local f = Instance.new("Frame")
+	f.BackgroundTransparency = 1
+	f.Size = UDim2.new(1, 0, 0, Widgets.BUTTON_HEIGHT)
+	f.LayoutOrder = order
+	f.Parent = parent
+	Widgets.list(f, true, Theme.space.xs)
+	for _, feature in features do
+		local l = Widgets.label(f, feature[2], TEXT_SIZE, Widgets.BUTTON_HEIGHT)
+		l.Size = UDim2.fromOffset(FEATURE_LABEL, Widgets.BUTTON_HEIGHT)
+		l.TextWrapped = false
+		l.LayoutOrder = #f:GetChildren()
+		Widgets.leadIcon(l, feature[1], Theme.size.icon)
+		option(f, feature[3], true, "On", FEATURE_OPTION)
+		option(f, feature[3], false, "Off", FEATURE_OPTION)
+	end
 end
 
 -- The next team for a player: the one after theirs that still has room (0 = no team).
@@ -249,14 +277,16 @@ local function buildPanel()
 	local disasters = row(right, 2, "meteor", "Disasters")
 	option(disasters, "disasters", true, "On")
 	option(disasters, "disasters", false, "Off")
+	-- the EU4 pack: insults (with gifts and military access), and event cards with choices
+	featureRow(right, 3, { { "grudge", "Insults", "diplomacy" }, { "scroll", "Events", "events" } })
 	local teamsTitle = Widgets.label(right, "Teams: tap a player (same team = allies)", TEXT_SIZE, 22)
-	teamsTitle.LayoutOrder = 3
+	teamsTitle.LayoutOrder = 4
 	Widgets.leadIcon(teamsTitle, "teams", Theme.size.icon)
 	teamGrid = Instance.new("Frame")
 	teamGrid.Name = "Teams"
 	teamGrid.BackgroundTransparency = 1
 	teamGrid.Size = UDim2.new(1, 0, 0, 4 * TEAM_CELL.Y + 3 * 4)
-	teamGrid.LayoutOrder = 4
+	teamGrid.LayoutOrder = 5
 	teamGrid.Parent = right
 	local grid = Instance.new("UIGridLayout")
 	grid.CellSize = UDim2.fromOffset(TEAM_CELL.X, TEAM_CELL.Y)

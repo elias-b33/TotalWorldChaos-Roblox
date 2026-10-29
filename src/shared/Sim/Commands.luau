@@ -7,6 +7,7 @@ local Army = require("./Army")
 local Config = require("../Config")
 local Diplomacy = require("./Diplomacy")
 local Economy = require("./Economy")
+local EventCards = require("./EventCards")
 local Movement = require("./Movement")
 local Navy = require("./Navy")
 local Pings = require("./Pings")
@@ -146,6 +147,8 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 			Pings.add(state, nationId, command.ping, command.province, state.tick)
 		end
 		return ok, reason
+	elseif command.kind == "EventChoice" then
+		return EventCards.choose(state, nationId, command.card, command.choice)
 	elseif command.kind == "Diplomacy" then
 		local action = command.action
 		if action == "War" then
@@ -158,6 +161,18 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 			return Diplomacy.accept(state, "Ally", nationId, command.target)
 		elseif action == "AcceptPeace" then
 			return Diplomacy.accept(state, "Peace", nationId, command.target)
+		elseif action == "Insult" then
+			return Diplomacy.insult(state, nationId, command.target)
+		elseif action == "InsultBack" then
+			return Diplomacy.insultBack(state, nationId, command.target)
+		elseif action == "LaughOff" then
+			return Diplomacy.laughOff(state, nationId, command.target)
+		elseif action == "Gift" then
+			return Diplomacy.gift(state, nationId, command.target)
+		elseif action == "Access" then
+			return Diplomacy.propose(state, "Access", nationId, command.target, 0)
+		elseif action == "AcceptAccess" then
+			return Diplomacy.accept(state, "Access", nationId, command.target)
 		end
 	end
 	return false, "UnknownCommand"

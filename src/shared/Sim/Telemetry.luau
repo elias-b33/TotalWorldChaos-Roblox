@@ -44,6 +44,20 @@ Telemetry.CUSTOM_EVENTS = {
 	"menu_choice",
 	"first_pick",
 	"ping_sent",
+	-- the EU4 pack (docs/DESIGN.md)
+	"diplomacy_action",
+	"event_card",
+	"music_setting",
+}
+
+-- The EU4 pack's diplomatic actions diplomacy_action logs, by Command action (field 1).
+local DIPLOMACY_ACTIONS: { [string]: string } = {
+	Insult = "insult",
+	InsultBack = "insult_back",
+	LaughOff = "laugh_off",
+	Gift = "gift",
+	Access = "access_asked",
+	AcceptAccess = "access_granted",
 }
 
 -- The one-time onboarding funnel (LogOnboardingFunnelStepEvent), in step order.
@@ -423,6 +437,44 @@ function Telemetry.firstPick(lobby: Types.LobbyState, mapId: string): Event?
 	local seconds = Config.Phases.FirstPickTicks - math.max(lobby.ticksLeft, 0)
 	local how = if lobby.votes[chooser] then "picked" else "timeout"
 	return Telemetry.custom("first_pick", seconds, { mapId, how }, chooser)
+end
+
+-- The EU4 pack --------------------------------------------------------------------------------------------------
+
+-- A player's insult, answer to an insult, gift or military access request or grant went through: diplomacy_action with the
+-- action, the map and who it was aimed at (human, bot). nil for any other command.
+function Telemetry.diplomacy(state: MatchState, userId: number, command: Types.Command): Event?
+	if command.kind ~= "Diplomacy" then
+		return nil
+	end
+	local action = DIPLOMACY_ACTIONS[command.action]
+	local target = state.nations[command.target]
+	if action == nil or target == nil then
+		return nil
+	end
+	local aimed = if target.userId ~= nil then "human" else "bot"
+	return Telemetry.custom("diplomacy_action", 1, { action, state.mapId, aimed }, userId)
+end
+
+-- A player's event card closed (the EU4 pack, Sim.EventCards): event_card with the event, the map, and how it ended
+-- ("picked_1", "picked_2", or "timeout_N" when time ran out and default choice N happened). nil without one.
+function Telemetry.eventCard(state: MatchState, userId: number, outcome: Types.EventOutcome?): Event?
+	if outcome == nil then
+		return nil
+	end
+	local how = (if outcome.auto then "timeout_" else "picked_") .. outcome.choice
+	return Telemetry.custom("event_card", 1, { outcome.event, state.mapId, how }, userId)
+end
+
+-- The speaker ----------------------------------------------------------------------------------------------------
+
+-- A speaker toggle changed (RequestPreference "music" or "sounds"): both toggles after the change ("on" or "off")
+-- and what the server was doing (Telemetry.menuWhere).
+function Telemetry.musicSetting(music: boolean, sounds: boolean, where: string, userId: number): Event
+	local function onOff(on: boolean): string
+		return if on then "on" else "off"
+	end
+	return Telemetry.custom("music_setting", 1, { onOff(music), onOff(sounds), where }, userId)
 end
 
 -- The map vote is over: one map_vote per voter. round: "lobby" (the first vote on this server) or "next" (after

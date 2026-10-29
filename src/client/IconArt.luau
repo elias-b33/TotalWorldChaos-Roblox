@@ -383,6 +383,42 @@ IconArt.ICONS = {
 		"................",
 		"................",
 	},
+	music = { -- two beamed notes (the speaker's Music toggle)
+		"................",
+		"......KKKKKKKKK.",
+		"......KWWWWWWWK.",
+		"......KWWWWWWWK.",
+		"......KWKKKKKWK.",
+		"......KWK...KWK.",
+		"......KWK...KWK.",
+		"......KWKKKKKWK.",
+		"...KKKKWKKWWWWK.",
+		"..KKWWWWKWWWWWK.",
+		"..KWWWWWKwWWWKK.",
+		"..KwWWWKKKKKKK..",
+		"..KKKKKK........",
+		"................",
+		"................",
+		"................",
+	},
+	musicOff = { -- a note and the speaker's red cross
+		"................",
+		"....KKK.........",
+		"....KWKK........",
+		"....KWWKK.......",
+		"....KWWWK.......",
+		"....KWKWK.......",
+		"....KWKKK.......",
+		"....KWK..KK..KK.",
+		".KKKKWK..KRKKRK.",
+		"KKWWWWK...KRRK..",
+		"KWWWWWK...KRRK..",
+		"KwWWWKK..KRKKRK.",
+		"KKKKKK...KK..KK.",
+		"................",
+		"................",
+		"................",
+	},
 	gear = {
 		"................",
 		"......KKKK......",
@@ -2389,6 +2425,44 @@ IconArt.ICONS = {
 		"......KYK.......",
 		"......KK........",
 	},
+	-- the EU4 pack: an insult (an anger mark: the insult marker, the Insult buttons) and military access (a signpost)
+	grudge = {
+		"................",
+		"....KK....KK....",
+		"...KRRK..KRRK...",
+		"...KRRK..KRRK...",
+		".KKKRRK..KRRKKK.",
+		"KRRRRrK..KrRRRRK",
+		".KKKKK....KKKKK.",
+		"................",
+		"................",
+		".KKKKK....KKKKK.",
+		"KRRRRrK..KrRRRRK",
+		".KKKRRK..KRRKKK.",
+		"...KRRK..KRRK...",
+		"...KRRK..KRRK...",
+		"....KK....KK....",
+		"................",
+	},
+	access = {
+		"................",
+		"......KKKK......",
+		"..KKKKKKKKKKK...",
+		"..KSSSSSSSoSSK..",
+		"..KSooooooooSSK.",
+		"..KSSSSSSSoSSK..",
+		"..KKKKKKKKKKK...",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"......KttK......",
+		"....KKKttKKK....",
+		"....KnnnnnnK....",
+		"....KKKKKKKK....",
+		"................",
+	},
+	-- (the EU4 pack's event cards use the navies' anchor above: a ship joins your fleet)
 } :: { [string]: { string } }
 
 -- Icons made by recolouring another one: { base, { [from code] = to code } }.
@@ -2421,6 +2495,8 @@ IconArt.FALLBACK = {
 	cart = "🛒",
 	soundOn = "🔊",
 	soundOff = "🔇",
+	music = "🎵",
+	musicOff = "🔇",
 	gear = "⚙",
 	trophy = "🏆",
 	medal = "🎖",
@@ -2542,6 +2618,9 @@ IconArt.FALLBACK = {
 	arccasters = "⚡",
 	stormlords = "👑",
 	ionstorms = "🌩",
+	-- the EU4 pack
+	grudge = "💢",
+	access = "🚶",
 } :: { [string]: string }
 
 -- Old emoji in text (toasts from the server, power names, relation marks) and the icon that replaces each.
@@ -2615,6 +2694,11 @@ IconArt.EMOJI = {
 	-- navies (toasts and refusals: "⚓ Zephyr blockades Aurora Landing!")
 	["⛵"] = "ship",
 	["🚢"] = "ship",
+	-- the EU4 pack (toasts: "💢 Rhine insulted you!", "😀 Your jesters…", "🚶 Rhine lets your armies through")
+	["💢"] = "grudge",
+	["😀"] = "smile",
+	["🚶"] = "access",
+	-- blockades and the EU4 pack's event cards ("⚓ Zephyr blockades Aurora Landing!", "⚓ A ship joins your fleet")
 	["⚓"] = "anchor",
 } :: { [string]: string }
 

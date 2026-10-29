@@ -56,6 +56,18 @@ local function longPressOn(client, provinceId: number)
 	Emulator.longPress(client, s.X, s.Y, Config.Pings.LongPressSeconds + 0.05)
 end
 
+-- The icon in the medallion of the visible toast whose text contains `needle` (nil: no such toast).
+local function toastIcon(client, needle: string): string?
+	for _, d in client.localPlayer.PlayerGui:GetDescendants() do
+		if d:IsA("TextLabel") and d.Name == "Toast" and H.shown(d) and string.find(d.Text, needle, 1, true) then
+			local medallion = d:FindFirstChild("Medallion")
+			local icon = medallion and medallion:FindFirstChild("Icon")
+			return icon and icon:GetAttribute("Icon")
+		end
+	end
+	return nil
+end
+
 local function markerIcon(client, name: string): string?
 	local marker = H.mapObject(client, name)
 	local medallion = marker and marker:FindFirstChild("Medallion")
@@ -135,7 +147,7 @@ local function run()
 	H.expect(received[carol] == 0, "Carol's client was never sent the ping")
 	H.expect(received[bob] == 1 and received[alice] == 1, "Alice and Bob were sent it once")
 	H.expect(waitText(bob, ": Attack · ", 4), "Bob gets a toast naming the ping")
-	H.expect(H.iconText(bob, "war", ": Attack · "), "the toast shows the ping's icon")
+	H.expect(toastIcon(bob, ": Attack · ") == "war", "the toast's medallion shows the ping's icon")
 	H.expect(waitText(alice, "Wait a moment to ping again", 4), "the second ping was refused: wait")
 	H.expect(Emulator.findText(carol, ": Attack · ") == nil, "Carol gets no toast")
 	H.shot(bob, "ally_sees")
@@ -157,6 +169,7 @@ local function run()
 	Emulator.run(1.5)
 	H.expect(markerIcon(bob, "Ping2") == "powerShield", "Bob sees Defend's shield on Alice's capital")
 	H.expect(waitText(bob, ": Defend · ", 4), "with its toast")
+	H.expect(toastIcon(bob, ": Defend · ") == "shield", "a shield in the toast's medallion")
 
 	-- a third live ping takes the oldest off the map at once
 	local alicesOther
