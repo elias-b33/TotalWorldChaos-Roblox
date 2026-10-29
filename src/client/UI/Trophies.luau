@@ -2,8 +2,9 @@
 -- The Trophies screen (docs/MONETIZATION.md 5.6, 7.3), phone first: your 30 achievements with progress bars and
 -- rewards (and the title you wear), and the weekly, friends and global level leaderboards. Opens from the trophy
 -- button in the Lobby (after the cart and the scroll) and from the Results screen. Boards show display names only.
--- Built from the UI kit (docs/DESIGN.md "UI style"); the panel's contents are built when it opens and dropped when
--- it closes.
+-- Built from the UI kit (docs/UI_DIRECTION.md 7.14): achievements as raised plates like quest rows (the ones a
+-- match just unlocked glow gold), board rows as raised plates with your own marked in gold. The panel's contents
+-- are built when it opens and dropped when it closes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,7 +28,7 @@ local LOBBY_SLOT = 2 -- the third round button in the Lobby's bottom-left row (a
 local BAR = Widgets.BUTTON_HEIGHT -- the header and the controls row
 local GAP = Theme.space.xs
 local COLUMNS = 3 -- achievement cards per row
-local CARD_ROWS = 4
+local CARD_ROWS = 3 -- nine to a page: room for three lines inside a raised plate's rim on a phone
 local BOARD_COLUMNS = 2
 local BOARD_ROWS = 8
 local ROW_HEIGHT = 26
@@ -36,6 +37,8 @@ local VALUE_WIDTH = 90
 local TITLE_BUTTON = 184
 local BAR_SHARE = 0.3 -- of an achievement card: its progress bar
 local GLORY_WIDTH = 58 -- an achievement's "+500" Glory, before its title or item
+local BAR_HEIGHT = 12 -- an achievement's progress bar
+local MARKER = 3 -- the gold marker on your board row's left
 
 type Tab = "Achievements" | "Weekly" | "Friends" | "Level"
 local TABS: { Tab } = { "Achievements", "Weekly", "Friends", "Level" }
@@ -151,11 +154,12 @@ local function card(body: Frame, a: Types.AchievementEntry, order: number, recen
 	c.AutomaticSize = Enum.AutomaticSize.None
 	c.LayoutOrder = order
 	local pad = c:FindFirstChildOfClass("UIPadding")
-	if pad then
-		pad.PaddingTop = UDim.new(0, Theme.space.xs)
-		pad.PaddingBottom = UDim.new(0, Theme.space.xs)
+	if pad then -- clear of the plate's lit top and its deeper base
+		pad.PaddingTop = UDim.new(0, Theme.space.s)
+		pad.PaddingBottom = UDim.new(0, Theme.space.m)
 	end
-	if recent then
+	if recent then -- just unlocked: a gold glow (and, in the flat look, a gold edge)
+		Widgets.glow(c, Theme.color.gold)
 		local outline = c:FindFirstChild("Outline")
 		if outline and outline:IsA("UIStroke") then
 			outline.Color = Theme.color.gold
@@ -172,15 +176,18 @@ local function card(body: Frame, a: Types.AchievementEntry, order: number, recen
 	text.Position = UDim2.fromOffset(0, 18)
 	text.TextWrapped = false
 	text.TextTruncate = Enum.TextTruncate.AtEnd
-	local progress = Widgets.progress(c, nil, 8, if a.done then Theme.color.gold else Theme.color.primary)
-	progress.Position = UDim2.fromOffset(0, 39)
-	progress.Size = UDim2.new(BAR_SHARE, -Theme.space.s, 0, 8)
+	-- the bar and what it pays along the bottom
+	local progress = Widgets.progress(c, nil, BAR_HEIGHT, if a.done then Theme.color.gold else Theme.color.azure)
+	progress.AnchorPoint = Vector2.new(0, 1)
+	progress.Position = UDim2.new(0, 0, 1, -2)
+	progress.Size = UDim2.new(BAR_SHARE, -Theme.space.s, 0, BAR_HEIGHT)
 	Widgets.setProgress(progress, a.progress / a.target)
 	-- what it pays, after the bar: Glory, then a title (crown) or an item (gift), cut short on a narrow card
 	local rewards = Instance.new("Frame")
 	rewards.Name = "Rewards"
 	rewards.BackgroundTransparency = 1
-	rewards.Position = UDim2.new(BAR_SHARE, 0, 0, 35)
+	rewards.AnchorPoint = Vector2.new(0, 1)
+	rewards.Position = UDim2.fromScale(BAR_SHARE, 1)
 	rewards.Size = UDim2.new(1 - BAR_SHARE, 0, 0, 16)
 	rewards.Parent = c
 	local color = if a.done then Theme.color.textDim else Theme.color.gold
@@ -200,19 +207,29 @@ end
 
 -- One board row: rank, display name (a level on the level board), value. Your own row is highlighted.
 local function boardRow(body: Frame, row: Types.BoardRow, order: number, unit: string)
-	local r = Instance.new("Frame")
+	local r = Instance.new("ImageLabel")
 	r.Name = "Row"
-	r.BackgroundColor3 = if row.me then Theme.color.primary else Theme.color.navyRaised
 	r.BorderSizePixel = 0
 	r.LayoutOrder = order
 	r.Parent = body
-	Widgets.corner(r, Theme.radius.m)
+	Widgets.material(r, "raised")
+	if row.me then -- your row: a gold marker at its left, your name in gold
+		local marker = Instance.new("Frame")
+		marker.Name = "Marker"
+		marker.BackgroundColor3 = Theme.color.gold
+		marker.BorderSizePixel = 0
+		marker.Position = UDim2.fromOffset(2, 4)
+		marker.Size = UDim2.new(0, MARKER, 1, -8)
+		marker.ZIndex = 2
+		marker.Parent = r
+	end
 	local rank = Widgets.label(r, tostring(row.rank), Theme.text.body, ROW_HEIGHT)
 	rank.Name = "Rank"
 	rank.FontFace = Theme.font.display
 	rank.TextXAlignment = Enum.TextXAlignment.Center
 	rank.Size = UDim2.fromOffset(RANK_WIDTH, ROW_HEIGHT)
-	rank.TextColor3 = if row.me then Theme.color.text else PODIUM[row.rank] or Theme.color.textDim
+	rank.TextColor3 = PODIUM[row.rank] or Theme.color.slate300
+	Widgets.textStroke(rank)
 	local name = Widgets.label(
 		r,
 		string.format("%s%s", row.name, if row.level then "  · Lv " .. row.level else ""),
@@ -223,6 +240,9 @@ local function boardRow(body: Frame, row: Types.BoardRow, order: number, unit: s
 	name.Size = UDim2.new(1, -(RANK_WIDTH + VALUE_WIDTH), 1, 0)
 	name.TextWrapped = false
 	name.TextTruncate = Enum.TextTruncate.AtEnd
+	if row.me then
+		name.TextColor3 = Theme.color.gold
+	end
 	local units = if row.value == 1 and unit == "pts" then "pt" else unit
 	local value = Widgets.label(r, formatNumber(row.value) .. " " .. units, Theme.text.small, ROW_HEIGHT)
 	value.FontFace = Theme.font.display
@@ -230,7 +250,8 @@ local function boardRow(body: Frame, row: Types.BoardRow, order: number, unit: s
 	value.Position = UDim2.new(1, -Theme.space.m, 0, 0)
 	value.Size = UDim2.fromOffset(VALUE_WIDTH, ROW_HEIGHT)
 	value.TextXAlignment = Enum.TextXAlignment.Right
-	value.TextColor3 = if row.me then Theme.color.text else Theme.color.gold
+	value.TextColor3 = Theme.color.gold
+	Widgets.textStroke(value)
 end
 
 -- The controls row's line on the left (it shrinks for the title button and the pager).

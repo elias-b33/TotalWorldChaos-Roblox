@@ -25,7 +25,7 @@ local Offers = require(script.Parent.Offers)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local CARD_ORDER = 0 -- in the offers column: above the insult card (1) and the offers (10 and up)
+local CARD_ORDER = 0 -- in the offers column: above the insult card (2) and the offers (10 and up)
 local PLATE_ROOM = 14 -- the title plate rides this far above the card's top edge
 local CHOICE_HEIGHT = 52 -- at least 44 px tall on phones; the two sit side by side, so the card stays short
 local INFO_HEIGHT = 24 -- the province and the countdown
@@ -92,15 +92,16 @@ local function refresh()
 	end
 end
 
--- A choice's button, half the card wide so the two sit side by side: its name at the top, its effects as icon chips
--- at the bottom (Widgets.actionButton's layout without the big lead icon, which leaves no room for a name).
+-- A choice's button, half the card wide so the two sit side by side: its name centred on the face, its effects as
+-- icon chips centred under it (Widgets.actionButton's layout without the big lead icon, which leaves no room for a
+-- name).
 local function choiceButton(parent: Instance, caption: string, chips: { { string } }, onPress: () -> ()): TextButton
 	local b = Widgets.button(parent, caption, 0, Widgets.BUTTON, onPress)
 	b.Size = UDim2.new(0.5, -Theme.space.s // 2, 0, CHOICE_HEIGHT)
 	b.TextSize = Theme.text.small + 1
 	b.TextWrapped = false
 	b.TextTruncate = Enum.TextTruncate.AtEnd
-	b.TextXAlignment = Enum.TextXAlignment.Left
+	b.TextXAlignment = Enum.TextXAlignment.Center
 	b.TextYAlignment = Enum.TextYAlignment.Top
 	local skinned = Widgets.skinned(b)
 	local pad = Widgets.padding(b, Theme.space.s, 0)
@@ -114,7 +115,7 @@ local function choiceButton(parent: Instance, caption: string, chips: { { string
 	row.Size = UDim2.new(1, 0, 0, 16)
 	row.ZIndex = 2
 	row.Parent = b
-	Widgets.list(row, true, Theme.space.xs)
+	Widgets.list(row, true, Theme.space.xs).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	for i, chip in chips do
 		local l = Widgets.label(row, chip[2], Theme.text.small, 16)
 		l.Name = "Effect"

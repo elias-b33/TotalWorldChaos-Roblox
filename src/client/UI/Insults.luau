@@ -2,7 +2,9 @@
 -- The answer card for an insult (docs/DESIGN.md "Diplomacy", the EU4 pack): when another nation insults you, a card
 -- in the offers column at the top right (until its window closes) shows the timer, your grudge, and two answers:
 -- Insult back and Laugh it off. Insults carry no message (Roblox's preset-text rule), so the card only offers game
--- actions; the server checks everything (Sim.Diplomacy). Built from the UI kit.
+-- actions; the server checks everything (Sim.Diplomacy). Built from the UI kit like the event card above it: an iron
+-- panel with "Answer <nation>" on its title plate, an info row (your grudge, and the seconds left in a chip) and the
+-- two answers side by side.
 
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,12 +21,17 @@ local Offers = require(script.Parent.Offers)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local CARD_ORDER = 1 -- in the offers column: above the offers
+local CARD_ORDER = 2 -- in the offers column: under the event card (0), above the offers (10 and up)
+local PLATE_ROOM = 14 -- the title plate rides this far above the card's top edge
 local ANSWER_HEIGHT = 52 -- the two answer buttons: at least 44 px tall on phones
+local INFO_HEIGHT = 34 -- the grudge (two lines at most) and the countdown in a chip, as on the event card
+local TIMER_HEIGHT = 24
+local TIMER_WIDTH = 76
 
 local Insults = {}
 
 local card: Frame? = nil
+local gap: Frame? = nil
 local cardKey = ""
 local cardTimer: TextLabel? = nil
 local cardGrudge: TextLabel? = nil
@@ -46,7 +53,10 @@ local function dropCard()
 	if card then
 		card:Destroy()
 	end
-	card, cardTimer, cardGrudge, cardKey = nil, nil, nil, ""
+	if gap then
+		gap:Destroy()
+	end
+	card, gap, cardTimer, cardGrudge, cardKey = nil, nil, nil, nil, ""
 end
 
 local function renderCard()
@@ -73,28 +83,35 @@ local function renderCard()
 	end
 	dropCard()
 	cardKey = key
-	local made = Widgets.panel(Offers.column(), Offers.WIDTH)
+	local column = Offers.column()
+	local room = Instance.new("Frame")
+	room.Name = "AnswerGap"
+	room.BackgroundTransparency = 1
+	room.Size = UDim2.new(1, 0, 0, PLATE_ROOM)
+	room.LayoutOrder = CARD_ORDER - 1
+	room.Parent = column
+	gap = room
+	local made = Widgets.panel(column, Offers.WIDTH)
 	made.Name = "Answer"
 	made.LayoutOrder = CARD_ORDER
 	Widgets.list(made, false, Theme.space.s)
+	Widgets.header(made, "Answer " .. nationName(window.to), "grudge")
 	card = made
-	local head = Instance.new("Frame")
-	head.BackgroundTransparency = 1
-	head.Size = UDim2.new(1, 0, 0, 30)
-	head.LayoutOrder = 1
-	head.Parent = made
-	local heading = Widgets.title(head, "Answer " .. nationName(window.to), Theme.text.body, 30)
-	heading.Size = UDim2.new(1, -72, 1, 0)
-	Widgets.leadIcon(heading, "grudge", Theme.size.icon)
-	local timer = Widgets.chip(head, "hourglass", left .. " s", 66, 28)
+	local info = Instance.new("Frame")
+	info.Name = "Info"
+	info.BackgroundTransparency = 1
+	info.Size = UDim2.new(1, 0, 0, INFO_HEIGHT)
+	info.LayoutOrder = 1
+	info.Parent = made
+	local hint = Widgets.hint(info, grudgeText, Theme.text.small, INFO_HEIGHT)
+	hint.Name = "Grudge"
+	hint.Size = UDim2.new(1, -(TIMER_WIDTH + Theme.space.s), 1, 0)
+	cardGrudge = hint
+	local timer = Widgets.chip(info, "hourglass", left .. " s", TIMER_WIDTH, TIMER_HEIGHT)
 	timer.Name = "Timer"
 	timer.AnchorPoint = Vector2.new(1, 0.5)
 	timer.Position = UDim2.fromScale(1, 0.5)
 	cardTimer = timer
-	local hint = Widgets.hint(made, grudgeText, Theme.text.small, 20)
-	hint.Name = "Grudge"
-	hint.LayoutOrder = 2
-	cardGrudge = hint
 	local row = Instance.new("Frame")
 	row.Name = "Answers"
 	row.BackgroundTransparency = 1

@@ -4,6 +4,10 @@
 -- takes two taps. A toggle changes at once on this client (Sounds) and is saved in the profile (RequestPreference,
 -- Sim.Preferences); the saved settings come back with the Profile remote when the player joins. The popover closes
 -- when the speaker is tapped again, or OPEN_SECONDS after the last tap.
+-- The popover is a popover: it draws above the cards in the offers column (an event card can stand right under the
+-- speaker), so it lives in its own screen over the bar's place rather than in the bar.
+
+local Players = game:GetService("Players")
 
 local Client = script.Parent.Parent
 local Intents = require(Client.Intents)
@@ -13,8 +17,9 @@ local Icons = require(script.Parent.Icons)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
-local TOGGLE_WIDTH = 148 -- "Sounds off" beside a 32 px icon
+local TOGGLE_WIDTH = 148 -- "Sounds off" and its 16 px icon, centred together
 local OPEN_SECONDS = 5 -- the popover closes this long after the last tap
+local DISPLAY_ORDER = 6 -- over the offers column (3), the nations drawer and the power picker (4), the tutorial (5)
 
 type Toggle = { setting: Sounds.Setting, name: string, label: string, on: string, off: string }
 local TOGGLES: { Toggle } = {
@@ -25,6 +30,8 @@ local TOGGLES: { Toggle } = {
 local Speaker = {}
 
 local speaker: TextButton? = nil
+local holder: Frame? = nil -- where the bar is, at the bar's scale, in the popover's own screen
+local holderScale: UIScale? = nil
 local panel: Frame? = nil
 local buttons: { [string]: TextButton } = {}
 local icons: { [string]: GuiObject } = {}
@@ -44,11 +51,16 @@ local function refresh()
 	end
 end
 
--- Under the speaker, its right edge on the speaker's (in the bar's own coordinates and scale).
+-- Under the speaker, its right edge on the speaker's (in the bar's own coordinates and scale: the holder copies the
+-- bar's place and scale).
 local function place()
-	local p, button = panel, speaker
-	if p and button then
+	local p, button, h, scale = panel, speaker, holder, holderScale
+	if p and button and h and scale then
 		local bar = button.Parent :: GuiObject
+		h.Position = bar.Position
+		h.Size = bar.Size
+		local barScale = bar:FindFirstChildOfClass("UIScale")
+		scale.Scale = if barScale then barScale.Scale else 1
 		local right = button.Position.X.Offset + button.Size.X.Offset - bar.Size.X.Offset
 		p.Position = UDim2.new(1, right, 0, HudLayout.ITEM + Theme.space.s)
 	end
@@ -84,23 +96,33 @@ end
 -- Build the popover for the speaker button (Hud's, Name Mute) and open it from there.
 function Speaker.attach(button: TextButton)
 	speaker = button
-	local p = Widgets.panel(button.Parent :: Instance, TOGGLE_WIDTH + 20, "plate")
+	-- like the bar's screen: the screen's own coordinates, Roblox's top-bar row included
+	local gui = Widgets.screen("Speaker", DISPLAY_ORDER)
+	gui.IgnoreGuiInset = true
+	gui.ScreenInsets = Enum.ScreenInsets.None
+	local h = Instance.new("Frame")
+	h.Name = "BarPlace"
+	h.BackgroundTransparency = 1
+	h.Parent = gui
+	local scale = Instance.new("UIScale")
+	scale.Parent = h
+	holder, holderScale = h, scale
+	local p = Widgets.panel(h, TOGGLE_WIDTH + 20, "plate")
 	p.Name = "SpeakerMenu"
 	p.AnchorPoint = Vector2.new(1, 0)
 	p.Visible = false
 	Widgets.list(p, false, Theme.space.s)
 	panel = p
 	for i, t in TOGGLES do
-		local b = Widgets.button(p, "", TOGGLE_WIDTH, Widgets.GOOD, function()
+		-- the kit's icon-and-caption button: a 16 px icon centred with its caption
+		local b = Widgets.iconTextButton(p, t.on, t.label .. " on", TOGGLE_WIDTH, Widgets.GOOD, function()
 			flip(t)
-		end)
-		b.Name = t.name
+		end, t.name)
 		b.LayoutOrder = i
-		b.TextXAlignment = Enum.TextXAlignment.Left
-		Widgets.padding(b, Theme.space.s, 0)
-		icons[t.setting] = Widgets.leadIcon(b, t.on, Theme.size.iconButton, Theme.space.s)
+		icons[t.setting] = b:FindFirstChild("Icon") :: GuiObject
 		buttons[t.setting] = b
 	end
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	refresh()
 	button.Activated:Connect(function()
 		setOpen(not p.Visible)

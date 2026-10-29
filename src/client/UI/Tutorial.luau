@@ -6,9 +6,10 @@
 --
 -- Nothing here covers what it points at: the card sits top left (clear of toasts, offers and the bottom sheets),
 -- the map arrow stands above its province and under every panel, and a button gets an outline, not a cover.
--- Built from the UI kit: a panel with a gold outline, a gold step pill, a title and a hint with pixel icons, and the
--- arrows are the kit's pixel arrow turned to point down, in gold. A hint that says to tap the map wears that same
--- arrow; a hint that names a button wears the button's own icon.
+-- Built from the UI kit (docs/UI_DIRECTION.md 7.10): an iron card whose brass title plate holds a gold step chip
+-- ("2/6") and the prompt, a gold hint line and a slate Skip; the button to press wears a gold outline that pulses,
+-- and the arrows are the kit's pixel arrow turned to point down, in gold. A hint that says to tap the map wears that
+-- same arrow; a hint that names a button wears the button's own icon.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,11 +33,13 @@ local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
 local CARD_WIDTH = 236 -- clear of the toasts in the middle of the top (Hud TOAST_WIDTH)
-local STEP_WIDTH = 40 -- the "2/6" pill
-local TITLE_HEIGHT = 24
+local STEP_WIDTH = 40 -- the "2/6" chip on the title plate
+local TITLE_MAX = CARD_WIDTH - 16 - 8 -- the title plate, from 16 px in, stops short of the card's right edge
+local PLATE_OVERHANG = 14 -- the title plate rides this far above the card's top edge
 local SKIP_WIDTH = 60
 local HINT_ICON = 16 -- the hint's icon, so a hint like "Tap +1 Regiment" fits one line
-local HINT_TOP = 30 -- the hint line and Skip sit under the title
+local HINT_TOP = 0 -- the hint line and Skip, under the title plate
+local GLOW_DIM = 0.6 -- the glow's outline pulses between solid and this transparency
 local ARROW_SIZE = 48 -- the 16×16 pixel arrow at 3× (whole pixels stay crisp)
 local ARROW_TURN = 90 -- the kit's arrow points right; turned this many degrees it points down
 local RING_SHARE = 0.6 -- the ring round a province: this share of its radius on screen...
@@ -73,7 +76,6 @@ local cardGui: ScreenGui
 local card: Frame
 local stepLabel: TextLabel
 local titleLabel: TextLabel
-local titleIcon: GuiObject
 local hintLabel: TextLabel
 local hintIcon: GuiObject
 local skipButton: TextButton
@@ -292,10 +294,9 @@ local function refresh()
 	local target: GuiButton? = nil
 	if v and active then
 		local icon, hint, needle, province = plan(v)
-		local titleIconName, titleText = title(v)
+		local _, titleText = title(v)
 		stepLabel.Text = string.format("%d/%d", v.step, v.total)
 		titleLabel.Text = titleText
-		Icons.set(titleIcon, titleIconName)
 		setHint(icon, hint)
 		target = if needle then findButton(needle) else nil
 		pointAt = if province and province ~= 0 then province else nil
@@ -320,11 +321,14 @@ local function refresh()
 		glow = nil
 		glowOn = target
 		if target then
+			-- a second outline outside the button's own, over it (docs/UI_DIRECTION.md 7.10)
 			local stroke = Instance.new("UIStroke")
 			stroke.Name = "TutorialGlow"
 			stroke.Color = GLOW
 			stroke.Thickness = 3
 			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.BorderStrokePosition = Enum.BorderStrokePosition.Outer
+			stroke.ZIndex = 2
 			stroke.Parent = target
 			glow = stroke
 		end
@@ -358,7 +362,8 @@ local function place()
 	local button = glowOn
 	local stroke = glow
 	if stroke and stroke.Parent then
-		stroke.Thickness = 3 + (bob + 4) / 4
+		-- the glow pulses its transparency (its thickness stays: no layout churn); still under reduced motion
+		stroke.Transparency = if Widgets.reducedMotion() then 0 else GLOW_DIM * (bob + 4) / 8
 	else
 		button = nil -- its panel rebuilt it; the next check finds the new one
 	end
@@ -403,32 +408,30 @@ function Tutorial.init(selectedArmy: () -> number?)
 	ringGold.Parent = ringLine
 	pointerGui.Parent = playerGui
 
-	-- the prompt card: a panel with a gold outline
+	-- the prompt card: an iron panel; its title plate on the top edge holds the step chip and the prompt
 	cardGui = Widgets.screen("Tutorial", 5)
 	card = Widgets.panel(cardGui, CARD_WIDTH)
 	card.Name = "Card"
 	card.Visible = false
 	local outline = card:FindFirstChild("Outline")
 	if outline and outline:IsA("UIStroke") then
-		outline.Color = GLOW
+		outline.Color = GLOW -- the flat look: a gold edge
 	end
-	-- "2/6" in a gold pill and the prompt's title across the top; the hint under it, with Skip on its right
-	stepLabel = Widgets.label(card, "", Theme.text.body, TITLE_HEIGHT)
+	local _, plate = Widgets.header(card, "", nil)
+	titleLabel = plate
+	titleLabel.TextSize = Theme.text.heading
+	titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(TITLE_MAX, Theme.size.titlePlate)
+	limit.Parent = titleLabel
+	local platePad = titleLabel:FindFirstChildOfClass("UIPadding") :: UIPadding
+	platePad.PaddingLeft = UDim.new(0, platePad.PaddingLeft.Offset + STEP_WIDTH + Theme.space.s)
+	stepLabel = Widgets.badge(titleLabel, "", GLOW)
 	stepLabel.Name = "Step"
-	stepLabel.Size = UDim2.fromOffset(STEP_WIDTH, TITLE_HEIGHT)
-	stepLabel.BackgroundColor3 = GLOW
-	stepLabel.BackgroundTransparency = 0
-	stepLabel.FontFace = Theme.font.display
-	stepLabel.TextColor3 = Theme.color.textDark
-	stepLabel.TextXAlignment = Enum.TextXAlignment.Center
-	stepLabel.TextWrapped = false
-	Widgets.corner(stepLabel, Theme.radius.m)
-	titleLabel = Widgets.title(card, "", Theme.text.heading, TITLE_HEIGHT)
-	titleLabel.Name = "Title"
-	titleLabel.TextColor3 = Theme.color.text
-	titleLabel.Position = UDim2.fromOffset(STEP_WIDTH + Theme.space.s, 0)
-	titleLabel.Size = UDim2.new(1, -(STEP_WIDTH + Theme.space.s), 0, TITLE_HEIGHT)
-	titleIcon = Widgets.leadIcon(titleLabel, "flag", Theme.size.icon, Theme.space.xs)
+	stepLabel.AutomaticSize = Enum.AutomaticSize.None
+	stepLabel.AnchorPoint = Vector2.new(0, 0.5)
+	stepLabel.Position = UDim2.new(0, -(STEP_WIDTH + Theme.space.s), 0.5, 0)
+	stepLabel.Size = UDim2.fromOffset(STEP_WIDTH, 22)
 	hintLabel = Widgets.label(card, "", Theme.text.body, Widgets.BUTTON_HEIGHT)
 	hintLabel.Name = "Hint"
 	hintLabel.TextColor3 = GLOW
@@ -465,10 +468,9 @@ function Tutorial.init(selectedArmy: () -> number?)
 	doneCard.Position = UDim2.fromScale(0.5, 0.5)
 	doneCard.Visible = false
 	Widgets.list(doneCard, false, Theme.space.m)
-	local doneTitle = Widgets.title(doneCard, "Tutorial done!", Theme.text.hero, 36)
-	doneTitle.LayoutOrder = 1
-	Widgets.leadIcon(doneTitle, "trophy", Theme.icon.medium)
-	Widgets.label(doneCard, "Now go rule the world!", Theme.text.heading, 26).LayoutOrder = 2
+	Widgets.header(doneCard, "Tutorial done!", "trophy") -- on a title plate on the card's top edge
+	local cheer = Widgets.title(doneCard, "Now go rule the world!", Theme.text.heading, 26)
+	cheer.LayoutOrder = 2
 	doneButtons = Instance.new("Frame")
 	doneButtons.Name = "Buttons"
 	doneButtons.BackgroundTransparency = 1
@@ -481,9 +483,9 @@ function Tutorial.init(selectedArmy: () -> number?)
 	buttonArrow = arrow(cardGui, "ButtonArrow")
 	-- the card (and the way out that replaces it) at the top left, under the top bar
 	local function placeCard()
-		local top = UDim2.fromOffset(Theme.space.m, HudLayout.contentTop())
-		Widgets.fit(card, nil, top)
-		Widgets.fit(leaveButton, nil, top)
+		local top = HudLayout.contentTop()
+		Widgets.fit(card, nil, UDim2.fromOffset(Theme.space.m, top + PLATE_OVERHANG)) -- its title plate rides above it
+		Widgets.fit(leaveButton, nil, UDim2.fromOffset(Theme.space.m, top))
 	end
 	placeCard()
 	HudLayout.onChange(placeCard)

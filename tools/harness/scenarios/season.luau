@@ -175,15 +175,23 @@ local function run()
 		Emulator.press(alice, "Next")
 	end
 	Emulator.run(0.3)
-	H.expect(Emulator.findText(alice, "4/7") ~= nil, "page 4: tiers 25-32")
+	H.expect(Emulator.findText(alice, "4/") ~= nil, "page 4 (eight tiers a page on a phone, five on a 667 px one)")
 	H.shot(alice, "season_page4")
-	for _ = 1, 3 do
+	for _ = 1, 8 do -- to the last page (Next stops there)
 		Emulator.press(alice, "Next")
 	end
 	Emulator.run(0.3)
-	H.expect(Emulator.findText(alice, "Primordial Herald") ~= nil or Emulator.findText(alice, "Titan +3") ~= nil, "the last page: tier 50")
-	H.expect(Emulator.findText(alice, "every 2,400 XP") ~= nil, "and the bonus reward")
+	local function tier50(): boolean
+		return Emulator.findText(alice, "Primordial Herald") ~= nil or Emulator.findText(alice, "Titan +3") ~= nil
+	end
+	local onLast = tier50()
+	H.expect(Emulator.findText(alice, "every 2,400 XP") ~= nil, "the last page: the bonus reward")
 	H.shot(alice, "season_last_page")
+	if not onLast then -- five tiers a page (a 667 px phone): the bonus column has the last page to itself
+		Emulator.press(alice, "Prev")
+		Emulator.run(0.3)
+	end
+	H.expect(onLast or tier50(), "and tier 50")
 	local steps = funnel("SeasonPass", player.UserId)
 	H.expect(string.find(steps, "pass_viewed", 1, true) and string.find(steps, "purchase_prompted", 1, true) and string.find(steps, "purchase_completed", 1, true), "SeasonPass funnel: " .. steps)
 	local tiers = 0
@@ -208,9 +216,23 @@ local function run()
 	for _, id in rotation.daily do
 		H.expect(alice.localPlayer.PlayerGui:FindFirstChild("Card_" .. id, true) ~= nil, id .. " is on the Today tab")
 	end
-	H.expect(Emulator.findText(alice, "Daily · new items in") ~= nil and Emulator.findText(alice, "Weekly · new in") ~= nil, "both sections say when they change")
+	local weeklyLine = Emulator.findText(alice, "Weekly · new in") ~= nil
+	local paged = not weeklyLine and H.find(alice, "NextPage") ~= nil
+	if paged then
+		-- a small phone (VIEWPORT=667x375): the daily four and the weekly two get a page each
+		H.shot(alice, "shop_day1")
+		Emulator.press(alice, "NextPage")
+		Emulator.run(0.3)
+		weeklyLine = Emulator.findText(alice, "Weekly · new in") ~= nil
+		H.shot(alice, "shop_day1_weekly")
+		Emulator.press(alice, "PrevPage")
+		Emulator.run(0.3)
+	end
+	H.expect(Emulator.findText(alice, "Daily · new items in") ~= nil and weeklyLine, "both sections say when they change")
 	H.expect(Emulator.findText(alice, "Every item comes back within 60 days") ~= nil, "and that every item comes back")
-	H.shot(alice, "shop_day1")
+	if not paged then
+		H.shot(alice, "shop_day1")
+	end
 	Data.update(player, function(d)
 		d.glory = 5000
 	end)

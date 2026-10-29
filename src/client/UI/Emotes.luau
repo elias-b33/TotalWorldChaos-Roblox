@@ -78,9 +78,10 @@ function Emotes.init()
 	button.AnchorPoint = Vector2.new(0, 1)
 	button.Position = UDim2.new(0, 12, 1, -12)
 	button.Visible = false
+	Widgets.shadow(button, "button") -- over the map
 	local round = button:FindFirstChildOfClass("UICorner")
-	if round then
-		round.CornerRadius = UDim.new(0.5, 0)
+	if round and not Widgets.skinned(button) then
+		round.CornerRadius = UDim.new(0.5, 0) -- the flat look: a disc
 	end
 
 	picker = Widgets.panel(gui, 0, "plate")
