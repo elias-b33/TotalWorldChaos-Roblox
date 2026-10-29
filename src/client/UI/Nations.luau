@@ -1,6 +1,7 @@
 --!strict
 -- Left drawer (docs/DESIGN.md "UI and controls"): every nation with its flag, province count and your relation,
--- and at the top the way to your quests during a match (the top bar has no room for another button).
+-- and at the top the way to your quests during a match (the top bar has no room for another button). A tap on
+-- another nation's row shows its land with the province sheet's diplomacy buttons (war, ally, insult, gift, access).
 -- One row per nation: flag, race, who plays it, name (in a nameplate frame if they own one), streak flame, VIP badge,
 -- then provinces (in a well) and your relation as pixel icons; your own row sits on a raised plate. Under the rows,
 -- your race and its one-line bonus. An iron drawer with its title on a plate (docs/UI_DIRECTION.md 7.10).
@@ -37,6 +38,7 @@ local FLAMES: { { string } } = { { "fire" }, { "fire", "fire" }, { "fireBlue" },
 local drawer: Frame
 local rows: Frame
 local raceLine: TextLabel
+local onNation: ((number) -> ())? = nil -- a tap on another nation's row
 local questsButton: TextButton? = nil
 local questsText: () -> string = function()
 	return "📜 Quests"
@@ -74,7 +76,8 @@ local function render()
 		return Relations.score(a.id) > Relations.score(b.id)
 	end)
 	for i, n in list do
-		-- your own row on a raised plate (painted on an ImageLabel), the others straight on the drawer
+		-- your own row on a raised plate (painted on an ImageLabel), the others straight on the drawer; another living
+		-- nation's row is a button: it shows that nation's land and its diplomacy buttons (the EU4 pack)
 		local row: GuiObject
 		if n.id == me then
 			local plate = Instance.new("ImageLabel")
@@ -82,6 +85,18 @@ local function render()
 			Widgets.material(plate, "raised")
 			Widgets.padding(plate, ROW_PAD, 0)
 			row = plate
+		elseif onNation ~= nil and not n.eliminated then
+			local b = Instance.new("TextButton")
+			b.Text = ""
+			b.AutoButtonColor = false
+			b.BackgroundTransparency = 1
+			local nationId = n.id
+			b.Activated:Connect(function()
+				if onNation then
+					onNation(nationId)
+				end
+			end)
+			row = b
 		else
 			local f = Instance.new("Frame")
 			f.BackgroundTransparency = 1
@@ -172,8 +187,10 @@ function Nations.toggle()
 	render()
 end
 
--- onQuests: opens the Quests screen; buttonText: its button's text (with the number of quests to claim).
-function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?)
+-- onQuests: opens the Quests screen; buttonText: its button's text (with the number of quests to claim);
+-- onNationTap: another nation's row was tapped (its land and diplomacy buttons, the EU4 pack).
+function Nations.init(onQuests: (() -> ())?, buttonText: (() -> string)?, onNationTap: ((number) -> ())?)
+	onNation = onNationTap
 	local gui = Widgets.screen("Nations", 4)
 	drawer = Widgets.panel(gui, WIDTH)
 	drawer.Name = "Drawer"

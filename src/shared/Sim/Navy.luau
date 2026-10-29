@@ -516,12 +516,13 @@ local function owners(side: { Fleet }): { number }
 	return out
 end
 
--- A side's combat multiplier: 1 + its random roll + the catch-up bonuses (underdog defending, coalition), as on
--- land; no terrain or forts at sea.
+-- A side's combat multiplier: 1 + its random roll + the catch-up bonuses (underdog defending, coalition) + an
+-- insult's grudge or high spirits (Sim.Diplomacy), as on land; no terrain or forts at sea.
 function Navy.modifier(state: MatchState, sides: Sides, defending: boolean, roll: number): number
 	local mine = owners(if defending then sides.defenders else sides.attackers)
 	local theirs = owners(if defending then sides.attackers else sides.defenders)
-	return math.max(0.1, 1 + roll + CatchUp.battleBonus(state, mine, theirs, defending))
+	local grudge = Diplomacy.grudgeBonus(state, mine, theirs)
+	return math.max(0.1, 1 + roll + grudge + CatchUp.battleBonus(state, mine, theirs, defending))
 end
 
 local function takeLosses(side: { Fleet }, losses: number)

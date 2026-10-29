@@ -345,7 +345,7 @@ T.test("one caster hits the same nation at most once per 2 minutes; others only 
 	T.equal(Primordial.cooldownLeft(state, { nation = A }, B), 0, "and only for the one who cast it")
 	state.tick += Config.Primordial.ImmunityTicks
 	local ok, err = primordial("Plague", B)
-	T.expect(not ok and err == "Cooldown", "the immunity is over, the caster's own cooldown isn't")
+	T.expect(not ok and err == "PowerCooldown", "the immunity is over, the caster's own cooldown isn't")
 	T.equal(state.primordials[BOB].charges, 4, "a refused power costs nothing")
 	T.expect((primordial("Plague", C)), "another nation is fair game")
 	T.expect((cast(state, A, "Plague", B)), "another caster only waits out the immunity")

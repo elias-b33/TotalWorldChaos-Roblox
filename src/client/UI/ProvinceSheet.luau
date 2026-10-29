@@ -1,9 +1,10 @@
 --!strict
 -- Bottom sheet for the tapped province (docs/DESIGN.md "UI and controls"): who owns it, development, building and
 -- who is standing there; one-tap actions on your own provinces (develop, build, recruit one regiment of each of
--- the five troops of your race's roster, move an army) and diplomacy on foreign ones (war, ally, peace). Every
--- button shows its price; the server decides. On an owned coast, "Ships" opens the choice of
--- how many of the map's ships to launch (docs/DESIGN.md "Navies"); a blockaded coast's tile is greyed with an anchor.
+-- the five troops of your race's roster, move an army) and diplomacy on foreign ones (war, ally, peace, and the EU4
+-- pack's insult, gift and military access). Every button shows its price; the server decides. On an owned coast,
+-- "Ships" opens the choice of how many of the map's ships to launch (docs/DESIGN.md "Navies"); a blockaded coast's
+-- tile is greyed with an anchor.
 -- Built from the UI kit (docs/UI_DIRECTION.md 7.10): the province's name on a title plate, a row of chips (icon +
 -- value, the development as the map's pip bar) and rows of slot tiles, five to a row: routine actions on calm slate
 -- tiles whose base says their group (build bronze, recruit green), decisions (war, ally, peace) in full colour.
@@ -415,7 +416,8 @@ local function render()
 	-- emerald)
 	if owner and me and owner.id ~= me.id and snap then
 		local target = owner.id
-		if Relations.atWar(me.id, target) then
+		local atWar, allied = Relations.atWar(me.id, target), Relations.allied(me.id, target)
+		if atWar then
 			for _, tribute in Config.Diplomacy.PeaceTributes do
 				local costs = if tribute == 0 then {} else { cost("gold", "+" .. tribute, me.gold, tribute) }
 				action(diplomacyRow, "peace", "Peace", costs, Widgets.GOOD, me.gold >= tribute, function()
@@ -424,16 +426,42 @@ local function render()
 			end
 		else
 			local canWar = snap.phase ~= "Peace"
-				and not Relations.allied(me.id, target)
+				and not allied
 				and not Relations.truce(me.id, target)
 				and Relations.borders(me.id, target)
 			action(diplomacyRow, "war", "Declare war", {}, Widgets.DANGER, canWar, function()
 				Intents.diplomacy("War", target)
 			end)
-			if not Relations.allied(me.id, target) then
+			if not allied then
 				action(diplomacyRow, "handshake", "Ally", {}, Widgets.BUTTON, true, function()
 					Intents.diplomacy("Ally", target)
 				end, "🤝 Ally")
+			end
+		end
+		-- the EU4 pack (a match setting): insult (an action with no message; never an ally), a gift, ask for military
+		-- access; the same diplomacy row, after war, ally and peace
+		if snap.setup.settings.diplomacy then
+			if not allied then
+				local wait = Relations.cooldown("Insult", me.id, target)
+				local costs = if wait > 0 then { { "hourglass", wait .. " s" } } else {}
+				action(diplomacyRow, "grudge", "Insult", costs, Widgets.BUTTON, wait == 0, function()
+					Intents.diplomacy("Insult", target)
+				end, "Insult")
+			end
+			if not atWar then
+				local gift = Config.Diplomacy.GiftGold
+				local wait = Relations.cooldown("Gift", me.id, 0) -- one gift a minute, whoever it goes to
+				local costs = if wait > 0
+					then { { "hourglass", wait .. " s" } }
+					else { cost("gold", tostring(gift), me.gold, gift) }
+				action(diplomacyRow, "gift", "Gift", costs, Widgets.GOOD, wait == 0 and me.gold >= gift, function()
+					Intents.diplomacy("Gift", target)
+				end, "Gift")
+				if not allied and not Relations.hasAccess(me.id, target) then
+					action(diplomacyRow, "access", "Access", {}, Widgets.BUTTON, true, function()
+						Intents.diplomacy("Access", target)
+					end, "Access")
+				end
 			end
 		end
 	end
@@ -523,8 +551,9 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 		if selected == nil then
 			return
 		end
-		-- the sheet shows prices and enabled buttons, so refresh when this province or any nation changes
-		local relevant = #delta.nations > 0
+		-- the sheet shows prices and enabled buttons, so refresh when this province, any nation or the diplomacy (a
+		-- war, an insult's wait) changes
+		local relevant = #delta.nations > 0 or delta.diplomacy ~= nil
 		for _, r in delta.provinces do
 			relevant = relevant or r.id == selected
 		end

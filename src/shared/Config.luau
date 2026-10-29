@@ -781,8 +781,135 @@ Config.Diplomacy = {
 	MaxAllianceSize = 3,
 	TruceTicks = 3 * 60,
 	CoalitionThreshold = 0.2, -- share of the ownable provinces (not mountains) that puts a crown on a nation
-	OfferTicks = 30, -- alliance and peace offers expire after this
+	OfferTicks = 30, -- alliance, peace and military access offers expire after this
 	PeaceTributes = { 0, 50, 100 }, -- gold a peace offer can include (the buttons in the province sheet)
+	-- Insults (a diplomatic action with no message, docs/DESIGN.md "Diplomacy"): one nation insults another at most
+	-- this often (each way)
+	InsultCooldownTicks = 90,
+	AnswerTicks = 30, -- the insulted nation may answer (insult back or laugh it off) this long
+	GrudgeTicks = 3 * 60, -- an insult gives the insulted nation a grudge against the insulter for this long...
+	GrudgeBonus = 0.1, -- ...worth this much combat strength in battles against the insulter (whole side, like races)
+	LaughTicks = 60, -- laughing an insult off trades the grudge for high spirits this long...
+	LaughBonus = 0.05, -- ...worth this much combat strength in every battle (doesn't stack with a grudge: the best counts)
+	MarkerSeconds = 5, -- how long the insult marker stays over the insulted nation's capital (client)
+	GiftGold = 25, -- a gift: a little gold to another nation
+	GiftCooldownTicks = 60, -- a nation sends one gift (to anyone) at most this often
+	AccessTicks = 3 * 60, -- military access: the guest's armies may enter the owner's land this long (a war between
+	-- them ends it); when it ends, the guest's armies there walk home under the white flag
+}
+
+-- Event cards (the EU4 pack, stage 2; docs/DESIGN.md "Events") -----------------------------------------------------
+-- Every few minutes each living nation gets an event card: a title and a line of flavour (Shared/Flavour/EventCards:
+-- shown only to that nation's player) and two choices. Rules: Sim/EventCards.luau. A choice's effects, any of:
+--   gold, manpower   added (negative: a cost, which must be affordable when choosing)
+--   development      levels added to the card's province (up to Config.Economy.MaxDevelopment)
+--   regiments        infantry regiments raised in the card's province (your capital if the province was lost)
+--   ships            ships launched into the card's coastal province's port zone
+--   boost            the nation's gold income × (1 + boost) for boostTicks
+-- `default` is the choice that happens when the card runs out of time (always one with no cost). `map`: only on
+-- that map (nil: every map). `needs`: "coast" (a coastal province), "fleet" (a fleet: from navies stage 2 on) or
+-- "war" (at war with someone). About 50 gold's worth a choice (100 manpower = 1 gold, a level of development 60):
+-- about two months of a starting nation's income, the same for everyone. docs/BALANCE.md section 21.
+Config.EventCards = {
+	FirstTicks = 2 * 60, -- nation 1's first card comes this far into the match...
+	StaggerTicks = 3, -- ...each next nation's this much later (the cards don't all land on one tick)...
+	EveryTicks = 3 * 60, -- ...and each next card this long after the last one closed
+	ChoiceTicks = 20, -- a card waits this long for an answer, then its default choice happens
+	BoostTicks = 2 * 60, -- an income boost lasts this long
+	Events = {
+		-- shared: every map (the text suits a castle, a wizard's tower and a space station alike)
+		{ id = "Harvest", default = 1, choices = { { gold = 50 }, { manpower = 4000 } } },
+		{ id = "Circus", default = 1, choices = { { gold = 40 }, { gold = -20, boost = 0.2 } } },
+		{ id = "Potholes", default = 2, choices = { { gold = -40, development = 1 }, { gold = 25 } } },
+		{ id = "Volunteers", default = 2, choices = { { regiments = 2 }, { gold = 30 } } },
+		{ id = "TreasureMap", default = 2, choices = { { manpower = -1000, gold = 80 }, { gold = 30 } } },
+		{ id = "Inventor", default = 2, choices = { { gold = -40, boost = 0.25 }, { manpower = 2500 } } },
+		{ id = "Festival", default = 2, choices = { { gold = -30, manpower = 6000 }, { manpower = 2500 } } },
+		{ id = "Traveller", default = 1, choices = { { development = 1 }, { regiments = 2 } } },
+		{ id = "Drills", default = 2, choices = { { gold = -20, regiments = 3 }, { manpower = 2500 } } },
+		{ id = "Cats", default = 1, choices = { { gold = 30 }, { manpower = 3000 } } },
+		{ id = "WarChest", needs = "war", default = 1, choices = { { gold = 60 }, { regiments = 2 } } },
+		{ id = "Flotsam", needs = "coast", default = 1, choices = { { gold = 50 }, { gold = -30, development = 1 } } },
+		-- Earth: down to earth
+		{
+			id = "PrintingPress",
+			map = "earth",
+			default = 2,
+			choices = { { gold = -20, development = 1 }, { manpower = 3000 } },
+		},
+		{ id = "Comet", map = "earth", default = 2, choices = { { gold = -30, development = 1 }, { gold = 40 } } },
+		{ id = "SpiceCaravan", map = "earth", default = 2, choices = { { boost = 0.2 }, { gold = 40 } } },
+		{
+			id = "Windmills",
+			map = "earth",
+			default = 2,
+			choices = { { manpower = -1500, development = 1 }, { gold = 30 } },
+		},
+		{ id = "Joust", map = "earth", default = 2, choices = { { gold = -20, manpower = 6000 }, { gold = 40 } } },
+		{
+			id = "FishingFleet",
+			map = "earth",
+			needs = "coast",
+			default = 1,
+			choices = { { gold = 40 }, { manpower = 3000 } },
+		},
+		{ id = "Galleons", map = "earth", needs = "fleet", default = 2, choices = { { ships = 1 }, { gold = 40 } } },
+		-- Eldmoor: fantasy
+		{ id = "DragonNap", map = "eldmoor", default = 1, choices = { { gold = 50 }, { regiments = 2 } } },
+		{ id = "Lemonade", map = "eldmoor", default = 1, choices = { { gold = 40 }, { gold = -20, development = 1 } } },
+		{
+			id = "TrollToll",
+			map = "eldmoor",
+			default = 2,
+			choices = { { gold = -20, boost = 0.2 }, { regiments = 2 } },
+		},
+		{ id = "FairyRing", map = "eldmoor", default = 1, choices = { { gold = 40 }, { manpower = 4000 } } },
+		{ id = "GriffinEgg", map = "eldmoor", default = 1, choices = { { gold = 60 }, { regiments = 2 } } },
+		{
+			id = "MerfolkMarket",
+			map = "eldmoor",
+			needs = "coast",
+			default = 2,
+			choices = { { boost = 0.2 }, { gold = 40 } },
+		},
+		{
+			id = "Dragonships",
+			map = "eldmoor",
+			needs = "fleet",
+			default = 2,
+			choices = { { ships = 1 }, { gold = 40 } },
+		},
+		-- Skyshards: sci-fi in space
+		{
+			id = "OreAsteroid",
+			map = "skyshards",
+			default = 1,
+			choices = { { gold = 50 }, { gold = -30, development = 1 } },
+		},
+		{ id = "SpaceOpera", map = "skyshards", default = 2, choices = { { manpower = 4000 }, { gold = 40 } } },
+		{
+			id = "SolarFlare",
+			map = "skyshards",
+			default = 1,
+			choices = { { boost = 0.2 }, { gold = -20, development = 1 } },
+		},
+		{ id = "MoonTomatoes", map = "skyshards", default = 1, choices = { { gold = 40 }, { manpower = 4000 } } },
+		{ id = "CargoPod", map = "skyshards", default = 1, choices = { { gold = 60 }, { regiments = 2 } } },
+		{
+			id = "CometIce",
+			map = "skyshards",
+			needs = "coast",
+			default = 1,
+			choices = { { gold = 40 }, { manpower = 3000 } },
+		},
+		{
+			id = "Starships",
+			map = "skyshards",
+			needs = "fleet",
+			default = 2,
+			choices = { { ships = 1 }, { gold = 40 } },
+		},
+	},
 }
 
 -- Primordial powers ------------------------------------------------------------------------------
@@ -1171,6 +1298,13 @@ Config.Season.Rewards = {
 	},
 }
 
+-- Match features (the "EU4 pack", docs/DESIGN.md): each is a match setting (Sim.Settings) with this default, so a
+-- private server, and later a sandbox mode, can turn it off. false here turns it off on every server.
+Config.Features = {
+	Diplomacy = true, -- insults and their answers, gifts, military access (war, alliances and peace are always on)
+	Events = true, -- event cards with two choices every few minutes (Config.EventCards)
+}
+
 -- Network and security ---------------------------------------------------------------------------
 
 Config.Net = {
@@ -1203,6 +1337,20 @@ Config.Bots = {
 	FastShare = 0.1,
 	OfferCooldownTicks = 90, -- a bot repeats an alliance or peace offer to the same nation at most this often
 	MaxRouteChecks = 6, -- paths checked per army per plan (keeps planning cheap)
+	-- insults (docs/DESIGN.md "Bot AI"): now and then a bot insults a rival, and an insulted bot answers back and leans
+	-- towards war with its insulter
+	InsultChance = 0.002, -- per plan (Normal bots plan every 3 s: about one insult per bot in a 25-minute match)
+	InsultBackChance = 0.5, -- an insulted bot insults back (it decides once per insult; else it keeps its grudge)
+	GrudgeAttackRatio = 0.85, -- against a nation it holds a grudge against, a bot needs this share of its attack ratio
+	GrudgeMinRatio = 1, -- ...but never less than this much of the enemy's strength (Hard's 1.1 × 0.85 would be 0.94)
+	-- event cards (Sim.EventCards.worth): a bot takes the choice worth more gold, counting the rest at these rates
+	EventWorth = {
+		Manpower = 0.01, -- gold per man (100 manpower = 1 gold, the price ratio of a regiment)
+		Development = 60, -- a development level (what developing 2 -> 3 costs)
+		Regiment = 15, -- a free regiment in peace (its price, less the upkeep it brings)...
+		RegimentAtWar = 30, -- ...and while at war
+		Ship = 20, -- a free ship
+	},
 }
 
 -- Private servers (docs/MONETIZATION.md 3.4): what the owner may pick in the Lobby's settings sheet. The defaults
