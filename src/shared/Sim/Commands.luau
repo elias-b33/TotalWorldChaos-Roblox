@@ -10,6 +10,7 @@ local Economy = require("./Economy")
 local EventCards = require("./EventCards")
 local Movement = require("./Movement")
 local Navy = require("./Navy")
+local Pings = require("./Pings")
 local Primordial = require("./Primordial")
 local Troops = require("./Troops")
 local Types = require("../Types")
@@ -140,6 +141,12 @@ function Commands.apply(state: MatchState, nationId: number, command: Command): 
 		return Navy.embark(state, nationId, command.army, command.fleet)
 	elseif command.kind == "Power" then
 		return Primordial.use(state, { nation = nationId }, command.power, command.target)
+	elseif command.kind == "Ping" then
+		local ok, reason = Pings.canPing(state, nationId, command.ping, command.province, state.tick)
+		if ok then
+			Pings.add(state, nationId, command.ping, command.province, state.tick)
+		end
+		return ok, reason
 	elseif command.kind == "EventChoice" then
 		return EventCards.choose(state, nationId, command.card, command.choice)
 	elseif command.kind == "Diplomacy" then

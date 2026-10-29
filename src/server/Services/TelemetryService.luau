@@ -548,6 +548,8 @@ function TelemetryService.init()
 		lastCommand[player.UserId] = state.tick
 		if ok and command.kind == "Power" then
 			TelemetryService.send(Telemetry.powerUsed(state, player.UserId, command.power), player)
+		elseif ok and command.kind == "Ping" then
+			TelemetryService.send(Telemetry.pingSent(state, player.UserId, command.ping, command.province), player)
 		end
 		local diplomacy = if ok then Telemetry.diplomacy(state, player.UserId, command) else nil
 		if diplomacy then

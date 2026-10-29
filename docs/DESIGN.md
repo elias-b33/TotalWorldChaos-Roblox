@@ -480,7 +480,7 @@ tools/mapgen/                  -- Python generator for everything in assets/
 3. Resolve battles on land, then at sea; then mark the blockaded provinces.
 4. Advance sieges and flip provinces.
 5. Every 10th tick: pay income and upkeep.
-6. Update Primordial-power charges and timers.
+6. Update Primordial-power charges and timers; drop map pings past their time.
 7. Bots plan (staggered: 1–2 bots per tick).
 8. Offers and insults' answer windows expire; event cards whose time ran out take their default choice, and nations whose next card is due get one; then check win conditions and phase changes.
 9. Send one delta to every client, and each player their own event card (only when it changed).
@@ -494,12 +494,14 @@ A sandbox server ("Sandbox") runs the same order at the speed its player sets (n
 - **Army movement:** an `UnreliableRemoteEvent` with progress between province centres; the client interpolates the token.
 - **Fleet movement:** a sailing fleet's progress towards its next zone goes on the same unreliable channel as the moving armies (in a list of its own), so its record is in a delta only when something else changes: a new zone, a battle, its hull, cargo or orders. The client glides the token between zone centres. The snapshot and the positions hold only the fleets `Navy.visible` shows (everyone sees every fleet for now, so one delta and one positions stream go to everyone; fog of war will need one per viewer). A sailing fleet costs about 36 bytes a tick (4 numbers) plus its record once per zone it enters, where it cost a whole record every tick before.
 - **Intents:** the client fires `Request…` remotes; the server answers with `CommandResult` (ok or reason).
+- **Map pings:** after each tick `PingService` sends every new ping with `FireClient` to the players of the sender's alliance only (the sender included). Pings are never in the snapshot or the delta, so enemies, neutrals and spectators can't read them from the network; a ping replaced early (or whose sender fell) is taken back with `PingGone`, the rest fade on each client at their `untilTick`.
 
 ### Security
 
 - `CommandRouter` checks ownership, neighbours, cost, cooldown and match phase on every intent. The client is never trusted.
 - Max 10 intents per second per player.
 - Bots go through `CommandRouter` too, so an AI bug can't make illegal moves.
+- A ping request is only a kind (one of `Config.Pings.Kinds`) and a province id, under the same 10-a-second limit; `Sim/Pings` then allows 1 ping per nation every 3 s, 12 a minute and 2 live at once (a third replaces the oldest), only with a living ally, never on a mountain. Pings carry no text from players.
 
 ### Map rendering
 
@@ -625,6 +627,8 @@ export type War = { id: number, attackers: { NationId }, defenders: { NationId }
 export type Alliance = { id: number, members: { NationId } }
 export type Truce = { a: NationId, b: NationId, untilTick: number }
 export type Primordial = { userId: number, charges: number, chargeTicks: number } -- chargeTicks: its own clock
+export type PingKind = "Attack" | "Defend" | "Help" | "Look"
+export type Ping = { id: number, by: NationId, kind: PingKind, province: ProvinceId, untilTick: number } -- Sim.Pings
 
 export type MatchState = {
     mapId: string,             -- which MapDef this match is played on
@@ -644,6 +648,9 @@ export type MatchState = {
     straits: { [ProvinceId]: { [ProvinceId]: ZoneId } }, -- the zone each strait crosses
     fleets: { [FleetId]: Fleet },
     nextFleetId: FleetId,
+    pings: { Ping },           -- live map pings, oldest first: never in the snapshot or the delta (PingService)
+    pingSent: { [NationId]: { number } }, -- each nation's ping ticks in the last minute (cooldown, per-minute cap)
+    nextPingId: number,
     -- the EU4 pack's diplomacy (Sim/Diplomacy.luau), each entry with an untilTick
     grudges: { Grudge },       -- { holder, against }: the insulted fights the insulter better; against = 0: high spirits
     answers: { Answer },       -- { from, to }: the insulted may answer this insult (insult back, laugh it off)
@@ -747,6 +754,9 @@ export type Command =
 | `RequestSandbox` | client → server | `Enter` map (from any server: off to a new sandbox world), `Leave`, `Speed` 0/1/2/4, `Play` nation (0 = watch), `Disasters` on, `NewWorld` map; all but `Enter` only on a sandbox server ("Sandbox") |
 | `RequestMenu` | client → server | `Online`: the start menu's Play online (join this server's matches) |
 | `Menu` | server → client | true = show your start menu, false = close it |
+| `RequestPing` | client → server | kind (Attack, Defend, Help, Look), provinceId |
+| `Ping` | server → client (the sender's alliance only) | id, by (nation), kind, province, untilTick |
+| `PingGone` | server → client (the same players) | id: a ping that went before its time |
 | `RequestPreference` | client → server | a saved preference (`Sim/Preferences`): `music` or `sounds` and a boolean; the new `Profile` summary carries it back |
 
 ## UI and controls
@@ -763,6 +773,7 @@ Phone first: the map fills the screen, the HUD stays on the edges, and every act
 - **Primordial powers:** a power button opens a radial menu; pick a power, tap a target, confirm.
 - **Map modes:** Political (default), Diplomacy (allies green, enemies red), Terrain.
 - **Feedback:** toasts for war declared, province lost and battle won; a short screen shake for a meteor.
+- **Map pings:** long-press a province (or right-click it on PC, or tap the ping gem on its sheet, shown while you have an ally) to ping it for your allies: a wheel of four gems opens under your finger, Attack (crossed swords, crimson), Defend (shield, azure), Help (fire, gold) and Look (eye, slate), under an "Allies only" plate. Pings are icons, never text. For 8 s your alliance (and you) sees the ping's medallion on a stem over the province, your flag beside it and two pulse rings in your colour; each ally also gets a toast with the ping's icon ("Niger: Attack · Mesopotamia") and the `Ping` sound when it is in view or on their land. Enemies and neutrals never see it. Allied bots will follow Attack and Help pings when strong enough (stage 3, see the roadmap). Phrases are Roblox Quick Words, which the owner sets up in Creator Hub (no code).
 
 **Rules for every screen**
 
@@ -977,7 +988,8 @@ The owner's "diplomacy like insulting" and more EU4 flavour, in stages. Later st
 
 ### Phase 6: Next features (docs/NEXT_FEATURES.md)
 
-- [ ] Map pings for allies (Attack, Defend, Help, Look) and Roblox Quick Words; allied bots follow pings
+- [x] Map pings for allies (Attack, Defend, Help, Look), stages 1–2: `Sim/Pings` with its tests, the `Ping` command through `CommandRouter`, `PingService` sending to allies only, the long-press wheel and the sheet's ping gem, markers on the map's pooled "Markers" layer (`MapMarkers`), the toast and the sound stand-in, `ping_sent` analytics, harness scenario `pings`; Roblox Quick Words are the owner's Creator Hub setup
+- [ ] Map pings, stage 3: allied bots follow Attack and Help pings and ping their own targets; `ping_followed`
 - [ ] Results replay of the match's borders and one award per player
 - [x] Music: Lobby, Peace, War, Cataclysm and Results tracks with crossfades; Music and Sounds toggles (stages 1 and 2: `Config.Music`, `MusicMood` with `tests/music.spec.luau`, `Music.luau`, the speaker popover, `RequestPreference` with `Sim/Preferences` and `tests/preferences.spec.luau`, `music_setting`; harness scenario `music`; the owner picks the tracks, `docs/STUDIO.md` "Music")
 - [ ] Map regions and empires

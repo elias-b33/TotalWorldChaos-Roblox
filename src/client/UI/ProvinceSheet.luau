@@ -9,6 +9,8 @@
 -- value, the development as the map's pip bar) and rows of slot tiles, five to a row: routine actions on calm slate
 -- tiles whose base says their group (build bronze, recruit green), decisions (war, ally, peace) in full colour.
 -- Every tile shows its price in gold (in red when you can't pay it) and greys out when it can't be done.
+-- With a living ally, a slate gem left of the close gem opens the ping wheel for the province (UI/Pings): the same
+-- wheel as a long press on the map, for players who never find the long press.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,6 +30,7 @@ local RaceInfo = require(Client.RaceInfo)
 local Relations = require(Client.Relations)
 local MapRenderer = require(Client.MapRenderer)
 local Icons = require(script.Parent.Icons)
+local Pings = require(script.Parent.Pings)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
@@ -51,6 +54,7 @@ local ProvinceSheet = {}
 
 local sheet: Frame
 local title: TextLabel
+local pingButton: TextButton
 local titleIcon: GuiObject
 local info: Frame
 local status: Frame
@@ -273,6 +277,7 @@ local function render()
 
 	title.Text = def.name
 	Icons.set(titleIcon, if def.isCapital then "crown" else TERRAIN_ICONS[def.terrain] or "flag")
+	pingButton.Visible = me ~= nil and def.terrain ~= "Mountain" and Pings.hasAllies()
 
 	-- the info chips: terrain, owner (your relation with it, else its race), development, building
 	Widgets.clear(info)
@@ -498,7 +503,7 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 	Widgets.list(sheet, false, Theme.space.m)
 
 	-- the province's name on a title plate on the sheet's top edge, the close gem on its corner
-	local _, plate = Widgets.header(sheet, "", "flag", function()
+	local header, plate = Widgets.header(sheet, "", "flag", function()
 		ProvinceSheet.show(nil)
 		if onClose then
 			onClose()
@@ -506,6 +511,28 @@ function ProvinceSheet.init(closeHandler: () -> (), selectArmyHandler: (number) 
 	end)
 	title = plate
 	titleIcon = title:FindFirstChild("Icon") :: GuiObject
+
+	-- the ping gem, left of the close gem: the sheet closes and the wheel opens over the province
+	pingButton = Widgets.iconButton(header, "flag", "PingButton", Widgets.BUTTON_HEIGHT, Widgets.BUTTON_OFF, function()
+		local id = selected
+		if id then
+			ProvinceSheet.show(nil)
+			if onClose then
+				onClose()
+			end
+			Pings.openFor(id)
+		end
+	end)
+	pingButton.ZIndex = 3
+	pingButton.Visible = false
+	local close = header:FindFirstChild("✕")
+	if close and close:IsA("GuiObject") then
+		local function placePing()
+			pingButton.Position = close.Position - UDim2.fromOffset(Widgets.BUTTON_HEIGHT + GAP, 0)
+		end
+		placePing()
+		close:GetPropertyChangedSignal("Position"):Connect(placePing)
+	end
 
 	info = chipRow(2, "Info")
 	status = chipRow(3, "Status")
