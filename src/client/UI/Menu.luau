@@ -360,6 +360,7 @@ end
 
 function Menu.init()
 	gui = Widgets.screen("Menu", 40) -- above every other screen: the lobby, the shop and the meta screens
+	Widgets.coverScreen(gui) -- the dim covers Roblox's top-bar row too, and the window centres on the whole screen
 	dim = Instance.new("Frame")
 	dim.Name = "MenuDim"
 	dim.Active = true -- nothing behind the menu can be tapped

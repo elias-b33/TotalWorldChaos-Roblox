@@ -40,6 +40,7 @@ local function run()
 	H.expect(H.myNation(alice) == 0, "Alice arrives watching")
 	H.expect(H.textOf(alice, "Nation") == "Spectating", "the top bar says so")
 	H.expect(H.client(alice, "UI.Sandbox").active(), "the client knows it's a sandbox")
+	H.expect(H.client(alice, "Music").state().track == "Peace", "a sandbox world plays Peace")
 	H.expect(Emulator.findText(alice, "Play as") ~= nil, "the sandbox panel shows Play as")
 	H.expect(H.iconIn(alice, "Pause", "pause"), "and the pause tab with its icon")
 	H.expect(Emulator.findText(alice, "Your world is alive") ~= nil, "a welcome toast")
@@ -174,15 +175,27 @@ local function run()
 	Emulator.press(alice, "Disasters")
 	Emulator.run(0.5)
 	H.expect(state.sandbox.disasters, "disasters on")
-	local struck = false
+	-- the server's Disaster event counts: the client drops a toast when four are already waiting (a war's
+	-- conquest toasts can fill the queue), so the toast alone can't say whether one struck
+	local Events = H.shared("Sim.Events")
+	local push = Events.push
+	local disasters = 0
+	Events.push = function(s, kind, ...)
+		if kind == "Disaster" then
+			disasters += 1
+		end
+		return push(s, kind, ...)
+	end
+	local toasted = false
 	for _ = 1, 40 do
 		Emulator.run(0.5)
-		if Emulator.findText(alice, "Cataclysm!") then
-			struck = true
+		toasted = toasted or Emulator.findText(alice, "Cataclysm!") ~= nil
+		if toasted then
 			break
 		end
 	end
-	H.expect(struck, "a disaster struck within a minute of game time")
+	Events.push = push
+	H.expect(disasters > 0 or toasted, "a disaster struck within a minute of game time")
 	H.shot(alice, "disaster")
 
 	-- one more player on a small phone: the panel and the lists fit, and Alice's nation is taken

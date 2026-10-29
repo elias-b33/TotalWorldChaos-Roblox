@@ -59,6 +59,9 @@ local TOKEN_PICK = 20 -- a tap this close to a token's centre (screen pixels) pi
 local TOKEN_LIFT = 4 -- map pixels: armies resting in a province stand this far above its centre (its name is below)
 local TOKEN_SLOT = 18 -- screen pixels between armies resting side by side in one province
 local TOKEN_SMOOTHING = 6 -- higher = tokens catch up with their target faster
+local MORALE_BAR_HEIGHT = 4 -- the morale bar under a token (an ink track with the fill inside), screen pixels
+local MORALE_COLORS: { [string]: Color3 } =
+	{ good = Theme.color.emerald, low = Theme.color.gold, broken = Theme.color.crimson }
 local BADGE_HEIGHT = 20 -- strength badges and status pills, screen pixels
 local BADGE_GAP = 2 -- between a token and its badge, and between stacked badges
 local BADGE_ICON = 16 -- the pixel icon in a badge or pill
@@ -90,6 +93,8 @@ local FLAG_WIDTH, FLAG_HEIGHT = 24, 18 -- a capital's 16×12 flag, screen pixels
 local FLAG_RIGHT, FLAG_BOTTOM = -10, 8 -- the flag's pole stands left of the capital's centre: its bottom right corner
 local POLE = 3 -- the pole's width plus the gap before the flag
 local EMOTE_SIZE = 26 -- capital emote icon, screen pixels
+local MARKER_SIZE = EMOTE_SIZE + 10 -- an insult's marker (a round badge with an anger mark), screen pixels
+local MARKER_LIFT = 58 -- screen pixels from the insulted capital up to the marker's foot (where emotes show)
 local VICTORY_SIZE = 32 -- victory animation over a winner's capital
 local VICTORY_FRAME_SECONDS = 0.4
 local _, PIP_BAR_W, PIP_BAR_H = MapBadges.pips(0, Config.Economy.MaxDevelopment) -- the pip bar's size in pixels
@@ -118,6 +123,8 @@ type Token = {
 	icon: string,
 	troops: string, -- its composition as last seen (ArmyRecord.troops), and the troop type it is mostly made of
 	troop: string?,
+	morale: number, -- the morale its bar shows (-1: no bar), and the bar once it has one
+	moraleBar: Frame?,
 }
 
 -- A province's status row: battle or siege, a blockade, and Primordial-power effects (MapBadges.status).
@@ -184,6 +191,7 @@ local stackShown: { [number]: number } = {} -- strength badges shown in each pro
 local stackHalf: { [number]: number } = {} -- half the biggest token in each province's stack
 local detailShown = false -- garrisons, pips and every army's size show (the region zoom inwards)
 local flags: { [number]: { frame: Frame, key: string } } = {}
+local insultMarkers: { [number]: Frame } = {} -- insulted nation -> the marker over its capital
 local victories: { { label: TextLabel, frames: { string } } } = {}
 local victoryClock = 0
 local selectedArmy: number? = nil
@@ -706,7 +714,7 @@ local function renderStatus(provinceId: number)
 		return
 	end
 	if status == nil then
-		local parent = layers.Markers
+		local parent = layers.Status
 		if parent == nil then
 			return
 		end
@@ -1072,6 +1080,60 @@ local function showEmote(e: Types.MatchEvent)
 	end)
 end
 
+-- An insult's marker (MatchEvent "Insult" / "InsultBack": b = the insulted nation): an anger mark in a round badge
+-- over the insulted nation's capital, or its first province once the capital is lost, for
+-- Config.Diplomacy.MarkerSeconds. Everyone sees it. No text: an insult carries no message (docs/DESIGN.md
+-- "Diplomacy"). A newer insult of the same nation replaces it.
+local function showInsultMarker(e: Types.MatchEvent)
+	local markerLayer = layers.Emotes
+	local snapshot = ClientState.snapshot()
+	local nation = ClientState.nation(e.b)
+	if markerLayer == nil or snapshot == nil or nation == nil then
+		return
+	end
+	local where = nation.capital
+	local capital = ClientState.province(nation.capital)
+	if capital == nil or capital.owner ~= nation.id then
+		for _, record in snapshot.provinces do
+			if record.owner == nation.id then
+				where = record.id
+				break
+			end
+		end
+	end
+	local old = insultMarkers[e.b]
+	if old then
+		old:Destroy()
+	end
+	local badge = Instance.new("Frame")
+	badge.Name = "Insulted" .. e.b
+	badge.AnchorPoint = Vector2.new(0.5, 1)
+	badge.Position = at(MapRenderer.centerOf(where)) + UDim2.fromOffset(0, -MARKER_LIFT)
+	badge.Size = UDim2.fromOffset(MARKER_SIZE, MARKER_SIZE)
+	badge.BackgroundColor3 = Theme.color.navyDeep
+	badge.BackgroundTransparency = 0.15
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = badge
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = Theme.color.ink
+	stroke.Thickness = Theme.stroke
+	stroke.Parent = badge
+	local icon = Icons.label(badge, "grudge", EMOTE_SIZE)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	badge.Parent = markerLayer
+	insultMarkers[e.b] = badge
+	local myGeneration = generation
+	task.delay(Config.Diplomacy.MarkerSeconds, function()
+		if generation == myGeneration and insultMarkers[e.b] == badge then
+			insultMarkers[e.b] = nil
+			badge:Destroy()
+		end
+	end)
+end
+
 -- The winners' victory animations over their capitals while Results shows (frames of the item's art, cycled).
 local function refreshVictory()
 	local snapshot = ClientState.snapshot()
@@ -1158,6 +1220,7 @@ local function build(map: Types.MapDef)
 	groups = {}
 	stackShown, stackHalf = {}, {}
 	flags = {}
+	insultMarkers = {}
 	victories = {}
 	layers = {}
 	widths = {}
@@ -1209,7 +1272,8 @@ local function build(map: Types.MapDef)
 		local notice = Widgets.toast(canvas.Parent or canvas, MapView.topBand() + NOTICE_TOP, NOTICE_WIDTH)
 		notice.Name = "MapArtOff"
 		artOffNotice = notice
-		Widgets.setIconText(notice, "🗺 Map art is off: turn on Allow Mesh / Image APIs", "map")
+		-- its map icon in the medallion (a toast's icon sits inside its Medallion), as wide as its line
+		Widgets.setToast(notice, "🗺 Map art is off: turn on Allow Mesh / Image APIs")
 		notice.Visible = true
 		if not warned then
 			warned = true
@@ -1276,9 +1340,10 @@ local function build(map: Types.MapDef)
 	layer("Flags", canvas)
 	layer("Tokens", canvas)
 	layer("Fleets", canvas)
-	layer("Markers", canvas)
+	layer("Status", canvas)
 	layer("Crowns", canvas)
 	layer("Emotes", canvas)
+	layer("Markers", canvas) -- MapMarkers' pooled overlays (pings), over every badge and crown
 	layer("Effects", canvas).ZIndex = 2 -- Effects' particles, over everything else
 	onZoom(MapView.zoom())
 end
@@ -1481,6 +1546,8 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 		icon = "",
 		troops = "",
 		troop = nil,
+		morale = -1,
+		moraleBar = nil,
 	}
 	token.badge.stroke.Color = edgeOf(token)
 	token.badge.label.AnchorPoint = Vector2.new(0.5, 1)
@@ -1488,6 +1555,43 @@ local function makeToken(army: Snapshot.ArmyRecord, target: Vector2): Token
 	frame.Visible = not neutral or detailShown
 	frame.Parent = layers.Tokens
 	return token
+end
+
+-- An army's morale bar under its token (docs/DESIGN.md "Armies and combat"): while it fights, and while it is below
+-- full (MapBadges.showMorale); its fill in the tone's colour. `morale` -1 hides it. Two objects, made on first use.
+local function setMorale(token: Token, morale: number)
+	local bar = token.moraleBar
+	if morale < 0 then
+		if bar then
+			bar.Visible = false
+		end
+		return
+	end
+	if bar == nil then
+		local track = Instance.new("Frame")
+		track.Name = "Morale"
+		track.AnchorPoint = Vector2.new(0.5, 0)
+		track.Position = UDim2.new(0.5, 0, 1, 2)
+		track.Size = UDim2.fromOffset(TOKEN_SKIN_SIZE, MORALE_BAR_HEIGHT)
+		track.BackgroundColor3 = Theme.color.ink
+		track.BorderSizePixel = 0
+		local fill = Instance.new("Frame")
+		fill.Name = "Fill"
+		fill.Position = UDim2.fromOffset(1, 1)
+		fill.BorderSizePixel = 0
+		fill.Parent = track
+		track.Parent = token.frame
+		token.moraleBar = track
+		bar = track
+	end
+	local track = bar :: Frame
+	local fraction, tone = MapBadges.morale(morale, Config.Battle.MoraleMax)
+	local fill = track:FindFirstChild("Fill") :: Frame
+	fill.Size = UDim2.new(fraction, -2 * fraction, 1, -2)
+	fill.BackgroundColor3 = MORALE_COLORS[tone]
+	fill.Visible = fraction > 0
+	track:SetAttribute("Morale", morale)
+	track.Visible = true
 end
 
 -- Beside the other armies resting in its province, or fleets in its zone (screen pixels from the anchor).
@@ -1540,6 +1644,13 @@ local function refreshArmies()
 		if t.icon ~= icon or t.text ~= text then
 			t.icon, t.text = icon, text
 			setPill(t.badge, icon, text)
+		end
+		local morale = if MapBadges.showMorale(army.morale, Config.Battle.MoraleMax, army.inBattle)
+			then army.morale
+			else -1
+		if t.morale ~= morale then
+			t.morale = morale
+			setMorale(t, morale)
 		end
 	end
 	for id, token in tokens do
@@ -1895,6 +2006,8 @@ function MapRenderer.init()
 		for _, e in delta.events do
 			if e.kind == "Emote" then
 				showEmote(e)
+			elseif e.kind == "Insult" or e.kind == "InsultBack" then
+				showInsultMarker(e)
 			end
 		end
 	end)

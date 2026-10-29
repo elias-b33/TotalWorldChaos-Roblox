@@ -51,6 +51,7 @@ export type ArmyRecord = {
 	next: number, -- next province on its route, 0 = standing still
 	dest: number, -- end of its route, 0 = standing still
 	inBattle: boolean,
+	morale: number, -- 0..Config.Battle.MoraleMax, whole points; it changes on battle rounds and every few ticks of rest
 	rebel: boolean, -- an owner-0 army raised by the Rebels power (else owner 0 is a neutral garrison)
 	retreating: boolean, -- beaten and walking home: takes no orders
 }
@@ -72,12 +73,17 @@ export type FleetRecord = {
 	retreating: boolean, -- beaten and sailing off: takes no orders
 }
 
--- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes.
+-- Wars, alliances, truces and pending offers: small, so sent whole whenever any of it changes. Also the EU4 pack's
+-- military access, insults' grudges, open answer windows and waits (the buttons grey out on the client).
 export type DiplomacyData = {
 	wars: { { id: number, attackers: { number }, defenders: { number } } },
 	alliances: { { id: number, members: { number } } },
 	truces: { { a: number, b: number, untilTick: number } },
 	offers: { Types.Offer },
+	access: { Types.Access },
+	grudges: { Types.Grudge },
+	answers: { Types.Answer },
+	cooldowns: { Types.Cooldown },
 }
 
 -- An eliminated player's Primordial: only charges change, so the list is sent whole whenever it changes.
@@ -219,6 +225,7 @@ function Snapshot.full(state: MatchState, cosmetics: { Types.NationCosmetics }?,
 			next = a.path[1] or 0,
 			dest = a.path[#a.path] or 0,
 			inBattle = a.inBattle,
+			morale = a.morale,
 			rebel = a.rebel == true,
 			retreating = a.retreating == true,
 		})
@@ -284,7 +291,23 @@ function Snapshot.diplomacy(state: MatchState): DiplomacyData
 	for _, o in state.offers do
 		table.insert(offers, table.clone(o))
 	end
-	return { wars = wars, alliances = alliances, truces = truces, offers = offers }
+	local function copies(list: { any }?): { any }
+		local out = {}
+		for _, x in list or {} do
+			table.insert(out, table.clone(x))
+		end
+		return out
+	end
+	return {
+		wars = wars,
+		alliances = alliances,
+		truces = truces,
+		offers = offers,
+		access = copies(state.access),
+		grudges = copies(state.grudges),
+		answers = copies(state.answers),
+		cooldowns = copies(state.cooldowns),
+	}
 end
 
 -- Moving armies, then the sailing fleets `viewer` sees (as Snapshot.fleets), for the unreliable ArmyPositions remote.

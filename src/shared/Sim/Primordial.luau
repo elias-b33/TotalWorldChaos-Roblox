@@ -252,7 +252,7 @@ function Primordial.use(state: MatchState, caster: Caster, power: Power, target:
 		return false, "OwnTarget"
 	end
 	if Primordial.HARMFUL[power] and hit ~= 0 and Primordial.cooldownLeft(state, caster, hit) > 0 then
-		return false, "Cooldown" -- this caster hit that nation less than TargetCooldownTicks ago
+		return false, "PowerCooldown" -- this caster hit that nation less than TargetCooldownTicks ago
 	end
 	local cost = Primordial.cost(power)
 	if charges < cost then

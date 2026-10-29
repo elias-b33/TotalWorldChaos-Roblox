@@ -30,6 +30,7 @@ local DevService = require(Server.Services.DevService)
 local LobbyService = require(Server.Services.LobbyService)
 local MatchService = require(Server.Services.MatchService)
 local MenuService = require(Server.Services.MenuService)
+local PingService = require(Server.Services.PingService)
 local PlayerDataService = require(Server.Services.PlayerDataService)
 local ProgressionService = require(Server.Services.ProgressionService)
 local Replicator = require(Server.Replicator)
@@ -195,7 +196,9 @@ local function sandboxTick(state: Types.MatchState)
 	if newPhase and PHASE_TOASTS[newPhase] then
 		Replicator.notifyAll("Phase", PHASE_TOASTS[newPhase])
 	end
+	PingService.afterTick(state) -- new map pings to the sender's alliance only
 	Replicator.broadcast(state) -- 9. one delta to every client
+	Replicator.sendCards(state, SandboxService.seat) -- ...and the nation a player took over, its own event cards
 end
 
 -- The sandbox's loop: a beat every Config.Sandbox.BeatSeconds runs a tick whenever the world's speed has gathered a
@@ -231,6 +234,7 @@ local function runSandbox()
 			end
 			if ran == 0 and (speed == 0 or changed) then
 				Replicator.broadcast(state)
+				Replicator.sendCards(state, SandboxService.seat) -- a choice made while paused closes its card
 			end
 		end)
 		last = now
@@ -282,6 +286,7 @@ local function arriveAtMenu(player: Player)
 end
 
 Replicator.init()
+PingService.init()
 CommandRouter.init(MatchService.nationOf)
 PlayerDataService.init()
 ProgressionService.init(MatchService.current)
@@ -349,7 +354,9 @@ local function tick()
 	if newPhase then
 		ShopService.onPhase(newPhase) -- after the rewards: the starter-pack offer counts finished matches
 	end
+	PingService.afterTick(state) -- new map pings to the sender's alliance only (never in the delta)
 	Replicator.broadcast(state) -- 9. one delta (with this tick's events) to every client
+	Replicator.sendCards(state, MatchService.nationOf) -- ...and each player their own event card, to them alone
 end
 
 -- A Lobby second: votes and picks, the clocks, then what changed to every client.

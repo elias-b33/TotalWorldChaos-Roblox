@@ -12,7 +12,7 @@
 --   SeasonPass funnel  ready (TelemetryService.seasonPass), unused until the season pass exists
 --   Economy            Glory sources (match_reward, level_up) and sinks (shop items); Robux IAP sinks
 --   Progression        AccountLevel (Complete for each level passed, Start for the new one); SeasonTier ready
---   Custom events      the 21 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
+--   Custom events      the 22 in LAUNCH.md (Sim.Telemetry.CUSTOM_EVENTS); a sandbox server sends only
 --                      sandbox_started and the economy
 --
 -- AnalyticsService only accepts events from servers of a published game: in Studio the calls go nowhere. Set a
@@ -31,6 +31,7 @@ local Catalogue = require(Shared.Catalogue)
 local Config = require(Shared.Config)
 local Maps = require(Shared.Maps)
 local Match = require(Shared.Sim.Match)
+local Preferences = require(Shared.Sim.Preferences)
 local Telemetry = require(Shared.Sim.Telemetry)
 local Tutorial = require(Shared.Sim.Tutorial)
 local Types = require(Shared.Types)
@@ -62,6 +63,7 @@ local logged: { [number]: { [string]: boolean } } = {} -- userId -> MatchFlow st
 local lastResults: { [number]: string } = {} -- userId -> MatchFlow session of the last Results they saw
 local lastCommand: { [number]: number } = {} -- userId -> match tick of their last command (seat time at first)
 local afk: { [number]: boolean } = {} -- afk_flagged sent this match
+local cardsLogged: { [number]: number } = {} -- userId -> the last event card event_card was sent for (this match)
 local startsLogged = false
 local endLogged = false
 local shopSession: { [Player]: string } = {}
@@ -235,6 +237,14 @@ function TelemetryService.firstPick(lobby: Types.LobbyState, mapId: string)
 	end
 end
 
+-- A speaker toggle changed (Sim.Preferences "music" or "sounds"): music_setting with both toggles and what the
+-- server was doing.
+function TelemetryService.musicSetting(player: Player, data: Types.PlayerProfile)
+	local music = Preferences.get(data, "music") == true
+	local sounds = Preferences.get(data, "sounds") == true
+	TelemetryService.send(Telemetry.musicSetting(music, sounds, menuWhere(), player.UserId), player)
+end
+
 -- MatchFlow -----------------------------------------------------------------------------------------------------
 
 local function sessionOf(userId: number): string
@@ -292,6 +302,7 @@ local function newMatch(state: Types.MatchState)
 	end
 	lastCommand = {}
 	afk = {}
+	cardsLogged = {}
 	startsLogged = false
 	endLogged = false
 end
@@ -321,6 +332,20 @@ local function observePlayer(state: Types.MatchState, player: Player)
 		local data = PlayerDataService.data(player)
 		if data and data.stats.matches <= 1 then
 			onboard(player, "first_match_finished")
+		end
+	end
+	-- the EU4 pack: their nation's last event card closed (picked, or the default when time ran out). The first look
+	-- only notes it: a card a bot closed before the player took the nation over isn't theirs.
+	local nationId = Match.nationOf(state, userId)
+	local chronicle = if nationId and state.chronicles then state.chronicles[nationId] else nil
+	local outcome = if chronicle then chronicle.last else nil
+	if cardsLogged[userId] == nil then
+		cardsLogged[userId] = if outcome then outcome.card else 0
+	elseif outcome and cardsLogged[userId] ~= outcome.card then
+		cardsLogged[userId] = outcome.card
+		local e = Telemetry.eventCard(state, userId, outcome)
+		if e then
+			TelemetryService.send(e, player)
 		end
 	end
 	local idleSince = lastCommand[userId] or state.tick
@@ -523,6 +548,17 @@ function TelemetryService.init()
 		lastCommand[player.UserId] = state.tick
 		if ok and command.kind == "Power" then
 			TelemetryService.send(Telemetry.powerUsed(state, player.UserId, command.power), player)
+		elseif ok and command.kind == "Ping" then
+			TelemetryService.send(Telemetry.pingSent(state, player.UserId, command.ping, command.province), player)
+		end
+		local diplomacy = if ok then Telemetry.diplomacy(state, player.UserId, command) else nil
+		if diplomacy then
+			TelemetryService.send(diplomacy, player) -- the EU4 pack: insults and answers, gifts, military access
+		end
+	end)
+	PlayerDataService.onPreference(function(player: Player, key: string, data: Types.PlayerProfile)
+		if key == "music" or key == "sounds" then
+			TelemetryService.musicSetting(player, data)
 		end
 	end)
 	PlayerDataService.onLoaded(function(player: Player, data: Types.PlayerProfile)

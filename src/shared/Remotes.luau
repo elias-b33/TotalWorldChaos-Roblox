@@ -32,6 +32,9 @@ local EVENTS = {
 	"RequestSeason", -- season pass: "Claim" tier track | "ClaimAll" | "Viewed"
 	"RequestSandbox", -- sandbox: "Enter" map | "Leave" | "Speed" n | "Play" nation | "Disasters" on | "NewWorld" map
 	"RequestMenu", -- the start menu: "Online" (join this server's matches) | "Tutorial" (off to a tutorial)
+	"RequestPing", -- map pings: kind (Config.Pings.Kinds), provinceId (Sim.Pings checks the rest)
+	"RequestEventChoice", -- the EU4 pack's event cards: card id, choice (1 or 2)
+	"RequestPreference", -- a saved preference (Sim.Preferences): key, value ("music" | "sounds", boolean)
 	-- server -> client
 	"Lobby", -- the map vote and the draft (Sim.Lobby.LobbyView)
 	"Menu", -- show (true) or close (false) your start menu
@@ -48,6 +51,9 @@ local EVENTS = {
 	"Season", -- your SeasonView (on join, at Results and after every change)
 	"Achievements", -- your AchievementView (on join and after every match)
 	"Boards", -- your BoardsView: weekly, friends and level boards (on join and after every refresh)
+	"Ping", -- an ally's map ping (or your own), to the sender's alliance only: id, by, kind, province, untilTick
+	"PingGone", -- a ping you were sent went early (its sender's third ping replaced it, or the sender fell): id
+	"EventCard", -- your nation's event cards (Types.EventCardView): to you alone, never in the delta
 }
 local UNRELIABLE_EVENTS = { "ArmyPositions" }
 

@@ -12,6 +12,8 @@ local RunService = game:GetService("RunService")
 
 ReplicatedStorage:WaitForChild("Shared")
 local Shared = ReplicatedStorage.Shared
+local Config = require(Shared.Config)
+local InsultLines = require(Shared.Flavour.Insults)
 local Remotes = require(Shared.Remotes)
 local Match = require(Shared.Sim.Match)
 local Settings = require(Shared.Sim.Settings)
@@ -21,11 +23,13 @@ local Client = script.Parent.Parent
 local ClientState = require(Client.ClientState)
 local Cosmetics = require(Client.Cosmetics)
 local LobbyState = require(Client.LobbyState)
+local MapBadges = require(Client.MapBadges)
 local ProfileState = require(Client.ProfileState)
 local Relations = require(Client.Relations)
 local Sounds = require(Client.Sounds)
 local HudLayout = require(script.Parent.HudLayout)
 local Icons = require(script.Parent.Icons)
+local Speaker = require(script.Parent.Speaker)
 local Widgets = require(script.Parent.Widgets)
 
 local Theme = Widgets.Theme
@@ -342,10 +346,9 @@ local function eventText(e: Types.MatchEvent): string?
 			return "🏳 " .. nationName(e.a) .. " took " .. provinceName(e.province) .. "!"
 		end
 	elseif e.kind == "BattleEnded" then
-		if e.a == me then
-			return "🎉 Battle won at " .. provinceName(e.province)
-		elseif e.b == me then
-			return "💀 Battle lost at " .. provinceName(e.province)
+		-- what decided it, when it was a flank or a side breaking (docs/DESIGN.md "Armies and combat")
+		if e.a == me or e.b == me then
+			return MapBadges.battleText(e.a == me, provinceName(e.province), e.flank == true, e.broke == true)
 		end
 	elseif e.kind == "Offer" and e.b == me then
 		return "📜 " .. nationName(e.a) .. " sent you an offer"
@@ -366,6 +369,32 @@ local function eventText(e: Types.MatchEvent): string?
 		local army = ClientState.army(e.a) -- the army that landed (in this same delta)
 		if army and army.owner == me then
 			return "⛵ Landed at " .. provinceName(e.province)
+		end
+	elseif e.kind == "Insult" or e.kind == "InsultBack" or e.kind == "LaughedOff" then
+		-- the EU4 pack: an insult carries no message (Roblox's preset-text rule, docs/DESIGN.md "Diplomacy"). The one it
+		-- was aimed at gets a neutral system line; the one who did it gets a game-written flavour line that only their
+		-- own client ever shows (Shared.Flavour.Insults). Everyone else sees the map's marker only.
+		if e.b == me then
+			if e.kind == "Insult" then
+				return "💢 " .. nationName(e.a) .. " insulted you!"
+			elseif e.kind == "InsultBack" then
+				return "💢 " .. nationName(e.a) .. " insulted you back!"
+			end
+			return "😀 " .. nationName(e.a) .. " laughed off your insult"
+		elseif e.a == me then
+			local snap = ClientState.snapshot()
+			local kind: InsultLines.Kind = if e.kind == "LaughedOff" then "laugh" else "insult"
+			local turn = ClientState.tick() + e.b
+			return "😀 " .. InsultLines.flavour(if snap then snap.mapId else "", kind, nationName(e.b), turn)
+		end
+	elseif e.kind == "Gift" and e.b == me then
+		return string.format("🎁 %s sent you %d gold", nationName(e.a), Config.Diplomacy.GiftGold)
+	elseif e.kind == "AccessGranted" then
+		local minutes = Config.Diplomacy.AccessTicks * Config.TickSeconds // 60
+		if e.b == me then
+			return string.format("🚶 %s lets your armies through for %d min", nationName(e.a), minutes)
+		elseif e.a == me then
+			return string.format("🚶 %s's armies may cross your land for %d min", nationName(e.b), minutes)
 		end
 	end
 	return nil
@@ -478,7 +507,8 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 	if onShopButton then
 		add(barButton("ShopButton", "cart", onShopButton), 5, ITEM, 0, ITEM, true)
 	end
-	-- sound on and off for the session (docs/DESIGN.md "Sound and effects")
+	-- the speaker: its popover has the Music and Sounds toggles, saved in the profile (docs/DESIGN.md "Sound and
+	-- effects"); muted when both are off
 	local mute = barButton("Mute", "soundOn", function() end)
 	add(mute, 5, ITEM, 0, ITEM, true)
 	local muteIcon = mute:FindFirstChild("Icon") :: GuiObject
@@ -486,6 +516,7 @@ function Hud.init(onCapitalButton: () -> (), onNationsButton: () -> (), onShopBu
 		Icons.set(muteIcon, if muted then "soundOff" else "soundOn")
 		mute:SetAttribute("Muted", muted)
 	end)
+	Speaker.attach(mute)
 
 	toastLabel = Widgets.toast(gui, 0, TOAST_WIDTH)
 	place()

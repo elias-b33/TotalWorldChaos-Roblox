@@ -661,3 +661,127 @@ Every race is within 0.8–1.25× except two: the Clans (0.62×, their starts, a
 - **The Clans' starts.** Tigris and Yangtze are Earth's two weakest starts; with one strong start in place of one of them (say Volga's or Zambezi's, swapped with that nation's race in `tools/mapgen/maps/earth.py` `RACES`), the Clans would get a fair share without being made the strongest race. That is a map-data change (regenerate the maps; `docs/MAPS.md`'s tables and the harness scenarios that name nations' races follow), so it is left for its own task.
 - The Lizardfolk sit at the bottom of the target (0.77–0.90×); watch them in the next run before touching their numbers.
 - Every share above is from bots. Players will lean on the specials' tricks and on fast troops more than bots do (bots never route by terrain and keep their fast troops under 10% of their men); watch the analytics once players play.
+
+## 20. The EU4 pack, stage 1: insults, grudges, gifts and military access
+
+`docs/DESIGN.md` "Diplomacy" has the rules (and why insults carry no message). What could move balance, and how much:
+
+| Effect | Size | Who gets it | Worth in men (section 5: +50% ≈ 15%, +30% ≈ 8%) |
+| --- | --- | --- | --- |
+| Grudge | +10% combat strength, 3 min | the insulted side, only against the insulter's side | about 3% |
+| Insult back | the same grudge for the first insulter | evens out the two sides' fights | 0 between them |
+| High spirits (laugh it off) | +5% in every battle, 1 min, instead of the grudge | the insulted side | about 1.5% |
+| Gift | 25 gold, one a minute per giver, never to an enemy | anyone (bots never send one) | zero-sum: at most 25 gold a minute moves, a fifth or less of a mid-game nation's income |
+| Military access | 3 min of marching through a neighbour's land | players who ask (bots grant, never ask) | none in bot play; no surprise attacks (the guest's armies walk home when it ends, wars included) |
+
+An insult only ever helps the one insulted, so it can't be farmed: two friends trading insults and laughs give each other a few percent for a minute, and the bonuses don't stack. The bot side is the bigger lever: an insulted bot puts its insulter first among its war targets at 0.85× its attack ratio (never under an even fight, `Bot.grudgeFactor`).
+
+**How it was measured.** `lune run tools/harness/tournament 200 <map>` on each map, seeds 1–200, Normal bots, map races, with the pack on (the default). The tournament now also prints insults, insults back and wars declared on an insulter per match, and `SET` takes `true`/`false` (`SET="Features.Diplomacy=false"` turns the pack off). The baseline is section 19's first pass (same Config, same seeds). The two aren't paired match by match: the bots' insult roll uses the bot random stream, and retreating armies now walk on through land that closed to them (`docs/DESIGN.md` "Armies and combat"), so each match plays out differently.
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Insults per match (all 10 bots) | 5.2 | 5.2 | 5.4 |
+| Insults back per match | 2.7 | 2.5 | 2.8 |
+| Wars declared on an insulter per match | 0.5 of 9.9 | 0.5 of 10.9 | 0.3 of 9.8 |
+| Alliance victories of 200 (section 19); the rest are score wins at 25:00, no dominations | 42 (41) | 50 (37) | 17 (17) |
+| Provinces taken from nations per match | 42.9 | 55.0 | 38.6 |
+| Men in all armies at 25:00 | 162k | 141k | 175k |
+| Start slots, lowest to highest share | 0.56×–1.72× | 0.46×–1.59× | 0.60×–1.45× |
+
+| Map | Race: wins (share); section 19's first pass in brackets |
+| --- | --- |
+| Earth | Kingdom 49 (0.86×; 0.80×) · Empire 61 (1.07×; 1.37×) · Nomads 65 (1.14×; 1.13×) · Republic 66 (1.16×; 1.10×) · Clans 44 (0.77×; 0.60×) |
+| Eldmoor | Humans 78 (1.29×; 1.25×) · Elves 68 (1.13×; 1.42×) · Orcs 51 (0.84×; 0.87×) · Dwarves 56 (0.93×; 0.82×) · Lizardfolk 49 (0.81×; 0.64×) |
+| Skyshards | Marines 38 (0.81×; 0.74×) · Robots 60 (1.28×; 1.06×) · Insectoids 35 (0.74×; 0.79×) · Crystal folk 44 (0.94×; 1.11×) · Energy beings 58 (1.23×; 1.30×) |
+
+**Balance holds.** Every race moved by about the noise of 200 seeds (±0.2×) or less, and the spread got no wider (Earth 0.77×–1.16×, Eldmoor 0.81×–1.29×, Skyshards 0.74×–1.28×). The same start slots lead and trail as in section 19 (Volga and Frostmarch on top; Saltmarsh, Ironholds and Mississippi at the bottom). Match length, wars and conquests sit in section 19's ranges. Insults are rare (about one every five minutes across the map) and decide about one war in twenty.
+
+**Watch:** Eldmoor's alliance victories rose from 37 to 50 of 200 (about 2 standard deviations); nothing in the pack points at alliances, so check it again with the next batch of seeds before acting. Players will insult far more than bots do; the soft launch's `diplomacy_action` events (`docs/LAUNCH.md`) show how much, and the grudge is small enough that it shouldn't matter.
+
+
+## 21. The EU4 pack, stage 2: event cards with choices
+
+`docs/DESIGN.md` "Events" has the rules; `Config.EventCards` has the 33 events and every number. Each living nation gets a card at 2:00 (plus 3 s per nation slot), then one 3 minutes after each card closes: about 7 a match. A choice is worth about 50 gold (100 manpower = 1 gold, a development level 60). Bots take the affordable choice worth more (`Config.Bots.EventWorth`).
+
+**How it was measured.** `lune run tools/harness/tournament 200 <map>` on each map, seeds 1–200, Normal bots, map races, with the cards on (the default) and off (`SET="Features.Events=false"`), the same code otherwise, so the two runs differ only by the cards (each seed still plays out differently once the first card is dealt). The tournament now prints the cards per match, how many ran out of time, and what they gave (30 more seeds per map for that line).
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Cards per match (all 10 bots); timed out | 68.7; 1.1 | 65.8; 1.2 | 70.7; 0.4 |
+| What they gave a nation in a match | 115 gold, 1,800 manpower, 1.1 development, 1.6 regiments, a +23% boost for 2 min | 133 gold, 2,100 manpower, 0.4 development, 2.0 regiments, +27% for 2 min | 167 gold, 2,200 manpower, 0.4 development, 1.8 regiments, +25% for 2 min |
+| Men in all armies at 25:00 (median), off → on | 165k → 201k | 145k → 167k | 174k → 222k |
+| Gold banked per nation at 25:00 (median) | 169 → 193 | 153 → 192 | 162 → 176 |
+| Provinces taken from nations per match | 42.8 → 40.8 | 54.6 → 50.3 | 38.4 → 37.1 |
+| Alliance victories of 200 (the rest score wins at 25:00, no dominations) | 38 → 22 | 54 → 29 | 16 → 5 |
+| Average match length | 23:48 → 24:13 | 23:07 → 24:01 | 24:28 → 24:55 |
+| Wars declared per match | 10.5 → 10.6 | 11.1 → 10.9 | 9.9 → 9.9 |
+| Bot commands refused | 31 → 20 of about 340k | 17 → 11 | 12 → 11 |
+
+Fairness, by the land each race ends with (average final provinces; this doesn't depend on how often alliances win):
+
+| Map | off | on |
+| --- | --- | --- |
+| Earth | Kingdom 10.8 · Empire 16.6 · Nomads 16.0 · Republic 14.8 · Clans 11.2 (best ÷ worst 1.55) | 11.1 · 16.8 · 15.2 · 15.3 · 11.1 (1.52) |
+| Eldmoor | Humans 14.9 · Elves 18.8 · Orcs 12.0 · Dwarves 11.6 · Lizardfolk 10.7 (1.75) | 15.7 · 18.2 · 11.8 · 11.9 · 10.2 (1.78) |
+| Skyshards | Marines 10.9 · Robots 11.2 · Insectoids 11.2 · Crystal folk 12.6 · Energy beings 14.1 (1.30) | 10.3 · 10.8 · 11.3 · 12.4 · 15.1 (1.46) |
+
+The start slots' land spread (best slot ÷ worst) went 1.94 → 1.81 on Earth, 2.45 → 2.26 on Eldmoor and 1.41 → 1.54 on Skyshards.
+
+**What the cards change.** Everyone gets about the same small gifts, so nobody pulls ahead: who ends with the land is the same as without them on Earth and Eldmoor, within the noise of 200 seeds (±0.3 provinces a race). What moves is the pace. The gifts end up as soldiers: an army is limited by the gold that pays its upkeep, so a little more gold and a level of development keep a regiment or two more per nation, and the armies at 25:00 are 15–28% bigger. Defenders hold a little better, about 5% fewer provinces change hands, and the 65% alliance victory (a long run of conquests) comes about half as often; the score at 25:00 decides the rest. Win shares spread out for the same reason: an alliance victory shares one win among two or three allies, a score win goes to one nation, so with fewer alliance victories the slots and races that already led win more of them (Eldmoor's Frostmarch went from 1.52× to 2.17× its fair share of wins, Skyshards' Energy beings from 1.20× to 1.67×), while their land barely moved (Frostmarch 20.0 → 19.4 provinces).
+
+Two checks on Earth (seeds 1–100) show it's the amount, not one kind of gift: with bots that never take regiments, the armies still grew as much (alliance victories 19 off, 10 on, 9 without regiments; men at 25:00 165k, 198k, 201k), and a card every 5 minutes instead of 3 (4.3 a nation) did about half as much (12 alliance victories, 186k men).
+
+**Balance holds** for who wins: no start slot or race gained land beyond the noise except Skyshards' Energy beings (+1.0 province, about 3 standard errors; their Swift passive may make more use of bigger armies), and bots refuse fewer commands than before (a bot decides its card after the plan's other orders, so a choice with a cost never fails).
+
+**Watch:** the slower pace. If the soft launch shows fewer conquests than players enjoy, lower the amounts in `Config.EventCards.Events` or raise `EveryTicks` (both scale the effect about linearly); `event_card` (`docs/LAUNCH.md`) shows what players pick and how often they let a card run out. Check Skyshards' Energy beings again with the next batch of seeds.
+
+## 22. Smarter PvP: counters, morale and flanking
+
+`docs/DESIGN.md` "Troops" (Counters), "Armies and combat" (morale, flanking, the result) and "Bot AI" (Tactics) have the rules; `Config.Battle` and `Config.Bots` every number. What they do to a battle: an even fight between fresh armies still goes three rounds (both end at 40 morale); a fresh army breaks before round 3 only when outnumbered about 2.5 to 1; a tired one breaks much sooner, so a fresh army beats a tired one of the same size. A second direction is +25% (a forest's worth), a third +50% (a fort's). The insult's grudge (+10%) and high spirits (+5%) from section 20 add to the same side modifier as the flank, and the bots' predictor (`Battle.outcome`, fed by `Battle.modifier`) counts them all.
+
+**How it was measured.** `lune run tools/harness/tournament 200 all`, seeds 1–200 on each map, Normal bots, map races, on this stage merged with main (EU4 pack stages 1–2) and on the stage alone before the merge; section 21's "on" column is main without the stage (same seeds, not paired: every rule change plays each seed out differently). Mixed difficulties: `tournament 20 all Hard/Normal` plus seeds 21–70 (`FIRST_SEED=21 … 50 all Hard/Normal`), 210 matches each.
+
+How battles go between nations (stage merged with main):
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Battles per match (between nations) | 290 (228) | 381 (323) | 401 (359) |
+| Average length between nations, rounds | 2.18 | 2.05 | 2.16 |
+| Ended by a morale break; before round 3 | 61%; 35% | 56%; 34% | 63%; 38% |
+| Fought with a flank; decided by it | 10%; 1% | 9%; 1% | 13%; 1% |
+| Decided by the troop counters | 8% | 7% | 9% |
+| Won by the side with fewer men | 11% | 9% | 13% |
+
+The match, main without the stage (section 21) → the stage alone → the stage merged with main:
+
+| | Earth | Eldmoor | Skyshards |
+| --- | --- | --- | --- |
+| Men in all armies at 25:00 (median) | 201k → 146k → 162k | 167k → 131k → 135k | 222k → 126k → 147k |
+| Gold banked per nation at 25:00 (median) | 193 → 201 → 261 | 192 → 170 → 242 | 176 → 161 → 177 |
+| Provinces taken from nations per match | 40.8 → 38.3 → 36.1 | 50.3 → 56.4 → 54.8 | 37.1 → 37.2 → 32.9 |
+| Alliance victories of 200 (the rest score wins at 25:00, no dominations) | 22 → 25 → 19 | 29 → 35 → 40 | 5 → 14 → 10 |
+| Most wins by one start slot, of 200 | – → 46 → 39 | – → 36 → 44 | – → 37 → 38 |
+| Start slots' land spread (best ÷ worst) | 1.81 → 1.94 → 2.06 | 2.26 → 2.84 → 2.82 | 1.54 → 1.60 → 1.56 |
+
+Fairness by the land each race ends with (average final provinces; best ÷ worst in brackets):
+
+| Map | Main (section 21) | The stage alone | Merged |
+| --- | --- | --- | --- |
+| Earth | Kingdom 11.1 · Empire 16.8 · Nomads 15.2 · Republic 15.3 · Clans 11.1 (1.52) | 11.6 · 15.5 · 16.2 · 16.0 · 10.1 (1.60) | 11.3 · 15.8 · 16.0 · 15.8 · 10.6 (1.51) |
+| Eldmoor | Humans 15.7 · Elves 18.2 · Orcs 11.8 · Dwarves 11.9 · Lizardfolk 10.2 (1.78) | 14.2 · 18.6 · 11.1 · 12.4 · 11.6 (1.68) | 15.6 · 19.0 · 10.6 · 12.0 · 10.7 (1.79) |
+| Skyshards | Marines 10.3 · Robots 10.8 · Insectoids 11.3 · Crystal folk 12.4 · Energy beings 15.1 (1.46) | 12.1 · 9.6 · 10.0 · 14.5 · 13.7 (1.57) | 12.0 · 9.7 · 10.4 · 14.2 · 13.7 (1.46) |
+
+Win shares by race, merged: Earth Kingdom 1.07× · Empire 1.03× · Nomads 1.34× · Republic 1.03× · Clans 0.53×; Eldmoor Humans 1.17× · Elves 1.37× · Orcs 0.87× · Dwarves 0.71× · Lizardfolk 0.87×; Skyshards Marines 1.08× · Robots 0.63× · Insectoids 0.63× · Crystal folk 1.49× · Energy beings 1.17×.
+
+Mixed difficulties, Hard / Normal wins (210 matches): main 47% / 53%, merged 41% / 59% (the stage alone, 60 matches: 37% / 63%).
+
+**What the stage changes.** Battles end sooner: well over half of them by a morale break, a third before round 3, and about one in nine goes to the side with fewer men (a fresh army against a tired one, or a flank). Broken armies rest before they attack again, so the armies at 25:00 are 19–34% smaller than on main and the bots bank more gold; conquests sit within about 12% of main's. Flanks are rare between bots (one battle in ten) and decide about one in a hundred: their weight is for players who plan a pincer. The counters decide 7–9% of battles.
+
+**The merge barely moved anything.** Against the stage alone, every race's land moved by half a province or less (the noise of 200 seeds is about ±0.3) except Eldmoor's Humans (+1.4) and Lizardfolk (−0.9), which swapped back to where main has them; the land spread by race is main's again (1.51, 1.79, 1.46). The EU4 cards' bigger armies show up here too (+3% to +17% men at 25:00), smaller than on main because broken armies don't recruit back at once. No Config number changed.
+
+**Gate 3 holds:** no start slot wins more than 44 of 200 matches (22%), against 20 for a fair share.
+
+**Watch:**
+- Skyshards' races traded places under the counters: Crystal folk (+1.8 provinces) and Marines (+1.7) up, Energy beings (−1.4) and Robots (−1.1) down; the spread is the same as main's (1.46). Robots and Insectoids win 0.63× and Crystal folk 1.49×: check the roles of their rosters (`Config.Races`) before touching numbers.
+- Eldmoor's start slots spread more (best ÷ worst land 2.26 on main, 2.8 with the stage): Greenvale and Ironholds end with 7.8 provinces, Elderwood with 22.0. Section 17's start-position work covers it.
+- Hard no longer beats Normal bot against bot (41% against 59%; on main 47%). Section 16's 56% came before the races and the EU4 pack; Hard's job is to be hardest on players, so the next difficulty pass should measure `Hard/Player` first.

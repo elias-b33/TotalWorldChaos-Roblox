@@ -33,27 +33,40 @@ local function run()
 	H.expect(Emulator.findText(olivia, "Private server settings") ~= nil, "the settings sheet opens")
 	H.expect(Emulator.findText(olivia, "full XP and Glory") == nil, "two players: the sheet says the rewards are half")
 	H.shot(olivia, "settings_default")
-	for _, name in { "Setting_minutes_15", "Setting_difficulty_Hard", "Setting_powers_false", "Setting_map_eldmoor" } do
+	local presses = { "Setting_minutes_15", "Setting_difficulty_Hard", "Setting_powers_false", "Setting_map_eldmoor" }
+	table.insert(presses, "Setting_events_false") -- the EU4 pack's event cards, under Insults
+	for _, name in presses do
 		Emulator.press(olivia, name)
 	end
 	for _ = 1, 4 do
 		Emulator.press(olivia, "BotsLess")
 		Emulator.run(1.1) -- each step counts down from the last view
 	end
+	H.shot(olivia, "settings_custom")
+	-- the Teams tab: a cell per player
+	Emulator.press(olivia, "SettingsTab_Teams")
+	Emulator.run(0.3)
+	H.expect(H.find(olivia, "Team_" .. PRIVATE_OWNER) ~= nil and H.find(olivia, "Setting_powers_true") == nil, "the Teams tab shows the players instead of the rules")
 	Emulator.press(olivia, "Team_" .. PRIVATE_OWNER)
 	Emulator.press(olivia, "Team_" .. pete.serverPlayer.UserId)
 	Emulator.run(1.5)
 	local s = LobbyService.state().settings
 	H.expect(s.minutes == 15 and s.difficulty == "Hard" and s.powers == false, "15 minutes, Hard bots, powers off")
 	H.expect(s.bots == 5 and s.map == "eldmoor", "5 bots, on Eldmoor")
+	H.expect(s.events == false and s.diplomacy == true, "no event cards; insults still on")
 	H.expect(#s.teams == 2 and s.teams[1].team == 1 and s.teams[2].team == 1, "Olivia and Pete are team 1")
 	H.expect(LobbyService.state().locked == "eldmoor", "the map setting locks the vote to Eldmoor")
 	H.expect(Emulator.findText(olivia, "custom rules") ~= nil, "the sheet says custom rules pay half")
-	H.shot(olivia, "settings_custom")
+	H.shot(olivia, "settings_teams")
+	Emulator.press(olivia, "SettingsTab_Rules")
 	Emulator.press(olivia, "SettingsDone")
 	Emulator.run(0.5)
-	H.expect(Emulator.findText(pete, "15 min") ~= nil and Emulator.findText(pete, "5 Hard bots") ~= nil, "Pete sees them")
+	H.expect(
+		Emulator.findText(pete, "15 min") ~= nil and Emulator.findText(pete, "5 Hard bots") ~= nil,
+		"Pete sees them"
+	)
 	H.expect(Emulator.findText(pete, "powers off") ~= nil, "including powers off")
+	H.expect(Emulator.findText(pete, "no events") ~= nil, "and no events")
 	H.shot(pete, "vote_locked")
 
 	-- the vote runs out, nobody picks: the draft gives everyone a nation, then the match plays the settings

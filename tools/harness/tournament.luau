@@ -8,6 +8,8 @@
 --   lune run tools/harness/tournament 20 all Hard/Normal   # mixed: half the nations on each, swapped every seed
 --   lune run tools/harness/tournament 20 all Easy/Player   # Easy bots against Normal-bot stand-ins for players
 --   SET="Siege.TicksPerDevelopment=20" lune run tools/harness/tournament   # what-if: override Config values first
+--   SET="Features.Diplomacy=false" lune run tools/harness/tournament 200 earth   # a match feature off (true/false)
+--   SET="Features.Events=false" lune run tools/harness/tournament 200 earth      # no event cards (the EU4 pack, stage 2)
 --   lune run tools/harness/tournament 200 eldmoor     # start-position balance (docs/BALANCE.md section 16)
 --   RACES=shuffle lune run tools/harness/tournament 100   # races dealt out at random each match (the map's mix):
 --                                                         # race strength without the start positions in it
@@ -30,6 +32,7 @@ local Commands = require("../../src/shared/Sim/Commands")
 local Config = require("../../src/shared/Config")
 local Diplomacy = require("../../src/shared/Sim/Diplomacy")
 local Economy = require("../../src/shared/Sim/Economy")
+local EventCards = require("../../src/shared/Sim/EventCards")
 local Maps = require("../../src/shared/Maps")
 local Match = require("../../src/shared/Sim/Match")
 local Races = require("../../src/shared/Sim/Races")
@@ -55,15 +58,17 @@ end
 local overrides = process.env.SET
 if overrides and overrides ~= "" then
 	for _, pair in string.split(overrides, ",") do
-		local path, value = string.match(pair, "^%s*([%w%.]+)%s*=%s*([%d%.]+)%s*$")
+		local path, value = string.match(pair, "^%s*([%w%.]+)%s*=%s*([%w%.]+)%s*$")
 		assert(path and value, "bad SET entry: " .. pair)
+		local parsed: any = if value == "true" then true elseif value == "false" then false else tonumber(value)
+		assert(parsed ~= nil, "bad SET value: " .. pair)
 		local node: any = Config
 		local keys = string.split(path, ".")
 		for i = 1, #keys - 1 do
 			node = node[keys[i]]
 		end
 		assert(node[keys[#keys]] ~= nil, "unknown Config value: " .. path)
-		node[keys[#keys]] = tonumber(value)
+		node[keys[#keys]] = parsed
 		print(string.format("what-if: Config.%s = %s", path, value))
 	end
 end
@@ -94,6 +99,12 @@ type MatchStats = {
 	wars: number,
 	conquests: number, -- provinces taken from another nation (not neutral land)
 	powers: number, -- Primordial powers bots used
+	insults: number, -- the EU4 pack: insults and insults back bots sent, wars declared on a nation the declarer holds a
+	insultsBack: number, -- grudge against (it insulted them)
+	grudgeWars: number,
+	cards: number, -- the EU4 pack's event cards closed (stage 2), and how many of them ran out of time
+	cardsTimedOut: number,
+	granted: { [string]: number }, -- what the closed cards gave, by effect (gold, manpower, development, regiments...)
 	leaderChanges: number, -- minutes (from 3:00) that ended with a different nation holding the most provinces
 	armyStats: { [number]: ArmyStats }, -- at the end of minutes 15 and 25 (or the end of the match)
 	group: { [number]: string }, -- mixed mode: nation -> "A" or "B"
@@ -103,6 +114,7 @@ type MatchStats = {
 	races: { [number]: string }, -- nation -> its race this match
 	recruits: { [string]: number }, -- troop type -> regiments bots recruited
 	navy: NavyStats,
+	battles: { [string]: number }, -- land battles (BATTLE_KEYS): how many, how long, what decided them
 }
 
 -- Navies in one match (docs/BALANCE.md section 20).
@@ -117,6 +129,24 @@ type NavyStats = {
 	blockadeGold: number, -- gold income lost to blockades (each payday's blockaded provinces)
 	shipsBy: { [number]: number }, -- nation -> ships built
 	landingsBy: { [number]: number }, -- nation -> landings
+}
+
+-- Land battles that ended with a result, counted by kind ("all", or "nations": between two nations, no garrison or
+-- Rebels): how many, rounds fought, ended by a morale break (before round 3: "early"), fought with a flank bonus on
+-- either side (seen from round 2), decided by a flank or by the troop counters, won by the side with fewer men (the
+-- BattleEnded event's flags, docs/DESIGN.md "Armies and combat").
+local BATTLE_KEYS = {
+	"all",
+	"rounds",
+	"broke",
+	"nations",
+	"nationRounds",
+	"nationBroke",
+	"nationEarly",
+	"flanked",
+	"flank",
+	"counter",
+	"outnumbered",
 }
 
 -- Nations' armies at one moment: how many, how many men, the biggest nation's men, standing armies that share
@@ -233,6 +263,12 @@ local function runMatch(mapId: string, seed: number): MatchStats
 	}
 	local landed: { number } = {} -- ids of the armies fleets put ashore
 	local lastLeader = 0
+	local battles: { [string]: number } = {}
+	for _, k in BATTLE_KEYS do
+		battles[k] = 0
+	end
+	local battleStart: { [number]: number } = {} -- province -> the tick its battle's first round was fought
+	local battleOf: { [number]: any } = {} -- province -> its battle's record (Types.Battle), as last seen
 	local stats = {
 		leaderByMinute = {},
 		finalProvinces = {},
@@ -242,9 +278,16 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		wars = 0,
 		conquests = 0,
 		powers = 0,
+		insults = 0,
+		insultsBack = 0,
+		grudgeWars = 0,
+		cards = 0,
+		cardsTimedOut = 0,
+		granted = {},
 		leaderChanges = 0,
 		armyStats = {},
 	}
+	local lastCard: { [number]: number } = {} -- nation -> the last event card counted
 	while state.result == nil do
 		for _, order in queue do -- 1. apply queued commands
 			stats.commands += 1
@@ -311,12 +354,44 @@ local function runMatch(mapId: string, seed: number): MatchStats
 						break
 					end
 				end
+			elseif e.kind == "Insult" then
+				stats.insults += 1
+			elseif e.kind == "InsultBack" then
+				stats.insultsBack += 1
 			end
 			if e.kind == "WarDeclared" then
 				stats.wars += 1
+				if Diplomacy.grudge(state, e.a, e.b) then
+					stats.grudgeWars += 1
+				end
 				if mixed and early then
 					local key = group[e.a] .. group[e.b]
 					earlyWars[key] = (earlyWars[key] or 0) + 1
+				end
+			elseif e.kind == "BattleEnded" then
+				local ev = e :: any
+				local rounds = if battleStart[e.province] then state.tick - battleStart[e.province] + 1 else 1
+				local record = battleOf[e.province]
+				battleStart[e.province] = nil
+				battleOf[e.province] = nil
+				local broke = if ev.broke then 1 else 0
+				battles.all += 1
+				battles.rounds += rounds
+				battles.broke += broke
+				if e.a ~= 0 and e.b ~= 0 then
+					battles.nations += 1
+					battles.nationRounds += rounds
+					battles.nationBroke += broke
+					battles.nationEarly += if ev.broke and rounds < Config.Battle.Rounds then 1 else 0
+					battles.flank += if ev.flank then 1 else 0
+					battles.counter += if ev.counter then 1 else 0
+					battles.outnumbered += if ev.outnumbered then 1 else 0
+					local edges = if record then { record.attackerEdge, record.defenderEdge } else {}
+					local flanked = false
+					for _, edge in edges do
+						flanked = flanked or (edge and edge.flankMen > 0)
+					end
+					battles.flanked += if flanked then 1 else 0
 				end
 			elseif e.kind == "ProvinceTaken" and e.a ~= 0 and e.b ~= 0 then
 				stats.conquests += 1
@@ -330,6 +405,30 @@ local function runMatch(mapId: string, seed: number): MatchStats
 			end
 		end
 		table.clear(state.events)
+		for p in battleStart do
+			if state.battles[p] == nil then
+				battleStart[p] = nil -- one side left or died out: no result
+				battleOf[p] = nil
+			end
+		end
+		for p, battle in state.battles do
+			battleStart[p] = battleStart[p] or state.tick
+			battleOf[p] = battle
+		end
+		for id, c in state.chronicles do
+			local last = c.last
+			if last and lastCard[id] ~= last.card then
+				lastCard[id] = last.card
+				stats.cards += 1
+				if last.auto then
+					stats.cardsTimedOut += 1
+				end
+				local def = EventCards.def(last.event)
+				for effect, amount in (if def then def.choices[last.choice] else {}) :: { [string]: number } do
+					stats.granted[effect] = (stats.granted[effect] or 0) + amount
+				end
+			end
+		end
 		if state.tick % 60 == 0 or state.result then
 			local best, leader = 0, 0
 			for id = 1, #state.nations do
@@ -367,6 +466,12 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		wars = stats.wars,
 		conquests = stats.conquests,
 		powers = stats.powers,
+		insults = stats.insults,
+		insultsBack = stats.insultsBack,
+		grudgeWars = stats.grudgeWars,
+		cards = stats.cards,
+		cardsTimedOut = stats.cardsTimedOut,
+		granted = stats.granted,
 		leaderChanges = stats.leaderChanges,
 		armyStats = stats.armyStats,
 		group = group,
@@ -376,6 +481,7 @@ local function runMatch(mapId: string, seed: number): MatchStats
 		races = races,
 		recruits = recruits,
 		navy = navy,
+		battles = battles,
 	}
 end
 
@@ -427,6 +533,8 @@ for _, mapId in mapIds do
 	local lengths = {}
 	local perMinute: { { number } } = {}
 	local rejected, commands, wars, conquests, leaderChanges, powers = 0, 0, 0, 0, 0, 0
+	local insults, insultsBack, grudgeWars, cards, cardsTimedOut = 0, 0, 0, 0, 0
+	local granted: { [string]: number } = {}
 	local atMinute: { [number]: { [string]: { number } } } = {}
 	for _, m in { 15, 25 } do
 		atMinute[m] = { armies = {}, men = {}, maxMen = {}, stacked = {}, gold = {}, manpower = {} }
@@ -452,6 +560,10 @@ for _, mapId in mapIds do
 	}
 	local shipsBy: { [number]: number } = {}
 	local landingsBy: { [number]: number } = {}
+	local battles: { [string]: number } = {}
+	for _, k in BATTLE_KEYS do
+		battles[k] = 0
+	end
 	for seed = firstSeed, firstSeed + seeds - 1 do
 		local s = runMatch(mapId, seed)
 		for k in navy do
@@ -462,6 +574,9 @@ for _, mapId in mapIds do
 		end
 		for id, n in s.navy.landingsBy do
 			landingsBy[id] = (landingsBy[id] or 0) + n
+		end
+		for k, v in s.battles do
+			battles[k] += v
 		end
 		for _, w in s.result.winners do
 			wins[w] = (wins[w] or 0) + 1
@@ -524,6 +639,14 @@ for _, mapId in mapIds do
 		wars += s.wars
 		conquests += s.conquests
 		powers += s.powers
+		insults += s.insults
+		insultsBack += s.insultsBack
+		grudgeWars += s.grudgeWars
+		cards += s.cards
+		cardsTimedOut += s.cardsTimedOut
+		for effect, amount in s.granted do
+			granted[effect] = (granted[effect] or 0) + amount
+		end
 		leaderChanges += s.leaderChanges
 		for k, v in s.rejectReasons do
 			reasons[k] = (reasons[k] or 0) + v
@@ -611,6 +734,31 @@ for _, mapId in mapIds do
 	print("match ends: " .. table.concat(ends, " "))
 	print(
 		string.format(
+			"insults per match %.1f, insults back %.1f  |  wars declared on an insulter per match %.1f",
+			insults / seeds,
+			insultsBack / seeds,
+			grudgeWars / seeds
+		)
+	)
+	print(
+		string.format(
+			"event cards per match %.1f (%.1f per nation), timed out %.1f",
+			cards / seeds,
+			cards / seeds / 10,
+			cardsTimedOut / seeds
+		)
+	)
+	local gave = {}
+	for _, effect in { "gold", "manpower", "development", "regiments", "ships", "boost" } do
+		if granted[effect] then
+			table.insert(gave, string.format("%s %.2f", effect, granted[effect] / seeds / 10))
+		end
+	end
+	if #gave > 0 then
+		print("  event cards gave per nation per match (boost: summed bonus): " .. table.concat(gave, ", "))
+	end
+	print(
+		string.format(
 			"provinces taken from nations per match %.1f  |  leader changes per match (minute checks after 3:00) %.1f  |  powers used by bots per match %.1f",
 			conquests / seeds,
 			leaderChanges / seeds,
@@ -640,6 +788,31 @@ for _, mapId in mapIds do
 		table.insert(row, string.format("%d:%s", m, tostring(median(perMinute[m]))))
 	end
 	print("median leader provinces by minute: " .. table.concat(row, " "))
+	local function pctOf(n: number, of: number): number
+		return math.floor(100 * n / math.max(of, 1) + 0.5)
+	end
+	print(
+		string.format(
+			"battles per match %.1f (%.1f between nations)  |  average length %.2f rounds (between nations %.2f)  |  ended by a morale break %d%% (between nations %d%%, before round %d %d%%)",
+			battles.all / seeds,
+			battles.nations / seeds,
+			battles.rounds / math.max(battles.all, 1),
+			battles.nationRounds / math.max(battles.nations, 1),
+			pctOf(battles.broke, battles.all),
+			pctOf(battles.nationBroke, battles.nations),
+			Config.Battle.Rounds,
+			pctOf(battles.nationEarly, battles.nations)
+		)
+	)
+	print(
+		string.format(
+			"  battles between nations: fought with a flank %d%%, decided by a flank %d%%, by the troop counters %d%%, won by the side with fewer men %d%%",
+			pctOf(battles.flanked, battles.nations),
+			pctOf(battles.flank, battles.nations),
+			pctOf(battles.counter, battles.nations),
+			pctOf(battles.outnumbered, battles.nations)
+		)
+	)
 	for _, m in { 15, 25 } do
 		local lists = atMinute[m]
 		print(

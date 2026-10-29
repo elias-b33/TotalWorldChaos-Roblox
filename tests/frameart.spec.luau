@@ -28,7 +28,7 @@ local USES: { [string]: { string | number } } = {
 		0xd23c50,
 	},
 	buttonDown = { "gold", "slate", "tile:powers" },
-	plate = { "plate", "plateRaised" },
+	plate = { "plate", "plateRaised", "common", "rare", "epic", "legendary" },
 	window = { "window", "windowIron", "common", "rare", "epic", "legendary" },
 	well = { "well" },
 	titlePlate = { "titlePlate", "common", "rare", "epic", "legendary", "slate", "gold" },
@@ -258,6 +258,75 @@ T.test("fixed-height frames: the title plate is 14 art px (28 on screen), the ri
 	T.equal(ribbonW, 40)
 	T.equal(ribbonH, 30)
 	T.equal(#FrameArt.ribbon(), 30)
+end)
+
+T.test("the Results sunburst: 16 rays in alternate sectors, fading out in steps, nothing past its circle", function()
+	local n = 64
+	local pixels, w, h = FrameArt.sunburst(n, 16, 0xfff1b8)
+	T.equal(w, n)
+	T.equal(h, n)
+	T.equal(buffer.len(pixels), n * n * 4)
+	local function alpha(x: number, y: number): number
+		return buffer.readu8(pixels, (y * n + x) * 4 + 3)
+	end
+	-- corners lie outside the circle
+	T.equal(alpha(0, 0), 0)
+	T.equal(alpha(n - 1, n - 1), 0)
+	-- walking round a ring crosses 16 lit sectors (32 lit/dark changes)
+	local changes, last = 0, alpha(n // 2 + 20, n // 2) > 0
+	local steps = 720
+	for i = 1, steps do
+		local a = i / steps * 2 * math.pi
+		local x = math.floor(n / 2 - 0.5 + 20 * math.cos(a) + 0.5)
+		local y = math.floor(n / 2 - 0.5 + 20 * math.sin(a) + 0.5)
+		local lit = alpha(x, y) > 0
+		if lit ~= last then
+			changes += 1
+		end
+		last = lit
+	end
+	T.expect(changes >= 30 and changes <= 34, "about 32 sector edges round the ring, got " .. changes)
+	-- alpha only takes the stepped values, and fades outwards along a lit ray
+	local seen = {}
+	for i = 0, n * n - 1 do
+		seen[buffer.readu8(pixels, i * 4 + 3)] = true
+	end
+	for a in seen do
+		local ok = a == 0
+		for s = 1, FrameArt.SUNBURST_STEPS do
+			ok = ok or a == math.floor(s / FrameArt.SUNBURST_STEPS * 255 + 0.5)
+		end
+		T.expect(ok, "stepped alpha, got " .. a)
+	end
+	-- no rays in the middle; full alpha just outside the hole, a quarter near the edge, in the colour asked for
+	T.equal(alpha(n // 2, n // 2), 0)
+	local strongest, faintest = 0, 255
+	for i = 0, n * n - 1 do
+		local a = buffer.readu8(pixels, i * 4 + 3)
+		if a > 0 then
+			strongest, faintest = math.max(strongest, a), math.min(faintest, a)
+			T.equal(buffer.readu8(pixels, i * 4), 0xff)
+		end
+	end
+	T.equal(strongest, 255)
+	T.equal(faintest, math.floor(255 / FrameArt.SUNBURST_STEPS + 0.5))
+end)
+
+T.test("text widths come from the font's advances: wider text, wider estimate; size scales it", function()
+	local TextWidth = require("../src/client/TextWidth")
+	T.equal(TextWidth.measure("", 17), 0)
+	T.expect(TextWidth.measure("WWW", 17) > TextWidth.measure("iii", 17), "W is wider than i")
+	T.expect(
+		math.abs(TextWidth.measure("Go", 34) - 2 * TextWidth.measure("Go", 17)) < 1e-6,
+		"twice the size, twice as wide"
+	)
+	-- Fredoka One 30 "YOU WIN!" measures about 140 px in its font file
+	local w = TextWidth.measure("YOU WIN!", 30)
+	T.expect(w > 130 and w < 150, "YOU WIN! at 30 px: " .. w)
+	T.expect(TextWidth.measure("Peace with Zephyr", 15, "body") > 100, "body text has its own widths")
+	-- kerning: "CATACLYSM!" measures about 182 px at 30 in the font file (AT, TA, LY pull letters together)
+	local kerned = TextWidth.measure("CATACLYSM!", 30)
+	T.expect(kerned > 178 and kerned < 186, "CATACLYSM! at 30 px, kerned: " .. kerned)
 end)
 
 T.finish()
