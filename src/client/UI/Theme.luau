@@ -71,7 +71,8 @@ Theme.font = {
 
 -- Type scale in px: nothing under 14 on a phone (docs/DESIGN.md "Rules for every screen").
 Theme.text = {
-	hero = 28, -- full-screen titles (map vote, results)
+	ribbon = 30, -- hero text on ribbons: the phase banners and the Results headline
+	hero = 28, -- full-screen titles (map vote)
 	title = 20, -- title plates
 	heading = 18, -- sheet titles, big numbers
 	button = 17, -- button captions (16 or 15 when dense)
@@ -116,6 +117,10 @@ Theme.shadow = {
 	counter = { y = 3, transparency = 0.65 }, -- the top bar's counters and chips
 	glow = { blur = 12, transparency = 0.45 }, -- rare shop cards, claimable rewards
 }
+
+-- The Results window (docs/UI_DIRECTION.md 7.13) hangs from a line near the top of the screen with its gold ribbon
+-- centred on it; Effects' MATCH OVER banner pops on the same line, as wide, and leaves the ribbon under it.
+Theme.results = { ribbonY = 36, ribbonWidth = 340 }
 
 -- Tablets (docs/STUDIO.md "UI kit"): the whole UI grows with the screen's short side, so a sheet or the top bar is
 -- as big in the hand on an iPad as on a phone. Phones (short side under `phone`) stay at exactly 1; bigger screens
