@@ -20,7 +20,7 @@
 -- Races (docs/DESIGN.md "Races"): each map also prints the wins by race (its own cast of five) against the race's
 -- fair share (all wins × its nations / 10) and the regiments bots recruited of each troop type the map has (the
 -- shared roles under the map's names, and its races' elites).
--- Navies (docs/DESIGN.md "Navies", docs/BALANCE.md section 20): ships built, landings, provinces taken by landed
+-- Navies (docs/DESIGN.md "Navies", docs/BALANCE.md section 23): ships built, landings, provinces taken by landed
 -- armies, sea battles, wars declared across the sea (no land border), blockaded province-ticks and the gold they
 -- cost, per match; and each slot's ships and landings.
 
@@ -117,7 +117,7 @@ type MatchStats = {
 	battles: { [string]: number }, -- land battles (BATTLE_KEYS): how many, how long, what decided them
 }
 
--- Navies in one match (docs/BALANCE.md section 20).
+-- Navies in one match (docs/BALANCE.md section 23).
 type NavyStats = {
 	ships: number, -- ships built
 	landings: number, -- armies put ashore

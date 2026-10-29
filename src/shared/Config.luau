@@ -783,7 +783,7 @@ Config.Siege = {
 
 -- Navies (docs/DESIGN.md "Navies"): one ship type per map (Galleon, Dragonship, Starship; MapDef.ship), the same
 -- numbers on every map. A sea battle is a land battle's rule with a fleet's hull as its men. Tuned with bot
--- tournaments once bots sailed: docs/BALANCE.md section 20.
+-- tournaments once bots sailed: docs/BALANCE.md section 23.
 Config.Navy = {
 	ShipGold = 25, -- one ship (no manpower)
 	ShipUpkeep = 1, -- gold per ship per month (a damaged fleet pays for what is left of it)
@@ -792,7 +792,7 @@ Config.Navy = {
 	MaxShipsPerCommand = 5, -- ships in one BuildShips order
 	MoveTicks = 8, -- to sail into the next sea zone
 	MinHull = 500, -- a fleet left with less than half a ship sinks after a battle, with everyone aboard
-	BlockadeGoldLoss = 0.25, -- a blockaded province loses this share of its gold income (0.5 before section 20)
+	BlockadeGoldLoss = 0.25, -- a blockaded province loses this share of its gold income (0.5 before section 23)
 	BlockadeSiegeSpeed = 1.25, -- the blockader's side besieges a blockaded province this much faster
 }
 
