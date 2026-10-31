@@ -967,9 +967,15 @@ WorldBox's best moments are the world itself changing: a meteor leaves a crater,
 | S4 Society and history | Kings and heirs, clans, cultures, world laws (toggles such as "no wars", "fast ageing"), a history log and timeline, world ages (golden age, dark age, chaos age) | 12–16 |
 | S5 Ages pack (ModernBox-style) | Kingdoms advance stone → medieval → gunpowder → industrial → modern → future; era units (musketeers, riflemen, tanks, jets, warships, mechs), era buildings, bombs from grenades to a cartoon nuke with fallout, missile defence | 20–30 |
 | S6 Sharing | World codes, a world browser with likes, Roblox text filter on every name, report and remove tools, storage limits | 8–12 |
-| S7 Into PvP | Turn a painted world into a private-server match map (a validator builds provinces from tiles, as `tools/mapgen` does for our maps) | 10–15 |
+| S7 Map maker and hosting | Make PvP maps in the sandbox and host matches on them (below) | 18–25 |
 
-**Total: about 100–145 hours.** That is a second game, larger than everything left on the PvP side. Recommendation: launch the PvP game first; build S1 and S3 next (they reuse the pixel-art painter and the powers, and already make the sandbox feel like WorldBox); then S2, S5, S4, S6, S7 in that order, guided by how many players use the sandbox.
+**Total: about 110–155 hours.** That is a second game, larger than everything left on the PvP side. Recommendation: launch the PvP game first; build S1 and S3 next (they reuse the pixel-art painter and the powers, and already make the sandbox feel like WorldBox); then S2, S5, S4, S6, S7 in that order, guided by how many players use the sandbox.
+
+**S7 in detail: players make PvP maps and host matches (owner request).**
+- **Map maker mode:** in a sandbox world, paint the land, then place up to 10 start nations (capital, colour, people), draw provinces (auto-split from the tiles, then merge or split by hand), mark mountains, straits and sea zones, set neutral garrisons and development.
+- **Validator** (the same checks `tools/mapgen` runs on our maps, in Luau): 60–150 provinces; every nation 8 provinces and 17 development; every nation can reach every other (by land or strait); no walled-in start; province sizes within limits (none under the tap target of 9.10); a quick 20-match bot tournament on the player's device that flags any start winning more than 2× its share. A map that fails can still be played in private servers but can't be published.
+- **Hosting:** a player hosts a match on their map from the sandbox: a reserved server with a join code and an invite to friends (the play-with-friends stage's party code), their own rules from the settings tabs, bots in empty seats. Custom-map matches pay half XP and Glory, like other custom rules.
+- **Publishing:** publish to the map browser (likes, plays, the text filter on every name, reporting). The best-liked published maps that pass the validator and a moderator check join a **Community** slot in the public map rotation (below), credited to their maker.
 
 **What players pay for (sandbox only; never sold for matches):**
 
@@ -985,6 +991,22 @@ WorldBox's best moments are the world itself changing: a meteor leaves a crater,
 Rules: everything listed with its contents before buying; no paid random items; free players can still build and share worlds; prices checked against the launch data (MONETIZATION 13.7).
 
 **Risks to check first:** phone performance with thousands of creatures (a prototype in S2 before committing); DataStore size per save (measure a full large world); moderation of shared pixel art (S6 can't ship without reporting).
+
+### 9.13 Keeping player counts high: two playlists, map rotation, bots in every seat (owner decisions, October 2026)
+
+**Map rotation instead of the vote.** Every public server plays the maps in turn (Earth → Eldmoor → Skyshards → …), so a map never splits the players, every map gets played, and the lobby is shorter. The map vote is removed from public servers; private servers keep choosing their map. The next map shows in the lobby and on Results ("Next: Eldmoor"). Later a fourth slot in the rotation is a **Community** map (9.12 S7), changed every week.
+
+**Playlists.** Two always on: **Chaos** (the main game, with Primordials) and **Classic** (no Primordials, 9.11). One rotating weekly slot (Blitz, Long, Fog Week, the Ages variant, a community map week) as the weekly twist. Everything else (Easy, custom lengths, any mix) lives in private and hosted servers. The sandbox is singleplayer and never splits a queue.
+
+**Matchmaking.**
+- A big **Play** button puts you in the fullest server of any public playlist with a free seat; the playlist picker is for those who care.
+- **Fill the fullest server first** so players cluster.
+- **Join in progress:** a newcomer takes a bot's nation in the first 5 minutes (in Peace for Blitz); bots fill every empty seat, so a quiet playlist means more bots, never a wait.
+- **Live rules by player count** (from a config the owner can change without an update): under about 300 players online the rotating slot pauses and everyone goes to Chaos and Classic.
+
+**Data.** Players and retention per playlist and per map; a playlist under about 10% of players for two weeks moves to private servers. The analytics events are in `docs/LAUNCH.md`.
+
+**Size.** Rotation, the Play button, fill-first and join in progress ride with the game-modes stage: about +3 hours (the rotation replaces the vote's screen with a smaller "next map" card).
 
 ## 10. Analytics additions
 
