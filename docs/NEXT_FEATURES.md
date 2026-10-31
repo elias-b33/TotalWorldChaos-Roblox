@@ -849,7 +849,52 @@ All numbers are starting values in `Config.Primordial`; rules in `Sim/Primordial
 - Harness scenario `primordial2`: Alice is eliminated, closes a rift, makes a battle call, casts an aimed meteor that Bob's army dodges and one that hits, draws a storm, marches a rebel host; screenshots at 844 × 390 and 667 × 375.
 - **Tournament with simulated Primordials:** eliminated bot nations rise as bot Primordials (a simple policy: aim at the top two nations, close most rifts, call battles for the bigger side). Compare with Primordials off, 200 seeds per map. Ship if: Gate 3 holds; no start slot's win share moves by more than 0.3×; the nation leading at 15:00 wins less often than with today's powers (chaos leans on the leader) but still at least 35% of the time; matches still end at 25:00 in about the same share.
 
-**Effort:** about 4–5 hours at xhigh (rules, client, tournament tuning). Place it after the bot strategy stage (Hard bots dodge meteors, and the simulated Primordials reuse the bot code) and before the combined balance pass.
+**Effort:** see "Staging, updated" below. Place it after the bot strategy stage (Hard bots dodge meteors, and the simulated Primordials reuse the bot code) and before the combined balance pass.
+
+#### Targeting, teaming and balance (owner request: plan these before building)
+
+**Targeting: chaos leans on the leader, never on the weak.** Hard bans feel bad, so most of it is price:
+- Harmful powers (Meteor, Plague, host, Earthquake) cost **30% less on the top three nations by score** and **50% more on the bottom three**.
+- **Newcomer and underdog protection:** a nation with 3 provinces or fewer can't be hit by Primordial harm at all (the power picker greys it, "too small to notice").
+- **Revenge, once:** a Primordial's first harmful power on the nation that eliminated it costs half. After that, normal prices and the normal 2-minute per-target cooldown.
+- **Total harm cap per nation:** the existing 60 s immunity stays, and a nation takes at most 3 Primordial hits in any 5 minutes from all Primordials together, so a lobby of knocked-out friends can't erase one player.
+- Meteor shadows, storms and hosts are visible to everyone with a warning, so every hit has counterplay.
+
+**Teaming: allowed, but bounded.** Primordials have no alliance (their old one is gone), but players will help friends; the rules limit how much that can decide a match:
+- **Help cap:** a living nation receives at most 2 Primordial gifts (Blessing, Shield) per 2 minutes from all Primordials together, and **the top two nations by score can't receive Primordial gifts at all**.
+- **Former allies:** gifts to a nation you were allied with when you fell cost double for 5 minutes (stops instant "dead ally becomes a buff bot").
+- **Primordials together:** they can pool Essence only for Wrath (stage 2), which only hits the top one or two nations. They can't pool against anyone else.
+- **Living ↔ dead deals** (stage 2 champions): gold offerings to a Primordial are capped (at most 10 Essence a minute from offerings), and a champion can't be a top-two nation.
+- **Kingmaking check** in the tournament (below): a Primordial that helps one friend all match may raise that friend's win rate by at most 8 percentage points.
+
+**Balancing method: bot Primordials with four personalities.** The tournament gets eliminated nations that rise as bot Primordials, each match mixing four policies:
+- *Leader hunter* (aims at the top nations), *griefer* (always the weakest legal target), *kingmaker* (helps one nation and hurts its enemies), *chaotic* (random legal actions, closes rifts and calls battles).
+Gates to ship, on 200 seeds per map against Primordials off:
+- Gate 3 holds; no start slot's win share moves by more than 0.3×.
+- The nation leading at 15:00 wins less often than today but at least 35% of the time.
+- A griefer alone never eliminates a nation that wasn't already losing (it had fewer than half its 10:00 provinces).
+- A kingmaker raises its friend's win rate by at most 8 points.
+- Matches still end at 25:00 in about the same share, and the soak's network and GUI numbers stay in budget.
+
+#### The sandbox layer: playing in the world, not just at it
+
+Knocked-out players should feel like they are in the sandbox, in a live match. Two layers:
+
+**Toys (free, unlimited, no effect on the match).** Like the sandbox's power palette, but cosmetic and visible to other Primordials (and to the living as faint weather):
+- weather brushes (rain, snow, aurora, sandstorm) painted over provinces for 20 s;
+- fireworks, lightning flashes and comets across the sky;
+- runes: draw a short stroke on the map that other Primordials see for 10 s (for "let's hit Volga" without chat);
+- ambient life: let a flock of birds or a whale cross the map.
+Rate-limited so they can't flood the screen or the network (at most 1 toy every 2 s per Primordial, 8 on screen per player). They give the dead constant, harmless play between powers.
+
+**World events that involve everyone (Essence, part of the game):**
+- **Beasts:** 30 Essence calls a roaming beast (a dragon on Eldmoor, a sea serpent on Earth, a void leviathan on Skyshards) into neutral land or a sea zone. It wanders, attacks armies and fleets near it, and the Primordial can nudge its direction every 10 s. **Living nations get a gold bounty for killing it**, so it is a shared threat and a prize, not just harm. One beast per map at a time, 3 minutes at most.
+- **Omens:** the Primordials' Essence spending raises a visible "chaos meter" for the match; when it fills, the next Cataclysm disaster is one the Primordials vote on (from three choices). It gives them a say in the endgame without a direct hit on anyone.
+- **Time and view:** Primordials see the whole map (as now) and get a free camera with a "follow the biggest battle" button, so watching is fun too.
+
+**Staging, updated.**
+- **Stage 1** (about 6–7 hours at xhigh): Essence with rifts and battle calls; aimed Meteor and Storm with warnings, plague cure; the rebel host; scaling; **the targeting and teaming rules above**; **toys**; the award, quests and achievements; the four-personality tournament and its gates.
+- **Stage 2** (about 3–4 hours, after a playtest): beasts, omens and the vote, champions, Wrath.
 
 #### Stage 2 (after playtests): champions and Wrath
 
