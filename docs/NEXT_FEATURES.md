@@ -994,7 +994,7 @@ Rules: everything listed with its contents before buying; no paid random items; 
 
 ### 9.13 Keeping player counts high: two playlists, map rotation, bots in every seat (owner decisions, October 2026)
 
-**Map rotation instead of the vote.** Every public server plays the maps in turn (Earth → Eldmoor → Skyshards → …), so a map never splits the players, every map gets played, and the lobby is shorter. The map vote is removed from public servers; private servers keep choosing their map. The next map shows in the lobby and on Results ("Next: Eldmoor"). Later a fourth slot in the rotation is a **Community** map (9.12 S7), changed every week.
+**One queue per playlist; the map is chosen inside the server (owner decision).** Players never pick a map before joining, so maps never split the players. Each public server keeps the **map vote** in its lobby (as now), with the rotation as its backbone: the card for the map that is next in the rotation starts with a small head start (it wins ties and a vote nobody joins), and the map just played isn't offered again, so every map gets played. The next map shows on Results ("Next up: Eldmoor, or vote"). Later a weekly **Community** map (9.12 S7) is a fourth card in the vote. Private servers choose their map as now.
 
 **Playlists.** Two always on: **Chaos** (the main game, with Primordials) and **Classic** (no Primordials, 9.11). One rotating weekly slot (Blitz, Long, Fog Week, the Ages variant, a community map week) as the weekly twist. Everything else (Easy, custom lengths, any mix) lives in private and hosted servers. The sandbox is singleplayer and never splits a queue.
 
@@ -1006,7 +1006,7 @@ Rules: everything listed with its contents before buying; no paid random items; 
 
 **Data.** Players and retention per playlist and per map; a playlist under about 10% of players for two weeks moves to private servers. The analytics events are in `docs/LAUNCH.md`.
 
-**Size.** Rotation, the Play button, fill-first and join in progress ride with the game-modes stage: about +3 hours (the rotation replaces the vote's screen with a smaller "next map" card).
+**Size.** Rotation, the Play button, fill-first and join in progress ride with the game-modes stage: about +3 hours (the vote stays; the rotation's head start, the no-repeat rule and the Results line are small).
 
 ## 10. Analytics additions
 
