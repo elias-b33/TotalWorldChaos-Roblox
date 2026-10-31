@@ -896,9 +896,9 @@ Rate-limited so they can't flood the screen or the network (at most 1 toy every 
 - **Stage 1** (about 6–7 hours at xhigh): Essence with rifts and battle calls; aimed Meteor and Storm with warnings, plague cure; the rebel host; scaling; **the targeting and teaming rules above**; **toys**; the award, quests and achievements; the four-personality tournament and its gates.
 - **Stage 2** (about 3–4 hours, after a playtest): beasts, omens and the vote, champions, Wrath.
 
-#### Fun for the living: skill, not dice (owner request)
+#### Fun for the living: readable chaos, not dice (owner request)
 
-Primordial play must feel like an opponent you can outplay, never a dice roll that ruins your match. Rules for every power, stage 1 and 2:
+The owner's direction: **a fun chaos EU4-style game, not a twitch-skill game.** Primordial play should be wild and readable: you see what is coming and can make a choice about it, but you don't need fast reflexes, and the rules below are about fairness, not about mastery. Rules for every power, stage 1 and 2:
 
 1. **Every hit is announced and dodgeable.** Meteor: a 4 s shadow; Storm: its path is drawn before it moves; the rebel host: a 3 s portal before it appears; beasts: shown a minute ahead as a stirring on the map. A player who watches the map and reacts loses nothing. Hard bots dodge, so bot matches teach it.
 2. **Every effect has an answer that costs a decision, not luck.** Plague: cure it for 60 gold or ride it out. Storm: wait, or march round it. Host: fight it (it has base strength and no race bonus) or Shield the province. Meteor: spread out, or keep a second army behind. A **Ward** building (cheap, one per nation, in the capital) makes the capital's province immune to Primordial harm, so players choose what to protect.
@@ -906,6 +906,15 @@ Primordial play must feel like an opponent you can outplay, never a dice roll th
 4. **No hidden numbers.** Primordial damage is fixed (50% of the biggest army in the province, never a roll); the warning toast says exactly what will happen ("Meteor on Anatolia in 4 s: your 6k army loses half"). The ±10% battle roll stays the only randomness in fights; Cataclysm disasters are announced 15 s ahead with their target, so the endgame stays readable too.
 5. **Primordials need skill as well.** Aiming at a moving army, reading where it will be in 4 s, steering a storm across a march route and choosing targets under the price and cap rules reward a good Primordial over a button-masher; rifts and battle calls reward map reading.
 6. **Measured, not guessed.** The tournament adds two numbers: how often a reacting nation (Hard bot) avoids a meteor versus a non-reacting one (Easy), and the win-rate gap between them under Primordial pressure. If reacting doesn't save at least half the losses, the warnings get longer.
+
+#### A "No Primordials" mode (owner request)
+
+Private servers can already switch powers off (the Rules tab's Powers switch). This makes it a full mode, a pure EU4-style war:
+- **Public playlist "Classic":** no Primordial powers for anyone (living nations' charges too), Cataclysm disasters off, everything else the same (25 minutes, missions, events, navies, fog). It sits beside the normal "Chaos" playlist on the start menu and in the game-modes stage (Easy, Blitz, Long), so a Classic Blitz or a Classic Long works too.
+- **Knocked out in Classic:** you become a **spectator**, not a Primordial: the free camera with "follow the biggest battle", battle calls and the toys (cosmetic only, seen by other spectators), and a "Play again" button to join a fresh match at once. No Essence, nothing that touches the match.
+- **Rewards:** full XP and Glory (it is not a custom rule); Primordial quests and achievements don't count there, the rest do.
+- **Balance:** the Classic tournament is the "Primordials off" run the Primordial stage measures anyway; section 17's start positions are checked on it too.
+- **Size:** small (the switches exist); it rides with the game-modes stage, about +1 hour.
 
 #### Stage 2 (after playtests): champions and Wrath
 
