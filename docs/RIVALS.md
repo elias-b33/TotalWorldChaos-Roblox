@@ -25,10 +25,16 @@ Just below: Manage A Country (600, 75%) and MEDIEVAL REAL TIME STRATEGY (480, 82
 
 | Game | Players | Visits | Liked | What it is |
 | --- | ---: | ---: | ---: | --- |
-| World Sim | 280 now; peak 5,000 (August 2026, two months after release) | 11M | 91% (92,000 favourites) | A pixel world sandbox: shape terrain, spawn people and animals, villages grow into kingdoms and go to war, meteors and plagues, save and load worlds |
-| The WorldBox Project's sandbox | not tracked yet | — | — | Brand new (October 2026 update): races with hero units, wars, ships and technology |
+| World Sim | 357 on 31 October; peak 5,000 (August 2026, two months after release) | 11.1M | 91% (93,000 favourites) | A pixel world sandbox: shape terrain, spawn people and animals, villages grow into kingdoms and go to war, meteors and plagues, save and load worlds |
+| [NUCLEAR WARFARE] God Simulation Sandbox (by "WorldBox Project") | no running servers when checked (31 October 2026) | — | — | ModernBox-style: humans, orcs, elves and dwarves build kingdoms; six ages from primitive to nuclear with cars, trains, planes and ships; nukes leave radioactive wasteland and zombie outbreaks; seasons, day and night, pollution; a "Mortal Mode" to play as one inhabitant; coins unlock stronger powers |
 
 WorldBox itself (PC and phones, by Maxim Karpenko) isn't on Roblox. It's the reference for this whole style, ours included.
+
+**What the sandbox rivals tell us (checked 31 October 2026):**
+- **World Sim** proves the demand: raise islands, carve oceans, paint 18+ biomes, spawn animals, dragons and humans, villagers grow into kingdoms and go to war, meteors, lightning, tornadoes, wildfire, plague and acid, save and load. It reached 5,000 players two months after release and fell to a few hundred: a pure sandbox with no goal and no sharing loses players. Its studio also runs side games ("Who wins? Battle Sandbox", "Experiment Box") of under 200 players each. No game passes are listed for it.
+- **God Simulation Sandbox** already does the ModernBox idea on Roblox (ages up to nuclear, vehicles, nukes), so an ages pack alone won't make us unique; its numbers can't be read yet. Its studio name uses "WorldBox", which we must never do.
+- **Our edge** in the sandbox (`docs/NEXT_FEATURES.md` 9.12): the same world, peoples and powers as a live PvP game; a map maker whose maps can be hosted as PvP matches and enter the public rotation; sharing with likes. That gives sandbox players a reason to come back, which World Sim lacks.
+- **Build order this suggests:** the painter, saves and the powers first (World Sim's core, which drew 5,000 players), then sharing and the map maker (our difference), then life and the ages pack.
 
 ## 2. What the market tells us
 
