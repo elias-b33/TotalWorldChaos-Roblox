@@ -896,6 +896,17 @@ Rate-limited so they can't flood the screen or the network (at most 1 toy every 
 - **Stage 1** (about 6–7 hours at xhigh): Essence with rifts and battle calls; aimed Meteor and Storm with warnings, plague cure; the rebel host; scaling; **the targeting and teaming rules above**; **toys**; the award, quests and achievements; the four-personality tournament and its gates.
 - **Stage 2** (about 3–4 hours, after a playtest): beasts, omens and the vote, champions, Wrath.
 
+#### Fun for the living: skill, not dice (owner request)
+
+Primordial play must feel like an opponent you can outplay, never a dice roll that ruins your match. Rules for every power, stage 1 and 2:
+
+1. **Every hit is announced and dodgeable.** Meteor: a 4 s shadow; Storm: its path is drawn before it moves; the rebel host: a 3 s portal before it appears; beasts: shown a minute ahead as a stirring on the map. A player who watches the map and reacts loses nothing. Hard bots dodge, so bot matches teach it.
+2. **Every effect has an answer that costs a decision, not luck.** Plague: cure it for 60 gold or ride it out. Storm: wait, or march round it. Host: fight it (it has base strength and no race bonus) or Shield the province. Meteor: spread out, or keep a second army behind. A **Ward** building (cheap, one per nation, in the capital) makes the capital's province immune to Primordial harm, so players choose what to protect.
+3. **Handling chaos pays.** Dodging a meteor, killing a host or a beast, and curing a plague quickly earn a little Glory and count toward the "Unbreakable" award and quests, so the living hunt Primordial threats instead of dreading them.
+4. **No hidden numbers.** Primordial damage is fixed (50% of the biggest army in the province, never a roll); the warning toast says exactly what will happen ("Meteor on Anatolia in 4 s: your 6k army loses half"). The ±10% battle roll stays the only randomness in fights; Cataclysm disasters are announced 15 s ahead with their target, so the endgame stays readable too.
+5. **Primordials need skill as well.** Aiming at a moving army, reading where it will be in 4 s, steering a storm across a march route and choosing targets under the price and cap rules reward a good Primordial over a button-masher; rifts and battle calls reward map reading.
+6. **Measured, not guessed.** The tournament adds two numbers: how often a reacting nation (Hard bot) avoids a meteor versus a non-reacting one (Easy), and the win-rate gap between them under Primordial pressure. If reacting doesn't save at least half the losses, the warnings get longer.
+
 #### Stage 2 (after playtests): champions and Wrath
 
 - **Champions:** a Primordial picks one living nation as its champion (not the top-ranked nation); its Blessings and Shields on the champion are cheaper, and the champion can send it gold offerings that become Essence (capped per minute). Gives the living a reason to court the dead.
