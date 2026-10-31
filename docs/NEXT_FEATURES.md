@@ -779,6 +779,39 @@ Three ideas from the owner to come back to after launch. They're recorded here s
 - The sandbox shares the map, peoples and powers with the PvP game. That's the advantage over World Sim (docs/RIVALS.md): every sandbox world is one tap from a real match.
 - It's also where the Sandbox Pass (docs/MONETIZATION.md 13.2) would earn its price.
 
+### 9.10 A bigger Earth with a larger Europe, and tap help (owner request, October 2026)
+
+**The problem.** Earth is 2048 × 1024 px with 150 provinces (the performance budget). The median land province is about 2,550 px, but the crowded middle of Europe is far below it: Lombardy 552 px (the 3rd smallest on the map), the Low Countries 569, Provence 577, the Alps 582, Bavaria 668, Latium 804, Jutland 876. Italy is two small provinces. Zoomed all the way out on a phone, Lombardy is about 10 screen px across, too small to tap. Siberia, Canada, the Sahara, Australia and the Pacific take a lot of the map for little play. Scandinavia is fine (Sweden 2,519 px, about the median).
+
+**The goal.** Europe's provinces as easy to tap and fight over as the rest of the map, with more map overall, at the same province count and no worse phone performance.
+
+**Targets (measured by the generator and the harness):**
+- No land province under 1,200 px of the new image (today 151–700 px for ten of them). Lombardy, Latium, the Low Countries, Provence, Bavaria and Jutland at least 2× their area today.
+- At the zoom a match opens at on an 844 × 390 phone, every province is at least 44 screen px across its narrowest tap area, or tap help (part C) covers it.
+- 150 provinces, every nation still 8 provinces and 17 development, Gate 3 and section 17's spread (no slot above about 2×) hold.
+- Phone cost: the map's painting time and memory measured before and after on the harness's phone profile; at most +60% memory for the map images, no visible hitch when the close-up paints.
+
+**Part A: a warped projection that enlarges Europe (generator only).** `tools/mapgen/maps/earth.py` projects with Miller cylindrical centred on 11°E. Replace `_project_raw` with Miller followed by a smooth, monotonic warp of x and y:
+- x: a piecewise-smooth stretch of about 1.6× between 10°W and 40°E (the Atlantic coast to the Urals' edge), paid for by compressing the open Pacific (the map's left and right edges) and, a little, central Siberia. The warp is monotonic, so continents keep their order and outlines stay continuous.
+- y: about 1.3× between 36°N and 60°N (Sicily to Stockholm), paid for by the far north (Arctic coasts, above 70°N) and the Southern Ocean.
+- Everything that uses `project` (coastlines, capitals and province seeds, straits, sea-zone seeds, labels) follows automatically. Check the straits (Dover, Gibraltar, Bosporus, Øresund) and sea-zone seeds by eye on the preview, and that the validator prints no `PROBLEM` lines.
+
+**Part B: a bigger image, 2560 × 1280 (all of Earth 25% larger at the same zoom).** The generator's size, `imageSize` and the half-resolution grid (1280 × 640) grow. To check before building:
+- the largest EditableImage Roblox allows (**unverified**; if 2560 × 1280 is over it, the whole-map painting is split into two tiles side by side);
+- the client's painting time and memory for the whole map and the close-up (`PixelArt`), the camera's zoom limits (`MapView`), and the MapData module size (the grid is RLE, so it grows less than the area).
+Eldmoor and Skyshards keep their size for now; the same change can follow if Earth plays better.
+
+**Part C: tap help (client only).**
+- When zoomed out, a tap picks the province whose centre is nearest within 24 screen px if the pixel under the finger is a province edge, sea or another province much bigger than a tiny neighbour next to it (a tiny province wins ties).
+- A province under 44 screen px across at the current zoom shows a small magnifier bubble while the finger is down (the area around the finger at 2×, with the province names); releasing taps what is under the bubble's centre.
+- Both in `MapView`/`Intents`, with a harness scenario that taps Lombardy and Jutland at the opening zoom on 844 × 390 and 667 × 375.
+
+**Part D (optional, the owner's call): merge the tiniest provinces.** For example Provence into Gaul, and use the freed slots to split Siberia or Canada. Bigger targets in Europe and more meaningful land elsewhere, but it changes history and start balance, and part A may make it unnecessary. Decide after part A's measurements: only if a province is still under the 1,200 px target.
+
+**Balance.** Moving land changes start positions, so after A and B re-run section 17's start-position tournament (200 seeds on Earth, with navies on) and fix any slot above about 2× with section 17's levers. This fits the combined balance pass, which already has Earth's Volga (2.14× with navies) and Yangtze (0.33×) on its list.
+
+**Order and effort.** One stage before the combined balance pass, so that pass measures the new map: parts A + B (generator, client size limits, regenerate, previews and docs' map pictures) about 3–4 hours at high effort; part C about 1.5 hours (it can ride with Slate & Brass step 8, which also works on phone controls); part D +1 hour if chosen.
+
 ## 10. Analytics additions
 
 All in LAUNCH.md's format; `Sim/Telemetry.luau` holds them as data, `TelemetryService` sends them. Today's plan uses 17 of 100 custom event names and 6 of 10 funnels (with `PrivateServer` and `Party` planned).
