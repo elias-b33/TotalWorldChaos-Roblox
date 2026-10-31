@@ -893,8 +893,8 @@ Rate-limited so they can't flood the screen or the network (at most 1 toy every 
 - **Time and view:** Primordials see the whole map (as now) and get a free camera with a "follow the biggest battle" button, so watching is fun too.
 
 **Staging, updated.**
-- **Stage 1** (about 6–7 hours at xhigh): Essence with rifts and battle calls; aimed Meteor and Storm with warnings, plague cure; the rebel host; scaling; **the targeting and teaming rules above**; **toys**; the award, quests and achievements; the four-personality tournament and its gates.
-- **Stage 2** (about 3–4 hours, after a playtest): beasts, omens and the vote, champions, Wrath.
+- **Stage 1** (about 8–9 hours at xhigh, with the land scars): Essence with rifts and battle calls; aimed Meteor and Storm with warnings, plague cure; the rebel host; scaling; **the targeting and teaming rules above**; **toys**; the award, quests and achievements; the four-personality tournament and its gates.
+- **Stage 2** (about 4–5 hours, after a playtest): beasts, omens and the vote, champions, Wrath, and the Wildfire, flood and Volcano scars.
 
 #### Fun for the living: readable chaos, not dice (owner request)
 
@@ -915,6 +915,29 @@ Private servers can already switch powers off (the Rules tab's Powers switch). T
 - **Rewards:** full XP and Glory (it is not a custom rule); Primordial quests and achievements don't count there, the rest do.
 - **Balance:** the Classic tournament is the "Primordials off" run the Primordial stage measures anyway; section 17's start positions are checked on it too.
 - **Size:** small (the switches exist); it rides with the game-modes stage, about +1 hour.
+
+#### Powers that change the land (owner request)
+
+WorldBox's best moments are the world itself changing: a meteor leaves a crater, a fire burns a forest away. Today terrain is fixed (plains; forest and hills +25% defence and slower; mountains impassable). The plan makes some of it change during a match, as **scars** on provinces:
+
+| Scar | Made by | What it does | Heals |
+| --- | --- | --- | --- |
+| **Crater** | Meteor (every hit) | −1 development (as now), the province's gold −50% while scarred, movement through it slower (like hills), no defence bonus | after 3 minutes, to its old terrain |
+| **Scorched** | Meteor on a forest, or the new **Wildfire** power (spreads to one neighbouring forest every 5 s, up to 3) | forest becomes open ground: its +25% defence and the forest races' bonuses are gone | regrows after 4 minutes |
+| **Rubble** | Earthquake | the building is destroyed (as now) and the province can't build for 2 minutes | after 2 minutes |
+| **Flooded** | Storm crossing a river or coastal province | slower movement and no sieges there while flooded | after 60 s |
+| **Lava field** | stage 2's **Volcano** (on hills only) | impassable for 90 s, then hills with +1 development (fertile ash): a short wall, then a reward | after 90 s |
+
+**Rules that keep it from breaking the game:**
+- Scars are **temporary** and the map always returns to its generated terrain, so start balance and the generator's guarantees (every nation has a way out, no walled-in kingdoms) hold over a match.
+- **Nothing can make a province permanently impassable**, and a lava field never forms where it would cut a nation off from all its own provinces or close a strait (checked against the map's neighbours when cast).
+- Capitals can be cratered but never turned to lava.
+- At most 12 scarred provinces on a map at once (the oldest heals first when a new one forms).
+- All scars follow the targeting and cap rules above; scars from Cataclysm disasters count too.
+
+**How it's built:** a per-province `scar` (kind and ticks left) in `MatchState` read by the terrain rules (`Sim/Battle`, movement, economy, sieges), so bots see it too; one small delta field per change on the network. `PixelArt` repaints just that province with the scar's look (a crater with ejecta and smoke, burnt trees and ash, cracked ground and stones, water over the fields, glowing lava), and back when it heals; the close-up gets matching detail sprites. The sandbox gets every scar for free, with no timers if the player wants a permanently changed world there.
+
+**Staging:** craters, scorched forests and rubble go in stage 1 (about +2 hours: the scar rule, the repaint, tests, the tournament checks scars don't shift start balance); Wildfire, floods and Volcano in stage 2. In the Classic mode there are no scars, since there are no powers.
 
 #### Stage 2 (after playtests): champions and Wrath
 
