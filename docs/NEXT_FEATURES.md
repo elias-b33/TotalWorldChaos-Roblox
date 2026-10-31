@@ -977,6 +977,14 @@ WorldBox's best moments are the world itself changing: a meteor leaves a crater,
 - **Hosting:** a player hosts a match on their map from the sandbox: a reserved server with a join code and an invite to friends (the play-with-friends stage's party code), their own rules from the settings tabs, bots in empty seats. Custom-map matches pay half XP and Glory, like other custom rules.
 - **Publishing:** publish to the map browser (likes, plays, the text filter on every name, reporting). The best-liked published maps that pass the validator and a moderator check join a **Community** slot in the public map rotation (below), credited to their maker.
 
+**Quality bar: clearly above World Sim (owner decision).** World Sim (11M visits, a 5,000-player peak) is the floor, not the target. Every sandbox stage must beat it on:
+- **Look:** the match map's two-level pixel art (the whole map plus the 4× close-up), animated water, lava, fire and weather, creature sprites with walk, work and fight frames, and readable kingdom colours at every zoom.
+- **Feel:** 60 fps on a mid phone with the creature cap reached; brushes that respond under the finger with no lag; undo for every tool; time controls that pause instantly.
+- **Life:** creatures with names, traits and a history log ("Borin the Brave founded Stonehold"), kingdoms with kings, wars with reasons, and a world timeline, so worlds tell stories worth sharing.
+- **Sound:** every tool and disaster with its own sound, and music that follows the world's mood.
+- **Purpose:** the map maker, sharing and the PvP crossover, which World Sim lacks.
+Each stage's definition of done includes side-by-side screenshots against World Sim's store pictures and a frame-time measurement on the harness's phone profile.
+
 **What players pay for (sandbox only; never sold for matches):**
 
 | Item | Price (Robux) | Contents |
@@ -1007,6 +1015,23 @@ Rules: everything listed with its contents before buying; no paid random items; 
 **Data.** Players and retention per playlist and per map; a playlist under about 10% of players for two weeks moves to private servers. The analytics events are in `docs/LAUNCH.md`.
 
 **Size.** Rotation, the Play button, fill-first and join in progress ride with the game-modes stage: about +3 hours (the vote stays; the rotation's head start, the no-repeat rule and the Results line are small).
+
+### 9.14 Combat at or above the top rivals (owner decision, October 2026)
+
+**Where we stand.** In rules we are already deeper than the leaders: troop counters, morale and breaking, flanking, terrain, forts, sieges, navies with transports and blockades, grudges, and soon generals. RoFront and its OpenFront relatives win on **instant readability and control** (colour is territory, send a share of your troops with one swipe, battles you see at a glance); Conquer The World wins on **scale and depth** (divisions, fronts, research). The gap to close is the feel: how battles look, how fast you can command, and how clearly you know what will happen.
+
+**What to add (one stage, about 6–8 hours, after bot strategy):**
+1. **Battle preview:** before you send an army, its route shows the expected fight: "Likely win (≈70%)", "Even", "Likely loss", with the reasons as chips (counter, flank, terrain, fort, grudge, morale). It uses the same `Battle.outcome` the bots use, so it never lies more than the ±10% roll.
+2. **Fast control on phones:**
+   - **Split and send a share:** drag from an army to a province with a slider that snaps to 25%, 50%, 75% or all (RoFront's one-swipe send).
+   - **Select several armies** (tap-hold then sweep, or a "select all in view" button) and send them together; they march to arrive on the same tick, the flank set-up the bots already use.
+   - **Rally point** per nation: new regiments walk there on their own.
+   - **Queue orders:** march here, then there; keep sieging after a win.
+3. **Battles you can read and enjoy:** the battle province shows both sides' pixel troops clashing in two lines (the troop sprites of each side's main types), a morale bar per side that drains each round, casualty numbers floating up, and a clear end: the loser's flag retreats with an arrow home, the winner gets a burst. A battle report card (tap the toast): both sides, losses by troop type, what decided it.
+4. **Fronts at a glance:** a war overlay (one button) that colours provinces by front: where your armies, enemies and sieges are, with arrows for marching armies, so a big war stays readable on a phone.
+5. **Measured:** the harness gets a "control test" (how many taps to send three armies to flank one province: target 6 or fewer), battle readability screenshots at 667 × 375, and the tournament checks the preview against real outcomes (it must be right at least 80% of the time on "likely" calls).
+
+**Not doing:** RoFront's percentage-of-all-troops land grab and its nukes in normal matches (nukes stay for the Ages ideas, 9.9); unit micro inside a battle (battles stay 3 seconds and automatic, so phones and 13-year-olds keep up).
 
 ## 10. Analytics additions
 
