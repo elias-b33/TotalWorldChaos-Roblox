@@ -69,6 +69,7 @@ docs/BALANCE.md        Balance analysis: economy, battles, sieges, catch-up, mat
 docs/UI_DIRECTION.md   The "Slate & Brass" GUI: palette, painted frames, component specs, the build plan
 docs/NEXT_FEATURES.md  Plans and task cards for the next features (pings, replay and awards, music, empires, friends, …)
 docs/RIVALS.md         The top 10 rival games (and the sandbox side) and how we take our share
+docs/COMPETITOR_VIDEOS.md  What YouTube shows about the rivals (formats, creators, views) and what we do about it
 assets/maps/           Generated per-map data (layout.json, province_ids.png) and previews
 assets/textures/       Generated seamless terrain tiles per theme
 tools/mapgen/          Python (numpy + Pillow) generator for everything in assets/
