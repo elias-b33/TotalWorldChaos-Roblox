@@ -812,6 +812,51 @@ Eldmoor and Skyshards keep their size for now; the same change can follow if Ear
 
 **Order and effort.** One stage before the combined balance pass, so that pass measures the new map: parts A + B (generator, client size limits, regenerate, previews and docs' map pictures) about 3–4 hours at high effort; part C about 1.5 hours (it can ride with Slate & Brass step 8, which also works on phone controls); part D +1 hour if chosen.
 
+### 9.11 Primordials as a real role (owner request, October 2026)
+
+**The problem.** A Primordial today earns 1 charge every 60 s (max 5) and spends it on one of six powers: pick a power, tap a target, wait a minute. It keeps knocked-out players in the match, but it is a cooldown, not a role. The goal: a knocked-out player has something to do every few seconds, with skill in it, and the living get counterplay. All without letting Primordials decide matches: they never win, never own land, and chaos leans on the leader.
+
+**What stays (the guardrails that already work):** no powers in Peace; a nation can be hit by a harmful power at most once per 60 s from anyone, and by the same caster at most once per 2 minutes; Primordials may target anyone; Cataclysm disasters as now.
+
+#### Stage 1 (build this): Essence, aimed powers, the rebel host, scaling, an award
+
+All numbers are starting values in `Config.Primordial`; rules in `Sim/Primordial.luau` (and a new `Sim/Rifts.luau`), pure and seeded, with Lune tests; every action a command through `CommandRouter`.
+
+1. **Essence replaces charges (Primordials only; living nations keep their charges).**
+   - Base income 1 Essence per 6 s (10 a minute, the same as today's 1 charge a minute at 10 Essence a charge), cap 50.
+   - Costs: Meteor 20, Plague 20, rebel host 25, Storm 15, Earthquake 10, Blessing 10, Shield 10.
+   - **Rifts:** every 45 s each Primordial gets a rift on a random land province in view (seeded per Primordial), shown only to them. Press and hold it 1.5 s to close it: +5 Essence. It fades after 20 s.
+   - **Battle calls:** when a land or sea battle starts anywhere, Primordials see a small bubble over it with the two sides' flags. Tap the side you think wins before round 2: +3 Essence if right, nothing if wrong. Never changes the battle.
+   - **Active cap:** rifts and calls add at most +6 Essence a minute on top of the base, so an active Primordial casts about 1.6× as often as an idle one, not 10×.
+2. **Aimed powers with a warning (counterplay).**
+   - **Meteor:** aim at a province instead of an army. A shadow and a 4 s countdown show for everyone; at impact it kills 50% of the biggest army of a non-immune nation still in that province (−1 development as now). An army whose march out of the province is past halfway escapes. Hard bots move armies out of a shadow when they can (Normal half the time, Easy never).
+   - **Storm (new, 15):** draw a path of up to 4 neighbouring provinces; the storm crosses one province every 2 s (8 s in all). Armies under it march at half speed and sieges under it pause. It is soft (no losses), so it doesn't trigger immunity, but each Primordial has one storm at a time and a 60 s storm cooldown.
+   - **Plague:** as now (−50% manpower income for 60 s), and the hit nation can **cure** it at once for 60 gold (a button on its toast).
+   - Earthquake, Blessing and Shield stay as they are (tap a province).
+3. **Command a rebel host (replaces the Rebels power for Primordials).** 25 Essence spawns a 3,000-man rebel army in a province (same targets as Rebels), and **the Primordial controls it for 90 s**: tap it, then tap a neighbouring province to march (rebel speed = the map's line troop). It besieges like Rebels today (a province it takes turns neutral). It can't enter a capital or cross water, fights with base strength (no race bonus, no morale edge), and disbands at 90 s or when beaten. One host per Primordial at a time. Living nations keep the plain Rebels power.
+4. **Scaling with the number of Primordials.** Each Primordial's base income is × 1/√n (n = Primordials in the match): 1 → full, 4 → half each (2× the total of one), 9 → a third each (3×). The active cap scales the same way. Late matches with many knocked-out players stay chaotic but not crushing.
+5. **Fame, not power.**
+   - A **"Most chaotic Primordial"** award on Results (Essence spent, armies hit, rifts closed, calls right).
+   - Three Primordial quests in the daily pool ("close 10 rifts", "make 5 right battle calls", "march a rebel host into 2 provinces"), paying XP and Glory like other quests.
+   - Two achievements (a host takes 3 provinces in one life; 10 right calls in one match).
+
+**Client (phone first, the Slate & Brass kit):** the Primordial bar shows an Essence gauge (purple, with the +/min) in place of charges; the power radial shows costs. Meteor aim: drag the target ring, release to cast. Storm: tap up to 4 provinces in a row, then Cast. Rifts: a glowing purple tear sprite with a fill ring while held. Battle calls: a 2-flag bubble over the battle (44 px buttons). The host uses the normal army controls (select, tap to march) with a 90 s ring. Meteor shadows and storms are visible to everyone, with a warning toast for the nation under a shadow.
+
+**Networking:** rifts are sent only to their Primordial; shadows, storms and hosts go in the normal deltas (a few dozen bytes); check the soak's per-tick bytes stay under budget.
+
+**Testing and balance (the part that decides whether it ships as is):**
+- Lune tests for every rule: Essence income, cap and scaling; rift timing and the active cap; calls paid once and only before round 2; meteor dodge at halfway; storm slow and siege pause; host limits (no capitals, no water, 90 s, one at a time); plague cure.
+- Harness scenario `primordial2`: Alice is eliminated, closes a rift, makes a battle call, casts an aimed meteor that Bob's army dodges and one that hits, draws a storm, marches a rebel host; screenshots at 844 × 390 and 667 × 375.
+- **Tournament with simulated Primordials:** eliminated bot nations rise as bot Primordials (a simple policy: aim at the top two nations, close most rifts, call battles for the bigger side). Compare with Primordials off, 200 seeds per map. Ship if: Gate 3 holds; no start slot's win share moves by more than 0.3×; the nation leading at 15:00 wins less often than with today's powers (chaos leans on the leader) but still at least 35% of the time; matches still end at 25:00 in about the same share.
+
+**Effort:** about 4–5 hours at xhigh (rules, client, tournament tuning). Place it after the bot strategy stage (Hard bots dodge meteors, and the simulated Primordials reuse the bot code) and before the combined balance pass.
+
+#### Stage 2 (after playtests): champions and Wrath
+
+- **Champions:** a Primordial picks one living nation as its champion (not the top-ranked nation); its Blessings and Shields on the champion are cheaper, and the champion can send it gold offerings that become Essence (capped per minute). Gives the living a reason to court the dead.
+- **Wrath:** two or more Primordials pool Essence (60 together) for one big event on the **top one or two nations** only: a meteor shower on three of its armies or a realm-wide plague. Once every 3 minutes, never in the last 60 s.
+- Decide after stage 1's playtest data: how often Primordials act, and whether players feel targeted.
+
 ## 10. Analytics additions
 
 All in LAUNCH.md's format; `Sim/Telemetry.luau` holds them as data, `TelemetryService` sends them. Today's plan uses 17 of 100 custom event names and 6 of 10 funnels (with `PrivateServer` and `Party` planned).
