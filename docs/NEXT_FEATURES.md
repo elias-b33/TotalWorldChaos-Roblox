@@ -945,6 +945,47 @@ WorldBox's best moments are the world itself changing: a meteor leaves a crater,
 - **Wrath:** two or more Primordials pool Essence (60 together) for one big event on the **top one or two nations** only: a meteor shower on three of its armies or a realm-wide plague. Once every 3 minutes, never in the last 60 s.
 - Decide after stage 1's playtest data: how often Primordials act, and whether players feel targeted.
 
+### 9.12 A WorldBox-level sandbox, with a ModernBox-style ages pack (owner request, October 2026)
+
+**The goal.** The singleplayer sandbox becomes a full world simulator at WorldBox's level, feature for feature, plus the content of its most popular mods (ModernBox's modern ages, units, vehicles and bombs). Some tools are sold as game passes; none of it ever touches a PvP match.
+
+**Legal line (must hold).** Game mechanics can't be owned, but art, names, text and UI layouts can. We match WorldBox's *features*, never its assets, names, icons, wording or screen layouts, and we don't use "WorldBox" or "ModernBox" anywhere in the game or its store page. All art is our own pixel art (`PixelArt`, the Slate & Brass kit). Mod content is used as a feature checklist only; mods are other people's work.
+
+**Why it is big.** Today's sandbox is the match world without rules: provinces, nations as bots, six powers, time controls. WorldBox simulates the world per tile and per creature. Feature parity means a **second simulation** next to the match Sim:
+- **Tiles:** the world is a tile grid (the map's pixels; Earth 2048 × 1024, split into chunks of 64 × 64 for painting, saving and simulation).
+- **Creatures:** individual units with a position, health, age, traits and a job, capped for phones (start at 1,500 living creatures on a phone and 4,000 on PC; measure). Pathing on a coarse grid with flow fields per chunk.
+- **Civilisations emerge:** villages grow into cities, cities claim tiles, kingdoms form from cities, borders are drawn from claimed tiles with the same nation-colour wash as the match map.
+- **Where it runs:** singleplayer, so the simulation runs on the player's device (no server cost, smooth time controls); the server only checks game passes, stores saves and serves shared worlds. A decision for the owner, since CLAUDE.md's "server is authoritative" was written for matches (recommendation: allowed for singleplayer sandbox worlds, never for matches).
+
+**Stages** (each shippable; hours are rough, one builder at a time):
+
+| Stage | What | Hours |
+| --- | --- | --- |
+| S1 World painter | New blank worlds in three sizes; terrain brushes (deep and shallow water, sand, grass, forest, hills, mountains, snow, desert, swamp, lava) with brush sizes; biomes; undo; save and load (compressed chunks in DataStores, slot limits) | 12–16 |
+| S2 Life | Peoples from all three maps plus animals; villages that grow into cities and kingdoms; food from tiles; births, ageing and death; wars between kingdoms; kingdom borders | 25–35 |
+| S3 Powers and disasters | About 50 tools: spawn any people or animal; fire, rain, lightning, tornado, earthquake, meteor, acid rain, plague, flood, volcano; blessings and curses; creature traits (brave, mad, friendly, strong…); destroy tools | 15–20 |
+| S4 Society and history | Kings and heirs, clans, cultures, world laws (toggles such as "no wars", "fast ageing"), a history log and timeline, world ages (golden age, dark age, chaos age) | 12–16 |
+| S5 Ages pack (ModernBox-style) | Kingdoms advance stone → medieval → gunpowder → industrial → modern → future; era units (musketeers, riflemen, tanks, jets, warships, mechs), era buildings, bombs from grenades to a cartoon nuke with fallout, missile defence | 20–30 |
+| S6 Sharing | World codes, a world browser with likes, Roblox text filter on every name, report and remove tools, storage limits | 8–12 |
+| S7 Into PvP | Turn a painted world into a private-server match map (a validator builds provinces from tiles, as `tools/mapgen` does for our maps) | 10–15 |
+
+**Total: about 100–145 hours.** That is a second game, larger than everything left on the PvP side. Recommendation: launch the PvP game first; build S1 and S3 next (they reuse the pixel-art painter and the powers, and already make the sandbox feel like WorldBox); then S2, S5, S4, S6, S7 in that order, guided by how many players use the sandbox.
+
+**What players pay for (sandbox only; never sold for matches):**
+
+| Item | Price (Robux) | Contents |
+| --- | --- | --- |
+| Free | 0 | The painter, the base peoples and animals, about 20 powers, 1 save slot, the medium world size |
+| Sandbox Pass | 199 | Every standard power and trait, 10 save slots, the large world size, world laws (docs/MONETIZATION.md 13.2) |
+| Ages Pack | 299–399 | The ModernBox-style ages: era units, vehicles, bombs, the nuke, missile defence |
+| Disaster Pack | 99–149 | The big disasters (meteor showers, mega tornado, volcano chains, acid storms) |
+| Creature Pack | 99–149 | Monsters (dragons, sea serpents, giant crabs) and extra animals |
+| Extra save slots | dev product, 49 per 5 | |
+
+Rules: everything listed with its contents before buying; no paid random items; free players can still build and share worlds; prices checked against the launch data (MONETIZATION 13.7).
+
+**Risks to check first:** phone performance with thousands of creatures (a prototype in S2 before committing); DataStore size per save (measure a full large world); moderation of shared pixel art (S6 can't ship without reporting).
+
 ## 10. Analytics additions
 
 All in LAUNCH.md's format; `Sim/Telemetry.luau` holds them as data, `TelemetryService` sends them. Today's plan uses 17 of 100 custom event names and 6 of 10 funnels (with `PrivateServer` and `Party` planned).
